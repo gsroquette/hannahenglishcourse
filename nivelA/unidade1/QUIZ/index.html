@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hannah Quiz</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: white; /* Fundo branco */
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2.5em;
+            color: #333;
+            margin-bottom: 20px; /* Diminui a margem inferior */
+        }
+
+        .gif-container {
+            display: none; /* Esconde o container inicialmente */
+            text-align: center;
+            margin-bottom: 20px; /* Aproxima o GIF das questões */
+        }
+
+        .gif-container img {
+            max-width: 500px; /* Aumenta o tamanho do GIF em 50% */
+        }
+
+        .question-container {
+            display: flex;
+            justify-content: center;
+        }
+
+        .question {
+            margin-bottom: 10px; /* Aproxima ainda mais as questões dos botões */
+            font-size: 1.2em;
+            padding: 20px;
+            text-align: left;
+            border: none; /* Retirando a borda branca ao redor */
+        }
+
+        label {
+            display: block;
+            font-size: 1em;
+            margin-bottom: 10px;
+        }
+
+        .btn-group {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 5px; /* Aproxima os botões das questões */
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 1em;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .prev-btn, .next-btn {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .prev-btn:hover, .next-btn:hover {
+            background-color: #45a049;
+        }
+
+        .read-btn {
+            background-color: #FF9800;
+            color: white;
+        }
+
+        .read-btn:hover {
+            background-color: #FB8C00;
+        }
+
+        .pdf-btn {
+            background-color: #03A9F4;
+            color: white;
+        }
+
+        .pdf-btn:hover {
+            background-color: #0288D1;
+        }
+
+        .feedback {
+            display: none;
+            margin-top: 20px;
+        }
+
+        audio {
+            display: none; /* Esconder a caixinha de execução do áudio */
+        }
+    </style>
+</head>
+<body>
+
+<h1>Hannah Quiz</h1>
+
+<div class="gif-container">
+    <img id="feedback-img" src="" alt="Feedback GIF"/> <!-- O GIF aparecerá aqui, aumentado em 50% -->
+</div>
+
+<div class="question-container">
+    <div id="quiz-container" class="question"></div>
+</div>
+
+<div class="btn-group">
+    <button class="read-btn" id="read-btn" onclick="readQuestion()">Read</button>
+    <button class="prev-btn" id="prev-btn" onclick="stopReading(); showPreviousQuestion()">Previous</button>
+    <button class="next-btn" id="next-btn" onclick="stopReading(); showNextQuestion()">Next</button>
+    <button class="pdf-btn" id="pdf-btn" onclick="generatePDF()">Generate PDF</button>
+</div>
+
+<div id="feedback" class="feedback">
+    <audio id="feedback-audio"></audio> <!-- O áudio ainda será reproduzido, mas não aparecerá na tela -->
+</div>
+
+<script>
+    let currentQuestionIndex = 0;
+    let questions = [];
+    let speechSynthesisUtterance = null;
+
+    async function loadQuestions() {
+        const response = await fetch('questions.txt');
+        const text = await response.text();
+        const lines = text.split('\n');
+        let currentQuestion = null;
+
+        lines.forEach(line => {
+            line = line.trim();
+            if (line.startsWith('Q:')) {
+                if (currentQuestion) {
+                    questions.push(currentQuestion);
+                }
+                currentQuestion = { question: line.substring(2).trim(), answers: [], correct: '' };
+            } else if (/^[A-Z]\./.test(line)) {  
+                currentQuestion.answers.push(line);
+            } else if (line.startsWith('Correct:')) {
+                currentQuestion.correct = line.split(':')[1].trim();
+            }
+        });
+
+        if (currentQuestion) {
+            questions.push(currentQuestion);
+        }
+
+        displayQuestion();
+    }
+
+    function displayQuestion() {
+        const container = document.getElementById('quiz-container');
+        container.innerHTML = '';
+
+        const q = questions[currentQuestionIndex];
+        const questionDiv = document.createElement('div');
+        questionDiv.classList.add('question');
+
+        const questionText = document.createElement('p');
+        questionText.id = 'question-text';
+        questionText.innerText = `${currentQuestionIndex + 1}. ${q.question}`;
+        questionDiv.appendChild(questionText);
+
+        q.answers.forEach((answer) => {
+            const answerLabel = document.createElement('label');
+            answerLabel.innerHTML = `<input type="radio" name="question${currentQuestionIndex}" value="${answer[0]}" onclick="checkAnswer(this, '${answer[0]}')"> ${answer}`;
+            questionDiv.appendChild(answerLabel);
+        });
+
+        container.appendChild(questionDiv);
+        updateNavigationButtons();
+    }
+
+    function updateNavigationButtons() {
+        document.getElementById('prev-btn').disabled = currentQuestionIndex === 0;
+        document.getElementById('next-btn').disabled = currentQuestionIndex === questions.length - 1;
+    }
+
+    function showNextQuestion() {
+        hideGIF(); // Esconder o GIF ao mudar a pergunta
+        if (currentQuestionIndex < questions.length - 1) {
+            currentQuestionIndex++;
+            displayQuestion();
+        }
+    }
+
+    function showPreviousQuestion() {
+        hideGIF(); // Esconder o GIF ao mudar a pergunta
+        if (currentQuestionIndex > 0) {
+            currentQuestionIndex--;
+            displayQuestion();
+        }
+    }
+
+    function checkAnswer(radioElement, selectedAnswer) {
+        const q = questions[currentQuestionIndex];
+        const feedbackDiv = document.getElementById('feedback');
+        const feedbackImg = document.getElementById('feedback-img');
+        const feedbackAudio = document.getElementById('feedback-audio');
+        const gifContainer = document.querySelector('.gif-container');
+
+        if (selectedAnswer === q.correct) {
+            feedbackImg.src = 'certo.gif';  // Certifique-se de que a imagem certa esteja correta
+            feedbackAudio.src = 'certo.mp3';
+            feedbackAudio.play();  // O áudio será reproduzido sem aparecer na tela
+            feedbackDiv.style.display = 'block';
+            gifContainer.style.display = 'block';  // Exibir o GIF
+            setTimeout(() => {
+                hideGIF();
+                showNextQuestion();
+            }, 5000);
+        } else {
+            feedbackImg.src = 'errado.gif';  // Certifique-se de que a imagem errada esteja correta
+            feedbackAudio.src = 'errado.mp3';
+            feedbackAudio.play();  // O áudio será reproduzido sem aparecer na tela
+            feedbackDiv.style.display = 'block';
+            gifContainer.style.display = 'block';  // Exibir o GIF
+            setTimeout(() => {
+                hideGIF();
+                radioElement.checked = false;
+            }, 5000);
+        }
+    }
+
+    function hideGIF() {
+        const gifContainer = document.querySelector('.gif-container');
+        gifContainer.style.display = 'none';  // Esconder o GIF ao mudar a pergunta
+    }
+
+    function readQuestion() {
+        stopReading();
+        const questionText = document.getElementById('question-text').innerText;
+        speechSynthesisUtterance = new SpeechSynthesisUtterance(questionText);
+        speechSynthesis.speak(speechSynthesisUtterance);
+    }
+
+    function stopReading() {
+        if (speechSynthesisUtterance) {
+            speechSynthesis.cancel();
+        }
+    }
+
+    function generatePDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        const logo = new Image();
+        logo.src = 'Logo.png'; 
+
+        doc.addImage(logo, 'PNG', 90, 10, 30, 30); 
+
+        doc.setFontSize(20);
+        doc.text('Hannah Quiz', 105, 50, null, null, 'center');
+
+        doc.setFontSize(12);
+        doc.text('Name: ____________________________________', 20, 70);
+        doc.text('Date: _______________', 150, 70);
+
+        let yPosition = 90;
+
+        questions.forEach((q, index) => {
+            doc.setFontSize(14);
+            let questionText = `${index + 1}. ${q.question}`;
+            let textLines = doc.splitTextToSize(questionText, 180);  
+            let questionHeight = textLines.length * 10; 
+
+            if (yPosition + questionHeight > 280) {
+                doc.addPage();
+                yPosition = 20;
+            }
+
+            doc.text(textLines, 20, yPosition);
+            yPosition += questionHeight;
+
+            q.answers.forEach(answer => {
+                doc.setFontSize(12);
+                let answerText = answer;
+                let answerLines = doc.splitTextToSize(answerText, 180);
+                let answerHeight = answerLines.length * 10;
+
+                if (yPosition + answerHeight > 280) {
+                    doc.addPage();
+                    yPosition = 20;
+                }
+
+                doc.text(answerLines, 30, yPosition);
+                yPosition += answerHeight;
+            });
+
+            yPosition += 10; 
+        });
+
+        doc.save('QuizQuestionsWithLogo.pdf');
+    }
+
+    window.onload = loadQuestions;
+</script>
+
+<!-- Including jsPDF library to handle PDF generation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+</body>
+</html>
