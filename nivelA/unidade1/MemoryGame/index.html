@@ -3,246 +3,328 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hannah Memory Game</title>
+    <title>Hannah Word Search Game</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            background-color: #f9f9f9;
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
+            color: #333;
+            margin: 0;
+            padding: 0;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
             height: 100vh;
-            margin: 0;
+            box-sizing: border-box;
         }
-
-        .container {
+        h1 {
+            font-size: 2.5em;
+            margin: 20px 0;
+            color: #4a90e2;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
             text-align: center;
         }
+        #word-search-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+        #word-search-canvas {
+            width: 100%;
+            max-width: 600px; /* Limitar o tamanho máximo do canvas */
+            height: auto;
+            border: 2px solid #4a90e2;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        #words-list {
+            text-align: left;
+            max-width: 100%;
+            margin-top: 20px;
+        }
+        #words-list ul {
+            list-style-type: none;
+            padding: 0;
+            text-align: center;
+        }
+        #words-list li {
+            margin: 5px 0;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+            display: inline-block;
+        }
+        #words-list li:hover {
+            background-color: #e1ecf4;
+        }
+        #reset-button {
+            margin: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #4a90e2;
+            color: white;
+            transition: background-color 0.3s ease;
+        }
+        #reset-button:hover {
+            background-color: #357ABD;
+        }
 
-        h1 {
-            font-size: 2em;
+        .image-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 10px;
+            justify-content: center;
             margin-bottom: 20px;
         }
 
-        .game-board {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-            gap: 10px;
-            max-width: 600px;
-            margin: 0 auto;
+        .image-container img {
+            max-width: 100px;
+            margin: auto;
         }
 
-        .card {
-            width: 100%;
-            padding-top: 100%; /* Mantém a proporção 1:1 */
-            position: relative;
-            perspective: 1000px;
-        }
-
-        .card-inner {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            transform-style: preserve-3d;
-            transition: transform 0.6s;
-            cursor: pointer;
-        }
-
-        .card.flipped .card-inner {
-            transform: rotateY(180deg);
-        }
-
-        .card-front, .card-back {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            backface-visibility: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        }
-
-        .card-back {
-            background-color: #4CAF50;
-        }
-
-        .card-back img {
-            max-width: 80%;
-            max-height: 80%;
-            object-fit: contain;
-        }
-
-        .card-front {
-            transform: rotateY(180deg);
-            background-color: #ffffff;
-            border: 2px solid #4CAF50;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 10px;
-            box-sizing: border-box;
-        }
-
-        .card-front img {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
-        }
-
-        .card-front p {
-            font-size: 1.2em;
-            text-align: center;
-            margin: 0;
-            word-wrap: break-word;
-        }
-
-        .controls {
-            margin-top: 20px;
-        }
-
-        button {
+        #back-button {
+            margin: 10px;
             padding: 10px 20px;
-            margin: 5px;
-            font-size: 1em;
+            font-size: 16px;
             cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #4a90e2;
+            color: white;
+            transition: background-color 0.3s ease;
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+        }
+        #back-button:hover {
+            background-color: #357ab7;
         }
 
-        button#back-button {
-            background-color: #f44336;
-            color: white;
-            border: none;
-        }
-
-        button#restart-button {
-            background-color: #4CAF50;
-            color: white;
-            border: none;
+        /* Media query para telas pequenas */
+        @media (max-width: 600px) {
+            #back-button {
+                position: static;
+                margin: 10px auto;
+                display: block;
+            }
+            h1 {
+                margin-top: 50px; /* Adiciona espaço extra acima do título */
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Hannah Memory Game</h1>
-        <div id="game-board" class="game-board"></div>
-        <div class="controls">
-            <button id="restart-button">Restart Game</button>
-            <button id="back-button">Back</button>
-            <p>Moves: <span id="move-counter">0</span></p>
+<button onclick="window.location.href='../index.html'" id="back-button">
+    Back
+</button>
+
+    <h1>Hannah Word Search Game</h1>
+    <button id="reset-button">Restart Game</button>
+    <div id="word-search-container">
+        <canvas id="word-search-canvas"></canvas>
+        <div id="words-list">
+            <h2>Words to Find</h2>
+            <ul id="words"></ul>
         </div>
     </div>
-
     <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            const gameBoard = document.getElementById("game-board");
-            const restartButton = document.getElementById("restart-button");
-            const backButton = document.getElementById("back-button");
-            const moveCounter = document.getElementById("move-counter");
+        const gridSize = 15;
+        const canvas = document.getElementById('word-search-canvas');
+        const ctx = canvas.getContext('2d');
 
-            let moves = 0;
-            let hasFlippedCard = false;
-            let lockBoard = false;
-            let firstCard, secondCard;
+        // Calcula o tamanho das células dinamicamente com base no tamanho do canvas
+        const cellSize = Math.min(canvas.clientWidth / gridSize, 30);
+        canvas.width = cellSize * gridSize;
+        canvas.height = cellSize * gridSize;
 
-            async function loadGameData() {
-                const response = await fetch('palavras.txt');
-                const data = await response.text();
-                const pairs = data.trim().split('\n').map(line => line.split(','));
+        let grid = [];
+        let selectedCells = [];
+        let foundCells = [];
+        const wordsList = document.getElementById('words');
+        let wordsToFind = [];
 
-                const cards = [];
-                pairs.forEach(pair => {
-                    const imageCard = createCard(pair[0], 'image');
-                    const textCard = createCard(pair[1], 'text');
-                    cards.push(imageCard, textCard);
-                });
-
-                cards.sort(() => 0.5 - Math.random());
-                cards.forEach(card => gameBoard.appendChild(card));
-            }
-
-            function createCard(content, type) {
-                const card = document.createElement('div');
-                card.classList.add('card');
-                card.innerHTML = `
-                    <div class="card-inner">
-                        <div class="card-front">
-                            ${type === 'image' ? `<img src="imagens/${content}" alt="${content}" />` : `<p>${content}</p>`}
-                        </div>
-                        <div class="card-back">
-                            <img src="logo.png" alt="Logo" />
-                        </div>
-                    </div>
-                `;
-
-                card.addEventListener('click', flipCard);
-                return card;
-            }
-
-            function flipCard() {
-                if (lockBoard) return;
-                if (this === firstCard) return;
-
-                this.classList.add('flipped');
-
-                if (!hasFlippedCard) {
-                    hasFlippedCard = true;
-                    firstCard = this;
-                    return;
+        async function loadWords() {
+            try {
+                const response = await fetch('words.txt');
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
                 }
+                const text = await response.text();
+                console.log('Loaded words:', text);
+                wordsToFind = text.split(/\r?\n/).filter(word => word.trim() !== '');
+                init();
+            } catch (error) {
+                console.error('Error loading words:', error);
+            }
+        }
 
-                secondCard = this;
-                checkForMatch();
+        function createWordSearchGrid() {
+            grid = Array.from({ length: gridSize }, () => Array(gridSize).fill(''));
+
+            wordsToFind.forEach(word => placeWordInGrid(word));
+
+            for (let row = 0; row < gridSize; row++) {
+                for (let col = 0; col < gridSize; col++) {
+                    if (grid[row][col] === '') {
+                        grid[row][col] = String.fromCharCode(65 + Math.floor(Math.random() * 26));
+                    }
+                }
+            }
+        }
+
+        function placeWordInGrid(word) {
+            const directions = [
+                { row: 0, col: 1 }, // Horizontal
+                { row: 1, col: 0 }, // Vertical
+                { row: 1, col: 1 }, // Diagonal (principal)
+                { row: 1, col: -1 } // Diagonal (secundária)
+            ];
+
+            const direction = directions[Math.floor(Math.random() * directions.length)];
+
+            let row, col;
+
+            do {
+                row = Math.floor(Math.random() * gridSize);
+                col = Math.floor(Math.random() * gridSize);
+            } while (!canPlaceWord(grid, word, row, col, direction));
+
+            for (let i = 0; i < word.length; i++) {
+                grid[row + i * direction.row][col + i * direction.col] = word[i];
+            }
+        }
+
+        function canPlaceWord(grid, word, row, col, direction) {
+            for (let i = 0; i < word.length; i++) {
+                const newRow = row + i * direction.row;
+                const newCol = col + i * direction.col;
+                if (newRow < 0 || newRow >= gridSize || newCol < 0 || newCol >= gridSize ||
+                    (grid[newRow][newCol] !== '' && grid[newRow][newCol] !== word[i])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function drawWordSearchGrid() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.font = `${cellSize * 0.6}px Arial`;
+            ctx.fillStyle = '#000'; // Cor preta para as letras
+
+            for (let row = 0; row < gridSize; row++) {
+                for (let col = 0; col < gridSize; col++) {
+                    ctx.strokeRect(col * cellSize, row * cellSize, cellSize, cellSize);
+                    ctx.fillText(grid[row][col], col * cellSize + cellSize / 4, row * cellSize + cellSize / 1.5);
+                }
             }
 
-            function checkForMatch() {
-                let isMatch = firstCard.querySelector('.card-front').innerHTML === secondCard.querySelector('.card-front').innerHTML;
-
-                isMatch ? disableCards() : unflipCards();
-                updateMoveCounter();
-            }
-
-            function disableCards() {
-                firstCard.removeEventListener('click', flipCard);
-                secondCard.removeEventListener('click', flipCard);
-
-                resetBoard();
-            }
-
-            function unflipCards() {
-                lockBoard = true;
-
-                setTimeout(() => {
-                    firstCard.classList.remove('flipped');
-                    secondCard.classList.remove('flipped');
-
-                    resetBoard();
-                }, 1500);
-            }
-
-            function resetBoard() {
-                [hasFlippedCard, lockBoard] = [false, false];
-                [firstCard, secondCard] = [null, null];
-            }
-
-            function updateMoveCounter() {
-                moves++;
-                moveCounter.textContent = moves;
-            }
-
-            restartButton.addEventListener('click', () => {
-                gameBoard.innerHTML = '';
-                moves = 0;
-                moveCounter.textContent = moves;
-                loadGameData();
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.3)';
+            foundCells.forEach(({ row, col }) => {
+                ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
             });
+        }
 
-            backButton.addEventListener('click', () => {
-                window.history.back();
+        function drawSelectedCells() {
+            ctx.fillStyle = 'rgba(0, 0, 255, 0.3)';
+            selectedCells.forEach(({ row, col }) => {
+                ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
             });
+        }
 
-            loadGameData();
-        });
+        function displayWordsList() {
+            wordsList.innerHTML = '';
+            wordsToFind.forEach(word => {
+                const li = document.createElement('li');
+                li.textContent = word;
+                li.onclick = () => markWordInList(word);
+                wordsList.appendChild(li);
+            });
+        }
+
+        function markWordInList(word) {
+            const listItems = wordsList.getElementsByTagName('li');
+            for (let item of listItems) {
+                if (item.textContent === word) {
+                    item.style.textDecoration = 'line-through';
+                    break;
+                }
+            }
+        }
+
+        function handleCanvasClick(event) {
+            const rect = canvas.getBoundingClientRect();
+            const x = (event.clientX - rect.left) * (canvas.width / rect.width);
+            const y = (event.clientY - rect.top) * (canvas.height / rect.height);
+
+            const col = Math.floor(x / cellSize);
+            const row = Math.floor(y / cellSize);
+
+            if (selectedCells.length > 0) {
+                const lastCell = selectedCells[selectedCells.length - 1];
+
+                const isHorizontal = row === lastCell.row;
+                const isVertical = col === lastCell.col;
+                const isDiagonal1 = row - lastCell.row === col - lastCell.col;
+                const isDiagonal2 = row - lastCell.row === lastCell.col - col;
+
+                if (isHorizontal || isVertical || isDiagonal1 || isDiagonal2) {
+                    selectedCells.push({ row, col });
+                    drawWordSearchGrid();
+                    drawSelectedCells();
+                    checkWord();
+                } else {
+                    selectedCells = [{ row, col }];
+                    drawWordSearchGrid();
+                    drawSelectedCells();
+                }
+            } else {
+                selectedCells.push({ row, col });
+                drawWordSearchGrid();
+                drawSelectedCells();
+            }
+        }
+
+        function checkWord() {
+            const selectedCellsSorted = [...selectedCells].sort((a, b) => a.row - b.row || a.col - b.col);
+            const selectedWord = selectedCellsSorted.map(cell => grid[cell.row][cell.col]).join('');
+
+            if (wordsToFind.includes(selectedWord)) {
+                markWordInList(selectedWord);
+                foundCells = foundCells.concat(selectedCells);
+                selectedCells = [];
+                drawWordSearchGrid();
+                drawSelectedCells();
+            }
+        }
+
+        function resetGame() {
+            selectedCells = [];
+            foundCells = [];
+            init();
+        }
+
+        function init() {
+            createWordSearchGrid();
+            drawWordSearchGrid();
+            displayWordsList();
+            canvas.addEventListener('click', handleCanvasClick);
+        }
+
+        document.getElementById('reset-button').addEventListener('click', resetGame);
+
+        loadWords();
     </script>
 </body>
 </html>
