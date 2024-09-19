@@ -2,10 +2,10 @@ const gridSize = 15;
 const canvas = document.getElementById('word-search-canvas');
 const ctx = canvas.getContext('2d');
 
-canvas.width = gridSize * 30;
-canvas.height = gridSize * 30;
+const cellSize = Math.min(canvas.clientWidth / gridSize, 30);
+canvas.width = cellSize * gridSize;
+canvas.height = cellSize * gridSize;
 
-const cellSize = 30;
 let grid = [];
 let selectedCells = [];
 let foundCells = [];
@@ -78,7 +78,7 @@ function canPlaceWord(grid, word, row, col, direction) {
 function drawWordSearchGrid() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    ctx.font = 'bold 20px Arial';
+    ctx.font = `${cellSize * 0.6}px Arial`;
     ctx.fillStyle = '#000'; // Cor preta para as letras
 
     for (let row = 0; row < gridSize; row++) {
@@ -132,11 +132,10 @@ function handleCanvasClick(event) {
     if (selectedCells.length > 0) {
         const lastCell = selectedCells[selectedCells.length - 1];
 
-        // Verifica se a seleção é contínua na horizontal, vertical ou diagonal
         const isHorizontal = row === lastCell.row;
         const isVertical = col === lastCell.col;
-        const isDiagonal1 = row - lastCell.row === col - lastCell.col; // Diagonal principal
-        const isDiagonal2 = row - lastCell.row === lastCell.col - col; // Diagonal secundária
+        const isDiagonal1 = row - lastCell.row === col - lastCell.col;
+        const isDiagonal2 = row - lastCell.row === lastCell.col - col;
 
         if (isHorizontal || isVertical || isDiagonal1 || isDiagonal2) {
             selectedCells.push({ row, col });
