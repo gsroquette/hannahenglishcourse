@@ -2,6 +2,7 @@ const gridSize = 15;
 const canvas = document.getElementById('word-search-canvas');
 const ctx = canvas.getContext('2d');
 
+// Calcula o tamanho das células dinamicamente com base no tamanho do canvas
 const cellSize = Math.min(canvas.clientWidth / gridSize, 30);
 canvas.width = cellSize * gridSize;
 canvas.height = cellSize * gridSize;
@@ -123,8 +124,8 @@ function markWordInList(word) {
 
 function handleCanvasClick(event) {
     const rect = canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
+    const x = (event.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (event.clientY - rect.top) * (canvas.height / rect.height);
 
     const col = Math.floor(x / cellSize);
     const row = Math.floor(y / cellSize);
