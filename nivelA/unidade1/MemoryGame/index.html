@@ -7,44 +7,48 @@
     <style>
         body {
             font-family: Arial, sans-serif;
+            background-color: #f9f9f9;
             display: flex;
-            flex-direction: column;
-            align-items: center;
             justify-content: center;
-            min-height: 100vh;
+            align-items: center;
+            height: 100vh;
             margin: 0;
-            background-color: #f4f4f4;
+        }
+
+        .container {
+            text-align: center;
         }
 
         h1 {
-            margin-bottom: 10px;
+            font-size: 2em;
+            margin-bottom: 20px;
         }
 
-        .image-container {
+        .game-board {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
             gap: 10px;
-            width: 90%;
             max-width: 600px;
+            margin: 0 auto;
         }
 
         .card {
-            position: relative;
             width: 100%;
-            padding-top: 100%; /* Mantém a proporção 1:1 */
-            perspective: 1000px; /* Cria o efeito 3D para virar a carta */
+            padding-top: 100%; /* Maintain aspect ratio 1:1 */
+            position: relative;
+            perspective: 1000px;
         }
 
         .card-inner {
             position: absolute;
             width: 100%;
             height: 100%;
-            transition: transform 0.6s;
             transform-style: preserve-3d;
+            transition: transform 0.6s;
             cursor: pointer;
         }
 
-        .card.show .card-inner {
+        .card.flipped .card-inner {
             transform: rotateY(180deg);
         }
 
@@ -53,205 +57,168 @@
             width: 100%;
             height: 100%;
             backface-visibility: hidden;
-            border-radius: 10px;
             display: flex;
-            align-items: center;
             justify-content: center;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            align-items: center;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
 
         .card-back {
-            background-color: #3498db;
-        }
-
-        .card-back img {
-            width: 80%;
-            height: 80%;
-            object-fit: contain;
+            background-color: #4CAF50;
         }
 
         .card-front {
-            background-color: #fff;
             transform: rotateY(180deg);
+            background-color: #ffffff;
+            border: 2px solid #4CAF50;
         }
 
-        .card-front img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            border-radius: 10px;
-        }
-
-        .card-front .text {
-            font-size: 1rem;
-            color: #333;
-            text-align: center;
-            padding: 10px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            word-wrap: break-word;
+        .controls {
+            margin-top: 20px;
         }
 
         button {
             padding: 10px 20px;
-            background-color: #3498db;
+            margin: 5px;
+            font-size: 1em;
+            cursor: pointer;
+        }
+
+        button#back-button {
+            background-color: #f44336;
             color: white;
             border: none;
-            border-radius: 5px;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: background-color 0.3s;
-            margin: 5px;
         }
 
-        button:hover {
-            background-color: #2980b9;
-        }
-
-        .controls {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .controls p {
-            margin: 5px 0;
-            font-size: 1.2rem;
+        button#restart-button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
         }
     </style>
 </head>
 <body>
-    <button onclick="window.history.back()">Back</button>
-
-    <h1>Hannah Memory Game</h1>
-    
-    <div class="controls">
-        <p>Moves: <span id="move-counter">0</span></p>
-        <button id="restart">Restart Game</button>
-    </div>
-    
-    <div class="image-container" id="game-board">
-        <!-- As cartas serão geradas dinamicamente aqui -->
+    <div class="container">
+        <h1>Hannah Memory Game</h1>
+        <div id="game-board" class="game-board"></div>
+        <div class="controls">
+            <button id="restart-button">Restart Game</button>
+            <button id="back-button">Back</button>
+            <p>Moves: <span id="move-counter">0</span></p>
+        </div>
     </div>
 
     <script>
-        const gameBoard = document.getElementById('game-board');
-        const moveCounter = document.getElementById('move-counter');
-        let moves = 0;
-        let firstCard, secondCard;
-        let lockBoard = false;
-        let cardPairs = [];
+        document.addEventListener("DOMContentLoaded", () => {
+            const gameBoard = document.getElementById("game-board");
+            const restartButton = document.getElementById("restart-button");
+            const backButton = document.getElementById("back-button");
+            const moveCounter = document.getElementById("move-counter");
 
-        // Função para ler o arquivo palavras.txt e gerar as cartas dinamicamente
-        function loadCards() {
-            fetch('palavras.txt')
-                .then(response => response.text())
-                .then(data => {
-                    const lines = data.trim().split('\n');
-                    lines.forEach(line => {
-                        const [image, word] = line.split(',');
-                        cardPairs.push({ type: 'image', content: image.trim() });
-                        cardPairs.push({ type: 'text', content: word.trim() });
-                    });
-                    shuffleAndCreateBoard();
+            let moves = 0;
+            let hasFlippedCard = false;
+            let lockBoard = false;
+            let firstCard, secondCard;
+
+            async function loadGameData() {
+                const response = await fetch('palavras.txt');
+                const data = await response.text();
+                const pairs = data.trim().split('\n').map(line => line.split(','));
+
+                const cards = [];
+                pairs.forEach(pair => {
+                    const imageCard = createCard(pair[0], 'image');
+                    const textCard = createCard(pair[1], 'text');
+                    cards.push(imageCard, textCard);
                 });
-        }
 
-        // Função para embaralhar e criar o tabuleiro de cartas
-        function shuffleAndCreateBoard() {
-            const shuffledPairs = shuffle(cardPairs);
-            shuffledPairs.forEach(pair => {
+                cards.sort(() => 0.5 - Math.random());
+                cards.forEach(card => gameBoard.appendChild(card));
+            }
+
+            function createCard(content, type) {
                 const card = document.createElement('div');
                 card.classList.add('card');
                 card.innerHTML = `
                     <div class="card-inner">
                         <div class="card-front">
-                            ${pair.type === 'image' ? `<img src="imagens/${pair.content}" alt="${pair.content}">` : `<div class="text">${pair.content}</div>`}
+                            ${type === 'image' ? `<img src="imagens/${content}" alt="${content}" />` : `<p>${content}</p>`}
                         </div>
                         <div class="card-back">
-                            <img src="logo.png" alt="Logo">
+                            <img src="logo.png" alt="Logo" />
                         </div>
-                    </div>`;
+                    </div>
+                `;
+
                 card.addEventListener('click', flipCard);
-                gameBoard.appendChild(card);
-            });
-        }
-
-        // Função para embaralhar um array
-        function shuffle(array) {
-            for (let i = array.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [array[i], array[j]] = [array[j], array[i]];
-            }
-            return array;
-        }
-
-        // Função para virar a carta
-        function flipCard() {
-            if (lockBoard) return;
-            if (this === firstCard) return;
-
-            this.classList.add('show');
-
-            if (!firstCard) {
-                firstCard = this;
-                return;
+                return card;
             }
 
-            secondCard = this;
-            checkForMatch();
-        }
+            function flipCard() {
+                if (lockBoard) return;
+                if (this === firstCard) return;
 
-        // Função para verificar se as cartas combinam
-        function checkForMatch() {
-            let isMatch = false;
-            if (firstCard.querySelector('img') && secondCard.querySelector('.text')) {
-                isMatch = firstCard.querySelector('img').alt === secondCard.querySelector('.text').textContent;
-            } else if (firstCard.querySelector('.text') && secondCard.querySelector('img')) {
-                isMatch = firstCard.querySelector('.text').textContent === secondCard.querySelector('img').alt;
+                this.classList.add('flipped');
+
+                if (!hasFlippedCard) {
+                    hasFlippedCard = true;
+                    firstCard = this;
+                    return;
+                }
+
+                secondCard = this;
+                checkForMatch();
             }
 
-            isMatch ? disableCards() : unflipCards();
-        }
+            function checkForMatch() {
+                let isMatch = firstCard.querySelector('.card-front').innerHTML === secondCard.querySelector('.card-front').innerHTML;
 
-        // Função para desativar as cartas que combinam
-        function disableCards() {
-            firstCard.removeEventListener('click', flipCard);
-            secondCard.removeEventListener('click', flipCard);
-            resetBoard();
-        }
+                isMatch ? disableCards() : unflipCards();
+                updateMoveCounter();
+            }
 
-        // Função para virar as cartas de volta se não combinarem
-        function unflipCards() {
-            lockBoard = true;
-            setTimeout(() => {
-                firstCard.classList.remove('show');
-                secondCard.classList.remove('show');
+            function disableCards() {
+                firstCard.removeEventListener('click', flipCard);
+                secondCard.removeEventListener('click', flipCard);
+
                 resetBoard();
-            }, 1000);
-        }
+            }
 
-        // Função para reiniciar o estado do tabuleiro
-        function resetBoard() {
-            [firstCard, secondCard, lockBoard] = [null, null, false];
-            moves++;
-            moveCounter.textContent = moves;
-        }
+            function unflipCards() {
+                lockBoard = true;
 
-        // Função para reiniciar o jogo
-        function restartGame() {
-            gameBoard.innerHTML = '';
-            moves = 0;
-            moveCounter.textContent = moves;
-            cardPairs = [];
-            loadCards();
-        }
+                setTimeout(() => {
+                    firstCard.classList.remove('flipped');
+                    secondCard.classList.remove('flipped');
 
-        // Inicializa o jogo ao carregar a página
-        document.getElementById('restart').addEventListener('click', restartGame);
-        loadCards();
+                    resetBoard();
+                }, 1500);
+            }
+
+            function resetBoard() {
+                [hasFlippedCard, lockBoard] = [false, false];
+                [firstCard, secondCard] = [null, null];
+            }
+
+            function updateMoveCounter() {
+                moves++;
+                moveCounter.textContent = moves;
+            }
+
+            restartButton.addEventListener('click', () => {
+                gameBoard.innerHTML = '';
+                moves = 0;
+                moveCounter.textContent = moves;
+                loadGameData();
+            });
+
+            backButton.addEventListener('click', () => {
+                window.history.back();
+            });
+
+            loadGameData();
+        });
     </script>
 </body>
 </html>
