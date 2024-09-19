@@ -130,6 +130,14 @@
             background-color: #7b1fa2;
             transform: scale(1.05);
         }
+
+        /* Floating state for list-items */
+        .floating {
+            pointer-events: none;
+            z-index: 1000;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+            transition: none;
+        }
     </style>
 </head>
 <body>
@@ -142,14 +150,14 @@
     <div class="container">
         <div class="list-container">
             <div class="list" id="lessons">
-                <div class="list-item" draggable="true" data-match="1" onclick="speakText(this)">Courage in the Face of Challenges</div>
-                <div class="list-item" draggable="true" data-match="2" onclick="speakText(this)">Trust in God</div>
-                <div class="list-item" draggable="true" data-match="3" onclick="speakText(this)">Use of Talents and Abilities</div>
-                <div class="list-item" draggable="true" data-match="4" onclick="speakText(this)">Appearances Can Be Deceiving</div>
-                <div class="list-item" draggable="true" data-match="5" onclick="speakText(this)">Preparation and Experience</div>
-                <div class="list-item" draggable="true" data-match="6" onclick="speakText(this)">Overcoming Fear</div>
-                <div class="list-item" draggable="true" data-match="7" onclick="speakText(this)">Resilience and Persistence</div>
-                <div class="list-item" draggable="true" data-match="8" onclick="speakText(this)">Humility</div>
+                <div class="list-item" data-match="1" onclick="speakText(this)">Courage in the Face of Challenges</div>
+                <div class="list-item" data-match="2" onclick="speakText(this)">Trust in God</div>
+                <div class="list-item" data-match="3" onclick="speakText(this)">Use of Talents and Abilities</div>
+                <div class="list-item" data-match="4" onclick="speakText(this)">Appearances Can Be Deceiving</div>
+                <div class="list-item" data-match="5" onclick="speakText(this)">Preparation and Experience</div>
+                <div class="list-item" data-match="6" onclick="speakText(this)">Overcoming Fear</div>
+                <div class="list-item" data-match="7" onclick="speakText(this)">Resilience and Persistence</div>
+                <div class="list-item" data-match="8" onclick="speakText(this)">Humility</div>
             </div>
 
             <div class="list" id="explanations">
@@ -179,41 +187,50 @@
         // Call shuffleList when the page loads
         window.onload = shuffleList;
 
-        const listItems = document.querySelectorAll('.list-item');
-        const dropZones = document.querySelectorAll('.drop-zone');
+        let selectedItem = null;
+        let initialPosition = { x: 0, y: 0 };
 
-        listItems.forEach(item => {
-            item.addEventListener('dragstart', dragStart);
+        document.querySelectorAll('.list-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+                selectedItem = this;
+                initialPosition = { x: e.clientX, y: e.clientY };
+                this.classList.add('floating');
+            });
         });
 
-        dropZones.forEach(zone => {
-            zone.addEventListener('dragover', dragOver);
-            zone.addEventListener('drop', dropItem);
-        });
-
-        function dragStart(e) {
-            e.dataTransfer.setData('text/plain', e.target.dataset.match);
-            e.target.classList.add('dragging');
-        }
-
-        function dragOver(e) {
-            e.preventDefault();
-        }
-
-        function dropItem(e) {
-            e.preventDefault();
-            const matchId = e.dataTransfer.getData('text/plain');
-            const dropZoneMatchId = e.target.dataset.match;
-
-            if (matchId === dropZoneMatchId) {
-                e.target.textContent = document.querySelector(`[data-match="${matchId}"]`).textContent;
-                e.target.classList.add('correct');
-                document.querySelector(`[data-match="${matchId}"]`).classList.add('hidden');
-            } else {
-                e.target.classList.add('wrong');
-                setTimeout(() => e.target.classList.remove('wrong'), 1000);
+        document.addEventListener('mousemove', function(e) {
+            if (selectedItem) {
+                selectedItem.style.position = 'absolute';
+                selectedItem.style.left = `${e.clientX}px`;
+                selectedItem.style.top = `${e.clientY}px`;
             }
-        }
+        });
+
+        document.addEventListener('click', function(e) {
+            if (selectedItem && !e.target.classList.contains('list-item')) {
+                selectedItem.style.position = 'static';
+                selectedItem.classList.remove('floating');
+                selectedItem = null;
+            }
+        });
+
+        document.querySelectorAll('.drop-zone').forEach(zone => {
+            zone.addEventListener('click', function(e) {
+                if (selectedItem) {
+                    if (selectedItem.dataset.match === this.dataset.match) {
+                        this.textContent = selectedItem.textContent;
+                        this.classList.add('correct');
+                        selectedItem.classList.add('hidden');
+                    } else {
+                        this.classList.add('wrong');
+                        setTimeout(() => this.classList.remove('wrong'), 1000);
+                    }
+                    selectedItem.style.position = 'static';
+                    selectedItem.classList.remove('floating');
+                    selectedItem = null;
+                }
+            });
+        });
 
         function speakText(element) {
             const text = element.textContent;
