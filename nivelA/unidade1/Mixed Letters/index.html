@@ -29,24 +29,6 @@
             align-items: center; /* Centraliza o conteúdo horizontalmente */
         }
 
-        .input-field {
-            display: block;
-            margin-bottom: 15px;
-            font-size: 1.5rem;
-            color: #8b4513;
-            text-align: center; /* Centraliza o texto */
-        }
-
-        input[type="text"], input[type="file"], input[type="checkbox"] {
-            padding: 10px;
-            font-size: 1.2rem;
-            border: 2px solid #8b4513;
-            border-radius: 10px;
-            width: 100%;
-            max-width: 300px;
-            text-align: center; /* Centraliza o texto dentro dos campos de entrada */
-        }
-
         .button {
             padding: 15px 25px;
             background-color: #ff6347;
@@ -184,21 +166,6 @@
 <h1>Hannah Mixed Letters</h1>
 
 <div class="form-container">
-    <!-- Upload de Imagem -->
-    <label class="input-field">Upload Image (Optional): 
-        <input type="file" id="image-upload" accept="image/*">
-    </label>
-
-    <!-- Inserção de Palavra -->
-    <label class="input-field">Associated Word:
-        <input type="text" id="word-input" placeholder="Enter the word here">
-    </label>
-
-    <!-- Checkbox para mostrar a palavra completa -->
-    <label class="input-field">
-        <input type="checkbox" id="show-word"> Show complete word
-    </label>
-
     <!-- Botões para adicionar atividade e gerar PDF -->
     <button class="button" id="add-activity-btn">Add Activity</button>
     <button class="button" id="generate-pdf-btn">Generate PDF</button>
@@ -210,24 +177,13 @@
 <script>
     let activities = []; // Lista para armazenar as atividades criadas
 
-    function loadImageAsBase64(imageFile) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                resolve(event.target.result); // Retornar imagem base64
-            };
-            reader.onerror = function() {
-                reject('Error loading image.');
-            };
-            reader.readAsDataURL(imageFile); // Ler imagem
-        });
-    }
-
+    // Função para embaralhar a palavra
     function shuffleWord(word) {
         const shuffled = word.split('').sort(() => 0.5 - Math.random()).join('');
         return shuffled !== word ? shuffled : shuffleWord(word); // Certificar que não retorne a mesma palavra
     }
 
+    // Função para falar o texto
     function speakText(text) {
         const synth = window.speechSynthesis;
         const utterThis = new SpeechSynthesisUtterance(text);
@@ -235,18 +191,26 @@
         synth.speak(utterThis);
     }
 
-    document.getElementById('add-activity-btn').addEventListener('click', async function() {
-        const word = document.getElementById('word-input').value;
-        const showWord = document.getElementById('show-word').checked; // Verificar se o checkbox está marcado
+    // Função para carregar palavras e imagens dinamicamente
+    async function loadActivities() {
+        try {
+            const response = await fetch('data/words.txt');
+            const text = await response.text();
+            const lines = text.trim().split('\n');
 
-        const imageInput = document.getElementById('image-upload');
-        const imageFile = imageInput.files[0];
-
-        let imageDataURL = null;
-        if (imageFile) {
-            imageDataURL = await loadImageAsBase64(imageFile);
+            for (const line of lines) {
+                const [imageName, word] = line.split(':');
+                const imageUrl = `data/imagens/${imageName}`;
+                
+                createActivity(imageUrl, word);
+            }
+        } catch (error) {
+            console.error('Erro ao carregar palavras e imagens:', error);
         }
+    }
 
+    // Função para criar uma nova atividade
+    function createActivity(imageUrl, word) {
         const activityContainer = document.getElementById('activity-container');
         const activityDiv = document.createElement('div');
         activityDiv.classList.add('activity');
@@ -264,11 +228,10 @@
         };
         activityDiv.appendChild(deleteButton);
 
-        if (imageFile) {
-            const imgElement = document.createElement('img');
-            imgElement.src = URL.createObjectURL(imageFile);
-            activityDiv.appendChild(imgElement);
-        }
+        // Adicionar a imagem
+        const imgElement = document.createElement('img');
+        imgElement.src = imageUrl;
+        activityDiv.appendChild(imgElement);
 
         const wordContainer = document.createElement('div');
         wordContainer.classList.add('word-container');
@@ -303,13 +266,6 @@
 
         wordContainer.appendChild(inputContainer);
 
-        // Mostrar a palavra completa se o checkbox estiver ativado
-        if (showWord) {
-            const fullWordElement = document.createElement('div');
-            fullWordElement.innerText = `Word: ${word}`;
-            wordContainer.appendChild(fullWordElement);
-        }
-
         // Botão para checar a resposta
         const checkAnswerBtn = document.createElement('button');
         checkAnswerBtn.classList.add('check-answer-btn');
@@ -341,18 +297,16 @@
         activityContainer.appendChild(activityDiv);
 
         // Guardar a atividade para o PDF
-        const activityData = { word, shuffledWord, showWord, imageDataURL };
+        const activityData = { word, shuffledWord, imageDataURL: imageUrl };
         activityDiv.activityData = activityData;
         activities.push(activityData); // Adicionar à lista de atividades
 
         // Rolar a página automaticamente para o final após adicionar a atividade
         activityDiv.scrollIntoView({ behavior: 'smooth' });
+    }
 
-        // Limpar os campos após adicionar a atividade
-        document.getElementById('word-input').value = '';
-        document.getElementById('image-upload').value = '';
-        document.getElementById('show-word').checked = false;
-    });
+    // Carregar atividades automaticamente ao carregar a página
+    document.addEventListener('DOMContentLoaded', loadActivities);
 
     // Função para gerar o PDF com as atividades em uma única coluna
     document.getElementById('generate-pdf-btn').addEventListener('click', async function() {
@@ -407,11 +361,6 @@
             for (let i = 0; i < activity.word.length; i++) {
                 doc.line(lineX, lineY, lineX + 10, lineY); // Criar uma linha de 10 unidades de comprimento
                 lineX += 12; // Adicionar espaçamento entre as linhas
-            }
-
-            if (activity.showWord) {
-                doc.setFontSize(14);
-                doc.text(`Word: ${activity.word}`, currentX + 50, lineY + 10);
             }
 
             yOffset += 60; // Ajustar a distância entre as atividades
