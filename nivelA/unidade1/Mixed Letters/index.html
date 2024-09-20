@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hannah Mixed Letters</title>
     <style>
+        /* Aplicação de Times New Roman e centralização dos elementos */
         body {
             font-family: 'Times New Roman', Times, serif;
             background-color: #ffebcd;
@@ -12,7 +13,7 @@
             padding: 20px;
             display: flex;
             flex-direction: column;
-            align-items: center;
+            align-items: center; /* Centraliza o conteúdo horizontalmente */
         }
 
         h1 {
@@ -20,6 +21,64 @@
             color: #ff4500;
             font-size: 3rem;
             margin-bottom: 20px;
+        }
+
+        .form-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center; /* Centraliza o conteúdo horizontalmente */
+        }
+
+        .input-field {
+            display: block;
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+            color: #8b4513;
+            text-align: center; /* Centraliza o texto */
+        }
+
+        input[type="text"], input[type="file"], input[type="checkbox"] {
+            padding: 10px;
+            font-size: 1.2rem;
+            border: 2px solid #8b4513;
+            border-radius: 10px;
+            width: 100%;
+            max-width: 300px;
+            text-align: center; /* Centraliza o texto dentro dos campos de entrada */
+        }
+
+        .button {
+            padding: 15px 25px;
+            background-color: #ff6347;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            margin: 5px; /* Espaçamento entre os botões */
+            text-align: center;
+        }
+
+        .button:hover {
+            background-color: #e55342;
+        }
+
+        #add-activity-btn {
+            background-color: #48d1cc;
+        }
+
+        #add-activity-btn:hover {
+            background-color: #40b4b0;
+        }
+
+        #generate-pdf-btn {
+            background-color: #ffd700;
+            color: black;
+        }
+
+        #generate-pdf-btn:hover {
+            background-color: #ffcc00;
         }
 
         .activity-container {
@@ -73,6 +132,26 @@
             border-color: red;
         }
 
+        .delete-icon {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            cursor: pointer;
+            background-color: #ff6347;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            font-size: 16px;
+            text-align: center;
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        .delete-icon:hover {
+            background-color: #e55342;
+        }
+
         .word-container {
             display: flex;
             flex-direction: column;
@@ -95,6 +174,7 @@
             background-color: #28a428;
         }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 <button onclick="window.location.href='../index.html'" style="padding: 15px 25px; background-color: #ff6347; color: white; border: none; border-radius: 10px; font-size: 1.5rem; cursor: pointer; transition: background-color 0.3s ease;">
@@ -103,55 +183,97 @@
 
 <h1>Hannah Mixed Letters</h1>
 
+<div class="form-container">
+    <!-- Upload de Imagem -->
+    <label class="input-field">Upload Image (Optional): 
+        <input type="file" id="image-upload" accept="image/*">
+    </label>
+
+    <!-- Inserção de Palavra -->
+    <label class="input-field">Associated Word:
+        <input type="text" id="word-input" placeholder="Enter the word here">
+    </label>
+
+    <!-- Checkbox para mostrar a palavra completa -->
+    <label class="input-field">
+        <input type="checkbox" id="show-word"> Show complete word
+    </label>
+
+    <!-- Botões para adicionar atividade e gerar PDF -->
+    <button class="button" id="add-activity-btn">Add Activity</button>
+    <button class="button" id="generate-pdf-btn">Generate PDF</button>
+</div>
+
+<!-- Contêiner onde as atividades serão exibidas -->
 <div id="activity-container" class="activity-container"></div>
 
 <script>
-    let activities = [];
+    let activities = []; // Lista para armazenar as atividades criadas
+
+    function loadImageAsBase64(imageFile) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                resolve(event.target.result); // Retornar imagem base64
+            };
+            reader.onerror = function() {
+                reject('Error loading image.');
+            };
+            reader.readAsDataURL(imageFile); // Ler imagem
+        });
+    }
 
     function shuffleWord(word) {
         const shuffled = word.split('').sort(() => 0.5 - Math.random()).join('');
-        return shuffled !== word ? shuffled : shuffleWord(word);
+        return shuffled !== word ? shuffled : shuffleWord(word); // Certificar que não retorne a mesma palavra
     }
 
     function speakText(text) {
         const synth = window.speechSynthesis;
         const utterThis = new SpeechSynthesisUtterance(text);
-        utterThis.lang = 'en-US';
+        utterThis.lang = 'en-US'; // Configurado para inglês dos Estados Unidos
         synth.speak(utterThis);
     }
 
-    async function loadActivities() {
-        try {
-            const response = await fetch('data/words.txt');
-            const text = await response.text();
-            const lines = text.trim().split('\n');
+    document.getElementById('add-activity-btn').addEventListener('click', async function() {
+        const word = document.getElementById('word-input').value;
+        const showWord = document.getElementById('show-word').checked; // Verificar se o checkbox está marcado
 
-            for (const line of lines) {
-                const [imageName, word] = line.split(':');
-                const imageUrl = `data/imagens/${imageName}`;
-                
-                createActivity(imageUrl, word);
-            }
-        } catch (error) {
-            console.error('Erro ao carregar palavras e imagens:', error);
+        const imageInput = document.getElementById('image-upload');
+        const imageFile = imageInput.files[0];
+
+        let imageDataURL = null;
+        if (imageFile) {
+            imageDataURL = await loadImageAsBase64(imageFile);
         }
-    }
 
-    function createActivity(imageUrl, word) {
         const activityContainer = document.getElementById('activity-container');
         const activityDiv = document.createElement('div');
         activityDiv.classList.add('activity');
 
-        const imgElement = document.createElement('img');
-        imgElement.src = imageUrl;
-        imgElement.onerror = function() {
-            console.error(`Erro ao carregar a imagem: ${imageUrl}`);
+        // Criar o ícone de delete "X"
+        const deleteButton = document.createElement('button');
+        deleteButton.classList.add('delete-icon');
+        deleteButton.innerText = 'X';
+        deleteButton.onclick = function() {
+            const activityIndex = activities.indexOf(activityDiv.activityData);
+            if (activityIndex > -1) {
+                activities.splice(activityIndex, 1); // Remover da lista de atividades
+            }
+            activityDiv.remove(); // Remover a atividade da tela
         };
-        activityDiv.appendChild(imgElement);
+        activityDiv.appendChild(deleteButton);
+
+        if (imageFile) {
+            const imgElement = document.createElement('img');
+            imgElement.src = URL.createObjectURL(imageFile);
+            activityDiv.appendChild(imgElement);
+        }
 
         const wordContainer = document.createElement('div');
         wordContainer.classList.add('word-container');
 
+        // Misturar as letras da palavra
         const shuffledWord = shuffleWord(word);
 
         const mixedLettersElement = document.createElement('div');
@@ -163,6 +285,7 @@
         });
         wordContainer.appendChild(mixedLettersElement);
 
+        // Criar campos de entrada para o aluno
         const inputContainer = document.createElement('div');
         shuffledWord.split('').forEach((_, index, array) => {
             const letterInput = document.createElement('input');
@@ -171,7 +294,7 @@
 
             letterInput.addEventListener('input', function() {
                 if (letterInput.value.length === 1 && index < array.length - 1) {
-                    inputContainer.children[index + 1].focus();
+                    inputContainer.children[index + 1].focus(); // Focar no próximo campo
                 }
             });
 
@@ -180,6 +303,14 @@
 
         wordContainer.appendChild(inputContainer);
 
+        // Mostrar a palavra completa se o checkbox estiver ativado
+        if (showWord) {
+            const fullWordElement = document.createElement('div');
+            fullWordElement.innerText = `Word: ${word}`;
+            wordContainer.appendChild(fullWordElement);
+        }
+
+        // Botão para checar a resposta
         const checkAnswerBtn = document.createElement('button');
         checkAnswerBtn.classList.add('check-answer-btn');
         checkAnswerBtn.innerText = 'Check Answer';
@@ -195,7 +326,7 @@
                     input.classList.add('correct');
                     input.classList.remove('incorrect');
                 });
-                speakText(word);
+                speakText(word);  // Ler a palavra correta se o aluno acertar
             } else {
                 letterInputs.forEach(input => {
                     input.classList.add('incorrect');
@@ -209,10 +340,88 @@
         activityDiv.appendChild(wordContainer);
         activityContainer.appendChild(activityDiv);
 
-        activityDiv.scrollIntoView({ behavior: 'smooth' });
-    }
+        // Guardar a atividade para o PDF
+        const activityData = { word, shuffledWord, showWord, imageDataURL };
+        activityDiv.activityData = activityData;
+        activities.push(activityData); // Adicionar à lista de atividades
 
-    document.addEventListener('DOMContentLoaded', loadActivities);
+        // Rolar a página automaticamente para o final após adicionar a atividade
+        activityDiv.scrollIntoView({ behavior: 'smooth' });
+
+        // Limpar os campos após adicionar a atividade
+        document.getElementById('word-input').value = '';
+        document.getElementById('image-upload').value = '';
+        document.getElementById('show-word').checked = false;
+    });
+
+    // Função para gerar o PDF com as atividades em uma única coluna
+    document.getElementById('generate-pdf-btn').addEventListener('click', async function() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        const logoPath = 'Logo.png';
+        const logoLoaded = new Promise((resolve, reject) => {
+            const img = new Image();
+            img.src = logoPath;
+            img.onload = function() {
+                resolve(img);
+            };
+            img.onerror = function() {
+                reject('Error loading logo.');
+            };
+        });
+
+        const logoImg = await logoLoaded;
+
+        doc.addImage(logoImg, 'PNG', 10, 5, 20, 20);
+        doc.setFontSize(22);
+        doc.text('Hannah Mixed Letters', 40, 20);
+
+        doc.setFontSize(14);
+        doc.text('Name: ____________________________________  Date: __________', 10, 35);
+
+        let yOffset = 45;
+        let currentX = 10; // Mantendo tudo em uma coluna
+
+        const checkAddPage = (doc, yOffset) => {
+            if (yOffset > doc.internal.pageSize.height - 50) {
+                doc.addPage();
+                yOffset = 20;
+            }
+            return yOffset;
+        };
+
+        const pdfPromises = activities.map(async (activity, index) => {
+            if (activity.imageDataURL) {
+                doc.addImage(activity.imageDataURL, 'PNG', currentX, yOffset, 40, 40);
+            }
+
+            doc.setFontSize(24);
+            const mixedWordText = activity.shuffledWord;
+            doc.text(mixedWordText, currentX + 50, yOffset + 20);
+
+            // Adicionar linhas para o aluno escrever as letras
+            let lineX = currentX + 50;
+            let lineY = yOffset + 40;
+            doc.setLineWidth(0.5);
+            for (let i = 0; i < activity.word.length; i++) {
+                doc.line(lineX, lineY, lineX + 10, lineY); // Criar uma linha de 10 unidades de comprimento
+                lineX += 12; // Adicionar espaçamento entre as linhas
+            }
+
+            if (activity.showWord) {
+                doc.setFontSize(14);
+                doc.text(`Word: ${activity.word}`, currentX + 50, lineY + 10);
+            }
+
+            yOffset += 60; // Ajustar a distância entre as atividades
+            yOffset = checkAddPage(doc, yOffset);
+        });
+
+        await Promise.all(pdfPromises);
+
+        doc.save('hannah-mixed-letters.pdf');
+    });
 
 </script>
 
