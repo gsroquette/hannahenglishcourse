@@ -16,6 +16,7 @@
             align-items: center;
             justify-content: center;
             min-height: 100vh;
+            overflow-x: hidden; /* Evita rolagem lateral */
         }
 
         h1 {
@@ -96,15 +97,32 @@
         }
 
         .image-container {
-            text-align: center;
-            margin-top: 20px;
             display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
             flex-direction: column;
             align-items: center;
+            justify-content: center;
+            text-align: center;
+            z-index: 1000;
+            padding: 20px;
+            box-sizing: border-box;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
         .image-container img {
             max-width: 80%;
+            max-height: 50%;
+            margin-bottom: 20px;
             border-radius: 10px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
         }
@@ -112,14 +130,25 @@
         .image-container h2 {
             margin-top: 10px;
             font-size: 2em;
-            color: #8e24aa;
+            color: #ffffff;
         }
 
         .image-container p {
             margin-top: 10px;
             font-size: 1.5em;
-            color: #424242;
+            color: #ffffff;
             max-width: 80%;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 2em;
+            color: #ffffff;
+            background-color: transparent;
+            border: none;
+            cursor: pointer;
         }
 
         .restart-btn, .back-btn {
@@ -162,6 +191,7 @@
 
 <!-- Container para mostrar a imagem e o texto -->
 <div class="image-container" id="image-container">
+    <button class="close-btn" onclick="closeImage()">×</button>
     <img id="lesson-image" src="" alt="Lesson Image">
     <h2 id="lesson-title"></h2>
     <p id="lesson-text"></p>
@@ -173,6 +203,7 @@
     let lessonData = [];
     let selectedLeftItem = null;
     let currentAnimatedItem = null;
+    let currentUtterance = null;  // Para rastrear a leitura atual
 
     // Carregar as lições e explicações dinamicamente do arquivo texto.txt
     fetch('texto.txt')
@@ -249,14 +280,14 @@
         }
         selectedLeftItem = element;
         element.classList.add('selected');
-        speakText(element);
+        speakText(element.textContent);
     }
 
     function selectRightItem(element) {
         removeCurrentAnimatedItem();
         if (!selectedLeftItem) return;
 
-        speakText(element);
+        speakText(element.textContent);
 
         if (selectedLeftItem.dataset.match === element.dataset.match) {
             animateCorrectMatch(element);
@@ -276,12 +307,14 @@
         currentAnimatedItem = element;
     }
 
-    function speakText(element) {
-        window.speechSynthesis.cancel();
-        const text = element.textContent;
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'en-US';
-        window.speechSynthesis.speak(utterance);
+    function speakText(text) {
+        window.speechSynthesis.cancel();  // Interrompe qualquer leitura anterior
+        if (currentUtterance) {
+            currentUtterance.onend = null;  // Remove o listener anterior, se houver
+        }
+        currentUtterance = new SpeechSynthesisUtterance(text);
+        currentUtterance.lang = 'en-US';
+        window.speechSynthesis.speak(currentUtterance);
     }
 
     function showLessonData(index) {
@@ -298,9 +331,12 @@
         imageContainer.style.display = 'flex';
 
         // Ler o texto em voz alta
-        const utterance = new SpeechSynthesisUtterance(data.text);
-        utterance.lang = 'en-US';
-        window.speechSynthesis.speak(utterance);
+        speakText(data.text);
+    }
+
+    function closeImage() {
+        const imageContainer = document.getElementById('image-container');
+        imageContainer.style.display = 'none';
     }
 
     function restartGame() {
