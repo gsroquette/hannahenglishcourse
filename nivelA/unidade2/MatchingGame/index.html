@@ -157,6 +157,14 @@
             cursor: pointer;
         }
 
+        .try-again {
+            color: #c62828;
+            font-size: 1.5em;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 20px;
+        }
+
         .restart-btn, .back-btn {
             padding: 10px 20px;
             font-size: 1.2em;
@@ -205,6 +213,8 @@
 
 <button class="restart-btn" onclick="restartGame()">Restart Game</button>
 
+<div id="try-again" class="try-again" style="display:none;">Try Again!</div>
+
 <script>
     let lessonData = [];
     let selectedLeftItem = null;
@@ -217,56 +227,38 @@
         .then(data => {
             const lines = data.split('\n');
 
-            const lessons = [];
-            const explanations = [];
+            // Assumindo que as lições e explicações estejam na mesma ordem no arquivo
             lines.forEach((line, index) => {
                 const [type, lesson, explanation] = line.split('|');
                 if (type === 'lesson') {
-                    lessons.push({ lesson, index });
-                    explanations.push({ explanation, index });
+                    lessonData.push({
+                        img: `imagens/imagem${index + 1}.png`,
+                        title: lesson,
+                        text: explanation
+                    });
                 }
             });
 
-            shuffleArray(lessons); // Embaralha apenas as lições
-
-            // Criar o array lessonData dinamicamente sem embaralhar as explicações
-            for (let i = 0; i < lessons.length; i++) {
-                lessonData.push({
-                    img: `imagens/imagem${lessons[i].index + 1}.png`,  // Associa as imagens na sequência
-                    title: lessons[i].lesson,                         // Usa a lição da coluna da esquerda
-                    text: explanations[lessons[i].index].explanation  // Usa a explicação correta
-                });
-            }
-
-            // Preencher as colunas com as lições e explicações embaralhadas
+            // Preencher as colunas com as lições e explicações
             const lessonsContainer = document.getElementById('lessons');
             const explanationsContainer = document.getElementById('explanations');
 
-            lessons.forEach(item => {
+            lessonData.forEach((item, index) => {
                 const lessonDiv = document.createElement('div');
                 lessonDiv.classList.add('list-item');
-                lessonDiv.textContent = item.lesson;
-                lessonDiv.dataset.match = item.index + 1;
+                lessonDiv.textContent = item.title;
+                lessonDiv.dataset.match = index + 1;
                 lessonDiv.onclick = () => selectLeftItem(lessonDiv);
                 lessonsContainer.appendChild(lessonDiv);
-            });
 
-            explanations.forEach((item, index) => {
                 const explanationDiv = document.createElement('div');
                 explanationDiv.classList.add('drop-zone');
-                explanationDiv.textContent = item.explanation;
+                explanationDiv.textContent = item.text;
                 explanationDiv.dataset.match = index + 1;
                 explanationDiv.onclick = () => selectRightItem(explanationDiv);
                 explanationsContainer.appendChild(explanationDiv);
             });
         });
-
-    function shuffleArray(array) {
-        for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
-        }
-    }
 
     function removeCurrentAnimatedItem() {
         if (currentAnimatedItem) {
@@ -299,8 +291,10 @@
             selectedLeftItem.classList.add('used');
             selectedLeftItem.classList.remove('selected');
             showLessonData(element.dataset.match - 1);  // Mostrar imagem e texto correspondente
+            document.getElementById('try-again').style.display = 'none'; // Esconde "Try Again"
         } else {
             element.classList.add('wrong');
+            document.getElementById('try-again').style.display = 'block'; // Mostra "Try Again"
             selectedLeftItem.classList.remove('selected');
             selectedLeftItem = null;
             speakText(element.textContent);
