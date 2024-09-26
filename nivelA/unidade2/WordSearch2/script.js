@@ -15,7 +15,8 @@ let wordsToFind = [];
 
 async function loadWords() {
     try {
-        const response = await fetch('words.txt');
+        // Caminho atualizado para buscar o arquivo words.txt na pasta data2
+        const response = await fetch('../data2/words.txt');
         if (!response.ok) {
             throw new Error('Network response was not ok');
         }
