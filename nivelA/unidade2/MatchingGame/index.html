@@ -227,15 +227,14 @@
                 }
             });
 
-            shuffleArray(lessons);
-            shuffleArray(explanations);
+            shuffleArray(lessons); // Embaralha apenas as lições
 
-            // Criar o array lessonData dinamicamente
+            // Criar o array lessonData dinamicamente sem embaralhar as explicações
             for (let i = 0; i < lessons.length; i++) {
                 lessonData.push({
-                    img: `imagens/imagem${i + 1}.png`,  // Associa as imagens na sequência
-                    title: lessons[i].lesson,          // Usa a lição da coluna da esquerda
-                    text: explanations[i].explanation  // Usa a explicação da coluna da direita
+                    img: `imagens/imagem${lessons[i].index + 1}.png`,  // Associa as imagens na sequência
+                    title: lessons[i].lesson,                         // Usa a lição da coluna da esquerda
+                    text: explanations[lessons[i].index].explanation  // Usa a explicação correta
                 });
             }
 
@@ -252,11 +251,11 @@
                 lessonsContainer.appendChild(lessonDiv);
             });
 
-            explanations.forEach(item => {
+            explanations.forEach((item, index) => {
                 const explanationDiv = document.createElement('div');
                 explanationDiv.classList.add('drop-zone');
                 explanationDiv.textContent = item.explanation;
-                explanationDiv.dataset.match = item.index + 1;
+                explanationDiv.dataset.match = index + 1;
                 explanationDiv.onclick = () => selectRightItem(explanationDiv);
                 explanationsContainer.appendChild(explanationDiv);
             });
@@ -281,12 +280,12 @@
 
     function selectLeftItem(element) {
         removeCurrentAnimatedItem();
-        resetWrongSelections(); // Reseta qualquer seleção incorreta anterior
         if (selectedLeftItem) {
             selectedLeftItem.classList.remove('selected');
         }
         selectedLeftItem = element;
         element.classList.add('selected');
+        resetWrongSelections();  // Reseta as seleções erradas
         speakText(element.textContent);
     }
 
@@ -295,22 +294,29 @@
         if (!selectedLeftItem) return;
 
         if (selectedLeftItem.dataset.match === element.dataset.match) {
-            speakText(element.textContent); // Fala o texto quando a correspondência for correta
+            speakText(element.textContent);
             animateCorrectMatch(element);
             selectedLeftItem.classList.add('used');
             selectedLeftItem.classList.remove('selected');
             showLessonData(element.dataset.match - 1);  // Mostrar imagem e texto correspondente
         } else {
-            speakText("Try again"); // Fala "Try again" quando a correspondência for errada
             element.classList.add('wrong');
             selectedLeftItem.classList.remove('selected');
             selectedLeftItem = null;
+            speakText(element.textContent);
         }
     }
 
     function animateCorrectMatch(element) {
         element.classList.add('correct');
         currentAnimatedItem = element;
+    }
+
+    function resetWrongSelections() {
+        const wrongElements = document.querySelectorAll('.wrong');
+        wrongElements.forEach(element => {
+            element.classList.remove('wrong');
+        });
     }
 
     function speakText(text) {
@@ -321,13 +327,6 @@
         currentUtterance = new SpeechSynthesisUtterance(text);
         currentUtterance.lang = 'en-US';
         window.speechSynthesis.speak(currentUtterance);
-    }
-
-    function resetWrongSelections() {
-        const wrongSelections = document.querySelectorAll('.wrong');
-        wrongSelections.forEach(item => {
-            item.classList.remove('wrong');
-        });
     }
 
     function showLessonData(index) {
