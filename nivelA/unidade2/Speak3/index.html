@@ -170,7 +170,7 @@
         let words = [];
         let currentWordIndex = 0;
         let recognitionTimeout;
-        let tryAgainPlayed = false;
+        let tryAgainInProgress = false; // Flag to prevent duplicate "Try Again"
 
         // Fetch words from the words.txt file
         fetch(wordListUrl)
@@ -194,7 +194,7 @@
                 document.getElementById("word").textContent = currentWord;
                 document.getElementById("image").src = imageFolderUrl + currentImage;
                 resetFeedback(); // Clear any feedback when navigating
-                tryAgainPlayed = false; // Reset Try Again flag
+                tryAgainInProgress = false; // Reset flag
                 enableStartButton(); // Re-enable the start button
             }
         }
@@ -250,7 +250,9 @@
             if (speechResult.includes(expectedWord)) {
                 handleCorrectAnswer();
             } else {
-                handleIncorrectAttempt();
+                if (!tryAgainInProgress) {
+                    handleIncorrectAttempt();
+                }
             }
         };
 
@@ -262,10 +264,8 @@
         };
 
         recognition.onend = () => {
-            if (!resultDiv.textContent.includes("Correct!") && !tryAgainPlayed) {
+            if (!resultDiv.textContent.includes("Correct!") && !tryAgainInProgress) {
                 handleIncorrectAttempt();
-            } else if (tryAgainPlayed) {
-                startRecognition(); // Reinicia o reconhecimento automaticamente após a segunda tentativa
             }
         };
 
@@ -291,20 +291,16 @@
         }
 
         function handleIncorrectAttempt() {
-            if (!tryAgainPlayed) {
-                tryAgainPlayed = true;
-                const tryAgainMessage = "Try again. Listen to the correct pronunciation of this word.";
-                resultDiv.textContent = tryAgainMessage;
-                resultDiv.style.color = "red";
-                readMessage(tryAgainMessage, () => {
-                    setTimeout(() => {
-                        readWordWithHighlight(words[currentWordIndex]);
-                        enableStartButton();
-                    }, 2000);
+            tryAgainInProgress = true;
+            const tryAgainMessage = "Try again. Listen to the correct pronunciation of this word.";
+            resultDiv.textContent = tryAgainMessage;
+            resultDiv.style.color = "red";
+            readMessage(tryAgainMessage, () => {
+                readWordWithHighlight(words[currentWordIndex], () => {
+                    enableStartButton();
+                    tryAgainInProgress = false;
                 });
-            } else {
-                startRecognition(); // Reinicia o reconhecimento para a segunda tentativa
-            }
+            });
         }
 
         function resetFeedback() {
@@ -335,13 +331,14 @@
             speechSynthesis.speak(utterance);
         }
 
-        function readWordWithHighlight(word) {
+        function readWordWithHighlight(word, callback) {
             wordDiv.classList.add("enlarged");
             const utterance = new SpeechSynthesisUtterance(word);
             utterance.lang = 'en-US';
             utterance.rate = 0.7;
             utterance.onend = () => {
                 wordDiv.classList.remove("enlarged");
+                if (callback) callback();
             };
             speechSynthesis.speak(utterance);
         }
