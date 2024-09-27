@@ -9,6 +9,14 @@
             font-family: Arial, sans-serif;
             text-align: center;
             margin-top: 50px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 3em;
+            color: #333;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px #aaa;
         }
         .container {
             position: relative;
@@ -17,6 +25,9 @@
         .image {
             width: 300px;
             height: auto;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
         }
         .icon {
             position: absolute;
@@ -47,13 +58,25 @@
             transform: translate(-50%, -50%);
             z-index: 1000;
         }
+        .button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+            transition: background-color 0.3s ease;
+        }
+        .button:hover {
+            background-color: #0056b3;
+        }
         #backButton {
             position: absolute;
             top: 10px;
             left: 10px;
-            padding: 10px 20px;
-            font-size: 16px;
-            cursor: pointer;
         }
         .scoreboard {
             display: flex;
@@ -81,17 +104,28 @@
         .score.red {
             background-color: red;
         }
+        #finalFeedback {
+            font-size: 2em;
+            color: black;
+            display: none;
+            margin-top: 20px;
+            animation: fadeIn 2s ease-in-out;
+        }
+        @keyframes fadeIn {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
     </style>
 </head>
 <body>
-    <h1>Read the Word</h1>
-    <button id="backButton">Back</button>
+    <h1>Word Reading Practice</h1>
+    <button id="backButton" class="button">Back</button>
     <div class="container">
         <img id="image" class="image" src="" alt="Image">
         <img id="icon" class="icon" src="businessman.png" alt="Icon">
     </div>
     <div class="word" id="word"></div>
-    <button id="startButton">Start Reading</button>
+    <button id="startButton" class="button">Start Reading</button>
     <div class="result" id="result"></div>
     
     <div class="scoreboard">
@@ -99,6 +133,9 @@
         <div id="secondThirdAttemptScore" class="score yellow">0</div>
         <div id="failedAttemptsScore" class="score red">0</div>
     </div>
+    
+    <div id="finalFeedback"></div>
+    <button id="restartButton" class="button">Restart</button>
     
     <div class="feedback" id="feedback">
         <img id="correctGif" src="certo.gif" alt="Correct">
@@ -129,17 +166,16 @@
 
         function loadWord(index) {
             if (index >= words.length) {
-                currentWordIndex = 0; // Reset to the first word if we've reached the end
+                showFinalFeedback(); // Show feedback when all words are completed
             } else {
                 currentWordIndex = index;
+                const currentWord = words[currentWordIndex];
+                const currentImage = `imagem${currentWordIndex + 1}.jpeg`;
+
+                document.getElementById("word").textContent = currentWord;
+                document.getElementById("image").src = imageFolderUrl + currentImage;
+                attemptCount = 0; // Reset attempt count for the new word
             }
-
-            const currentWord = words[currentWordIndex];
-            const currentImage = `imagem${currentWordIndex + 1}.jpeg`;
-
-            document.getElementById("word").textContent = currentWord;
-            document.getElementById("image").src = imageFolderUrl + currentImage;
-            attemptCount = 0; // Reset attempt count for the new word
         }
 
         const startButton = document.getElementById("startButton");
@@ -156,17 +192,25 @@
         const secondThirdAttemptScoreDiv = document.getElementById("secondThirdAttemptScore");
         const failedAttemptsScoreDiv = document.getElementById("failedAttemptsScore");
 
+        const finalFeedbackDiv = document.getElementById("finalFeedback");
+        const restartButton = document.getElementById("restartButton");
+
         const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
         recognition.lang = 'en-US';
         recognition.interimResults = false; // Only handle final results
         recognition.maxAlternatives = 1;
 
         startButton.addEventListener('click', () => {
+            stopAll(); // Stop any ongoing reading, animation, or audio
             startRecognition();
         });
 
         backButton.addEventListener('click', () => {
             window.history.back(); // Navigate back to the previous page
+        });
+
+        restartButton.addEventListener('click', () => {
+            restartGame(); // Restart the game
         });
 
         recognition.onresult = (event) => {
@@ -195,7 +239,7 @@
         };
 
         recognition.onend = () => {
-            // If recognition ends naturally (e.g., after a period of silence), treat it as incorrect
+            // Se o reconhecimento terminar naturalmente (ex: após um período de silêncio), trata como tentativa incorreta
             if (!resultDiv.textContent.includes("Correct!")) {
                 handleIncorrectAttempt();
             }
@@ -205,8 +249,8 @@
             resultDiv.textContent = "Listening...";
             recognition.start();
             recognitionTimeout = setTimeout(() => {
-                recognition.stop(); // Force stop recognition after 5 seconds
-            }, 5000); // 5 seconds timeout
+                recognition.stop(); // Força a interrupção do reconhecimento após 5 segundos
+            }, 5000); // 5 segundos de tempo limite
         }
 
         function handleIncorrectAttempt() {
@@ -214,17 +258,17 @@
             if (attemptCount >= maxAttempts) {
                 resultDiv.textContent = "Moving to the next word...";
                 resultDiv.style.color = "red";
-                updateScore(false); // Update the score after the third incorrect attempt
+                updateScore(false); // Atualiza a pontuação após a terceira tentativa incorreta
                 loadWord(currentWordIndex + 1);
             } else {
                 const tryAgainMessage = "Try again. Listen to the correct pronunciation of this word.";
                 resultDiv.textContent = tryAgainMessage;
                 resultDiv.style.color = "red";
                 readMessage(tryAgainMessage, () => {
-                    // Now, only read the word after the message has finished
+                    // Agora, só lê a palavra após a mensagem terminar e um pequeno atraso
                     setTimeout(() => {
                         readWordWithHighlight(words[currentWordIndex]);
-                    }, 2000); // 2-second delay before reading the word
+                    }, 2000); // 2 segundos de atraso antes de ler a palavra
                 });
             }
         }
@@ -244,6 +288,28 @@
             failedAttemptsScoreDiv.textContent = failedAttemptsScore;
         }
 
+        function showFinalFeedback() {
+            const totalWords = words.length;
+            const successRate = (firstAttemptScore / totalWords) * 100;
+
+            if (successRate === 100) {
+                finalFeedbackDiv.textContent = "Excellent!";
+                finalFeedbackDiv.style.color = "green";
+            } else if (successRate > 90) {
+                finalFeedbackDiv.textContent = "Very Good!";
+                finalFeedbackDiv.style.color = "blue";
+            } else if (successRate >= 80) {
+                finalFeedbackDiv.textContent = "Good!";
+                finalFeedbackDiv.style.color = "orange";
+            } else {
+                finalFeedbackDiv.textContent = "You need more practice!";
+                finalFeedbackDiv.style.color = "red";
+            }
+
+            finalFeedbackDiv.style.display = "block";
+            restartButton.style.display = "block";
+        }
+
         function playCorrectFeedback() {
             feedbackDiv.style.display = "block";
             correctGif.style.display = "block";
@@ -254,37 +320,59 @@
             feedbackDiv.style.display = "none";
             correctGif.style.display = "none";
             correctAudio.pause();
-            correctAudio.currentTime = 0; // Reset the audio to the beginning
+            correctAudio.currentTime = 0; // Redefine o áudio para o início
         }
 
-        // Function to read a message using Speech Synthesis
+        function stopAll() {
+            // Para todas as leituras, animações e sons em execução
+            speechSynthesis.cancel(); // Cancela qualquer leitura de texto em andamento
+            stopCorrectFeedback(); // Para a animação e o som
+            recognition.stop(); // Interrompe o reconhecimento de fala
+            clearTimeout(recognitionTimeout); // Limpa qualquer tempo limite pendente
+        }
+
+        // Função para ler uma mensagem usando Síntese de Fala
         function readMessage(message, callback) {
             const utterance = new SpeechSynthesisUtterance(message);
             utterance.lang = 'en-US';
-            utterance.onend = callback; // Call the callback function when the message is done
+            utterance.onend = callback; // Chama a função de callback quando a mensagem for lida
             speechSynthesis.speak(utterance);
         }
 
-        // Function to read the word using Speech Synthesis and highlight it
+        // Função para ler a palavra usando Síntese de Fala e destacá-la
         function readWordWithHighlight(word) {
             wordDiv.classList.add("enlarged");
             const utterance = new SpeechSynthesisUtterance(word);
             utterance.lang = 'en-US';
-            utterance.rate = 0.7; // Slow down the speech rate for clear pronunciation
+            utterance.rate = 0.7; // Diminui a velocidade da fala para clareza na pronúncia
             utterance.onend = () => {
                 wordDiv.classList.remove("enlarged");
             };
             speechSynthesis.speak(utterance);
         }
 
-        // Event listeners for image and icon clicks
+        // Event listeners para cliques na imagem e ícone
         imageElement.addEventListener('click', () => {
+            stopAll(); // Para qualquer execução anterior
             readWordWithHighlight(words[currentWordIndex]);
         });
 
         iconElement.addEventListener('click', () => {
+            stopAll(); // Para qualquer execução anterior
             readWordWithHighlight(words[currentWordIndex]);
         });
+
+        function restartGame() {
+            firstAttemptScore = 0;
+            secondThirdAttemptScore = 0;
+            failedAttemptsScore = 0;
+            firstAttemptScoreDiv.textContent = "0";
+            secondThirdAttemptScoreDiv.textContent = "0";
+            failedAttemptsScoreDiv.textContent = "0";
+            finalFeedbackDiv.style.display = "none";
+            restartButton.style.display = "none";
+            loadWord(0);
+        }
     </script>
 </body>
 </html>
