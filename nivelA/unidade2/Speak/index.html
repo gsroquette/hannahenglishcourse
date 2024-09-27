@@ -55,6 +55,32 @@
             font-size: 16px;
             cursor: pointer;
         }
+        .scoreboard {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .score {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5em;
+            color: white;
+            margin: 0 10px;
+        }
+        .score.green {
+            background-color: green;
+        }
+        .score.yellow {
+            background-color: yellow;
+            color: black;
+        }
+        .score.red {
+            background-color: red;
+        }
     </style>
 </head>
 <body>
@@ -67,6 +93,13 @@
     <div class="word" id="word"></div>
     <button id="startButton">Start Reading</button>
     <div class="result" id="result"></div>
+    
+    <div class="scoreboard">
+        <div id="firstAttemptScore" class="score green">0</div>
+        <div id="secondThirdAttemptScore" class="score yellow">0</div>
+        <div id="failedAttemptsScore" class="score red">0</div>
+    </div>
+    
     <div class="feedback" id="feedback">
         <img id="correctGif" src="certo.gif" alt="Correct">
         <audio id="correctAudio" src="certo.mp3"></audio>
@@ -80,6 +113,10 @@
         let attemptCount = 0;
         let recognitionTimeout;
         const maxAttempts = 3;
+
+        let firstAttemptScore = 0;
+        let secondThirdAttemptScore = 0;
+        let failedAttemptsScore = 0;
 
         // Fetch words from the words.txt file
         fetch(wordListUrl)
@@ -115,6 +152,10 @@
         const correctGif = document.getElementById("correctGif");
         const correctAudio = document.getElementById("correctAudio");
 
+        const firstAttemptScoreDiv = document.getElementById("firstAttemptScore");
+        const secondThirdAttemptScoreDiv = document.getElementById("secondThirdAttemptScore");
+        const failedAttemptsScoreDiv = document.getElementById("failedAttemptsScore");
+
         const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
         recognition.lang = 'en-US';
         recognition.interimResults = false; // Only handle final results
@@ -136,6 +177,7 @@
             if (speechResult.includes(expectedWord)) {
                 resultDiv.textContent = "Correct!";
                 resultDiv.style.color = "green";
+                updateScore();
                 playCorrectFeedback();
                 setTimeout(() => {
                     stopCorrectFeedback();
@@ -172,17 +214,31 @@
             if (attemptCount >= maxAttempts) {
                 resultDiv.textContent = "Moving to the next word...";
                 resultDiv.style.color = "red";
+                failedAttemptsScore++;
+                updateScore();
                 loadWord(currentWordIndex + 1);
             } else {
                 const tryAgainMessage = "Try again. Listen to the correct pronunciation of this word.";
                 resultDiv.textContent = tryAgainMessage;
                 resultDiv.style.color = "red";
                 readMessage(tryAgainMessage, () => {
+                    // Now, only read the word after the message has finished
                     setTimeout(() => {
                         readWordWithHighlight(words[currentWordIndex]);
                     }, 2000); // 2-second delay before reading the word
                 });
             }
+        }
+
+        function updateScore() {
+            if (attemptCount === 1) {
+                firstAttemptScore++;
+            } else if (attemptCount === 2 || attemptCount === 3) {
+                secondThirdAttemptScore++;
+            }
+            firstAttemptScoreDiv.textContent = firstAttemptScore;
+            secondThirdAttemptScoreDiv.textContent = secondThirdAttemptScore;
+            failedAttemptsScoreDiv.textContent = failedAttemptsScore;
         }
 
         function playCorrectFeedback() {
