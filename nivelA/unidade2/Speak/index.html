@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Word Reading Practice</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+        }
+        .word {
+            font-size: 2em;
+            margin: 20px 0;
+        }
+        .image {
+            width: 300px;
+            height: auto;
+        }
+        .result {
+            font-size: 1.5em;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Read the Word</h1>
+    <img id="image" class="image" src="" alt="Image">
+    <div class="word" id="word"></div>
+    <button id="startButton">Start Reading</button>
+    <div class="result" id="result"></div>
+
+    <script>
+        const wordListUrl = '../data1/words.txt';
+        const imageFolderUrl = '../data1/imagens/';
+        let words = [];
+        let currentWordIndex = 0;
+
+        // Fetch words from the words.txt file
+        fetch(wordListUrl)
+            .then(response => response.text())
+            .then(data => {
+                words = data.split('\n').map(word => word.trim()).filter(word => word);
+                loadWord(currentWordIndex);
+            })
+            .catch(error => console.error('Error fetching words:', error));
+
+        function loadWord(index) {
+            if (index >= words.length) {
+                currentWordIndex = 0; // Reset to the first word if we've reached the end
+            } else {
+                currentWordIndex = index;
+            }
+
+            const currentWord = words[currentWordIndex];
+            const currentImage = `imagem${currentWordIndex + 1}.jpeg`;
+
+            document.getElementById("word").textContent = currentWord;
+            document.getElementById("image").src = imageFolderUrl + currentImage;
+        }
+
+        const startButton = document.getElementById("startButton");
+        const resultDiv = document.getElementById("result");
+
+        const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        recognition.lang = 'en-US';
+
+        startButton.addEventListener('click', () => {
+            resultDiv.textContent = "Listening...";
+            recognition.start();
+        });
+
+        recognition.onresult = (event) => {
+            const speechResult = event.results[0][0].transcript.toLowerCase();
+            const expectedWord = words[currentWordIndex].toLowerCase();
+
+            if (speechResult.includes(expectedWord)) {
+                resultDiv.textContent = "Correct!";
+                resultDiv.style.color = "green";
+            } else {
+                resultDiv.textContent = "Try again!";
+                resultDiv.style.color = "red";
+            }
+
+            // Move to the next word and image
+            loadWord(currentWordIndex + 1);
+        };
+
+        recognition.onerror = (event) => {
+            resultDiv.textContent = "Error occurred in recognition: " + event.error;
+            resultDiv.style.color = "red";
+        };
+    </script>
+</body>
+</html>
