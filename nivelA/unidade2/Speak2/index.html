@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Word Reading Practice</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+            background-color: #f5f5f5;
+            padding: 0 20px;
+        }
+        h1 {
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 3em;
+            color: #333;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px #aaa;
+        }
+        .container {
+            position: relative;
+            display: inline-block;
+        }
+        .image {
+            width: 300px;
+            height: auto;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        .icon {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+        }
+        .word {
+            font-size: 2em;
+            margin: 20px 0;
+            transition: transform 0.5s ease;
+        }
+        .word.enlarged {
+            transform: scale(1.5);
+            color: #DAA520; /* Amarelo escuro */
+            font-weight: bold;
+        }
+        .result {
+            font-size: 1.5em;
+            margin-top: 20px;
+        }
+        .feedback {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+        }
+        .button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+            transition: background-color 0.3s ease;
+        }
+        .button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #backButton {
+            margin-bottom: 20px;
+            display: inline-block;
+        }
+        .navigation {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .nav-button {
+            margin: 0 10px;
+        }
+        #startButton {
+            background-color: #007BFF;
+            border: none;
+            cursor: pointer;
+            border-radius: 50%;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            display: inline-block;
+            transition: box-shadow 0.3s ease;
+        }
+        #startButton img {
+            width: 50px;
+            height: 50px;
+        }
+        #startButton:hover {
+            box-shadow: 0px 6px 12px rgba(0, 0, 0, 0.3);
+        }
+        #finalFeedback {
+            font-size: 2em;
+            color: black;
+            display: none;
+            margin-top: 20px;
+            animation: fadeIn 2s ease-in-out;
+        }
+        @keyframes fadeIn {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+
+        /* Media Query for Small Screens */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2em;
+                margin-top: 20px;
+            }
+            #backButton {
+                margin-bottom: 10px;
+            }
+            #startButton img {
+                width: 40px;
+                height: 40px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <button id="backButton" class="button">Back</button>
+    <h1>Word Reading Practice</h1>
+    <div class="container">
+        <img id="image" class="image" src="" alt="Image">
+        <img id="icon" class="icon" src="businessman.png" alt="Icon">
+    </div>
+    <div class="word" id="word"></div>
+    <button id="startButton">
+        <img src="microfone.png" alt="Start Reading">
+    </button>
+    <div class="result" id="result"></div>
+    
+    <div class="navigation">
+        <button id="prevButton" class="button nav-button">Previous</button>
+        <button id="nextButton" class="button nav-button">Next</button>
+    </div>
+    
+    <div id="finalFeedback"></div>
+    <button id="restartButton" class="button" style="display: none;">Restart</button>
+    
+    <div class="feedback" id="feedback">
+        <img id="correctGif" src="certo.gif" alt="Correct">
+        <audio id="correctAudio" src="certo.mp3"></audio>
+    </div>
+
+    <script>
+        const wordListUrl = '../data2/words.txt';
+        const imageFolderUrl = '../data2/imagens/';
+        let words = [];
+        let currentWordIndex = 0;
+        let recognitionTimeout;
+        let tryAgainPlayed = false;
+
+        // Fetch words from the words.txt file
+        fetch(wordListUrl)
+            .then(response => response.text())
+            .then(data => {
+                words = data.split('\n').map(word => word.trim()).filter(word => word);
+                loadWord(currentWordIndex);
+            })
+            .catch(error => console.error('Error fetching words:', error));
+
+        function loadWord(index) {
+            if (index >= words.length) {
+                showFinalFeedback(); // Show feedback when all words are completed
+            } else if (index < 0) {
+                currentWordIndex = 0;
+            } else {
+                currentWordIndex = index;
+                const currentWord = words[currentWordIndex];
+                const currentImage = `imagem${currentWordIndex + 1}.jpeg`;
+
+                document.getElementById("word").textContent = currentWord;
+                document.getElementById("image").src = imageFolderUrl + currentImage;
+                resetFeedback(); // Clear any feedback when navigating
+                tryAgainPlayed = false; // Reset Try Again flag
+            }
+        }
+
+        const startButton = document.getElementById("startButton");
+        const prevButton = document.getElementById("prevButton");
+        const nextButton = document.getElementById("nextButton");
+        const backButton = document.getElementById("backButton");
+        const resultDiv = document.getElementById("result");
+        const wordDiv = document.getElementById("word");
+        const imageElement = document.getElementById("image");
+        const iconElement = document.getElementById("icon");
+        const feedbackDiv = document.getElementById("feedback");
+        const correctGif = document.getElementById("correctGif");
+        const correctAudio = document.getElementById("correctAudio");
+
+        const finalFeedbackDiv = document.getElementById("finalFeedback");
+        const restartButton = document.getElementById("restartButton");
+
+        const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        recognition.lang = 'en-US';
+        recognition.interimResults = false; // Only handle final results
+        recognition.maxAlternatives = 1;
+
+        startButton.addEventListener('click', () => {
+            disableStartButton();
+            startRecognition(); // Start recognition without stopping any ongoing processes
+        });
+
+        prevButton.addEventListener('click', () => {
+            loadWord(currentWordIndex - 1);
+        });
+
+        nextButton.addEventListener('click', () => {
+            loadWord(currentWordIndex + 1);
+        });
+
+        backButton.addEventListener('click', () => {
+            window.history.back(); // Navigate back to the previous page
+        });
+
+        restartButton.addEventListener('click', () => {
+            restartGame(); // Restart the game
+        });
+
+        recognition.onresult = (event) => {
+            clearTimeout(recognitionTimeout);
+            const speechResult = event.results[0][0].transcript.toLowerCase();
+            const expectedWord = words[currentWordIndex].toLowerCase();
+
+            if (speechResult.includes(expectedWord)) {
+                handleCorrectAnswer();
+            } else {
+                handleIncorrectAttempt();
+            }
+        };
+
+        recognition.onerror = (event) => {
+            resultDiv.textContent = "Error occurred in recognition: " + event.error;
+            resultDiv.style.color = "red";
+            clearTimeout(recognitionTimeout);
+            enableStartButton();
+        };
+
+        recognition.onend = () => {
+            if (!resultDiv.textContent.includes("Correct!") && !tryAgainPlayed) {
+                handleIncorrectAttempt();
+            }
+        };
+
+        function startRecognition() {
+            resultDiv.textContent = "Listening...";
+            recognition.start();
+            recognitionTimeout = setTimeout(() => {
+                recognition.stop();
+            }, 5000);
+        }
+
+        function handleCorrectAnswer() {
+            resultDiv.textContent = "Correct!";
+            resultDiv.style.color = "green";
+            playCorrectFeedback();
+            setTimeout(() => {
+                stopCorrectFeedback();
+                if (currentWordIndex + 1 < words.length) {
+                    loadWord(currentWordIndex + 1);
+                } else {
+                    showFinalFeedback();
+                }
+                enableStartButton();
+            }, 3000); // 3 segundos para o feedback
+        }
+
+        function handleIncorrectAttempt() {
+            if (!tryAgainPlayed) {
+                tryAgainPlayed = true;
+                const tryAgainMessage = "Try again. Listen to the correct pronunciation of this word.";
+                resultDiv.textContent = tryAgainMessage;
+                resultDiv.style.color = "red";
+                readMessage(tryAgainMessage, () => {
+                    setTimeout(() => {
+                        readWordWithHighlight(words[currentWordIndex]);
+                        enableStartButton();
+                    }, 2000);
+                });
+            }
+        }
+
+        function resetFeedback() {
+            resultDiv.textContent = "";
+            feedbackDiv.style.display = "none";
+            correctGif.style.display = "none";
+            correctAudio.pause();
+            correctAudio.currentTime = 0;
+        }
+
+        function playCorrectFeedback() {
+            feedbackDiv.style.display = "block";
+            correctGif.style.display = "block";
+            correctAudio.play();
+        }
+
+        function stopCorrectFeedback() {
+            feedbackDiv.style.display = "none";
+            correctGif.style.display = "none";
+            correctAudio.pause();
+            correctAudio.currentTime = 0;
+        }
+
+        function readMessage(message, callback) {
+            const utterance = new SpeechSynthesisUtterance(message);
+            utterance.lang = 'en-US';
+            utterance.onend = callback;
+            speechSynthesis.speak(utterance);
+        }
+
+        function readWordWithHighlight(word) {
+            wordDiv.classList.add("enlarged");
+            const utterance = new SpeechSynthesisUtterance(word);
+            utterance.lang = 'en-US';
+            utterance.rate = 0.7;
+            utterance.onend = () => {
+                wordDiv.classList.remove("enlarged");
+            };
+            speechSynthesis.speak(utterance);
+        }
+
+        imageElement.addEventListener('click', () => {
+            readWordWithHighlight(words[currentWordIndex]);
+        });
+
+        iconElement.addEventListener('click', () => {
+            readWordWithHighlight(words[currentWordIndex]);
+        });
+
+        function showFinalFeedback() {
+            finalFeedbackDiv.textContent = "You've completed all words!";
+            finalFeedbackDiv.style.display = "block";
+            restartButton.style.display = "inline-block"; // Show restart button at the end
+        }
+
+        function restartGame() {
+            currentWordIndex = 0;
+            finalFeedbackDiv.style.display = "none";
+            restartButton.style.display = "none";
+            loadWord(0);
+            enableStartButton();
+        }
+
+        function disableStartButton() {
+            startButton.disabled = true;
+        }
+
+        function enableStartButton() {
+            startButton.disabled = false;
+        }
+    </script>
+</body>
+</html>
