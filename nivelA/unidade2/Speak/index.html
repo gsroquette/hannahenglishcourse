@@ -51,6 +51,9 @@
         const imageFolderUrl = '../data1/imagens/';
         let words = [];
         let currentWordIndex = 0;
+        let attemptCount = 0;
+        let recognitionTimeout;
+        const maxAttempts = 3;
 
         // Fetch words from the words.txt file
         fetch(wordListUrl)
@@ -73,6 +76,7 @@
 
             document.getElementById("word").textContent = currentWord;
             document.getElementById("image").src = imageFolderUrl + currentImage;
+            attemptCount = 0; // Reset attempt count for the new word
         }
 
         const startButton = document.getElementById("startButton");
@@ -84,30 +88,56 @@
         recognition.lang = 'en-US';
 
         startButton.addEventListener('click', () => {
-            resultDiv.textContent = "Listening...";
-            recognition.start();
+            startRecognition();
         });
 
         recognition.onresult = (event) => {
+            clearTimeout(recognitionTimeout);
             const speechResult = event.results[0][0].transcript.toLowerCase();
             const expectedWord = words[currentWordIndex].toLowerCase();
 
             if (speechResult.includes(expectedWord)) {
                 resultDiv.textContent = "Correct!";
                 resultDiv.style.color = "green";
+                attemptCount = 0; // Reset attempt count on correct answer
+                loadWord(currentWordIndex + 1); // Load the next word
             } else {
-                resultDiv.textContent = "Try again!";
-                resultDiv.style.color = "red";
+                handleIncorrectAttempt();
             }
-
-            // Move to the next word and image
-            loadWord(currentWordIndex + 1);
         };
 
         recognition.onerror = (event) => {
             resultDiv.textContent = "Error occurred in recognition: " + event.error;
             resultDiv.style.color = "red";
+            clearTimeout(recognitionTimeout);
         };
+
+        recognition.onspeechend = () => {
+            clearTimeout(recognitionTimeout);
+            recognition.stop();
+        };
+
+        function startRecognition() {
+            resultDiv.textContent = "Listening...";
+            recognition.start();
+            recognitionTimeout = setTimeout(() => {
+                recognition.stop();
+                handleIncorrectAttempt();
+            }, 10000); // 10 seconds timeout
+        }
+
+        function handleIncorrectAttempt() {
+            attemptCount++;
+            if (attemptCount >= maxAttempts) {
+                resultDiv.textContent = "Moving to the next word...";
+                resultDiv.style.color = "red";
+                loadWord(currentWordIndex + 1);
+            } else {
+                resultDiv.textContent = "Try again. Listen to the correct pronunciation of this word.";
+                resultDiv.style.color = "red";
+                readWord(words[currentWordIndex]);
+            }
+        }
 
         // Function to read the word using Speech Synthesis
         function readWord(word) {
