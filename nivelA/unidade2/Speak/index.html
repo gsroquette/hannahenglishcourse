@@ -162,7 +162,6 @@
         let currentWordIndex = 0;
         let attemptCount = 0;
         let recognitionTimeout;
-        let tryAgainPlayed = false; // Controlar se o "Try Again" foi lido
         const maxAttempts = 3;
 
         let firstAttemptScore = 0;
@@ -189,7 +188,6 @@
                 document.getElementById("word").textContent = currentWord;
                 document.getElementById("image").src = imageFolderUrl + currentImage;
                 attemptCount = 0; // Reset attempt count for the new word
-                tryAgainPlayed = false; // Reset "Try Again" control
             }
         }
 
@@ -262,9 +260,15 @@
         }
 
         function handleCorrectAnswer() {
+            if (attemptCount === 0) { // Primeira tentativa
+                firstAttemptScore++;
+                firstAttemptScoreDiv.textContent = firstAttemptScore;
+            } else if (attemptCount === 1 || attemptCount === 2) { // Segunda ou terceira tentativa
+                secondThirdAttemptScore++;
+                secondThirdAttemptScoreDiv.textContent = secondThirdAttemptScore;
+            }
             resultDiv.textContent = "Correct!";
             resultDiv.style.color = "green";
-            updateScore(true);
             playCorrectFeedback();
             setTimeout(() => {
                 stopCorrectFeedback();
@@ -282,7 +286,8 @@
             if (attemptCount >= maxAttempts) {
                 resultDiv.textContent = "Moving to the next word...";
                 resultDiv.style.color = "red";
-                updateScore(false);
+                failedAttemptsScore++;
+                failedAttemptsScoreDiv.textContent = failedAttemptsScore;
                 setTimeout(() => {
                     if (currentWordIndex + 1 < words.length) {
                         loadWord(currentWordIndex + 1);
@@ -298,32 +303,14 @@
 
         function playTryAgainMessage() {
             const tryAgainMessage = "Try again. Listen to the correct pronunciation of this word.";
-            if (!tryAgainPlayed) {
-                resultDiv.textContent = tryAgainMessage;
-                resultDiv.style.color = "red";
-                readMessage(tryAgainMessage, () => {
-                    setTimeout(() => {
-                        readWordWithHighlight(words[currentWordIndex]);
-                        enableStartButton();
-                    }, 2000);
-                });
-                tryAgainPlayed = true;
-            }
-        }
-
-        function updateScore(correct) {
-            if (correct) {
-                if (attemptCount === 1) {
-                    firstAttemptScore++;
-                    firstAttemptScoreDiv.textContent = firstAttemptScore;
-                } else if (attemptCount > 1 && attemptCount <= 3) {
-                    secondThirdAttemptScore++;
-                    secondThirdAttemptScoreDiv.textContent = secondThirdAttemptScore;
-                }
-            } else {
-                failedAttemptsScore++;
-                failedAttemptsScoreDiv.textContent = failedAttemptsScore;
-            }
+            resultDiv.textContent = tryAgainMessage;
+            resultDiv.style.color = "red";
+            readMessage(tryAgainMessage, () => {
+                setTimeout(() => {
+                    readWordWithHighlight(words[currentWordIndex]);
+                    enableStartButton();
+                }, 2000);
+            });
         }
 
         function showFinalFeedback() {
