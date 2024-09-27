@@ -170,6 +170,7 @@
         let words = [];
         let currentWordIndex = 0;
         let recognitionTimeout;
+        let tryAgainInProgress = false; // Flag to prevent duplicate "Try Again"
 
         // Fetch words from the words.txt file
         fetch(wordListUrl)
@@ -193,6 +194,7 @@
                 document.getElementById("word").textContent = currentWord;
                 document.getElementById("image").src = imageFolderUrl + currentImage;
                 resetFeedback(); // Clear any feedback when navigating
+                tryAgainInProgress = false; // Reset flag
                 enableStartButton(); // Re-enable the start button
             }
         }
@@ -248,7 +250,9 @@
             if (speechResult.includes(expectedWord)) {
                 handleCorrectAnswer();
             } else {
-                handleIncorrectAttempt();
+                if (!tryAgainInProgress) {
+                    handleIncorrectAttempt();
+                }
             }
         };
 
@@ -260,7 +264,7 @@
         };
 
         recognition.onend = () => {
-            if (!resultDiv.textContent.includes("Correct!")) {
+            if (!resultDiv.textContent.includes("Correct!") && !tryAgainInProgress) {
                 handleIncorrectAttempt();
             }
         };
@@ -287,12 +291,15 @@
         }
 
         function handleIncorrectAttempt() {
+            tryAgainInProgress = true;
             const tryAgainMessage = "Try again. Listen to the correct pronunciation of this word.";
             resultDiv.textContent = tryAgainMessage;
             resultDiv.style.color = "red";
             readMessage(tryAgainMessage, () => {
-                readWordWithHighlight(words[currentWordIndex]);
-                enableStartButton();
+                readWordWithHighlight(words[currentWordIndex], () => {
+                    enableStartButton();
+                    tryAgainInProgress = false;
+                });
             });
         }
 
@@ -324,13 +331,14 @@
             speechSynthesis.speak(utterance);
         }
 
-        function readWordWithHighlight(word) {
+        function readWordWithHighlight(word, callback) {
             wordDiv.classList.add("enlarged");
             const utterance = new SpeechSynthesisUtterance(word);
             utterance.lang = 'en-US';
             utterance.rate = 0.7;
             utterance.onend = () => {
                 wordDiv.classList.remove("enlarged");
+                if (callback) callback();
             };
             speechSynthesis.speak(utterance);
         }
