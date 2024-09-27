@@ -5,7 +5,111 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Word Reading Practice</title>
     <style>
-        /* [Estilo CSS permanece o mesmo] */
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+            background-color: #f5f5f5;
+            padding: 0 20px;
+        }
+        h1 {
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 3em;
+            color: #333;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px #aaa;
+        }
+        .container {
+            position: relative;
+            display: inline-block;
+        }
+        .image {
+            width: 300px;
+            height: auto;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        .icon {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+        }
+        .word {
+            font-size: 2em;
+            margin: 20px 0;
+            transition: transform 0.5s ease;
+        }
+        .word.enlarged {
+            transform: scale(1.5);
+            color: #DAA520; /* Amarelo escuro */
+            font-weight: bold;
+        }
+        .result {
+            font-size: 1.5em;
+            margin-top: 20px;
+        }
+        .feedback {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+        }
+        .button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+            transition: background-color 0.3s ease;
+        }
+        .button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #backButton {
+            margin-bottom: 20px;
+            display: inline-block;
+        }
+        .navigation {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .nav-button {
+            margin: 0 10px;
+        }
+        #finalFeedback {
+            font-size: 2em;
+            color: black;
+            display: none;
+            margin-top: 20px;
+            animation: fadeIn 2s ease-in-out;
+        }
+        @keyframes fadeIn {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+
+        /* Media Query for Small Screens */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2em;
+                margin-top: 20px;
+            }
+            #backButton {
+                margin-bottom: 10px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -19,9 +123,9 @@
     <button id="startButton" class="button">Start Reading</button>
     <div class="result" id="result"></div>
     
-    <div class="scoreboard">
-        <div id="correctScore" class="score green">0</div>
-        <div id="failedScore" class="score red">0</div>
+    <div class="navigation">
+        <button id="prevButton" class="button nav-button">Previous</button>
+        <button id="nextButton" class="button nav-button">Next</button>
     </div>
     
     <div id="finalFeedback"></div>
@@ -37,10 +141,7 @@
         const imageFolderUrl = '../data1/imagens/';
         let words = [];
         let currentWordIndex = 0;
-        let attemptCount = 0;
-
-        let correctScore = 0;
-        let failedScore = 0;
+        let recognitionTimeout;
 
         // Fetch words from the words.txt file
         fetch(wordListUrl)
@@ -53,7 +154,9 @@
 
         function loadWord(index) {
             if (index >= words.length) {
-                showFinalFeedback();
+                showFinalFeedback(); // Show feedback when all words are completed
+            } else if (index < 0) {
+                currentWordIndex = 0;
             } else {
                 currentWordIndex = index;
                 const currentWord = words[currentWordIndex];
@@ -61,14 +164,12 @@
 
                 document.getElementById("word").textContent = currentWord;
                 document.getElementById("image").src = imageFolderUrl + currentImage;
-
-                // Reset attempt count for the new word
-                attemptCount = 0;
-                enableStartButton();
             }
         }
 
         const startButton = document.getElementById("startButton");
+        const prevButton = document.getElementById("prevButton");
+        const nextButton = document.getElementById("nextButton");
         const backButton = document.getElementById("backButton");
         const resultDiv = document.getElementById("result");
         const wordDiv = document.getElementById("word");
@@ -77,9 +178,6 @@
         const feedbackDiv = document.getElementById("feedback");
         const correctGif = document.getElementById("correctGif");
         const correctAudio = document.getElementById("correctAudio");
-
-        const correctScoreDiv = document.getElementById("correctScore");
-        const failedScoreDiv = document.getElementById("failedScore");
 
         const finalFeedbackDiv = document.getElementById("finalFeedback");
         const restartButton = document.getElementById("restartButton");
@@ -91,7 +189,15 @@
 
         startButton.addEventListener('click', () => {
             disableStartButton();
-            startRecognition();
+            startRecognition(); // Start recognition without stopping any ongoing processes
+        });
+
+        prevButton.addEventListener('click', () => {
+            loadWord(currentWordIndex - 1);
+        });
+
+        nextButton.addEventListener('click', () => {
+            loadWord(currentWordIndex + 1);
         });
 
         backButton.addEventListener('click', () => {
@@ -106,8 +212,6 @@
             clearTimeout(recognitionTimeout);
             const speechResult = event.results[0][0].transcript.toLowerCase();
             const expectedWord = words[currentWordIndex].toLowerCase();
-
-            recognition.stop(); // Ensure recognition is stopped
 
             if (speechResult.includes(expectedWord)) {
                 handleCorrectAnswer();
@@ -138,81 +242,26 @@
         }
 
         function handleCorrectAnswer() {
-            correctScore++;
-            correctScoreDiv.textContent = correctScore;
-
             resultDiv.textContent = "Correct!";
             resultDiv.style.color = "green";
             playCorrectFeedback();
-            
             setTimeout(() => {
                 stopCorrectFeedback();
-                if (currentWordIndex + 1 < words.length) {
-                    loadWord(currentWordIndex + 1);
-                } else {
-                    showFinalFeedback();
-                }
-            }, 3000);
+                loadWord(currentWordIndex + 1);
+                enableStartButton();
+            }, 3000); // 3 segundos para o feedback
         }
 
         function handleIncorrectAttempt() {
-            attemptCount++;
-            clearTimeout(recognitionTimeout);
-            recognition.stop();
-
-            if (attemptCount >= 2) { // If two incorrect attempts, move to next word
-                failedScore++;
-                failedScoreDiv.textContent = failedScore;
-
-                resultDiv.textContent = "Moving to the next word...";
-                resultDiv.style.color = "red";
-
-                setTimeout(() => {
-                    if (currentWordIndex + 1 < words.length) {
-                        loadWord(currentWordIndex + 1);
-                    } else {
-                        showFinalFeedback();
-                    }
-                    enableStartButton();
-                }, 2000);
-            } else {
-                playTryAgainMessage();
-            }
-        }
-
-        function playTryAgainMessage() {
             const tryAgainMessage = "Try again. Listen to the correct pronunciation of this word.";
             resultDiv.textContent = tryAgainMessage;
             resultDiv.style.color = "red";
-
             readMessage(tryAgainMessage, () => {
                 setTimeout(() => {
                     readWordWithHighlight(words[currentWordIndex]);
                     enableStartButton();
                 }, 2000);
             });
-        }
-
-        function showFinalFeedback() {
-            const totalWords = words.length;
-            const successRate = (correctScore / totalWords) * 100;
-
-            if (successRate === 100) {
-                finalFeedbackDiv.textContent = "Excellent!";
-                finalFeedbackDiv.style.color = "green";
-            } else if (successRate > 90) {
-                finalFeedbackDiv.textContent = "Very Good!";
-                finalFeedbackDiv.style.color = "blue";
-            } else if (successRate >= 80) {
-                finalFeedbackDiv.textContent = "Good!";
-                finalFeedbackDiv.style.color = "orange";
-            } else {
-                finalFeedbackDiv.textContent = "You need more practice!";
-                finalFeedbackDiv.style.color = "red";
-            }
-
-            finalFeedbackDiv.style.display = "block";
-            restartButton.style.display = "block";
         }
 
         function playCorrectFeedback() {
@@ -256,11 +305,6 @@
 
         function restartGame() {
             currentWordIndex = 0;
-            correctScore = 0;
-            failedScore = 0;
-
-            correctScoreDiv.textContent = "0";
-            failedScoreDiv.textContent = "0";
             finalFeedbackDiv.style.display = "none";
             restartButton.style.display = "none";
             loadWord(0);
@@ -273,6 +317,12 @@
 
         function enableStartButton() {
             startButton.disabled = false;
+        }
+
+        function showFinalFeedback() {
+            finalFeedbackDiv.textContent = "You've completed all words!";
+            finalFeedbackDiv.style.display = "block";
+            restartButton.style.display = "block";
         }
     </script>
 </body>
