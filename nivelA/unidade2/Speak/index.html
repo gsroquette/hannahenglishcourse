@@ -29,6 +29,11 @@
         .word {
             font-size: 2em;
             margin: 20px 0;
+            transition: transform 0.5s ease;
+        }
+        .word.enlarged {
+            transform: scale(1.5);
+            color: red;
         }
         .result {
             font-size: 1.5em;
@@ -44,24 +49,17 @@
         }
         #backButton {
             position: absolute;
-            top: 20px;
-            left: 20px;
+            top: 10px;
+            left: 10px;
             padding: 10px 20px;
-            background-color: #007BFF;
-            color: white;
-            border: none;
+            font-size: 16px;
             cursor: pointer;
-        }
-        #backButton:hover {
-            background-color: #0056b3;
         }
     </style>
 </head>
 <body>
     <h1>Read the Word</h1>
-    
     <button id="backButton">Back</button>
-
     <div class="container">
         <img id="image" class="image" src="" alt="Image">
         <img id="icon" class="icon" src="businessman.png" alt="Icon">
@@ -108,13 +106,14 @@
         }
 
         const startButton = document.getElementById("startButton");
+        const backButton = document.getElementById("backButton");
         const resultDiv = document.getElementById("result");
+        const wordDiv = document.getElementById("word");
         const imageElement = document.getElementById("image");
         const iconElement = document.getElementById("icon");
         const feedbackDiv = document.getElementById("feedback");
         const correctGif = document.getElementById("correctGif");
         const correctAudio = document.getElementById("correctAudio");
-        const backButton = document.getElementById("backButton");
 
         const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
         recognition.lang = 'en-US';
@@ -126,7 +125,7 @@
         });
 
         backButton.addEventListener('click', () => {
-            window.history.back(); // Go to the previous page
+            window.history.back(); // Navigate back to the previous page
         });
 
         recognition.onresult = (event) => {
@@ -154,6 +153,7 @@
         };
 
         recognition.onend = () => {
+            // If recognition ends naturally (e.g., after a period of silence), treat it as incorrect
             if (!resultDiv.textContent.includes("Correct!")) {
                 handleIncorrectAttempt();
             }
@@ -179,7 +179,7 @@
                 resultDiv.style.color = "red";
                 readMessage(tryAgainMessage, () => {
                     setTimeout(() => {
-                        readWord(words[currentWordIndex], true);
+                        readWordWithHighlight(words[currentWordIndex]);
                     }, 2000); // 2-second delay before reading the word
                 });
             }
@@ -206,23 +206,25 @@
             speechSynthesis.speak(utterance);
         }
 
-        // Function to read the word using Speech Synthesis
-        function readWord(word, slow = false) {
+        // Function to read the word using Speech Synthesis and highlight it
+        function readWordWithHighlight(word) {
+            wordDiv.classList.add("enlarged");
             const utterance = new SpeechSynthesisUtterance(word);
             utterance.lang = 'en-US';
-            if (slow) {
-                utterance.rate = 0.7; // Slow down the speech rate for clear pronunciation
-            }
+            utterance.rate = 0.7; // Slow down the speech rate for clear pronunciation
+            utterance.onend = () => {
+                wordDiv.classList.remove("enlarged");
+            };
             speechSynthesis.speak(utterance);
         }
 
         // Event listeners for image and icon clicks
         imageElement.addEventListener('click', () => {
-            readWord(words[currentWordIndex]);
+            readWordWithHighlight(words[currentWordIndex]);
         });
 
         iconElement.addEventListener('click', () => {
-            readWord(words[currentWordIndex]);
+            readWordWithHighlight(words[currentWordIndex]);
         });
     </script>
 </body>
