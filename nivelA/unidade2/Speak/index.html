@@ -234,19 +234,7 @@
             const expectedWord = words[currentWordIndex].toLowerCase();
 
             if (speechResult.includes(expectedWord)) {
-                resultDiv.textContent = "Correct!";
-                resultDiv.style.color = "green";
-                updateScore(true); // Update the score immediately after a correct answer
-                playCorrectFeedback();
-                setTimeout(() => {
-                    stopCorrectFeedback();
-                    if (currentWordIndex + 1 < words.length) {
-                        loadWord(currentWordIndex + 1); // Load the next word
-                    } else {
-                        showFinalFeedback(); // Show feedback when all words are completed
-                    }
-                    enableStartButton();
-                }, 3000); // 3 seconds for feedback
+                handleCorrectAnswer();
             } else {
                 handleIncorrectAttempt();
             }
@@ -260,7 +248,6 @@
         };
 
         recognition.onend = () => {
-            // Se o reconhecimento terminar naturalmente (ex: após um período de silêncio), trata como tentativa incorreta
             if (!resultDiv.textContent.includes("Correct!")) {
                 handleIncorrectAttempt();
             }
@@ -270,8 +257,24 @@
             resultDiv.textContent = "Listening...";
             recognition.start();
             recognitionTimeout = setTimeout(() => {
-                recognition.stop(); // Força a interrupção do reconhecimento após 5 segundos
-            }, 5000); // 5 segundos de tempo limite
+                recognition.stop();
+            }, 5000);
+        }
+
+        function handleCorrectAnswer() {
+            resultDiv.textContent = "Correct!";
+            resultDiv.style.color = "green";
+            updateScore(true);
+            playCorrectFeedback();
+            setTimeout(() => {
+                stopCorrectFeedback();
+                if (currentWordIndex + 1 < words.length) {
+                    loadWord(currentWordIndex + 1);
+                } else {
+                    showFinalFeedback();
+                }
+                enableStartButton();
+            }, 3000); // 3 segundos para o feedback
         }
 
         function handleIncorrectAttempt() {
@@ -279,34 +282,38 @@
             if (attemptCount >= maxAttempts) {
                 resultDiv.textContent = "Moving to the next word...";
                 resultDiv.style.color = "red";
-                updateScore(false); // Atualiza a pontuação após a terceira tentativa incorreta
+                updateScore(false);
                 setTimeout(() => {
                     if (currentWordIndex + 1 < words.length) {
                         loadWord(currentWordIndex + 1);
                     } else {
-                        showFinalFeedback(); // Show feedback when all words are completed
+                        showFinalFeedback();
                     }
                     enableStartButton();
-                }, 2000); // Pequeno atraso para dar tempo ao feedback antes de mudar
+                }, 2000); // Pequeno atraso antes de mudar de palavra
             } else {
-                const tryAgainMessage = "Try again. Listen to the correct pronunciation of this word.";
-                if (!tryAgainPlayed) { // Garante que "Try Again" é lido apenas uma vez por tentativa
-                    resultDiv.textContent = tryAgainMessage;
-                    resultDiv.style.color = "red";
-                    readMessage(tryAgainMessage, () => {
-                        setTimeout(() => {
-                            readWordWithHighlight(words[currentWordIndex]);
-                            enableStartButton();
-                        }, 2000); // 2 segundos de atraso antes de ler a palavra
-                    });
-                    tryAgainPlayed = true;
-                }
+                playTryAgainMessage();
+            }
+        }
+
+        function playTryAgainMessage() {
+            const tryAgainMessage = "Try again. Listen to the correct pronunciation of this word.";
+            if (!tryAgainPlayed) {
+                resultDiv.textContent = tryAgainMessage;
+                resultDiv.style.color = "red";
+                readMessage(tryAgainMessage, () => {
+                    setTimeout(() => {
+                        readWordWithHighlight(words[currentWordIndex]);
+                        enableStartButton();
+                    }, 2000);
+                });
+                tryAgainPlayed = true;
             }
         }
 
         function updateScore(correct) {
             if (correct) {
-                if (attemptCount === 1) { // Verifica se é a primeira tentativa
+                if (attemptCount === 1) {
                     firstAttemptScore++;
                     firstAttemptScoreDiv.textContent = firstAttemptScore;
                 } else if (attemptCount > 1 && attemptCount <= 3) {
@@ -351,30 +358,27 @@
             feedbackDiv.style.display = "none";
             correctGif.style.display = "none";
             correctAudio.pause();
-            correctAudio.currentTime = 0; // Redefine o áudio para o início
+            correctAudio.currentTime = 0;
         }
 
-        // Função para ler uma mensagem usando Síntese de Fala
         function readMessage(message, callback) {
             const utterance = new SpeechSynthesisUtterance(message);
             utterance.lang = 'en-US';
-            utterance.onend = callback; // Chama a função de callback quando a mensagem for lida
+            utterance.onend = callback;
             speechSynthesis.speak(utterance);
         }
 
-        // Função para ler a palavra usando Síntese de Fala e destacá-la
         function readWordWithHighlight(word) {
             wordDiv.classList.add("enlarged");
             const utterance = new SpeechSynthesisUtterance(word);
             utterance.lang = 'en-US';
-            utterance.rate = 0.7; // Diminui a velocidade da fala para clareza na pronúncia
+            utterance.rate = 0.7;
             utterance.onend = () => {
                 wordDiv.classList.remove("enlarged");
             };
             speechSynthesis.speak(utterance);
         }
 
-        // Event listeners para cliques na imagem e ícone
         imageElement.addEventListener('click', () => {
             readWordWithHighlight(words[currentWordIndex]);
         });
