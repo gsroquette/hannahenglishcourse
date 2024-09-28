@@ -8,26 +8,35 @@
         body {
             font-family: Arial, sans-serif;
             margin: 0;
-            padding: 20px;
+            padding: 0;
             background-color: #f0f0f0;
             color: #333;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
         }
         header {
-            display: flex;
+            position: fixed;
+            top: 0;
             width: 100%;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px;
             background-color: #4CAF50;
             color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
         }
-        header h1 {
+        .header-content {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            max-width: 800px;
+            justify-content: space-between;
+        }
+        h1 {
             margin: 0;
             font-size: 1.5em;
+            text-align: center;
+            flex-grow: 1;
         }
         header button {
             background-color: white;
@@ -37,6 +46,11 @@
             font-size: 1em;
             cursor: pointer;
             border-radius: 5px;
+            display: flex;
+            align-items: center;
+        }
+        header button img {
+            margin-right: 5px;
         }
         header button:hover {
             background-color: #45a049;
@@ -45,45 +59,37 @@
         .content-wrapper {
             width: 100%;
             max-width: 800px;
-            margin: 20px auto;
+            margin: 100px auto 20px auto; /* Ajusta o topo para evitar sobreposição com o cabeçalho fixo */
             padding: 20px;
             background-color: white;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             border-radius: 8px;
         }
-        h2 {
-            color: #4CAF50;
-        }
         .highlight {
             background-color: yellow;
-        }
-        button.start-lesson {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px 20px;
-            font-size: 1.2em;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-top: 20px;
-        }
-        button.start-lesson:hover {
-            background-color: #45a049;
         }
     </style>
 </head>
 <body>
     <header>
-        <button onclick="history.back()">Back</button>
-        <h1>Personal Pronouns</h1>
+        <div class="header-content">
+            <button onclick="history.back()">Back</button>
+            <h1>Personal Pronouns</h1>
+            <button id="toggleButton" class="start-lesson" onclick="toggleLesson()">
+                <img src="play-icon.png" alt="Play" id="toggleIcon"> Start Lesson
+            </button>
+        </div>
     </header>
-    <div class="content-wrapper">
+    <div class="content-wrapper" id="contentWrapper">
         <div id="content"></div>
-        <button class="start-lesson" onclick="startLesson()">Iniciar Aula</button>
     </div>
 
     <script>
         let texts = [];
+        let isPlaying = false;
+        let currentIndex = 0;
+        let utterance;
+        let scrollInterval;
 
         // Função para carregar o arquivo .txt
         async function loadTextFile() {
@@ -108,29 +114,73 @@
             });
         }
 
-        function startLesson() {
-            let index = 0;
-
-            function speakNext() {
-                if (index < texts.length) {
-                    const textObj = texts[index];
-                    const element = document.getElementById(textObj.id);
-                    element.classList.add('highlight');
-
-                    const utterance = new SpeechSynthesisUtterance(textObj.text);
-                    utterance.lang = textObj.lang;
-
-                    utterance.onend = function () {
-                        element.classList.remove('highlight');
-                        index++;
-                        speakNext();
-                    };
-
-                    speechSynthesis.speak(utterance);
-                }
+        function toggleLesson() {
+            if (isPlaying) {
+                pauseLesson();
+            } else {
+                startLesson();
             }
+        }
 
+        function startLesson() {
+            if (currentIndex >= texts.length) {
+                currentIndex = 0; // Reinicia a leitura do início se tiver acabado
+            }
+            isPlaying = true;
+            updateButtonState();
             speakNext();
+            startScroll();
+        }
+
+        function pauseLesson() {
+            isPlaying = false;
+            updateButtonState();
+            if (utterance) {
+                speechSynthesis.cancel();
+            }
+            clearInterval(scrollInterval);
+        }
+
+        function updateButtonState() {
+            const button = document.getElementById('toggleButton');
+            const icon = document.getElementById('toggleIcon');
+            if (isPlaying) {
+                button.innerHTML = '<img src="pause-icon.png" alt="Pause" id="toggleIcon"> Pause Lesson';
+            } else {
+                button.innerHTML = '<img src="play-icon.png" alt="Play" id="toggleIcon"> Start Lesson';
+            }
+        }
+
+        function speakNext() {
+            if (currentIndex < texts.length && isPlaying) {
+                const textObj = texts[currentIndex];
+                const element = document.getElementById(textObj.id);
+                element.classList.add('highlight');
+
+                utterance = new SpeechSynthesisUtterance(textObj.text);
+                utterance.lang = textObj.lang;
+
+                utterance.onend = function () {
+                    element.classList.remove('highlight');
+                    currentIndex++;
+                    speakNext();
+                };
+
+                speechSynthesis.speak(utterance);
+            } else {
+                pauseLesson();
+            }
+        }
+
+        function startScroll() {
+            const contentWrapper = document.getElementById('contentWrapper');
+            scrollInterval = setInterval(() => {
+                if (contentWrapper.scrollTop + contentWrapper.clientHeight < contentWrapper.scrollHeight) {
+                    contentWrapper.scrollTop += 1;
+                } else {
+                    clearInterval(scrollInterval);
+                }
+            }, 50);
         }
 
         // Carrega o arquivo .txt quando a página é carregada
