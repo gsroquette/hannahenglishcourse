@@ -243,69 +243,67 @@
         answerElement.style.display = 'inline';
     }
 
-    function generatePDF() {
-        fetch('texto.txt')
-            .then(response => response.text())
-            .then(data => {
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF();
-                const lines = data.split('\n');
-                let y = 20;
+function generatePDF() {
+    fetch('texto.txt')
+        .then(response => response.text())
+        .then(data => {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            const lines = data.split('\n');
+            let y = 20;
 
-                doc.addImage('Logo.png', 'PNG', 90, y, 30, 30); // Logo reduzida
-                y += 40;
-                doc.setFontSize(12);
-                doc.text("Name: ____________________________  Date: _______________", 20, y);
-                y += 20;
+            doc.addImage('Logo.png', 'PNG', 90, y, 30, 30); // Logo reduzida
+            y += 40;
+            doc.setFontSize(12);
+            doc.text("Name: ____________________________  Date: _______________", 20, y);
+            y += 20;
 
-                lines.forEach(line => {
-                    if (line.startsWith('Title: ')) {
-                        doc.setFontSize(16);
-                        doc.text(line.replace('Title: ', ''), 20, y);
-                        y += 20;
-                    } else if (line.startsWith('# ')) {
-                        if (y > doc.internal.pageSize.height - 20) {
-                            doc.addPage();
-                            y = 20;
-                        }
-                        doc.setFontSize(14);
-                        doc.text(line.replace('# ', ''), 20, y);
-                        y += 10;
-                    } else if (line.startsWith('Subtitle: ')) {
-                        doc.setFontSize(14);
-                        doc.text(line.replace('Subtitle: ', ''), 20, y);
-                        y += 10;
-                    } else if (line.startsWith('Text: ')) {
-                        doc.setFontSize(12);
-                        const textLines = doc.splitTextToSize(line.replace('Text: ', ''), 170); // Quebrando o texto longo
-                        doc.text(textLines, 20, y);
-                        y += textLines.length * 10; // Ajuste do valor de y com base no número de linhas
-                    } else if (line.startsWith('Examples from the Creation Story:')) {
-                        doc.setFontSize(12);
-                        doc.text(line, 20, y);
-                        y += 10;
-                    } else if (line.startsWith('"')) {
-                        doc.setFontSize(12);
-                        const textLines = doc.splitTextToSize(line, 170); // Quebrando o texto longo
-                        doc.text(textLines, 25, y);
-                        y += textLines.length * 10; // Ajuste do valor de y com base no número de linhas
-                    } else {
-                        doc.setFontSize(12);
-                        const textLines = doc.splitTextToSize(line, 170); // Quebrando o texto longo
-                        doc.text(textLines, 20, y);
-                        y += textLines.length * 10; // Ajuste do valor de y com base no número de linhas
-                    }
-
+            lines.forEach(line => {
+                if (line.startsWith('Title: ')) {
+                    doc.setFontSize(16);
+                    doc.text(line.replace('Title: ', ''), 20, y);
+                    y += 20;
+                } else if (line.startsWith('# ')) {
                     if (y > doc.internal.pageSize.height - 20) {
                         doc.addPage();
                         y = 20;
                     }
-                });
+                    doc.setFontSize(14);
+                    doc.text(line.replace('# ', ''), 20, y);
+                    y += 10;
+                } else if (line.startsWith('Subtitle: ')) {
+                    doc.setFontSize(14);
+                    doc.text(line.replace('Subtitle: ', ''), 20, y);
+                    y += 10;
+                } else if (line.startsWith('Text: ')) {
+                    const textWithoutAnswer = line.replace(/ \[Answer:.*\]/, '');  // Remove [Answer: ...]
+                    doc.setFontSize(12);
+                    const textLines = doc.splitTextToSize(textWithoutAnswer.replace('Text: ', ''), 170); 
+                    doc.text(textLines, 20, y);
+                    y += textLines.length * 10; 
+                } else if (line.includes('→')) {  // Linha de exercício com resposta
+                    const textWithoutAnswer = line.replace(/ \[Answer:.*\]/, '');  // Remove [Answer: ...]
+                    doc.setFontSize(12);
+                    const textLines = doc.splitTextToSize(textWithoutAnswer, 170); 
+                    doc.text(textLines, 20, y);
+                    y += textLines.length * 10; 
+                } else {
+                    doc.setFontSize(12);
+                    const textLines = doc.splitTextToSize(line, 170); 
+                    doc.text(textLines, 20, y);
+                    y += textLines.length * 10; 
+                }
 
-                doc.save("grammar_lesson_creation.pdf");
-            })
-            .catch(error => console.error('Error generating the PDF:', error));
-    }
+                if (y > doc.internal.pageSize.height - 20) {
+                    doc.addPage();
+                    y = 20;
+                }
+            });
+
+            doc.save("grammar_lesson_creation.pdf");
+        })
+        .catch(error => console.error('Error generating the PDF:', error));
+}
 
     function loadProfessorButtons() {
         const buttonContainer = document.querySelector('.button-container');
