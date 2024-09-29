@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hannah Mixed Letters</title>
+    <style>
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            background-color: #ffebcd;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            text-align: center;
+            color: #ff4500;
+            font-size: 3rem;
+            margin-bottom: 20px;
+        }
+
+        .activity-container {
+            margin-top: 20px;
+            width: 100%;
+        }
+
+        .activity {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            padding: 20px;
+            background-color: #ffdab9;
+            border-radius: 15px;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+            overflow: hidden;
+            font-family: 'Times New Roman', Times, serif;
+        }
+
+        .activity img {
+            max-width: 150px;
+            max-height: 150px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+        }
+
+        .mixed-letters {
+            font-size: 36px;
+            font-weight: bold;
+            color: #ff4500;
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 15px;
+        }
+
+        .letter-input {
+            width: 40px;
+            font-size: 36px;
+            text-align: center;
+            border-bottom: 2px solid black;
+            margin-right: 5px;
+        }
+
+        .correct {
+            border-color: blue;
+        }
+
+        .incorrect {
+            border-color: red;
+        }
+
+        .word-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: 'Times New Roman', Times, serif;
+        }
+
+        .check-answer-btn {
+            background-color: #32CD32;
+            color: white;
+            margin-top: 10px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+
+        .check-answer-btn:hover {
+            background-color: #28a428;
+        }
+    </style>
+</head>
+<body>
+<button onclick="window.location.href='../index.html'" style="padding: 15px 25px; background-color: #ff6347; color: white; border: none; border-radius: 10px; font-size: 1.5rem; cursor: pointer; transition: background-color 0.3s ease;">
+    Back
+</button>
+
+<h1>Hannah Mixed Letters</h1>
+
+<div id="activity-container" class="activity-container"></div>
+
+<script>
+    let activities = [];
+
+    function shuffleWord(word) {
+        const shuffled = word.split('').sort(() => 0.5 - Math.random()).join('');
+        return shuffled !== word ? shuffled : shuffleWord(word);
+    }
+
+    function speakText(text) {
+        const synth = window.speechSynthesis;
+        const utterThis = new SpeechSynthesisUtterance(text);
+        utterThis.lang = 'en-US';
+        synth.speak(utterThis);
+    }
+
+    async function loadActivities() {
+        try {
+            const response = await fetch('../data1/words.txt'); // Subindo um nível e acessando a pasta data1
+            const text = await response.text();
+            const words = text.trim().split('\n');
+
+            words.forEach((word, index) => {
+                const imageName = `imagem${index + 1}.jpeg`; // Gera os nomes das imagens sequencialmente
+                const imageUrl = `../data1/imagens/${imageName}`; // Subindo um nível para acessar as imagens
+                
+                createActivity(imageUrl, word);
+            });
+        } catch (error) {
+            console.error('Erro ao carregar palavras:', error);
+        }
+    }
+
+    function createActivity(imageUrl, word) {
+        const activityContainer = document.getElementById('activity-container');
+        const activityDiv = document.createElement('div');
+        activityDiv.classList.add('activity');
+
+        const imgElement = document.createElement('img');
+        imgElement.src = imageUrl;
+        imgElement.onerror = function() {
+            console.error(`Erro ao carregar a imagem: ${imageUrl}`);
+        };
+        activityDiv.appendChild(imgElement);
+
+        const wordContainer = document.createElement('div');
+        wordContainer.classList.add('word-container');
+
+        const shuffledWord = shuffleWord(word);
+
+        const mixedLettersElement = document.createElement('div');
+        mixedLettersElement.classList.add('mixed-letters');
+        shuffledWord.split('').forEach(letter => {
+            const letterElement = document.createElement('span');
+            letterElement.innerText = letter;
+            mixedLettersElement.appendChild(letterElement);
+        });
+        wordContainer.appendChild(mixedLettersElement);
+
+        const inputContainer = document.createElement('div');
+        shuffledWord.split('').forEach((_, index, array) => {
+            const letterInput = document.createElement('input');
+            letterInput.classList.add('letter-input');
+            letterInput.maxLength = 1;
+
+            letterInput.addEventListener('input', function() {
+                if (letterInput.value.length === 1 && index < array.length - 1) {
+                    inputContainer.children[index + 1].focus();
+                }
+            });
+
+            inputContainer.appendChild(letterInput);
+        });
+
+        wordContainer.appendChild(inputContainer);
+
+        const checkAnswerBtn = document.createElement('button');
+        checkAnswerBtn.classList.add('check-answer-btn');
+        checkAnswerBtn.innerText = 'Check Answer';
+
+        checkAnswerBtn.onclick = function() {
+            const userAnswer = Array.from(inputContainer.querySelectorAll('.letter-input'))
+                .map(input => input.value.toUpperCase())
+                .join('');
+
+            const letterInputs = inputContainer.querySelectorAll('.letter-input');
+            if (userAnswer === word.toUpperCase()) {
+                letterInputs.forEach(input => {
+                    input.classList.add('correct');
+                    input.classList.remove('incorrect');
+                });
+                speakText(word);
+            } else {
+                letterInputs.forEach(input => {
+                    input.classList.add('incorrect');
+                    input.classList.remove('correct');
+                });
+            }
+        };
+
+        wordContainer.appendChild(checkAnswerBtn);
+
+        activityDiv.appendChild(wordContainer);
+        activityContainer.appendChild(activityDiv);
+
+        activityDiv.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    document.addEventListener('DOMContentLoaded', loadActivities);
+
+</script>
+
+</body>
+</html>

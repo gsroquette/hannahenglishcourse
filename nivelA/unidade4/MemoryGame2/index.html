@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hannah Memory Game</title>
+    <style>
+        body {
+            font-family: "Times New Roman", Times, serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            height: 100vh;
+            margin: 0;
+            background-color: #f7f7f7;
+            color: #333;
+        }
+
+        #back-button {
+            margin-bottom: 10px;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            position: relative;
+            top: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.3s ease;
+        }
+
+        #back-button:hover {
+            background-color: #0056b3;
+        }
+
+        h1 {
+            margin-top: 40px;
+            margin-bottom: 10px;
+            text-align: center;
+            font-size: 2.5em;
+            color: #444;
+            text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        #move-counter {
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            text-align: center;
+            color: #666;
+        }
+
+        #memory-game {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            grid-gap: 10px;
+            width: 100%;
+            max-width: 600px;
+            margin-top: 10px;
+        }
+
+        .card {
+            position: relative;
+            width: 100%;
+            padding-top: 100%; /* Aspect ratio 1:1 */
+            perspective: 1000px; /* Perspective for 3D effect */
+        }
+
+        .card-inner {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+            cursor: pointer;
+        }
+
+        .card.flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-transform: uppercase;
+            text-align: center;
+            box-sizing: border-box;
+            padding: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-front {
+            background-color: #3498db;
+            color: white;
+        }
+
+        .card-front img {
+            max-width: 80%;
+            max-height: 80%;
+            object-fit: contain;
+        }
+
+        .card-back {
+            background-color: #2ecc71;
+            transform: rotateY(180deg);
+        }
+
+        .card img {
+            max-width: 80%;
+            max-height: 80%;
+            object-fit: contain;
+        }
+
+        .card .word {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+            word-wrap: break-word;
+            white-space: normal;
+            text-align: center;
+            font-size: calc(10px + 2.5vmin); /* Initial font size */
+        }
+
+        #restart-button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.3s ease;
+        }
+
+        #restart-button:hover {
+            background-color: #218838;
+        }
+    </style>
+</head>
+<body>
+    <button id="back-button" onclick="goBack()">Back</button>
+    <h1>Hannah Memory Game</h1>
+    <div id="move-counter">Moves: 0</div>
+    <div id="memory-game">
+        <!-- Cards will be dynamically generated here -->
+    </div>
+    <button id="restart-button" onclick="restartGame()">Restart Game</button>
+
+    <script>
+        const gameContainer = document.getElementById('memory-game');
+        const moveCounterElement = document.getElementById('move-counter');
+        let moves = 0;
+        let firstCard = null;
+        let secondCard = null;
+        let lockBoard = false;
+
+        function loadCardsData(callback) {
+            fetch('../data2/words.txt')
+                .then(response => response.text())
+                .then(text => {
+                    const words = text.trim().split('\n');
+                    const cardsArray = [];
+
+                    words.forEach((word, index) => {
+                        const imageName = `image${index + 1}`;
+                        cardsArray.push({
+                            type: 'image',
+                            src: `../data2/imagens/imagem${index + 1}.jpeg`,
+                            pair: imageName
+                        });
+                        cardsArray.push({
+                            type: 'word',
+                            text: word.trim(),
+                            pair: imageName
+                        });
+                    });
+
+                    callback(cardsArray);
+                });
+        }
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function createCard(cardData) {
+            const card = document.createElement('div');
+            card.classList.add('card');
+            card.dataset.pair = cardData.pair;
+
+            const cardInner = document.createElement('div');
+            cardInner.classList.add('card-inner');
+
+            const cardFront = document.createElement('div');
+            cardFront.classList.add('card-front');
+            const cardBack = document.createElement('div');
+            cardBack.classList.add('card-back');
+
+            const logo = document.createElement('img');
+            logo.src = 'logo.png';
+            cardFront.appendChild(logo);
+
+            if (cardData.type === 'image') {
+                const img = document.createElement('img');
+                img.src = cardData.src;
+                cardBack.appendChild(img);
+            } else if (cardData.type === 'word') {
+                const word = document.createElement('div');
+                word.classList.add('word');
+                word.textContent = cardData.text;
+                cardBack.appendChild(word);
+            }
+
+            cardInner.appendChild(cardFront);
+            cardInner.appendChild(cardBack);
+            card.appendChild(cardInner);
+
+            card.addEventListener('click', flipCard);
+            return card;
+        }
+
+        function flipCard() {
+            if (lockBoard) return;
+            if (this.classList.contains('flipped')) return;
+
+            this.classList.add('flipped');
+
+            if (!firstCard) {
+                firstCard = this;
+                return;
+            }
+
+            secondCard = this;
+            updateMoveCounter();
+            checkForMatch();
+        }
+
+        function checkForMatch() {
+            const isMatch = firstCard.dataset.pair === secondCard.dataset.pair;
+
+            isMatch ? disableCards() : unflipCards();
+        }
+
+        function disableCards() {
+            firstCard.removeEventListener('click', flipCard);
+            secondCard.removeEventListener('click', flipCard);
+            resetBoard();
+        }
+
+        function unflipCards() {
+            lockBoard = true;
+            setTimeout(() => {
+                firstCard.classList.remove('flipped');
+                secondCard.classList.remove('flipped');
+                resetBoard();
+            }, 1500);
+        }
+
+        function resetBoard() {
+            [firstCard, secondCard] = [null, null];
+            lockBoard = false;
+        }
+
+        function updateMoveCounter() {
+            moves++;
+            moveCounterElement.textContent = `Moves: ${moves}`;
+        }
+
+        function initGame(cardsArray) {
+            shuffle(cardsArray).forEach(cardData => {
+                const cardElement = createCard(cardData);
+                gameContainer.appendChild(cardElement);
+            });
+            adjustFontSize();
+            moves = 0;
+            moveCounterElement.textContent = 'Moves: 0';
+        }
+
+        function restartGame() {
+            gameContainer.innerHTML = '';
+            loadCardsData(initGame);
+        }
+
+        function goBack() {
+            window.history.back();
+        }
+
+        function adjustFontSize() {
+            const cards = document.querySelectorAll('.card .word');
+            cards.forEach(card => {
+                let fontSize = parseInt(window.getComputedStyle(card).fontSize);
+                while (card.scrollWidth > card.clientWidth || card.scrollHeight > card.clientHeight) {
+                    fontSize -= 1;
+                    card.style.fontSize = `${fontSize}px`;
+                }
+            });
+        }
+
+        loadCardsData(initGame);
+        window.addEventListener('resize', adjustFontSize);
+    </script>
+</body>
+</html>

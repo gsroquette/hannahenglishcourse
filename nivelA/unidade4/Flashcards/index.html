@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hannah FlashCards</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            font-size: 2em;
+            margin-bottom: 20px;
+            text-align: center;
+            color: #333;
+            width: 100%;
+        }
+        #flashcards-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            width: 100%;
+        }
+        .card {
+            width: 200px;
+            height: 300px;
+            perspective: 1000px;
+            margin: 20px;
+            position: relative;
+        }
+        .card-inner {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            text-align: center;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+        .card:hover .card-inner {
+            transform: rotateY(180deg);
+        }
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+        }
+        .card-front {
+            background-color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 1px solid #ccc;
+        }
+        .card-front img {
+            max-width: 100%;
+            max-height: 100%;
+        }
+        .card-back {
+            background-color: #f8f8f8;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transform: rotateY(180deg);
+            border: 1px solid #ccc;
+            font-size: 20px;
+            padding: 10px;
+        }
+        .play-sound {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+<button onclick="window.location.href='../index.html'" style="padding: 15px 25px; background-color: #f8f8f8; color: #333; border: 1px solid #ccc; border-radius: 5px; font-size: 1.2rem; cursor: pointer;">
+    Back
+</button>
+
+    <h1>Hannah FlashCards</h1>
+    <div id="flashcards-container"></div>
+
+    <script>
+        // Função para carregar palavras do arquivo words.txt
+        async function loadWords() {
+            try {
+                const response = await fetch('../data1/words.txt');
+                const text = await response.text();
+                return text.split('\n').filter(word => word.trim() !== '').map(word => word.trim());
+            } catch (error) {
+                console.error("Erro ao carregar o arquivo words.txt", error);
+                return [];
+            }
+        }
+
+        // Função para gerar os flash cards
+        async function generateFlashcards() {
+            const words = await loadWords();
+            const container = document.getElementById('flashcards-container');
+            
+            if (words.length === 0) {
+                container.innerHTML = "Não foi possível carregar os flash cards.";
+                return;
+            }
+
+            words.forEach((word, index) => {
+                const card = document.createElement('div');
+                card.classList.add('card');
+                
+                const cardInner = document.createElement('div');
+                cardInner.classList.add('card-inner');
+                
+                const cardFront = document.createElement('div');
+                cardFront.classList.add('card-front');
+                const img = document.createElement('img');
+                img.src = `../data1/imagens/imagem${index + 1}.jpeg`;  // Carrega as imagens
+                img.onerror = function() {
+                    console.error(`Erro ao carregar a imagem: imagem${index + 1}.jpeg`);
+                };
+                cardFront.appendChild(img);
+                
+                const cardBack = document.createElement('div');
+                cardBack.classList.add('card-back');
+                cardBack.textContent = word;  // Mostra a palavra correta no verso
+                
+                // Ícone de som posicionado sobre o cartão
+                const playSoundIcon = document.createElement('img');
+                playSoundIcon.classList.add('play-sound');
+                playSoundIcon.src = 'businessman.png'; // Substitui o ícone pelo businessman.png
+                playSoundIcon.alt = "Play Sound";
+                playSoundIcon.onclick = (event) => {
+                    event.stopPropagation(); // Evita que o cartão gire ao clicar no ícone
+                    playSound(word);
+                };
+
+                cardInner.appendChild(cardFront);
+                cardInner.appendChild(cardBack);
+                card.appendChild(cardInner);
+                card.appendChild(playSoundIcon); // Adiciona o ícone de som sobre o cartão
+                container.appendChild(card);
+            });
+        }
+
+        // Função para reproduzir o som da palavra
+        function playSound(word) {
+            const utterance = new SpeechSynthesisUtterance(word);
+            utterance.lang = 'en-US'; // Define o idioma para inglês 
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // Carregar flash cards ao abrir a página
+        generateFlashcards();
+    </script>
+</body>
+</html>
