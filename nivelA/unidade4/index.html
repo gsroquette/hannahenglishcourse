@@ -1,9 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Game Map with Dotted Line</title>
+    <meta charset="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Curved Dotted Line Between Activities</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -19,7 +18,7 @@
         .map-container {
             width: 90%;
             height: 80vh;
-            background-image: url('../../imagens/map_background.png'); /* Imagem do mapa */
+            background-image: url('../../imagens/map_background.png'); /* Substituir pela imagem correta do mapa */
             background-size: cover;
             position: relative;
             filter: brightness(0.9); /* Leve escurecimento do fundo */
@@ -74,13 +73,6 @@
             height: 60px;
         }
 
-        /* Estilo da linha pontilhada */
-        .dotted-line {
-            position: absolute;
-            border-top: 5px dashed red; /* Linha pontilhada grossa e colorida */
-            z-index: 0;
-        }
-
         /* Responsividade */
         @media (min-width: 1024px) {
             .phase img {
@@ -117,15 +109,23 @@
                 height: 40px;
             }
         }
+
+        /* Estilo da linha curva pontilhada */
+        svg path {
+            fill: none;
+            stroke: red;
+            stroke-width: 4;
+            stroke-dasharray: 10; /* Define a linha pontilhada */
+        }
     </style>
 </head>
 <body>
     <div class="map-container" id="mapContainer">
-        <!-- Fases e bonequinho serão gerados dinamicamente -->
+        <!-- Aqui serão geradas as fases e o bonequinho -->
+        <svg width="100%" height="100%" id="lineContainer"></svg> <!-- Contêiner para a linha curva -->
     </div>
 
     <script>
-        // Dados dinâmicos das atividades (fases)
         const activities = [
             { id: 1, name: "Activity 1", top: '10%', left: '10%', locked: false, image: 'botoes/storycards_button.png', link: '../unidade2/StoryCards/index.html' },
             { id: 2, name: "Activity 2", top: '30%', left: '20%', locked: true, image: 'botoes/flashcards_button.png', link: '../unidade2/Flashcards/index.html' },
@@ -135,9 +135,12 @@
             { id: 6, name: "Activity 6", top: '70%', left: '80%', locked: true, image: 'botoes/grammar_button.png', link: '../unidade2/Grammar/index.html' }
         ];
 
-        // Função para gerar fases e linhas pontilhadas dinamicamente
+        // Função para gerar as fases e a linha curva
         function generatePhases() {
             const mapContainer = document.getElementById('mapContainer');
+            const lineContainer = document.getElementById('lineContainer');
+
+            let pathD = ''; // Caminho para o atributo "d" do SVG
 
             activities.forEach((activity, index) => {
                 const phaseDiv = document.createElement('div');
@@ -146,57 +149,42 @@
                     phaseDiv.classList.add('locked');
                 }
 
-                // Adiciona a imagem correspondente à fase
                 const img = document.createElement('img');
                 img.src = `../../imagens/${activity.image}`;
                 img.alt = activity.name;
                 phaseDiv.appendChild(img);
 
-                // Define a posição de cada fase no mapa
                 phaseDiv.style.top = activity.top;
                 phaseDiv.style.left = activity.left;
 
-                // Adiciona o evento de clique
                 phaseDiv.addEventListener('click', function () {
                     if (!activity.locked) {
-                        moveCharacterToPhase(index); // Move o bonequinho
-                        unlockNextPhase(index); // Desbloqueia a próxima fase
-                        window.location.href = activity.link; // Redireciona para o link da fase
+                        moveCharacterToPhase(index); 
+                        unlockNextPhase(index); 
+                        window.location.href = activity.link; 
                     } else {
                         alert('This phase is locked.');
                     }
                 });
 
-                // Adiciona a fase ao mapa
                 mapContainer.appendChild(phaseDiv);
 
-                // Adiciona a linha pontilhada entre as fases
-                if (index < activities.length - 1) {
-                    const lineDiv = document.createElement('div');
-                    lineDiv.classList.add('dotted-line');
-                    lineDiv.style.top = calculateMidPoint(activity.top, activities[index + 1].top);
-                    lineDiv.style.left = activity.left;
-                    lineDiv.style.width = calculateDistance(activity.left, activities[index + 1].left);
-                    mapContainer.appendChild(lineDiv);
-                }
+                // Adiciona o centro de cada fase ao caminho da linha
+                const topValue = parseFloat(activity.top);
+                const leftValue = parseFloat(activity.left);
+                const x = (leftValue / 100) * mapContainer.clientWidth;
+                const y = (topValue / 100) * mapContainer.clientHeight;
+
+                pathD += `${index === 0 ? 'M' : 'L'} ${x},${y} `; // "M" para o primeiro ponto, "L" para os outros
             });
 
-            // Adiciona o bonequinho ao mapa
+            // Adiciona o caminho ao SVG
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            path.setAttribute("d", pathD);
+            lineContainer.appendChild(path);
+
+            // Adiciona o bonequinho
             addCharacter();
-        }
-
-        // Função para calcular o ponto médio vertical entre duas fases
-        function calculateMidPoint(pos1, pos2) {
-            const p1 = parseFloat(pos1);
-            const p2 = parseFloat(pos2);
-            return `${(p1 + p2) / 2}%`;
-        }
-
-        // Função para calcular a distância entre duas fases
-        function calculateDistance(left1, left2) {
-            const l1 = parseFloat(left1);
-            const l2 = parseFloat(left2);
-            return `${Math.abs(l1 - l2)}%`;
         }
 
         // Função para adicionar o bonequinho no mapa
@@ -205,12 +193,10 @@
             character.classList.add('character');
             character.id = 'gameCharacter';
 
-            // Adiciona a imagem do bonequinho
             const characterImg = document.createElement('img');
-            characterImg.src = '../../imagens/bonequinho.png'; // Certifique-se de que o bonequinho.png está no caminho correto
+            characterImg.src = '../../imagens/bonequinho.png';
             character.appendChild(characterImg);
 
-            // Posiciona o bonequinho na primeira fase
             const firstPhase = activities[0];
             character.style.top = firstPhase.top;
             character.style.left = firstPhase.left;
@@ -218,7 +204,7 @@
             document.getElementById('mapContainer').appendChild(character);
         }
 
-        // Função para mover o bonequinho entre as fases
+        // Função para mover o bonequinho
         function moveCharacterToPhase(phaseIndex) {
             if (phaseIndex >= activities.length) return;
 
@@ -233,9 +219,9 @@
         function unlockNextPhase(phaseIndex) {
             const nextPhaseIndex = phaseIndex + 1;
             if (nextPhaseIndex < activities.length) {
-                activities[nextPhaseIndex].locked = false; // Desbloqueia a fase seguinte
+                activities[nextPhaseIndex].locked = false;
                 const nextPhaseDiv = document.getElementsByClassName('phase')[nextPhaseIndex];
-                nextPhaseDiv.classList.remove('locked'); // Remove a classe 'locked' visualmente
+                nextPhaseDiv.classList.remove('locked');
             }
         }
 
