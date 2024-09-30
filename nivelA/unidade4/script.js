@@ -54,6 +54,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const phase = document.querySelectorAll('.phase')[index];
         const coords = phase.getBoundingClientRect();
         
+        // Remover o destaque amarelo da fase anterior
+        document.querySelectorAll('.phase').forEach(phase => {
+            phase.classList.remove('active');
+        });
+
+        // Adicionar o destaque amarelo na nova fase
+        phase.classList.add('active');
+
         // Mover o bonequinho para a fase com animação
         player.style.top = `${coords.top + window.scrollY + coords.height / 2}px`;
         player.style.left = `${coords.left + window.scrollX + coords.width / 2}px`;
