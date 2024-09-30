@@ -2,33 +2,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const activities = [
         { id: 1, name: "StoryCards", path: "../unidade2/StoryCards/index.html", img: "../../imagens/botoes/storycards_button.png" },
         { id: 2, name: "Flashcards", path: "../unidade2/Flashcards/index.html", img: "../../imagens/botoes/flashcards_button.png" },
-        { id: 3, name: "Flashcards2", path: "../unidade2/Flashcards2/index.html", img: "../../imagens/botoes/flashcards_button.png" },
-        { id: 4, name: "Flashcards3", path: "../unidade2/Flashcards3/index.html", img: "../../imagens/botoes/flashcards_button.png" },
-        { id: 5, name: "MemoryGame", path: "../unidade2/MemoryGame/index.html", img: "../../imagens/botoes/memorygame_button.png" },
-        { id: 6, name: "MemoryGame2", path: "../unidade2/MemoryGame2/index.html", img: "../../imagens/botoes/memorygame_button.png" },
-        { id: 7, name: "MemoryGame3", path: "../unidade2/MemoryGame3/index.html", img: "../../imagens/botoes/memorygame_button.png" },
-        { id: 8, name: "QUIZ", path: "../unidade2/QUIZ/index.html", img: "../../imagens/botoes/quiz_button.png" },
-        { id: 9, name: "WordSearch", path: "../unidade2/WordSearch/index.html", img: "../../imagens/botoes/wordsearch_button.png" },
-        { id: 10, name: "WordSearch2", path: "../unidade2/WordSearch2/index.html", img: "../../imagens/botoes/wordsearch_button.png" },
-        { id: 11, name: "WordSearch3", path: "../unidade2/WordSearch3/index.html", img: "../../imagens/botoes/wordsearch_button.png" },
-        { id: 12, name: "Grammar", path: "../unidade2/Grammar/index.html", img: "../../imagens/botoes/grammar_button.png" },
-        { id: 13, name: "Fill in the Blanks", path: "../unidade2/Fill in the Blanks/index.html", img: "../../imagens/botoes/fillintheblanks_button.png" },
-        { id: 14, name: "Mixed Letters FIXO", path: "../unidade2/Mixed Letters FIXO/index.html", img: "../../imagens/botoes/mixed_letters_students.png" },
-        { id: 15, name: "Mixed Letters FIXO2", path: "../unidade2/Mixed Letters FIXO2/index.html", img: "../../imagens/botoes/mixed_letters_students.png" },
-        { id: 16, name: "Mixed Letters FIXO3", path: "../unidade2/Mixed Letters FIXO3/index.html", img: "../../imagens/botoes/mixed_letters_students.png" },
-        { id: 17, name: "Missing Word", path: "../unidade2/Missing Word/index.html", img: "../../imagens/botoes/missing_word_button.png" },
-        { id: 18, name: "Missing Word2", path: "../unidade2/Missing Word2/index.html", img: "../../imagens/botoes/missing_word_button.png" },
-        { id: 19, name: "Missing Word3", path: "../unidade2/Missing Word3/index.html", img: "../../imagens/botoes/missing_word_button.png" },
-        { id: 20, name: "Speak", path: "../unidade2/Speak/index.html", img: "../../imagens/botoes/speak_button.png" },
-        { id: 21, name: "Speak2", path: "../unidade2/Speak2/index.html", img: "../../imagens/botoes/speak_button.png" },
-        { id: 22, name: "Speak3", path: "../unidade2/Speak3/index.html", img: "../../imagens/botoes/speak_button.png" },
-        { id: 23, name: "MatchingGame", path: "../unidade2/MatchingGame/index.html", img: "../../imagens/botoes/matching_game_button.png" },
-        { id: 24, name: "Fine Motor Skills", path: "../unidade2/Fine Motor Skills/index.html", img: "../../imagens/botoes/Fine_Motor_Skills_Button.png" },
-        { id: 25, name: "Missing Letter", path: "../unidade2/Missing Letter/index.html", img: "../../imagens/botoes/missing_letter_button.png" },
-        { id: 26, name: "Mixed Letters", path: "../unidade2/Mixed Letters/index.html", img: "../../imagens/botoes/mixed_letters_button.png" }
+        { id: 3, name: "MemoryGame", path: "../unidade2/MemoryGame/index.html", img: "../../imagens/botoes/memorygame_button.png" },
+        { id: 4, name: "QUIZ", path: "../unidade2/QUIZ/index.html", img: "../../imagens/botoes/quiz_button.png" },
+        { id: 5, name: "WordSearch", path: "../unidade2/WordSearch/index.html", img: "../../imagens/botoes/wordsearch_button.png" }
+        // Mais atividades podem ser adicionadas
     ];
 
     const mapContainer = document.getElementById('mapContainer');
+    const svgContainer = document.getElementById('linesSvg');
     let currentPhase = 0;
     let player; // Referência ao bonequinho
 
@@ -52,6 +33,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const phaseImage = document.createElement('img');
         phaseImage.src = activity.img; // Carregar a imagem correspondente
         phaseImage.alt = activity.name;
+        phaseImage.classList.add('phase-img'); // Adicionar classe de estilo
         phaseDiv.appendChild(phaseImage);
 
         // Definir fases bloqueadas/desbloqueadas
@@ -81,6 +63,40 @@ document.addEventListener('DOMContentLoaded', function() {
         player.classList.add('moving');
     }
 
-    // Adicionar o bonequinho no mapa
-    createPlayer();
+    // Função para calcular as coordenadas absolutas
+    function getCoords(phase) {
+        const rect = phase.getBoundingClientRect();
+        return {
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2
+        };
+    }
+
+    // Desenhar as linhas entre as fases
+    function drawLines() {
+        svgContainer.innerHTML = ''; // Limpar SVG antes de desenhar
+        for (let i = 0; i < activities.length - 1; i++) {
+            const phase1 = document.querySelectorAll('.phase')[i];
+            const phase2 = document.querySelectorAll('.phase')[i + 1];
+
+            const coords1 = getCoords(phase1);
+            const coords2 = getCoords(phase2);
+
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const d = `M ${coords1.x} ${coords1.y} Q ${coords1.x + 100} ${coords1.y + 100}, ${coords2.x} ${coords2.y}`;
+            path.setAttribute('d', d);
+            path.setAttribute('stroke', 'black');
+            path.setAttribute('stroke-dasharray', '15,10'); // Traços mais longos para efeito de mapa do tesouro
+            path.setAttribute('fill', 'transparent');
+            path.setAttribute('stroke-width', '6'); // Espessura da linha
+            svgContainer.appendChild(path);
+        }
+    }
+
+    // Desenhar as linhas após o carregamento
+    drawLines();
+    createPlayer(); // Adicionar o bonequinho no mapa
+
+    // Recalcular as linhas ao redimensionar a tela
+    window.addEventListener('resize', drawLines);
 });
