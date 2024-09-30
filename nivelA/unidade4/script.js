@@ -24,12 +24,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const phaseDiv = document.createElement('div');
         phaseDiv.classList.add('phase');
 
-        // Alternar as posições dos círculos entre esquerda e direita
         const leftPosition = (index % 2 === 0) ? '20%' : '70%'; // Esquerda para pares, direita para ímpares
-        phaseDiv.style.top = `${10 + index * 20}%`; // Distância vertical entre as fases
+        phaseDiv.style.top = `${10 + index * 20}%`;
         phaseDiv.style.left = leftPosition;
 
-        // Adicionar imagem da fase
         const phaseImage = document.createElement('img');
         phaseImage.src = activity.img;
         phaseImage.alt = activity.name;
@@ -44,7 +42,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         phaseDiv.addEventListener('click', () => {
             if (!phaseDiv.classList.contains('locked')) {
-                moveToPhase(index, activity.path, index); // Agora passa também o índice para liberar a próxima fase
+                moveToPhase(index, activity.path, index);
             }
         });
 
@@ -61,7 +59,6 @@ document.addEventListener('DOMContentLoaded', function() {
         player.style.left = `${coords.left + window.scrollX + coords.width / 2}px`;
         player.classList.add('moving');
 
-        // Scroll automático para fase fora da tela
         const phaseInView = phase.getBoundingClientRect().top >= 0 && phase.getBoundingClientRect().bottom <= window.innerHeight;
         if (!phaseInView) {
             window.scrollTo({
@@ -70,18 +67,16 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
 
-        // Abrir o link da fase após o bonequinho se mover (espera 600ms para a animação concluir)
         if (path) {
             setTimeout(() => {
                 window.location.href = path;
             }, 600);
         }
 
-        // Desbloquear a próxima fase após mover para a fase atual
         if (clickedIndex !== null && clickedIndex < activities.length - 1) {
             setTimeout(() => {
                 unlockNextPhase(clickedIndex);
-            }, 600); // Desbloquear a próxima fase depois que o bonequinho se move
+            }, 600);
         }
     }
 
@@ -93,7 +88,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Função para desenhar as linhas entre as fases
+    // Função para desenhar as linhas entre as fases com curvas em S
     function drawLines() {
         svgContainer.innerHTML = '';
         for (let i = 0; i < activities.length - 1; i++) {
@@ -102,9 +97,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const coords1 = phase1.getBoundingClientRect();
             const coords2 = phase2.getBoundingClientRect();
 
+            // Criar curvas sinuosas em S
+            const controlPointX1 = coords1.left + coords1.width * 0.5;
+            const controlPointY1 = coords1.top + coords1.height * 0.5;
+            const controlPointX2 = coords2.left + coords2.width * 0.5;
+            const controlPointY2 = coords2.top + coords2.height * 0.5 + 200; // Ponto de controle ajustado para fazer curvas acentuadas
+
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
-                       Q ${(coords1.left + coords2.left) / 2} ${(coords1.top + coords2.top) / 2}, 
+                       C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
                        ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
             path.setAttribute('d', d);
             path.setAttribute('stroke', 'black');
