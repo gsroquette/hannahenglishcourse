@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', function() {
             path.setAttribute('stroke', 'black');
             path.setAttribute('stroke-dasharray', '5,5'); // Linhas pontilhadas
             path.setAttribute('fill', 'transparent');
-            path.setAttribute('stroke-width', '2');
+            path.setAttribute('stroke-width', '6'); // Aumentando a espessura da linha
             svgContainer.appendChild(path);
         }
     }
