@@ -9,17 +9,31 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const mapContainer = document.getElementById('mapContainer');
     const svgContainer = document.getElementById('linesSvg');
+    let currentPhase = 0;
 
     // Adicionar fases no mapa
-    activities.forEach(activity => {
+    activities.forEach((activity, index) => {
         const phaseDiv = document.createElement('div');
         phaseDiv.classList.add('phase');
         phaseDiv.style.top = activity.top;
         phaseDiv.style.left = activity.left;
-        
+
+        // Definir fases bloqueadas/desbloqueadas
+        if (index === currentPhase) {
+            phaseDiv.classList.add('active'); // A fase ativa
+        } else if (index > currentPhase) {
+            phaseDiv.classList.add('locked'); // Fases bloqueadas
+        }
+
         const phaseText = document.createElement('span');
         phaseText.textContent = activity.name;
         phaseDiv.appendChild(phaseText);
+
+        phaseDiv.addEventListener('click', () => {
+            if (!phaseDiv.classList.contains('locked')) {
+                unlockNextPhase(index);
+            }
+        });
 
         mapContainer.appendChild(phaseDiv);
     });
@@ -31,6 +45,18 @@ document.addEventListener('DOMContentLoaded', function() {
             x: rect.left + rect.width / 2,
             y: rect.top + rect.height / 2
         };
+    }
+
+    // Função para desbloquear a próxima fase
+    function unlockNextPhase(index) {
+        if (index < activities.length - 1) {
+            const nextPhase = document.querySelectorAll('.phase')[index + 1];
+            nextPhase.classList.remove('locked');
+            nextPhase.classList.add('unlocked');
+            setTimeout(() => {
+                nextPhase.classList.remove('unlocked');
+            }, 1000); // Duração da animação
+        }
     }
 
     // Desenhar as linhas entre as fases
