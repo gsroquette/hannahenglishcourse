@@ -1,10 +1,10 @@
 document.addEventListener('DOMContentLoaded', function() {
     const activities = [
-        { id: 1, name: "StoryCards", path: "../unidade2/StoryCards/index.html", img: "../../imagens/botoes/storycards_button.png" },
-        { id: 2, name: "Flashcards", path: "../unidade2/Flashcards/index.html", img: "../../imagens/botoes/flashcards_button.png" },
-        { id: 3, name: "MemoryGame", path: "../unidade2/MemoryGame/index.html", img: "../../imagens/botoes/memorygame_button.png" },
-        { id: 4, name: "QUIZ", path: "../unidade2/QUIZ/index.html", img: "../../imagens/botoes/quiz_button.png" },
-        { id: 5, name: "WordSearch", path: "../unidade2/WordSearch/index.html", img: "../../imagens/botoes/wordsearch_button.png" }
+        { id: 1, name: "Fase 1", top: '10%', left: '10%' },
+        { id: 2, name: "Fase 2", top: '25%', left: '30%' },
+        { id: 3, name: "Fase 3", top: '50%', left: '50%' },
+        { id: 4, name: "Fase 4", top: '70%', left: '70%' },
+        { id: 5, name: "Fase 5", top: '90%', left: '20%' }
     ];
 
     const mapContainer = document.getElementById('mapContainer');
@@ -25,15 +25,8 @@ document.addEventListener('DOMContentLoaded', function() {
     activities.forEach((activity, index) => {
         const phaseDiv = document.createElement('div');
         phaseDiv.classList.add('phase');
-        phaseDiv.style.top = `${10 + index * 15}%`; // Posição vertical dinâmica
-        phaseDiv.style.left = `${10 + index * 10}%`; // Posição horizontal dinâmica
-
-        // Adicionar imagem da fase
-        const phaseImage = document.createElement('img');
-        phaseImage.src = activity.img; // Carregar a imagem correspondente
-        phaseImage.alt = activity.name;
-        phaseImage.classList.add('phase-img'); // Adicionar classe de estilo
-        phaseDiv.appendChild(phaseImage);
+        phaseDiv.style.top = activity.top;
+        phaseDiv.style.left = activity.left;
 
         // Definir fases bloqueadas/desbloqueadas
         if (index === currentPhase) {
@@ -42,19 +35,14 @@ document.addEventListener('DOMContentLoaded', function() {
             phaseDiv.classList.add('locked'); // Fases bloqueadas
         }
 
+        const phaseText = document.createElement('span');
+        phaseText.textContent = activity.name;
+        phaseDiv.appendChild(phaseText);
+
         phaseDiv.addEventListener('click', () => {
             if (!phaseDiv.classList.contains('locked')) {
-                window.location.href = activity.path; // Abrir o HTML correspondente
-
-                // Desbloquear a próxima fase
-                if (index < activities.length - 1) {
-                    const nextPhase = document.querySelectorAll('.phase')[index + 1];
-                    nextPhase.classList.remove('locked');
-                    nextPhase.classList.add('unlocked');
-                    setTimeout(() => {
-                        nextPhase.classList.remove('unlocked');
-                    }, 1000);
-                }
+                moveToPhase(index); // Mover o bonequinho para a nova fase
+                unlockNextPhase(index);
             }
         });
 
@@ -66,10 +54,39 @@ document.addEventListener('DOMContentLoaded', function() {
         const phase = document.querySelectorAll('.phase')[index];
         const coords = phase.getBoundingClientRect();
         
+        // Remover o destaque amarelo da fase anterior
+        document.querySelectorAll('.phase').forEach(phase => {
+            phase.classList.remove('active');
+        });
+
+        // Adicionar o destaque amarelo na nova fase
+        phase.classList.add('active');
+
         // Mover o bonequinho para a fase com animação
         player.style.top = `${coords.top + window.scrollY + coords.height / 2}px`;
         player.style.left = `${coords.left + window.scrollX + coords.width / 2}px`;
         player.classList.add('moving');
+
+        // Verificar se a fase está fora da área visível e fazer scroll
+        const phaseInView = phase.getBoundingClientRect().top >= 0 && phase.getBoundingClientRect().bottom <= window.innerHeight;
+        if (!phaseInView) {
+            window.scrollTo({
+                top: coords.top + window.scrollY - window.innerHeight / 2,
+                behavior: 'smooth'
+            });
+        }
+    }
+
+    // Função para desbloquear a próxima fase
+    function unlockNextPhase(index) {
+        if (index < activities.length - 1) {
+            const nextPhase = document.querySelectorAll('.phase')[index + 1];
+            nextPhase.classList.remove('locked');
+            nextPhase.classList.add('unlocked');
+            setTimeout(() => {
+                nextPhase.classList.remove('unlocked');
+            }, 1000); // Duração da animação
+        }
     }
 
     // Função para calcular as coordenadas absolutas
