@@ -23,8 +23,15 @@ document.addEventListener('DOMContentLoaded', function() {
     activities.forEach((activity, index) => {
         const phaseDiv = document.createElement('div');
         phaseDiv.classList.add('phase');
-        phaseDiv.style.top = `${10 + index * 15}%`;
-        phaseDiv.style.left = `${10 + index * 10}%`;
+
+        // Alternar as posições dos círculos para criar o efeito zigzag
+        if (index % 2 === 0) {
+            phaseDiv.style.top = `${10 + index * 25}%`;  // Fases pares mais à esquerda
+            phaseDiv.style.left = '20%';
+        } else {
+            phaseDiv.style.top = `${10 + index * 25}%`;  // Fases ímpares mais à direita
+            phaseDiv.style.left = '70%';
+        }
 
         // Adicionar imagem da fase
         const phaseImage = document.createElement('img');
@@ -61,54 +68,3 @@ document.addEventListener('DOMContentLoaded', function() {
         // Scroll automático para fase fora da tela
         const phaseInView = phase.getBoundingClientRect().top >= 0 && phase.getBoundingClientRect().bottom <= window.innerHeight;
         if (!phaseInView) {
-            window.scrollTo({
-                top: coords.top + window.scrollY - window.innerHeight / 2,
-                behavior: 'smooth'
-            });
-        }
-
-        // Abrir o link da fase após o bonequinho se mover (espera 600ms para a animação concluir)
-        if (path) {
-            setTimeout(() => {
-                window.location.href = path;
-            }, 600);
-        }
-
-        // Desbloquear a próxima fase após mover para a fase atual
-        if (clickedIndex !== null && clickedIndex < activities.length - 1) {
-            setTimeout(() => {
-                unlockNextPhase(clickedIndex);
-            }, 600); // Desbloquear a próxima fase depois que o bonequinho se move
-        }
-    }
-
-    function unlockNextPhase(index) {
-        if (index < activities.length - 1) {
-            const nextPhase = document.querySelectorAll('.phase')[index + 1];
-            nextPhase.classList.remove('locked');
-            nextPhase.classList.add('unlocked');
-        }
-    }
-
-    function drawLines() {
-        svgContainer.innerHTML = '';
-        for (let i = 0; i < activities.length - 1; i++) {
-            const phase1 = document.querySelectorAll('.phase')[i];
-            const phase2 = document.querySelectorAll('.phase')[i + 1];
-            const coords1 = phase1.getBoundingClientRect();
-            const coords2 = phase2.getBoundingClientRect();
-            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} Q ${(coords1.left + coords2.left) / 2} ${(coords1.top + coords2.top) / 2}, ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
-            path.setAttribute('d', d);
-            path.setAttribute('stroke', 'black');
-            path.setAttribute('stroke-dasharray', '15,10');
-            path.setAttribute('fill', 'transparent');
-            path.setAttribute('stroke-width', '6');
-            svgContainer.appendChild(path);
-        }
-    }
-
-    drawLines();
-    createPlayer();
-    window.addEventListener('resize', drawLines);
-});
