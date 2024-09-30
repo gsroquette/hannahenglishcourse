@@ -8,24 +8,16 @@ document.addEventListener('DOMContentLoaded', function() {
     ];
 
     const mapContainer = document.getElementById('mapContainer');
-    const svgContainer = document.getElementById('linesSvg');
-    let currentPhase = 0;
-    let player;
-
-    function createPlayer() {
-        player = document.createElement('img');
-        player.src = '../../imagens/bonequinho.png'; // Caminho da imagem do bonequinho
-        player.classList.add('player');
-        mapContainer.appendChild(player);
-        moveToPhase(currentPhase); // Posicionar o bonequinho na fase inicial
-    }
+    const contentWrapper = document.createElement('div'); // Wrapper para fases e scroll
+    contentWrapper.classList.add('content');
+    mapContainer.appendChild(contentWrapper);
 
     activities.forEach((activity, index) => {
         const phaseDiv = document.createElement('div');
         phaseDiv.classList.add('phase');
 
-        const leftPosition = (index % 2 === 0) ? '20%' : '70%'; // Esquerda para pares, direita para ímpares
-        phaseDiv.style.top = `${10 + index * 20}%`;
+        const leftPosition = (index % 2 === 0) ? '20%' : '70%'; // Alterna entre esquerda e direita
+        phaseDiv.style.top = `${10 + index * 25}%`; // Espaçamento maior para distribuir fases
         phaseDiv.style.left = leftPosition;
 
         const phaseImage = document.createElement('img');
@@ -34,93 +26,24 @@ document.addEventListener('DOMContentLoaded', function() {
         phaseImage.classList.add('phase-img');
         phaseDiv.appendChild(phaseImage);
 
-        mapContainer.appendChild(phaseDiv);
-
-        if (index === currentPhase) {
-            phaseDiv.classList.add('active');
-        } else if (index > currentPhase) {
-            phaseDiv.classList.add('locked');
-
-            // Adicionar o cadeado separadamente, fora do contêiner .phase.locked para não herdar o filtro
-            const lockIcon = document.createElement('img');
-            lockIcon.src = '../../imagens/lock_icon_resized.png'; // Caminho da imagem do cadeado
-            lockIcon.classList.add('lock-icon');
-            mapContainer.appendChild(lockIcon);
-
-            // Posicionar o cadeado visualmente sobre a fase
-            lockIcon.style.top = `${10 + index * 20}%`;
-            lockIcon.style.left = leftPosition;
-        }
-
-        phaseDiv.addEventListener('click', () => {
-            if (!phaseDiv.classList.contains('locked')) {
-                moveToPhase(index, activity.path, index);
-            }
-        });
+        contentWrapper.appendChild(phaseDiv);
     });
 
-    function moveToPhase(index, path = null, clickedIndex = null) {
-        const phase = document.querySelectorAll('.phase')[index];
-        const coords = phase.getBoundingClientRect();
-        document.querySelectorAll('.phase').forEach(phase => { phase.classList.remove('active'); });
-        phase.classList.add('active');
-
-        player.style.top = `${coords.top + window.scrollY + coords.height / 2}px`;
-        player.style.left = `${coords.left + window.scrollX + coords.width / 2}px`;
-        player.classList.add('moving');
-
-        const phaseInView = phase.getBoundingClientRect().top >= 0 && phase.getBoundingClientRect().bottom <= window.innerHeight;
-        if (!phaseInView) {
-            window.scrollTo({
-                top: coords.top + window.scrollY - window.innerHeight / 2,
-                behavior: 'smooth'
-            });
-        }
-
-        if (path) {
-            setTimeout(() => {
-                window.location.href = path;
-            }, 600);
-        }
-
-        if (clickedIndex !== null && clickedIndex < activities.length - 1) {
-            setTimeout(() => {
-                unlockNextPhase(clickedIndex);
-            }, 600);
-        }
-    }
-
-    function unlockNextPhase(index) {
-        if (index < activities.length - 1) {
-            const nextPhase = document.querySelectorAll('.phase')[index + 1];
-            nextPhase.classList.remove('locked');
-            nextPhase.classList.add('unlocked');
-
-            // Remover o cadeado ao desbloquear a fase
-            const lockIcon = mapContainer.querySelector('.lock-icon');
-            if (lockIcon) {
-                lockIcon.remove();
-            }
-        }
-    }
+    drawLines(); // Função de desenhar as linhas, que já foi implementada
 
     function drawLines() {
-        svgContainer.innerHTML = '';
+        const svgContainer = document.getElementById('linesSvg');
+        svgContainer.innerHTML = ''; // Limpa linhas antigas
+
         for (let i = 0; i < activities.length - 1; i++) {
             const phase1 = document.querySelectorAll('.phase')[i];
             const phase2 = document.querySelectorAll('.phase')[i + 1];
             const coords1 = phase1.getBoundingClientRect();
             const coords2 = phase2.getBoundingClientRect();
 
-            const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
-            const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150; // Acentuar curva
-            const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
-            const controlPointY2 = coords2.top - 150; // Acentuar curva
-
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
-                       C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
-                       ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
+            const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2}
+                       L ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
             path.setAttribute('d', d);
             path.setAttribute('stroke', 'black');
             path.setAttribute('stroke-dasharray', '15,10');
@@ -129,8 +52,4 @@ document.addEventListener('DOMContentLoaded', function() {
             svgContainer.appendChild(path);
         }
     }
-
-    drawLines();
-    createPlayer();
-    window.addEventListener('resize', drawLines);
 });
