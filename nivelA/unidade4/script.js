@@ -10,6 +10,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const mapContainer = document.getElementById('mapContainer');
     const svgContainer = document.getElementById('linesSvg');
     let currentPhase = 0;
+    let player; // Referência ao bonequinho
+
+    // Função para adicionar o bonequinho
+    function createPlayer() {
+        player = document.createElement('img');
+        player.src = '../../imagens/bonequinho.png'; // Caminho da imagem do bonequinho
+        player.classList.add('player');
+        mapContainer.appendChild(player);
+        moveToPhase(currentPhase); // Posicionar o bonequinho na fase inicial
+    }
 
     // Adicionar fases no mapa
     activities.forEach((activity, index) => {
@@ -31,6 +41,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         phaseDiv.addEventListener('click', () => {
             if (!phaseDiv.classList.contains('locked')) {
+                moveToPhase(index); // Mover o bonequinho para a nova fase
                 unlockNextPhase(index);
             }
         });
@@ -38,13 +49,24 @@ document.addEventListener('DOMContentLoaded', function() {
         mapContainer.appendChild(phaseDiv);
     });
 
-    // Função para calcular as coordenadas absolutas
-    function getCoords(phase) {
-        const rect = phase.getBoundingClientRect();
-        return {
-            x: rect.left + rect.width / 2,
-            y: rect.top + rect.height / 2
-        };
+    // Função para mover o bonequinho
+    function moveToPhase(index) {
+        const phase = document.querySelectorAll('.phase')[index];
+        const coords = phase.getBoundingClientRect();
+        
+        // Mover o bonequinho para a fase com animação
+        player.style.top = `${coords.top + window.scrollY + coords.height / 2}px`;
+        player.style.left = `${coords.left + window.scrollX + coords.width / 2}px`;
+        player.classList.add('moving');
+
+        // Verificar se a fase está fora da área visível e fazer scroll
+        const phaseInView = phase.getBoundingClientRect().top >= 0 && phase.getBoundingClientRect().bottom <= window.innerHeight;
+        if (!phaseInView) {
+            window.scrollTo({
+                top: coords.top + window.scrollY - window.innerHeight / 2,
+                behavior: 'smooth'
+            });
+        }
     }
 
     // Função para desbloquear a próxima fase
@@ -57,6 +79,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 nextPhase.classList.remove('unlocked');
             }, 1000); // Duração da animação
         }
+    }
+
+    // Função para calcular as coordenadas absolutas
+    function getCoords(phase) {
+        const rect = phase.getBoundingClientRect();
+        return {
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2
+        };
     }
 
     // Desenhar as linhas entre as fases
@@ -82,6 +113,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Desenhar as linhas após o carregamento
     drawLines();
+    createPlayer(); // Adicionar o bonequinho no mapa
 
     // Recalcular as linhas ao redimensionar a tela
     window.addEventListener('resize', drawLines);
