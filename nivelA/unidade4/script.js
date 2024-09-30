@@ -8,7 +8,9 @@ document.addEventListener('DOMContentLoaded', function() {
     ];
 
     const mapContainer = document.getElementById('mapContainer');
+    const svgContainer = document.getElementById('linesSvg');
 
+    // Adicionar fases no mapa
     activities.forEach(activity => {
         const phaseDiv = document.createElement('div');
         phaseDiv.classList.add('phase');
@@ -21,4 +23,40 @@ document.addEventListener('DOMContentLoaded', function() {
 
         mapContainer.appendChild(phaseDiv);
     });
+
+    // Função para calcular as coordenadas absolutas
+    function getCoords(phase) {
+        const rect = phase.getBoundingClientRect();
+        return {
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2
+        };
+    }
+
+    // Desenhar as linhas entre as fases
+    function drawLines() {
+        svgContainer.innerHTML = ''; // Limpar SVG antes de desenhar
+        for (let i = 0; i < activities.length - 1; i++) {
+            const phase1 = document.querySelectorAll('.phase')[i];
+            const phase2 = document.querySelectorAll('.phase')[i + 1];
+
+            const coords1 = getCoords(phase1);
+            const coords2 = getCoords(phase2);
+
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const d = `M ${coords1.x} ${coords1.y} Q ${coords1.x + 100} ${coords1.y + 100}, ${coords2.x} ${coords2.y}`;
+            path.setAttribute('d', d);
+            path.setAttribute('stroke', 'black');
+            path.setAttribute('stroke-dasharray', '5,5'); // Linhas pontilhadas
+            path.setAttribute('fill', 'transparent');
+            path.setAttribute('stroke-width', '2');
+            svgContainer.appendChild(path);
+        }
+    }
+
+    // Desenhar as linhas após o carregamento
+    drawLines();
+
+    // Recalcular as linhas ao redimensionar a tela
+    window.addEventListener('resize', drawLines);
 });
