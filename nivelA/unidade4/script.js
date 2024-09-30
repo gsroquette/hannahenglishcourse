@@ -7,33 +7,33 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 5, name: "WordSearch", path: "../unidade2/WordSearch/index.html", img: "../../imagens/botoes/wordsearch_button.png" }
     ];
 
-    const mapContainer = document.getElementById('mapContainer');
-    const contentWrapper = document.createElement('div'); // Wrapper para fases e scroll
-    contentWrapper.classList.add('content');
-    mapContainer.appendChild(contentWrapper);
+    const gridContainer = document.createElement('div');
+    gridContainer.classList.add('grid-container');
+    document.getElementById('mapContainer').appendChild(gridContainer);
 
     activities.forEach((activity, index) => {
         const phaseDiv = document.createElement('div');
         phaseDiv.classList.add('phase');
 
-        const leftPosition = (index % 2 === 0) ? '20%' : '70%'; // Alterna entre esquerda e direita
-        phaseDiv.style.top = `${10 + index * 25}%`; // Espaçamento maior para distribuir fases
-        phaseDiv.style.left = leftPosition;
-
         const phaseImage = document.createElement('img');
         phaseImage.src = activity.img;
         phaseImage.alt = activity.name;
-        phaseImage.classList.add('phase-img');
         phaseDiv.appendChild(phaseImage);
 
-        contentWrapper.appendChild(phaseDiv);
+        gridContainer.appendChild(phaseDiv);
+
+        phaseDiv.addEventListener('click', () => {
+            if (!phaseDiv.classList.contains('locked')) {
+                moveToPhase(index, activity.path, index);
+            }
+        });
     });
 
-    drawLines(); // Função de desenhar as linhas, que já foi implementada
+    drawLines(); // Mantemos a função de desenhar as linhas, ajustada para a nova grade
 
     function drawLines() {
         const svgContainer = document.getElementById('linesSvg');
-        svgContainer.innerHTML = ''; // Limpa linhas antigas
+        svgContainer.innerHTML = ''; // Limpa as linhas antigas
 
         for (let i = 0; i < activities.length - 1; i++) {
             const phase1 = document.querySelectorAll('.phase')[i];
@@ -43,7 +43,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2}
-                       L ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
+                       C ${coords1.left + (coords2.left - coords1.left) / 2} ${coords1.top + 100},
+                         ${coords2.left + (coords2.left - coords1.left) / 2} ${coords2.top - 100},
+                         ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
             path.setAttribute('d', d);
             path.setAttribute('stroke', 'black');
             path.setAttribute('stroke-dasharray', '15,10');
