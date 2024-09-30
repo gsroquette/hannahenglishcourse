@@ -41,14 +41,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
         phaseDiv.addEventListener('click', () => {
             if (!phaseDiv.classList.contains('locked')) {
-                moveToPhase(index, activity.path);
+                moveToPhase(index, activity.path, index); // Agora passa também o índice para liberar a próxima fase
             }
         });
 
         mapContainer.appendChild(phaseDiv);
     });
 
-    function moveToPhase(index, path = null) {
+    function moveToPhase(index, path = null, clickedIndex = null) {
         const phase = document.querySelectorAll('.phase')[index];
         const coords = phase.getBoundingClientRect();
         document.querySelectorAll('.phase').forEach(phase => { phase.classList.remove('active'); });
@@ -67,11 +67,26 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
 
-        // Abrir o link da fase após o bonequinho se mover (espera 500ms para a animação concluir)
+        // Abrir o link da fase após o bonequinho se mover (espera 600ms para a animação concluir)
         if (path) {
             setTimeout(() => {
                 window.location.href = path;
-            }, 600); // tempo da animação de 600ms
+            }, 600);
+        }
+
+        // Desbloquear a próxima fase após mover para a fase atual
+        if (clickedIndex !== null && clickedIndex < activities.length - 1) {
+            setTimeout(() => {
+                unlockNextPhase(clickedIndex);
+            }, 600); // Desbloquear a próxima fase depois que o bonequinho se move
+        }
+    }
+
+    function unlockNextPhase(index) {
+        if (index < activities.length - 1) {
+            const nextPhase = document.querySelectorAll('.phase')[index + 1];
+            nextPhase.classList.remove('locked');
+            nextPhase.classList.add('unlocked');
         }
     }
 
