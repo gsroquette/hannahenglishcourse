@@ -34,16 +34,22 @@ document.addEventListener('DOMContentLoaded', function() {
         phaseImage.classList.add('phase-img');
         phaseDiv.appendChild(phaseImage);
 
+        mapContainer.appendChild(phaseDiv);
+
         if (index === currentPhase) {
             phaseDiv.classList.add('active');
         } else if (index > currentPhase) {
             phaseDiv.classList.add('locked');
 
-            // Adicionar o cadeado sobre as fases bloqueadas
+            // Adicionar o cadeado separadamente, fora do contêiner .phase.locked para não herdar o filtro
             const lockIcon = document.createElement('img');
             lockIcon.src = '../../imagens/lock_icon_resized.png'; // Caminho da imagem do cadeado
             lockIcon.classList.add('lock-icon');
-            phaseDiv.appendChild(lockIcon);
+            mapContainer.appendChild(lockIcon);
+
+            // Posicionar o cadeado visualmente sobre a fase
+            lockIcon.style.top = `${10 + index * 20}%`;
+            lockIcon.style.left = leftPosition;
         }
 
         phaseDiv.addEventListener('click', () => {
@@ -51,8 +57,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 moveToPhase(index, activity.path, index);
             }
         });
-
-        mapContainer.appendChild(phaseDiv);
     });
 
     function moveToPhase(index, path = null, clickedIndex = null) {
@@ -93,7 +97,7 @@ document.addEventListener('DOMContentLoaded', function() {
             nextPhase.classList.add('unlocked');
 
             // Remover o cadeado ao desbloquear a fase
-            const lockIcon = nextPhase.querySelector('.lock-icon');
+            const lockIcon = mapContainer.querySelector('.lock-icon');
             if (lockIcon) {
                 lockIcon.remove();
             }
