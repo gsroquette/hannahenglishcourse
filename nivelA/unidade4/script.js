@@ -5,7 +5,6 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 3, name: "MemoryGame", path: "../unidade2/MemoryGame/index.html", img: "../../imagens/botoes/memorygame_button.png" },
         { id: 4, name: "QUIZ", path: "../unidade2/QUIZ/index.html", img: "../../imagens/botoes/quiz_button.png" },
         { id: 5, name: "WordSearch", path: "../unidade2/WordSearch/index.html", img: "../../imagens/botoes/wordsearch_button.png" }
-        // Mais atividades podem ser adicionadas
     ];
 
     const mapContainer = document.getElementById('mapContainer');
@@ -46,6 +45,16 @@ document.addEventListener('DOMContentLoaded', function() {
         phaseDiv.addEventListener('click', () => {
             if (!phaseDiv.classList.contains('locked')) {
                 window.location.href = activity.path; // Abrir o HTML correspondente
+
+                // Desbloquear a próxima fase
+                if (index < activities.length - 1) {
+                    const nextPhase = document.querySelectorAll('.phase')[index + 1];
+                    nextPhase.classList.remove('locked');
+                    nextPhase.classList.add('unlocked');
+                    setTimeout(() => {
+                        nextPhase.classList.remove('unlocked');
+                    }, 1000);
+                }
             }
         });
 
