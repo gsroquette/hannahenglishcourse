@@ -1,9 +1,10 @@
 // Função para mover o bonequinho entre as fases
 function movePlayerToPhase(player, phase) {
     if (phase.classList.contains('locked')) {
-        console.log("A fase está bloqueada. O bonequinho não pode se mover.");
-        return; // Não permite mover o bonequinho para fases bloqueadas
+        alert("Esta fase está bloqueada.");
+        return;
     }
+
     const phasePosition = phase.getBoundingClientRect();
     const playerPosition = player.getBoundingClientRect();
 
@@ -32,11 +33,12 @@ function unlockNextPhase(currentPhase) {
 document.querySelectorAll('.phase').forEach(phase => {
     phase.addEventListener('click', () => {
         const player = document.querySelector('.player');
+        movePlayerToPhase(player, phase);
+
         if (!phase.classList.contains('locked')) {
-            movePlayerToPhase(player, phase);
             setTimeout(() => {
                 unlockNextPhase(phase);
-            }, 600);
+            }, 600); // Espera 600ms para mover o bonequinho antes de desbloquear a próxima fase
         }
     });
 });
