@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Função para desenhar as linhas entre as fases com curvas em S
+    // Função para desenhar as linhas entre as fases com curvas em S mais acentuadas
     function drawLines() {
         svgContainer.innerHTML = '';
         for (let i = 0; i < activities.length - 1; i++) {
@@ -97,11 +97,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const coords1 = phase1.getBoundingClientRect();
             const coords2 = phase2.getBoundingClientRect();
 
-            // Criar curvas sinuosas em S
-            const controlPointX1 = coords1.left + coords1.width * 0.5;
-            const controlPointY1 = coords1.top + coords1.height * 0.5;
-            const controlPointX2 = coords2.left + coords2.width * 0.5;
-            const controlPointY2 = coords2.top + coords2.height * 0.5 + 200; // Ponto de controle ajustado para fazer curvas acentuadas
+            // Criar curvas sinuosas mais acentuadas
+            const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
+            const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 100; // Ajuste para acentuar o S
+            const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
+            const controlPointY2 = coords2.top - 100; // Ajuste para acentuar o S
 
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
