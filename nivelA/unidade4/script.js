@@ -92,7 +92,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Função para desenhar as linhas entre as fases com curvas suaves como no mapa do tesouro
+    // Função para desenhar as linhas entre as fases com curvas em S
     function drawLines() {
         svgContainer.innerHTML = '';
         for (let i = 0; i < activities.length - 1; i++) {
@@ -101,11 +101,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const coords1 = phase1.getBoundingClientRect();
             const coords2 = phase2.getBoundingClientRect();
 
-            // Ajuste para fazer as curvas bem suaves
-            const controlPointX1 = coords1.left + coords1.width * 0.8;  // Primeiro ponto de controle para curva suave
-            const controlPointY1 = coords1.top + coords1.height * 0.8;
-            const controlPointX2 = coords2.left + coords2.width * 0.2;  // Segundo ponto de controle
-            const controlPointY2 = coords2.top + coords2.height * 0.2;
+            // Ajuste para criar curvas em S
+            const controlPointX1 = coords1.left + coords1.width * 0.8;  // Primeiro ponto de controle mais à direita
+            const controlPointY1 = coords1.top + coords1.height * 0.5;  // Mantém na metade da altura
+            const controlPointX2 = coords2.left + coords2.width * 0.2;  // Segundo ponto de controle mais à esquerda
+            const controlPointY2 = coords2.top + coords2.height * 0.5;  // Mantém na metade da altura
 
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
