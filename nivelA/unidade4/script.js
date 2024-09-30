@@ -24,9 +24,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const phaseDiv = document.createElement('div');
         phaseDiv.classList.add('phase');
 
-        // Espaçar mais as fases para melhorar a aparência das curvas
-        phaseDiv.style.top = `${10 + index * 25}%`; // Aumentei o espaçamento vertical
-        phaseDiv.style.left = `${10 + index * 20}%`; // Aumentei o espaçamento horizontal
+        // Alternar as posições dos círculos para criar as curvas em S
+        if (index % 2 === 0) {
+            phaseDiv.style.top = `${10 + index * 25}%`;
+            phaseDiv.style.left = '20%';  // Fases pares mais à esquerda
+        } else {
+            phaseDiv.style.top = `${10 + index * 25}%`;
+            phaseDiv.style.left = '70%';  // Fases ímpares mais à direita
+        }
 
         // Adicionar imagem da fase
         const phaseImage = document.createElement('img');
@@ -101,15 +106,13 @@ document.addEventListener('DOMContentLoaded', function() {
             const coords1 = phase1.getBoundingClientRect();
             const coords2 = phase2.getBoundingClientRect();
 
-            // Ajuste para criar curvas em S
-            const controlPointX1 = coords1.left + coords1.width * 0.8;  // Primeiro ponto de controle mais à direita
-            const controlPointY1 = coords1.top + coords1.height * 0.5;  // Mantém na metade da altura
-            const controlPointX2 = coords2.left + coords2.width * 0.2;  // Segundo ponto de controle mais à esquerda
-            const controlPointY2 = coords2.top + coords2.height * 0.5;  // Mantém na metade da altura
+            // Ponto de controle para curva acentuada
+            const controlPointX1 = (coords1.left + coords2.left) / 2;
+            const controlPointY1 = (coords1.top + coords2.top) / 2 - 200;  // Aumentei para acentuar a curva em S
 
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
-                       C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
+                       Q ${controlPointX1} ${controlPointY1}, 
                        ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
             
             path.setAttribute('d', d);
