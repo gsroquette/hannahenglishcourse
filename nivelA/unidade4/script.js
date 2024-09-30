@@ -47,9 +47,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const d = `M ${coords1.x} ${coords1.y} Q ${coords1.x + 100} ${coords1.y + 100}, ${coords2.x} ${coords2.y}`;
             path.setAttribute('d', d);
             path.setAttribute('stroke', 'black');
-            path.setAttribute('stroke-dasharray', '5,5'); // Linhas pontilhadas
+            path.setAttribute('stroke-dasharray', '15,10'); // Traços mais longos para efeito de mapa do tesouro
             path.setAttribute('fill', 'transparent');
-            path.setAttribute('stroke-width', '6'); // Aumentando a espessura da linha
+            path.setAttribute('stroke-width', '6'); // Espessura da linha
             svgContainer.appendChild(path);
         }
     }
