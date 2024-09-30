@@ -90,6 +90,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Função para desenhar as linhas entre as fases com curvas mais sinuosas
     function drawLines() {
         svgContainer.innerHTML = '';
         for (let i = 0; i < activities.length - 1; i++) {
@@ -97,8 +98,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const phase2 = document.querySelectorAll('.phase')[i + 1];
             const coords1 = phase1.getBoundingClientRect();
             const coords2 = phase2.getBoundingClientRect();
+
+            // Aumentando a sinuosidade da curva
+            const controlPointX = (coords1.left + coords2.left) / 2;
+            const controlPointY = (coords1.top + coords2.top) / 2 - 300;  // Aumentei o controle Y para fazer a curva mais acentuada
+            
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} Q ${(coords1.left + coords2.left) / 2} ${(coords1.top + coords2.top) / 2}, ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
+            const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
+                       Q ${controlPointX} ${controlPointY}, 
+                       ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
+            
             path.setAttribute('d', d);
             path.setAttribute('stroke', 'black');
             path.setAttribute('stroke-dasharray', '15,10');
