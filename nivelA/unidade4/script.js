@@ -23,6 +23,12 @@ document.addEventListener('DOMContentLoaded', function() {
             phaseDiv.classList.add('active'); // A fase ativa
         } else if (index > currentPhase) {
             phaseDiv.classList.add('locked'); // Fases bloqueadas
+
+            // Adicionar ícone de cadeado na fase bloqueada
+            const lockIcon = document.createElement('img');
+            lockIcon.src = '../../imagens/lock_icon_resized.png'; // Caminho para o ícone de cadeado
+            lockIcon.classList.add('lock-icon');
+            phaseDiv.appendChild(lockIcon);
         }
 
         const phaseText = document.createElement('span');
@@ -38,15 +44,6 @@ document.addEventListener('DOMContentLoaded', function() {
         mapContainer.appendChild(phaseDiv);
     });
 
-    // Função para calcular as coordenadas absolutas
-    function getCoords(phase) {
-        const rect = phase.getBoundingClientRect();
-        return {
-            x: rect.left + rect.width / 2,
-            y: rect.top + rect.height / 2
-        };
-    }
-
     // Função para desbloquear a próxima fase
     function unlockNextPhase(index) {
         if (index < activities.length - 1) {
@@ -57,6 +54,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 nextPhase.classList.remove('unlocked');
             }, 1000); // Duração da animação
         }
+    }
+
+    // Função para calcular as coordenadas absolutas
+    function getCoords(phase) {
+        const rect = phase.getBoundingClientRect();
+        return {
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2
+        };
     }
 
     // Desenhar as linhas entre as fases
