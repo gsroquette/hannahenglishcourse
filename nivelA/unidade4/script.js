@@ -38,6 +38,12 @@ document.addEventListener('DOMContentLoaded', function() {
             phaseDiv.classList.add('active');
         } else if (index > currentPhase) {
             phaseDiv.classList.add('locked');
+
+            // Adicionar o cadeado sobre as fases bloqueadas
+            const lockIcon = document.createElement('img');
+            lockIcon.src = '../../imagens/lock_icon_resized.png'; // Caminho da imagem do cadeado
+            lockIcon.classList.add('lock-icon');
+            phaseDiv.appendChild(lockIcon);
         }
 
         phaseDiv.addEventListener('click', () => {
@@ -85,10 +91,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const nextPhase = document.querySelectorAll('.phase')[index + 1];
             nextPhase.classList.remove('locked');
             nextPhase.classList.add('unlocked');
+
+            // Remover o cadeado ao desbloquear a fase
+            const lockIcon = nextPhase.querySelector('.lock-icon');
+            if (lockIcon) {
+                lockIcon.remove();
+            }
         }
     }
 
-    // Função para desenhar as linhas entre as fases com curvas mais acentuadas
     function drawLines() {
         svgContainer.innerHTML = '';
         for (let i = 0; i < activities.length - 1; i++) {
@@ -97,11 +108,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const coords1 = phase1.getBoundingClientRect();
             const coords2 = phase2.getBoundingClientRect();
 
-            // Criar curvas ainda mais sinuosas
             const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
-            const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150; // Aumentando a curvatura
+            const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150; // Acentuar curva
             const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
-            const controlPointY2 = coords2.top - 150; // Ajustando mais para criar o efeito S
+            const controlPointY2 = coords2.top - 150; // Acentuar curva
 
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
