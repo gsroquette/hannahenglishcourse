@@ -23,15 +23,8 @@ document.addEventListener('DOMContentLoaded', function() {
     activities.forEach((activity, index) => {
         const phaseDiv = document.createElement('div');
         phaseDiv.classList.add('phase');
-
-        // Alternar as posições dos círculos para criar as curvas em S
-        if (index % 2 === 0) {
-            phaseDiv.style.top = `${10 + index * 25}%`;
-            phaseDiv.style.left = '20%';  // Fases pares mais à esquerda
-        } else {
-            phaseDiv.style.top = `${10 + index * 25}%`;
-            phaseDiv.style.left = '70%';  // Fases ímpares mais à direita
-        }
+        phaseDiv.style.top = `${10 + index * 15}%`;
+        phaseDiv.style.left = `${10 + index * 10}%`;
 
         // Adicionar imagem da fase
         const phaseImage = document.createElement('img');
@@ -97,7 +90,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Função para desenhar as linhas entre as fases com curvas em S
     function drawLines() {
         svgContainer.innerHTML = '';
         for (let i = 0; i < activities.length - 1; i++) {
@@ -105,16 +97,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const phase2 = document.querySelectorAll('.phase')[i + 1];
             const coords1 = phase1.getBoundingClientRect();
             const coords2 = phase2.getBoundingClientRect();
-
-            // Ponto de controle para curva acentuada
-            const controlPointX1 = (coords1.left + coords2.left) / 2;
-            const controlPointY1 = (coords1.top + coords2.top) / 2 - 200;  // Aumentei para acentuar a curva em S
-
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
-                       Q ${controlPointX1} ${controlPointY1}, 
-                       ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
-            
+            const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} Q ${(coords1.left + coords2.left) / 2} ${(coords1.top + coords2.top) / 2}, ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
             path.setAttribute('d', d);
             path.setAttribute('stroke', 'black');
             path.setAttribute('stroke-dasharray', '15,10');
