@@ -23,8 +23,10 @@ document.addEventListener('DOMContentLoaded', function() {
     activities.forEach((activity, index) => {
         const phaseDiv = document.createElement('div');
         phaseDiv.classList.add('phase');
-        phaseDiv.style.top = `${10 + index * 15}%`;
-        phaseDiv.style.left = `${10 + index * 10}%`;
+
+        // Espaçar mais as fases para melhorar a aparência das curvas
+        phaseDiv.style.top = `${10 + index * 25}%`; // Aumentei o espaçamento vertical
+        phaseDiv.style.left = `${10 + index * 20}%`; // Aumentei o espaçamento horizontal
 
         // Adicionar imagem da fase
         const phaseImage = document.createElement('img');
@@ -90,7 +92,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Função para desenhar as linhas entre as fases com curvas mais sinuosas
+    // Função para desenhar as linhas entre as fases com curvas mais sinuosas e espaçadas
     function drawLines() {
         svgContainer.innerHTML = '';
         for (let i = 0; i < activities.length - 1; i++) {
@@ -99,9 +101,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const coords1 = phase1.getBoundingClientRect();
             const coords2 = phase2.getBoundingClientRect();
 
-            // Aumentando a sinuosidade da curva
+            // Aumentando a sinuosidade da curva com mais espaço
             const controlPointX = (coords1.left + coords2.left) / 2;
-            const controlPointY = (coords1.top + coords2.top) / 2 - 300;  // Aumentei o controle Y para fazer a curva mais acentuada
+            const controlPointY = (coords1.top + coords2.top) / 2 - 400;  // Aumentei o controle Y para fazer a curva mais acentuada
             
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
