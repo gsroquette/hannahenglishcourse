@@ -103,6 +103,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (clickedIndex !== null && clickedIndex < activities.length - 1) {
             setTimeout(() => {
                 unlockNextPhase(clickedIndex);
+                updateLineColor(clickedIndex);
             }, 600);
         }
     }
@@ -113,7 +114,6 @@ document.addEventListener('DOMContentLoaded', function() {
             nextPhase.classList.remove('locked');
             nextPhase.classList.add('unlocked');
 
-            // Remover o cadeado ao desbloquear a fase
             const lockIcon = mapContainer.querySelector('.lock-icon');
             if (lockIcon) {
                 lockIcon.remove();
@@ -139,11 +139,16 @@ document.addEventListener('DOMContentLoaded', function() {
                        C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
                        ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
             path.setAttribute('d', d);
-            path.setAttribute('stroke', 'black');
-            path.setAttribute('stroke-dasharray', '15,10');
-            path.setAttribute('fill', 'transparent');
-            path.setAttribute('stroke-width', '6');
+            path.setAttribute('class', `path path-blue`);
             svgContainer.appendChild(path);
+        }
+    }
+
+    function updateLineColor(index) {
+        const paths = document.querySelectorAll('.path');
+        if (paths[index]) {
+            paths[index].classList.remove('path-blue');
+            paths[index].classList.add('path-purple');
         }
     }
 
