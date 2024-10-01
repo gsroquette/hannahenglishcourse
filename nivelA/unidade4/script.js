@@ -24,11 +24,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const phaseDiv = document.createElement('div');
         phaseDiv.classList.add('phase');
 
-        // Garantir espaçamento superior para evitar sobreposição com o título
-        const baseTopPosition = 200; // Espaço inicial de 200px para o título
-        const randomVerticalGap = Math.random() * (25 - 15) + 15; // Valor aleatório entre 15% e 25% da altura da tela
+        const baseTopPosition = 200;
+        const randomVerticalGap = Math.random() * (25 - 15) + 15;
         const topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
-        const randomLeft = Math.random() * (90 - 10) + 10; // Valor aleatório entre 10% e 90%
+        const randomLeft = Math.random() * (90 - 10) + 10;
 
         phaseDiv.style.top = `${topPosition}px`;
         phaseDiv.style.left = `${randomLeft}%`;
@@ -46,13 +45,11 @@ document.addEventListener('DOMContentLoaded', function() {
         } else if (index > currentPhase) {
             phaseDiv.classList.add('locked');
 
-            // Adicionar o cadeado separadamente, fora do contêiner .phase.locked para não herdar o filtro
             const lockIcon = document.createElement('img');
-            lockIcon.src = '../../imagens/lock_icon_resized.png'; // Caminho da imagem do cadeado
+            lockIcon.src = '../../imagens/lock_icon_resized.png';
             lockIcon.classList.add('lock-icon');
             mapContainer.appendChild(lockIcon);
 
-            // Posicionar o cadeado visualmente sobre a fase
             lockIcon.style.top = `${topPosition}px`;
             lockIcon.style.left = `${randomLeft}%`;
         }
@@ -101,7 +98,6 @@ document.addEventListener('DOMContentLoaded', function() {
             nextPhase.classList.remove('locked');
             nextPhase.classList.add('unlocked');
 
-            // Remover o cadeado ao desbloquear a fase
             const lockIcon = mapContainer.querySelector('.lock-icon');
             if (lockIcon) {
                 lockIcon.remove();
@@ -112,11 +108,16 @@ document.addEventListener('DOMContentLoaded', function() {
     // Função para redesenhar as linhas
     function drawLines() {
         svgContainer.innerHTML = ''; // Limpar o SVG antes de redesenhar as linhas
+        console.log('Drawing lines...'); // Log de debug para ver se a função está sendo chamada
+
         for (let i = 0; i < activities.length - 1; i++) {
             const phase1 = document.querySelectorAll('.phase')[i];
             const phase2 = document.querySelectorAll('.phase')[i + 1];
             const coords1 = phase1.getBoundingClientRect();
             const coords2 = phase2.getBoundingClientRect();
+
+            // Log para verificar as coordenadas
+            console.log(`Fase ${i} coordenadas: `, coords1, `Próxima fase ${i + 1} coordenadas: `, coords2);
 
             const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
             const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150;
@@ -133,7 +134,21 @@ document.addEventListener('DOMContentLoaded', function() {
             path.setAttribute('fill', 'transparent');
             path.setAttribute('stroke-width', '6');
             svgContainer.appendChild(path);
+
+            // Log para garantir que os elementos <path> estão sendo adicionados ao SVG
+            console.log('Path adicionado: ', path);
         }
+
+        // Adicionar um retângulo temporário para ver se o SVG está visível
+        const tempRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        tempRect.setAttribute('x', '10');
+        tempRect.setAttribute('y', '10');
+        tempRect.setAttribute('width', '100');
+        tempRect.setAttribute('height', '100');
+        tempRect.setAttribute('stroke', 'red');
+        tempRect.setAttribute('fill', 'none');
+        svgContainer.appendChild(tempRect);
+        console.log('Retângulo temporário adicionado para debug.');
     }
 
     function checkImagesLoaded(callback) {
