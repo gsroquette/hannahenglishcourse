@@ -109,6 +109,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Função para redesenhar as linhas
     function drawLines() {
         svgContainer.innerHTML = '';
         for (let i = 0; i < activities.length - 1; i++) {
@@ -135,7 +136,25 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    drawLines();
+    // Adicionando debounce para otimizar o resize
+    function debounce(func, wait) {
+        let timeout;
+        return function(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    // Redesfocar linhas ao redimensionar com debounce
+    window.addEventListener('resize', debounce(() => {
+        requestAnimationFrame(drawLines);
+    }, 100));
+
+    // Redesenhar as linhas ao carregar completamente a página
+    requestAnimationFrame(drawLines);
     createPlayer();
-    window.addEventListener('resize', drawLines);
 });
