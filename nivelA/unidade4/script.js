@@ -125,15 +125,17 @@ document.addEventListener('DOMContentLoaded', function() {
             mapContainer.style.transform = 'scale(1.5)';
             mapContainer.style.transition = 'transform 1s ease';
 
-            // Exibe o gif de cadeado após o scroll
+            // Exibe o gif de cadeado sobre o círculo da fase desbloqueada
             setTimeout(() => {
                 const unlockGif = document.createElement('img');
                 unlockGif.src = '../../imagens/cadeado.gif'; // O GIF de cadeado
                 unlockGif.classList.add('unlock-gif');
-                mapContainer.appendChild(unlockGif);
+                nextPhase.appendChild(unlockGif); // Anexado ao círculo desbloqueado
 
-                unlockGif.style.top = `${nextPhaseCoords.top + window.scrollY + nextPhaseCoords.height / 2}px`;
-                unlockGif.style.left = `${nextPhaseCoords.left + window.scrollX + nextPhaseCoords.width / 2}px`;
+                unlockGif.style.position = 'absolute';
+                unlockGif.style.top = '50%';
+                unlockGif.style.left = '50%';
+                unlockGif.style.transform = 'translate(-50%, -50%)';
 
                 // Remove o GIF após 3 segundos e reseta o zoom
                 setTimeout(() => {
