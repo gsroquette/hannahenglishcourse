@@ -12,14 +12,18 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentPhase = 0;
     let player;
 
+    // Função para criar e adicionar o bonequinho ao mapa
     function createPlayer() {
         player = document.createElement('img');
         player.src = '../../imagens/bonequinho.png'; // Caminho da imagem do bonequinho
         player.classList.add('player');
+        player.style.border = '2px solid red'; // Adiciona uma borda vermelha para debug
+        player.style.position = 'absolute'; // Certificar que está posicionado corretamente
         mapContainer.appendChild(player);
         moveToPhase(currentPhase); // Posicionar o bonequinho na fase inicial
     }
 
+    // Criar fases dinamicamente
     activities.forEach((activity, index) => {
         const phaseDiv = document.createElement('div');
         phaseDiv.classList.add('phase');
@@ -54,6 +58,9 @@ document.addEventListener('DOMContentLoaded', function() {
             lockIcon.style.left = `${randomLeft}%`;
         }
 
+        // Log para verificar a fase criada
+        console.log(`Fase ${index} criada em (${randomLeft}%, ${topPosition}px)`);
+
         phaseDiv.addEventListener('click', () => {
             if (!phaseDiv.classList.contains('locked')) {
                 moveToPhase(index, activity.path, index);
@@ -61,6 +68,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    // Mover o bonequinho para a fase selecionada
     function moveToPhase(index, path = null, clickedIndex = null) {
         const phase = document.querySelectorAll('.phase')[index];
         const coords = phase.getBoundingClientRect();
@@ -70,6 +78,9 @@ document.addEventListener('DOMContentLoaded', function() {
         player.style.top = `${coords.top + window.scrollY + coords.height / 2}px`;
         player.style.left = `${coords.left + window.scrollX + coords.width / 2}px`;
         player.classList.add('moving');
+
+        // Log para verificar a movimentação do bonequinho
+        console.log(`Movendo o bonequinho para (${player.style.left}, ${player.style.top})`);
 
         const phaseInView = phase.getBoundingClientRect().top >= 0 && phase.getBoundingClientRect().bottom <= window.innerHeight;
         if (!phaseInView) {
@@ -92,6 +103,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Função para desbloquear a próxima fase
     function unlockNextPhase(index) {
         if (index < activities.length - 1) {
             const nextPhase = document.querySelectorAll('.phase')[index + 1];
