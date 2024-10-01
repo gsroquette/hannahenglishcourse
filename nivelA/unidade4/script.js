@@ -136,6 +136,29 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Verificação do carregamento completo das imagens
+    function checkImagesLoaded(callback) {
+        const images = document.querySelectorAll('img');
+        let loadedImagesCount = 0;
+
+        images.forEach(img => {
+            img.onload = function() {
+                loadedImagesCount++;
+                if (loadedImagesCount === images.length) {
+                    callback(); // Executa o callback quando todas as imagens estiverem carregadas
+                }
+            };
+        });
+    }
+
+    // Função principal para carregar a página e garantir que todos os elementos estejam prontos
+    window.onload = function() {
+        checkImagesLoaded(() => {
+            requestAnimationFrame(drawLines); // Redesenhar as linhas após todas as imagens serem carregadas
+            createPlayer();
+        });
+    };
+
     // Adicionando debounce para otimizar o resize
     function debounce(func, wait) {
         let timeout;
@@ -153,8 +176,4 @@ document.addEventListener('DOMContentLoaded', function() {
     window.addEventListener('resize', debounce(() => {
         requestAnimationFrame(drawLines);
     }, 100));
-
-    // Redesenhar as linhas ao carregar completamente a página
-    requestAnimationFrame(drawLines);
-    createPlayer();
 });
