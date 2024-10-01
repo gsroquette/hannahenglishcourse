@@ -9,13 +9,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const mapContainer = document.getElementById('mapContainer');
     const svgContainer = document.getElementById('linesSvg');
+    const starsContainer = document.getElementById('starsContainer');
     let currentPhase = 0;
     let player;
     let previousPosition = null;
 
     function createPlayer() {
         player = document.createElement('img');
-        player.src = '../../imagens/bonequinho.png'; 
+        player.src = '../../imagens/bonequinho.png';
         player.classList.add('player');
         mapContainer.appendChild(player);
         moveToPhase(currentPhase);
@@ -103,7 +104,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (clickedIndex !== null && clickedIndex < activities.length - 1) {
             setTimeout(() => {
                 unlockNextPhase(clickedIndex);
-                updateLineColor(clickedIndex);
+                updateStars(clickedIndex + 1);
             }, 600);
         }
     }
@@ -118,6 +119,17 @@ document.addEventListener('DOMContentLoaded', function() {
             if (lockIcon) {
                 lockIcon.remove();
             }
+        }
+    }
+
+    function updateStars(starCount) {
+        starsContainer.innerHTML = ''; // Limpar estrelas anteriores
+
+        for (let i = 0; i < starCount; i++) {
+            const starImg = document.createElement('img');
+            starImg.src = '../../imagens/estrela.png';
+            starImg.classList.add('star');
+            starsContainer.appendChild(starImg);
         }
     }
 
@@ -141,14 +153,6 @@ document.addEventListener('DOMContentLoaded', function() {
             path.setAttribute('d', d);
             path.setAttribute('class', `path path-blue`);
             svgContainer.appendChild(path);
-        }
-    }
-
-    function updateLineColor(index) {
-        const paths = document.querySelectorAll('.path');
-        if (paths[index]) {
-            paths[index].classList.remove('path-blue');
-            paths[index].classList.add('path-purple');
         }
     }
 
