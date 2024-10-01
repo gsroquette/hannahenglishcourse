@@ -94,12 +94,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
 
-        if (path) {
-            setTimeout(() => {
-                window.location.href = path;
-            }, 600);
-        }
-
         if (clickedIndex !== null && clickedIndex < activities.length - 1) {
             setTimeout(() => {
                 unlockNextPhase(clickedIndex, path);
@@ -155,7 +149,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             behavior: 'smooth'
                         });
 
-                        // Abre a fase
+                        // Abre a fase (somente agora)
                         setTimeout(() => {
                             window.location.href = path;
                         }, 600);
