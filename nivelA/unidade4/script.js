@@ -11,18 +11,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const svgContainer = document.getElementById('linesSvg');
     let currentPhase = 0;
     let player;
-    let previousPosition = null; // Para armazenar a posição anterior
+    let previousPosition = null;
 
     function createPlayer() {
         player = document.createElement('img');
-        player.src = '../../imagens/bonequinho.png'; // Caminho da imagem do bonequinho
+        player.src = '../../imagens/bonequinho.png'; 
         player.classList.add('player');
         mapContainer.appendChild(player);
-        moveToPhase(currentPhase); // Posicionar o bonequinho na fase inicial
+        moveToPhase(currentPhase);
     }
 
     function isTooClose(pos1, pos2) {
-        const minDistance = 100; // Distância mínima em pixels
+        const minDistance = 100;
         const dx = pos1.left - pos2.left;
         const dy = pos1.top - pos2.top;
         const distance = Math.sqrt(dx * dx + dy * dy);
@@ -33,15 +33,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const phaseDiv = document.createElement('div');
         phaseDiv.classList.add('phase');
 
-        // Garantir espaçamento superior para evitar sobreposição com o título
-        const baseTopPosition = 200; // Espaço inicial de 200px para o título
+        const baseTopPosition = 200;
         let topPosition, randomLeft;
 
-        // Geração de posições com verificação de distância mínima
         do {
-            const randomVerticalGap = Math.random() * (30 - 20) + 20; // Valor aleatório entre 20% e 30%
+            const randomVerticalGap = Math.random() * (30 - 20) + 20;
             topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
-            randomLeft = Math.random() * (80 - 20) + 20; // Valor aleatório entre 20% e 80%
+            randomLeft = Math.random() * (80 - 20) + 20;
         } while (previousPosition && isTooClose({ top: topPosition, left: randomLeft }, previousPosition));
 
         previousPosition = { top: topPosition, left: randomLeft };
@@ -62,13 +60,11 @@ document.addEventListener('DOMContentLoaded', function() {
         } else if (index > currentPhase) {
             phaseDiv.classList.add('locked');
 
-            // Adicionar o cadeado separadamente, fora do contêiner .phase.locked para não herdar o filtro
             const lockIcon = document.createElement('img');
-            lockIcon.src = '../../imagens/lock_icon_resized.png'; // Caminho da imagem do cadeado
+            lockIcon.src = '../../imagens/lock_icon_resized.png';
             lockIcon.classList.add('lock-icon');
             mapContainer.appendChild(lockIcon);
 
-            // Posicionar o cadeado visualmente sobre a fase
             lockIcon.style.top = `${topPosition}px`;
             lockIcon.style.left = `${randomLeft}%`;
         }
@@ -134,9 +130,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const coords2 = phase2.getBoundingClientRect();
 
             const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
-            const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150; // Acentuar curva
+            const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150;
             const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
-            const controlPointY2 = coords2.top - 150; // Acentuar curva
+            const controlPointY2 = coords2.top - 150;
 
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
