@@ -24,9 +24,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const phaseDiv = document.createElement('div');
         phaseDiv.classList.add('phase');
 
-        // Gerar uma posição horizontal mais orgânica (variando entre 10% e 90%)
-        const randomLeft = Math.random() * (90 - 10) + 10; // Gera um valor aleatório entre 10% e 90%
-        phaseDiv.style.top = `${10 + index * 20}%`;
+        // Garantir espaçamento superior para evitar sobreposição com o título
+        const topPosition = 200 + index * 20; // Começar a 200px de distância do topo
+        const randomLeft = Math.random() * (90 - 10) + 10; // Valor aleatório entre 10% e 90%
+
+        phaseDiv.style.top = `${topPosition}px`;
         phaseDiv.style.left = `${randomLeft}%`;
 
         const phaseImage = document.createElement('img');
@@ -49,7 +51,7 @@ document.addEventListener('DOMContentLoaded', function() {
             mapContainer.appendChild(lockIcon);
 
             // Posicionar o cadeado visualmente sobre a fase
-            lockIcon.style.top = `${10 + index * 20}%`;
+            lockIcon.style.top = `${topPosition}px`;
             lockIcon.style.left = `${randomLeft}%`;
         }
 
