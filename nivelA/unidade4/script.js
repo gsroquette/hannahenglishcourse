@@ -116,7 +116,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const coords1 = phase1.getBoundingClientRect();
             const coords2 = phase2.getBoundingClientRect();
 
-            // Log para verificar as coordenadas
             console.log(`Fase ${i} coordenadas: `, coords1, `Próxima fase ${i + 1} coordenadas: `, coords2);
 
             const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
@@ -135,11 +134,9 @@ document.addEventListener('DOMContentLoaded', function() {
             path.setAttribute('stroke-width', '6');
             svgContainer.appendChild(path);
 
-            // Log para garantir que os elementos <path> estão sendo adicionados ao SVG
             console.log('Path adicionado: ', path);
         }
 
-        // Adicionar um retângulo temporário para ver se o SVG está visível
         const tempRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         tempRect.setAttribute('x', '10');
         tempRect.setAttribute('y', '10');
@@ -174,6 +171,19 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 300); // Atraso para garantir que o layout esteja pronto
         });
     };
+
+    // Função debounce para evitar redesenhar excessivamente
+    function debounce(func, wait) {
+        let timeout;
+        return function(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
 
     window.addEventListener('resize', debounce(() => {
         setTimeout(() => {
