@@ -111,7 +111,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Função para redesenhar as linhas
     function drawLines() {
-        svgContainer.innerHTML = '';
+        svgContainer.innerHTML = ''; // Limpar o SVG antes de redesenhar as linhas
         for (let i = 0; i < activities.length - 1; i++) {
             const phase1 = document.querySelectorAll('.phase')[i];
             const phase2 = document.querySelectorAll('.phase')[i + 1];
@@ -154,8 +154,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Função principal para carregar a página e garantir que todos os elementos estejam prontos
     window.onload = function() {
         checkImagesLoaded(() => {
-            requestAnimationFrame(drawLines); // Redesenhar as linhas após todas as imagens serem carregadas
-            createPlayer();
+            setTimeout(() => {
+                requestAnimationFrame(drawLines); // Redesenhar as linhas após todas as imagens serem carregadas
+                createPlayer();
+            }, 300); // Atraso de 300ms para garantir que o layout esteja pronto
         });
     };
 
@@ -174,6 +176,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Redesfocar linhas ao redimensionar com debounce
     window.addEventListener('resize', debounce(() => {
-        requestAnimationFrame(drawLines);
+        setTimeout(() => {
+            requestAnimationFrame(drawLines);
+        }, 100); // Pequeno atraso para garantir que o layout foi ajustado
     }, 100));
 });
