@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const svgContainer = document.getElementById('linesSvg');
     let currentPhase = 0;
     let player;
+    let previousPosition = null; // Para armazenar a posição anterior
 
     function createPlayer() {
         player = document.createElement('img');
@@ -20,15 +21,30 @@ document.addEventListener('DOMContentLoaded', function() {
         moveToPhase(currentPhase); // Posicionar o bonequinho na fase inicial
     }
 
+    function isTooClose(pos1, pos2) {
+        const minDistance = 100; // Distância mínima em pixels
+        const dx = pos1.left - pos2.left;
+        const dy = pos1.top - pos2.top;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        return distance < minDistance;
+    }
+
     activities.forEach((activity, index) => {
         const phaseDiv = document.createElement('div');
         phaseDiv.classList.add('phase');
 
         // Garantir espaçamento superior para evitar sobreposição com o título
         const baseTopPosition = 200; // Espaço inicial de 200px para o título
-        const randomVerticalGap = Math.random() * (25 - 15) + 15; // Valor aleatório entre 15% e 25% da altura da tela
-        const topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100; // Convertendo para pixels
-        const randomLeft = Math.random() * (90 - 10) + 10; // Valor aleatório entre 10% e 90%
+        let topPosition, randomLeft;
+
+        // Geração de posições com verificação de distância mínima
+        do {
+            const randomVerticalGap = Math.random() * (30 - 20) + 20; // Valor aleatório entre 20% e 30%
+            topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
+            randomLeft = Math.random() * (80 - 20) + 20; // Valor aleatório entre 20% e 80%
+        } while (previousPosition && isTooClose({ top: topPosition, left: randomLeft }, previousPosition));
+
+        previousPosition = { top: topPosition, left: randomLeft };
 
         phaseDiv.style.top = `${topPosition}px`;
         phaseDiv.style.left = `${randomLeft}%`;
