@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Garantir espaçamento superior para evitar sobreposição com o título
         const baseTopPosition = 200; // Espaço inicial de 200px para o título
         const randomVerticalGap = Math.random() * (25 - 15) + 15; // Valor aleatório entre 15% e 25% da altura da tela
-        const topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100; // Convertendo para pixels
+        const topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
         const randomLeft = Math.random() * (90 - 10) + 10; // Valor aleatório entre 10% e 90%
 
         phaseDiv.style.top = `${topPosition}px`;
@@ -119,9 +119,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const coords2 = phase2.getBoundingClientRect();
 
             const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
-            const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150; // Acentuar curva
+            const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150;
             const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
-            const controlPointY2 = coords2.top - 150; // Acentuar curva
+            const controlPointY2 = coords2.top - 150;
 
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
@@ -136,7 +136,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Verificação do carregamento completo das imagens
     function checkImagesLoaded(callback) {
         const images = document.querySelectorAll('img');
         let loadedImagesCount = 0;
@@ -151,33 +150,19 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Função principal para carregar a página e garantir que todos os elementos estejam prontos
+    // Carregar página e redesenhar após todas as imagens estarem prontas
     window.onload = function() {
         checkImagesLoaded(() => {
             setTimeout(() => {
                 requestAnimationFrame(drawLines); // Redesenhar as linhas após todas as imagens serem carregadas
                 createPlayer();
-            }, 300); // Atraso de 300ms para garantir que o layout esteja pronto
+            }, 300); // Atraso para garantir que o layout esteja pronto
         });
     };
 
-    // Adicionando debounce para otimizar o resize
-    function debounce(func, wait) {
-        let timeout;
-        return function(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
-    }
-
-    // Redesfocar linhas ao redimensionar com debounce
     window.addEventListener('resize', debounce(() => {
         setTimeout(() => {
             requestAnimationFrame(drawLines);
-        }, 100); // Pequeno atraso para garantir que o layout foi ajustado
+        }, 100);
     }, 100));
 });
