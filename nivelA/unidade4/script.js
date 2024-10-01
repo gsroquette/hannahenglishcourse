@@ -102,13 +102,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (clickedIndex !== null && clickedIndex < activities.length - 1) {
             setTimeout(() => {
-                unlockNextPhase(clickedIndex);
+                unlockNextPhase(clickedIndex, path);
                 updateLineColor(clickedIndex);
             }, 600);
         }
     }
 
-    function unlockNextPhase(index) {
+    function unlockNextPhase(index, path) {
         if (index < activities.length - 1) {
             const nextPhase = document.querySelectorAll('.phase')[index + 1];
             nextPhase.classList.remove('locked');
@@ -119,19 +119,49 @@ document.addEventListener('DOMContentLoaded', function() {
                 lockIcon.remove();
             }
 
-            // Exibe o gif de cadeado quando a fase é desbloqueada
-            const unlockGif = document.createElement('img');
-            unlockGif.src = '../../imagens/cadeado.gif'; // O GIF de cadeado
-            unlockGif.classList.add('unlock-gif');
-            mapContainer.appendChild(unlockGif);
+            // Scroll e zoom para a fase desbloqueada
+            const nextPhaseCoords = nextPhase.getBoundingClientRect();
+            window.scrollTo({
+                top: nextPhaseCoords.top + window.scrollY - window.innerHeight / 2,
+                left: nextPhaseCoords.left + window.scrollX - window.innerWidth / 2,
+                behavior: 'smooth'
+            });
 
-            unlockGif.style.top = `${nextPhase.style.top}`;
-            unlockGif.style.left = `${nextPhase.style.left}`;
+            // Adiciona o zoom temporário
+            mapContainer.style.transform = 'scale(1.5)';
+            mapContainer.style.transition = 'transform 1s ease';
 
-            // Remove o GIF após 3 segundos
+            // Exibe o gif de cadeado após o scroll
             setTimeout(() => {
-                unlockGif.remove();
-            }, 3000);
+                const unlockGif = document.createElement('img');
+                unlockGif.src = '../../imagens/cadeado.gif'; // O GIF de cadeado
+                unlockGif.classList.add('unlock-gif');
+                mapContainer.appendChild(unlockGif);
+
+                unlockGif.style.top = `${nextPhaseCoords.top + window.scrollY + nextPhaseCoords.height / 2}px`;
+                unlockGif.style.left = `${nextPhaseCoords.left + window.scrollX + nextPhaseCoords.width / 2}px`;
+
+                // Remove o GIF após 3 segundos e reseta o zoom
+                setTimeout(() => {
+                    unlockGif.remove();
+                    mapContainer.style.transform = 'scale(1)';
+
+                    // Scroll de volta para a fase que será aberta
+                    setTimeout(() => {
+                        const clickedPhase = document.querySelectorAll('.phase')[index];
+                        const clickedCoords = clickedPhase.getBoundingClientRect();
+                        window.scrollTo({
+                            top: clickedCoords.top + window.scrollY - window.innerHeight / 2,
+                            behavior: 'smooth'
+                        });
+
+                        // Abre a fase
+                        setTimeout(() => {
+                            window.location.href = path;
+                        }, 600);
+                    }, 1000);
+                }, 3000);
+            }, 1000);
         }
     }
 
