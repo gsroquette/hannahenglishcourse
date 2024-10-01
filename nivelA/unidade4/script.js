@@ -25,7 +25,9 @@ document.addEventListener('DOMContentLoaded', function() {
         phaseDiv.classList.add('phase');
 
         // Garantir espaçamento superior para evitar sobreposição com o título
-        const topPosition = 200 + index * 20; // Começar a 200px de distância do topo
+        const baseTopPosition = 200; // Espaço inicial de 200px para o título
+        const randomVerticalGap = Math.random() * (25 - 15) + 15; // Valor aleatório entre 15% e 25% da altura da tela
+        const topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100; // Convertendo para pixels
         const randomLeft = Math.random() * (90 - 10) + 10; // Valor aleatório entre 10% e 90%
 
         phaseDiv.style.top = `${topPosition}px`;
