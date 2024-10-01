@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function isTooClose(pos1, pos2) {
-        const minDistance = 150;  // Aumentando a distância mínima entre as fases
+        const minDistance = 150; // Mantendo uma distância mínima entre as fases para evitar sobreposição
         const dx = pos1.left - pos2.left;
         const dy = pos1.top - pos2.top;
         const distance = Math.sqrt(dx * dx + dy * dy);
@@ -33,11 +33,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const phaseDiv = document.createElement('div');
         phaseDiv.classList.add('phase');
 
-        const baseTopPosition = 100;
+        const baseTopPosition = 300; // Aumentando a posição inicial das fases para não sobrepor o título
         let topPosition, randomLeft;
 
         do {
-            const randomVerticalGap = Math.random() * (50 - 30) + 30;  // Aumentando o espaçamento vertical
+            const randomVerticalGap = Math.random() * (40 - 30) + 30; // Ajustando o espaçamento vertical
             topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
             randomLeft = Math.random() * (80 - 20) + 20;
         } while (previousPosition && isTooClose({ top: topPosition, left: randomLeft }, previousPosition));
