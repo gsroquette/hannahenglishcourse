@@ -118,6 +118,20 @@ document.addEventListener('DOMContentLoaded', function() {
             if (lockIcon) {
                 lockIcon.remove();
             }
+
+            // Exibe o gif de cadeado quando a fase é desbloqueada
+            const unlockGif = document.createElement('img');
+            unlockGif.src = '../../imagens/cadeado.gif'; // O GIF de cadeado
+            unlockGif.classList.add('unlock-gif');
+            mapContainer.appendChild(unlockGif);
+
+            unlockGif.style.top = `${nextPhase.style.top}`;
+            unlockGif.style.left = `${nextPhase.style.left}`;
+
+            // Remove o GIF após 3 segundos
+            setTimeout(() => {
+                unlockGif.remove();
+            }, 3000);
         }
     }
 
