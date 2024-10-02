@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 23, name: "MatchingGame", path: "../unidade2/MatchingGame/index.html", img: "../../imagens/botoes/matching_game_button.png" }
     ];
 
+   
     const mapContainer = document.getElementById('mapContainer');
     const svgContainer = document.getElementById('linesSvg');
     let currentPhase = 0;
@@ -226,9 +227,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 const coords2 = phase2.getBoundingClientRect();
 
                 const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
-                const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150;
+                const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 100;  // Ajuste na curva
                 const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
-                const controlPointY2 = coords2.top - 150;
+                const controlPointY2 = coords2.top - 100;  // Ajuste na curva
 
                 const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                 const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
