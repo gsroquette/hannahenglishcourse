@@ -176,9 +176,9 @@ document.addEventListener('DOMContentLoaded', function() {
             // Exibe o gif de cadeado sobre o círculo da fase desbloqueada
             setTimeout(() => {
                 const unlockGif = document.createElement('img');
-                unlockGif.src = '../../imagens/cadeado.gif';
+                unlockGif.src = '../../imagens/cadeado.gif'; // O GIF de cadeado
                 unlockGif.classList.add('unlock-gif');
-                nextPhase.appendChild(unlockGif);
+                nextPhase.appendChild(unlockGif); // Anexado ao círculo desbloqueado
 
                 unlockGif.style.position = 'absolute';
                 unlockGif.style.top = '50%';
@@ -190,6 +190,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     unlockGif.remove();
                     mapContainer.style.transform = 'scale(1)';
 
+                    // Scroll de volta para a fase que será aberta
                     setTimeout(() => {
                         const clickedPhase = document.querySelectorAll('.phase')[index];
                         const clickedCoords = clickedPhase.getBoundingClientRect();
@@ -198,6 +199,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             behavior: 'smooth'
                         });
 
+                        // Abre a fase (somente agora)
                         setTimeout(() => {
                             window.location.href = path;
                         }, 600);
@@ -208,33 +210,34 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function drawLines() {
-        svgContainer.innerHTML = '';
-        for (let i = currentPhaseGroup * phasesPerPage; i < Math.min((currentPhaseGroup + 1) * phasesPerPage, activities.length - 1); i++) {
-            const phase1 = document.querySelectorAll('.phase')[i % phasesPerPage];
-            const phase2 = document.querySelectorAll('.phase')[i % phasesPerPage + 1];
-            const coords1 = phase1.getBoundingClientRect();
-            const coords2 = phase2.getBoundingClientRect();
+        svgContainer.innerHTML = ''; // Limpa o SVG atual
+        const phases = document.querySelectorAll('.phase');
+        
+        // Verificar se há fases suficientes para desenhar as linhas
+        if (phases.length < 2) return; // Sem linhas se houver menos de 2 fases visíveis
 
-            const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
-            const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150;
-            const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
-            const controlPointY2 = coords2.top - 150;
+        for (let i = 0; i < phases.length - 1; i++) {
+            const phase1 = phases[i];
+            const phase2 = phases[i + 1];
 
-            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
-                       C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
-                       ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
-            path.setAttribute('d', d);
-            path.setAttribute('class', `path path-blue`);
-            svgContainer.appendChild(path);
-        }
-    }
+            // Verifica se ambas as fases existem antes de acessar seus valores
+            if (phase1 && phase2) {
+                const coords1 = phase1.getBoundingClientRect();
+                const coords2 = phase2.getBoundingClientRect();
 
-    function updateLineColor(index) {
-        const paths = document.querySelectorAll('.path');
-        if (paths[index % phasesPerPage]) {
-            paths[index % phasesPerPage].classList.remove('path-blue');
-            paths[index % phasesPerPage].classList.add('path-purple');
+                const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
+                const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150;
+                const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
+                const controlPointY2 = coords2.top - 150;
+
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
+                           C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
+                           ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
+                path.setAttribute('d', d);
+                path.setAttribute('class', 'path path-blue');
+                svgContainer.appendChild(path);
+            }
         }
     }
 
