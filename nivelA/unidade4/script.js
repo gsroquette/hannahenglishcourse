@@ -27,16 +27,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
     const mapContainer = document.getElementById('mapContainer');
-    let currentPhase = 0; // Iniciar na fase 1 (índice 0)
+    let currentPhase = 0;
     let player;
 
     // Função para criar o bonequinho
     function createPlayer() {
         player = document.createElement('img');
-        player.src = '../../imagens/bonequinho.png'; 
+        player.src = '../../imagens/bonequinho.png';
         player.classList.add('player');
         mapContainer.appendChild(player);
-        moveToPhase(currentPhase); // Move o bonequinho para a fase 1
+        moveToPhase(currentPhase);
     }
 
     // Criando as fases
@@ -52,45 +52,74 @@ document.addEventListener('DOMContentLoaded', function() {
 
         mapContainer.appendChild(phaseDiv);
 
-        // Marcar as fases como ativas ou bloqueadas
         if (index === currentPhase) {
-            phaseDiv.classList.add('active'); // Primeira fase está ativa
+            phaseDiv.classList.add('active');
         } else if (index > currentPhase) {
-            phaseDiv.classList.add('locked'); // Fases posteriores estão bloqueadas
+            phaseDiv.classList.add('locked');
         }
 
-        // Adicionar o evento de clique para abrir a atividade, apenas se a fase não estiver bloqueada
+        // Adicionar evento de clique
         phaseDiv.addEventListener('click', () => {
             if (!phaseDiv.classList.contains('locked')) {
-                // Mover o bonequinho para a fase e abrir o caminho da atividade
                 moveToPhase(index, activity.path);
             } else {
-                console.log("Fase bloqueada. Complete a fase anterior para desbloquear.");
+                console.log("Fase bloqueada. Complete a fase anterior.");
             }
         });
     });
 
-    // Função para mover o bonequinho e abrir a atividade correspondente
+    // Função para mover o bonequinho
     function moveToPhase(index, path = null) {
         const phase = document.querySelectorAll('.phase')[index];
         const coords = phase.getBoundingClientRect();
         document.querySelectorAll('.phase').forEach(phase => { phase.classList.remove('active'); });
         phase.classList.add('active');
 
-        // Ajustar a posição do bonequinho para ficar próximo à fase, não sobre ela
         player.style.top = `${coords.top + window.scrollY + coords.height / 2 - player.offsetHeight / 2}px`;
-        player.style.left = `${coords.left + window.scrollX + coords.width + 20}px`; // 20px à direita da fase
+        player.style.left = `${coords.left + window.scrollX + coords.width / 2 - player.offsetWidth / 2}px`;
 
-        // Abrir o caminho da atividade se fornecido
         if (path) {
             setTimeout(() => {
-                console.log(`Abrindo caminho: ${path}`);
-                window.location.href = path; // Abre a atividade ao clicar na fase desbloqueada
-            }, 600); // Pequeno atraso para o bonequinho se mover antes de abrir a atividade
+                window.location.href = path;
+            }, 600);
         }
     }
 
-    createPlayer(); // Cria e posiciona o bonequinho
+    // Função para desenhar linhas entre as fases
+    function drawLines() {
+        const phases = document.querySelectorAll('.phase');
+        const svg = document.getElementById('linesSvg');
+        svg.innerHTML = ''; // Limpa o SVG antes de desenhar as linhas
+
+        phases.forEach((phase, index) => {
+            if (index < phases.length - 1) {
+                const startCoords = phase.getBoundingClientRect();
+                const endCoords = phases[index + 1].getBoundingClientRect();
+
+                const startX = startCoords.left + startCoords.width / 2;
+                const startY = startCoords.top + startCoords.height / 2 + window.scrollY;
+                const endX = endCoords.left + endCoords.width / 2;
+                const endY = endCoords.top + endCoords.height / 2 + window.scrollY;
+
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', startX);
+                line.setAttribute('y1', startY);
+                line.setAttribute('x2', endX);
+                line.setAttribute('y2', endY);
+                line.setAttribute('stroke', 'black'); // Cor da linha
+                line.setAttribute('stroke-width', '2'); // Largura da linha
+                line.setAttribute('stroke-dasharray', '5,5'); // Pontilhado
+
+                svg.appendChild(line);
+            }
+        });
+    }
+
+    createPlayer(); // Cria o bonequinho
+    drawLines(); // Desenha as linhas entre as fases
+
+    // Recalcular e redesenhar as linhas ao redimensionar a janela
+    window.addEventListener('resize', drawLines);
 });
 
    
