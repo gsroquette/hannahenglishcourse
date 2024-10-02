@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', function() {
     ];
 
     const mapContainer = document.getElementById('mapContainer');
-    let currentPhase = 0;
+    let currentPhase = 0; // Iniciar na fase 0, que corresponde à fase 1 na tela
     let player;
 
     function createPlayer() {
@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', function() {
         player.src = '../../imagens/bonequinho.png'; 
         player.classList.add('player');
         mapContainer.appendChild(player);
-        moveToPhase(currentPhase);
+        moveToPhase(currentPhase); // Mover o bonequinho para a fase 1
     }
 
     activities.forEach((activity, index) => {
@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         phaseDiv.addEventListener('click', () => {
             if (!phaseDiv.classList.contains('locked')) {
-                moveToPhase(index, activity.path, index);
+                moveToPhase(index, activity.path);
             }
         });
     });
@@ -68,8 +68,9 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.phase').forEach(phase => { phase.classList.remove('active'); });
         phase.classList.add('active');
 
-        player.style.top = `${coords.top + window.scrollY + coords.height / 2}px`;
-        player.style.left = `${coords.left + window.scrollX + coords.width / 2}px`;
+        // Corrigir a posição do bonequinho centralizando ele na fase
+        player.style.top = `${coords.top + window.scrollY + coords.height / 2 - player.offsetHeight / 2}px`;
+        player.style.left = `${coords.left + window.scrollX + coords.width / 2 - player.offsetWidth / 2}px`;
 
         if (path) {
             setTimeout(() => {
@@ -78,5 +79,5 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    createPlayer();
+    createPlayer(); // Cria e posiciona o bonequinho
 });
