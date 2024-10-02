@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentPhase = 0;
     let player;
     let previousPosition = null;
+    let positionLeft = true;  // Inicia pela esquerda
 
     function createPlayer() {
         player = document.createElement('img');
@@ -34,18 +35,27 @@ document.addEventListener('DOMContentLoaded', function() {
         phaseDiv.classList.add('phase');
 
         const baseTopPosition = 200;
-        let topPosition, randomLeft;
+        let topPosition, horizontalPosition;
 
-        do {
-            const randomVerticalGap = Math.random() * (30 - 20) + 20;
-            topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
-            randomLeft = Math.random() * (80 - 20) + 20;
-        } while (previousPosition && isTooClose({ top: topPosition, left: randomLeft }, previousPosition));
+        // Definindo a posição vertical
+        const randomVerticalGap = Math.random() * (30 - 20) + 20;
+        topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
 
-        previousPosition = { top: topPosition, left: randomLeft };
+        // Alterna entre esquerda e direita
+        if (positionLeft) {
+            // Posição aleatória à esquerda (entre 5% e 20%)
+            horizontalPosition = Math.random() * (20 - 5) + 5;
+        } else {
+            // Posição aleatória à direita (entre 80% e 95%)
+            horizontalPosition = Math.random() * (95 - 80) + 80;
+        }
 
+        // Alterna a posição para a próxima fase
+        positionLeft = !positionLeft;
+
+        // Define as posições calculadas
         phaseDiv.style.top = `${topPosition}px`;
-        phaseDiv.style.left = `${randomLeft}%`;
+        phaseDiv.style.left = `${horizontalPosition}%`;
 
         const phaseImage = document.createElement('img');
         phaseImage.src = activity.img;
@@ -66,7 +76,7 @@ document.addEventListener('DOMContentLoaded', function() {
             mapContainer.appendChild(lockIcon);
 
             lockIcon.style.top = `${topPosition}px`;
-            lockIcon.style.left = `${randomLeft}%`;
+            lockIcon.style.left = `${horizontalPosition}%`;
         }
 
         phaseDiv.addEventListener('click', () => {
