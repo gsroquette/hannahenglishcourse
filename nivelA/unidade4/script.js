@@ -34,10 +34,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function createPlayer() {
         player = document.createElement('img');
-        player.src = '../../imagens/bonequinho.png'; 
+        player.src = '../../imagens/bonequinho.png';
         player.classList.add('player');
         mapContainer.appendChild(player);
-        moveToPhase(currentPhase);
+        moveToPhase(currentPhase); // Mover para a fase inicial
     }
 
     function isTooClose(pos1, pos2) {
@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Exibir apenas 5 fases
-    activities.slice(0, 5).forEach((activity, index) => { // Alterado para limitar a 5 fases
+    activities.slice(0, 5).forEach((activity, index) => { // Limitando a 5 fases
         const phaseDiv = document.createElement('div');
         phaseDiv.classList.add('phase');
 
@@ -192,7 +192,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function drawLines() {
         svgContainer.innerHTML = '';
-        for (let i = 0; i < activities.length - 1 && i < 5; i++) {  // Desenha apenas 5 linhas (conectando as 5 fases)
+        for (let i = 0; i < activities.length - 1 && i < 5; i++) {  // Desenha apenas 5 linhas (conectando 5 fases)
             const phase1 = document.querySelectorAll('.phase')[i];
             const phase2 = document.querySelectorAll('.phase')[i + 1];
             const coords1 = phase1.getBoundingClientRect();
