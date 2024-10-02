@@ -71,18 +71,35 @@ document.addEventListener('DOMContentLoaded', function() {
     // Função para mover o bonequinho
     function moveToPhase(index, path = null) {
         const phase = document.querySelectorAll('.phase')[index];
-        const coords = phase.getBoundingClientRect();
+        const coords = getAbsolutePosition(phase);
         document.querySelectorAll('.phase').forEach(phase => { phase.classList.remove('active'); });
         phase.classList.add('active');
 
-        player.style.top = `${coords.top + window.pageYOffset + coords.height / 2 - player.offsetHeight / 2}px`;
-        player.style.left = `${coords.left + window.pageXOffset + coords.width / 2 - player.offsetWidth / 2}px`;
+        player.style.top = `${coords.top + coords.height / 2 - player.offsetHeight / 2}px`;
+        player.style.left = `${coords.left + coords.width / 2 - player.offsetWidth / 2}px`;
 
         if (path) {
             setTimeout(() => {
                 window.location.href = path;
             }, 600);
         }
+    }
+
+    // Função para obter a posição absoluta de um elemento no documento
+    function getAbsolutePosition(element) {
+        let top = 0;
+        let left = 0;
+        let width = element.offsetWidth;
+        let height = element.offsetHeight;
+
+        // Loop para obter o deslocamento total do elemento em relação ao documento
+        while (element) {
+            top += element.offsetTop - element.scrollTop + element.clientTop;
+            left += element.offsetLeft - element.scrollLeft + element.clientLeft;
+            element = element.offsetParent;
+        }
+
+        return { top, left, width, height };
     }
 
     // Função para desenhar linhas sinuosas entre as fases
@@ -93,13 +110,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
         phases.forEach((phase, index) => {
             if (index < phases.length - 1) {
-                const startCoords = phase.getBoundingClientRect();
-                const endCoords = phases[index + 1].getBoundingClientRect();
+                const startCoords = getAbsolutePosition(phase);
+                const endCoords = getAbsolutePosition(phases[index + 1]);
 
-                const startX = startCoords.left + startCoords.width / 2 + window.pageXOffset;
-                const startY = startCoords.top + startCoords.height / 2 + window.pageYOffset;
-                const endX = endCoords.left + endCoords.width / 2 + window.pageXOffset;
-                const endY = endCoords.top + endCoords.height / 2 + window.pageYOffset;
+                const startX = startCoords.left + startCoords.width / 2;
+                const startY = startCoords.top + startCoords.height / 2;
+                const endX = endCoords.left + endCoords.width / 2;
+                const endY = endCoords.top + endCoords.height / 2;
 
                 // Ajustando os pontos de controle para garantir uma curva mais precisa
                 const controlX1 = (startX + endX) / 2 - 100; // Mais afastado para sinuosidade
@@ -127,5 +144,3 @@ document.addEventListener('DOMContentLoaded', function() {
     // Recalcular e redesenhar as linhas ao redimensionar a janela
     window.addEventListener('resize', drawCurvedLines);
 });
-
-   
