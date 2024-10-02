@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         createNavigationButtons(page);
-        drawLines(start, end); // Redesenha as linhas entre as fases da página
+        drawLines(); // Redesenha as linhas entre as fases da página
     }
 
     function createNavigationButtons(page) {
@@ -107,12 +107,13 @@ document.addEventListener('DOMContentLoaded', function() {
         createPhases(page);
     }
 
-    function drawLines(start, end) {
+    function drawLines() {
         svgContainer.innerHTML = ''; // Limpa as linhas anteriores
 
-        for (let i = 0; i < end - start - 1; i++) {
-            const phase1 = document.querySelectorAll('.phase')[i];
-            const phase2 = document.querySelectorAll('.phase')[i + 1];
+        const phases = document.querySelectorAll('.phase');
+        for (let i = 0; i < phases.length - 1; i++) {
+            const phase1 = phases[i];
+            const phase2 = phases[i + 1];
 
             if (phase1 && phase2) {
                 const coords1 = phase1.getBoundingClientRect();
