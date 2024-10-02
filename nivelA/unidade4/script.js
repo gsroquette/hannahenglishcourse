@@ -5,9 +5,7 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 3, name: "Flashcards2", path: "../unidade2/Flashcards2/index.html", img: "../../imagens/botoes/flashcards_button.png" },
         { id: 4, name: "Flashcards3", path: "../unidade2/Flashcards3/index.html", img: "../../imagens/botoes/flashcards_button.png" },
         { id: 5, name: "MemoryGame", path: "../unidade2/MemoryGame/index.html", img: "../../imagens/botoes/memorygame_button.png" },
-        { id: 6, name: "MemoryGame2", path: "../unidade2/MemoryGame2/index.html", img: "../../imagens/botoes/memorygame_button.png" },
-        { id: 7, name: "MemoryGame3", path: "../unidade2/MemoryGame3/index.html", img: "../../imagens/botoes/memorygame_button.png" },
-        { id: 8, name: "QUIZ", path: "../unidade2/QUIZ/index.html", img: "../../imagens/botoes/quiz_button.png" }
+        { id: 6, name: "MemoryGame2", path: "../unidade2/MemoryGame2/index.html", img: "../../imagens/botoes/memorygame_button.png" }
     ];
 
     const mapContainer = document.getElementById('mapContainer');
@@ -113,6 +111,8 @@ document.addEventListener('DOMContentLoaded', function() {
     function unlockNextPhase(index, path) {
         if (index < activities.length - 1) {
             const nextPhase = document.querySelectorAll('.phase')[index + 1];
+            const currentPhaseElement = document.querySelectorAll('.phase')[index];
+
             nextPhase.classList.remove('locked');
             nextPhase.classList.add('unlocked');
 
@@ -149,10 +149,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     unlockGif.remove();
                     mapContainer.style.transform = 'scale(1)';
 
-                    // Scroll de volta para a fase que será aberta
+                    // Scroll de volta para a fase onde o bonequinho está
                     setTimeout(() => {
-                        window.location.href = path;
-                    }, 600);
+                        const clickedCoords = currentPhaseElement.getBoundingClientRect();
+                        window.scrollTo({
+                            top: clickedCoords.top + window.scrollY - window.innerHeight / 2,
+                            left: clickedCoords.left + window.scrollX - window.innerWidth / 2,
+                            behavior: 'smooth'
+                        });
+                        setTimeout(() => {
+                            if (path) {
+                                window.location.href = path;
+                            }
+                        }, 600);
+                    }, 1000);
                 }, 3000);
             }, 1000);
         }
