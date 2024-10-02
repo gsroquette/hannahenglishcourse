@@ -32,6 +32,9 @@ document.addEventListener('DOMContentLoaded', function() {
     let previousPosition = null;
     let positionLeft = true;  // Inicia pela esquerda
 
+    let phasesLoaded = 5;  // Quantidade inicial de fases carregadas
+    const phasesPerLoad = 5;  // Quantidade de fases carregadas a cada scroll
+
     function createPlayer() {
         player = document.createElement('img');
         player.src = '../../imagens/bonequinho.png'; 
@@ -40,69 +43,57 @@ document.addEventListener('DOMContentLoaded', function() {
         moveToPhase(currentPhase);
     }
 
-    function isTooClose(pos1, pos2) {
-        const minDistance = 100;
-        const dx = pos1.left - pos2.left;
-        const dy = pos1.top - pos2.top;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        return distance < minDistance;
-    }
+    function loadPhases(limit) {
+        activities.slice(0, limit).forEach((activity, index) => {
+            const phaseDiv = document.createElement('div');
+            phaseDiv.classList.add('phase');
 
-    activities.forEach((activity, index) => {
-        const phaseDiv = document.createElement('div');
-        phaseDiv.classList.add('phase');
+            const baseTopPosition = 200;
+            let topPosition, horizontalPosition;
 
-        const baseTopPosition = 200;
-        let topPosition, horizontalPosition;
+            const randomVerticalGap = Math.random() * (30 - 20) + 20;
+            topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
 
-        // Definindo a posição vertical
-        const randomVerticalGap = Math.random() * (30 - 20) + 20;
-        topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
-
-        // Alterna entre esquerda e direita
-        if (positionLeft) {
-            // Posição aleatória à esquerda (entre 5% e 20%)
-            horizontalPosition = Math.random() * (20 - 5) + 5;
-        } else {
-            // Posição aleatória à direita (entre 80% e 95%)
-            horizontalPosition = Math.random() * (95 - 80) + 80;
-        }
-
-        // Alterna a posição para a próxima fase
-        positionLeft = !positionLeft;
-
-        // Define as posições calculadas
-        phaseDiv.style.top = `${topPosition}px`;
-        phaseDiv.style.left = `${horizontalPosition}%`;
-
-        const phaseImage = document.createElement('img');
-        phaseImage.src = activity.img;
-        phaseImage.alt = activity.name;
-        phaseImage.classList.add('phase-img');
-        phaseDiv.appendChild(phaseImage);
-
-        mapContainer.appendChild(phaseDiv);
-
-        if (index === currentPhase) {
-            phaseDiv.classList.add('active');
-        } else if (index > currentPhase) {
-            phaseDiv.classList.add('locked');
-
-            const lockIcon = document.createElement('img');
-            lockIcon.src = '../../imagens/lock_icon_resized.png';
-            lockIcon.classList.add('lock-icon');
-            mapContainer.appendChild(lockIcon);
-
-            lockIcon.style.top = `${topPosition}px`;
-            lockIcon.style.left = `${horizontalPosition}%`;
-        }
-
-        phaseDiv.addEventListener('click', () => {
-            if (!phaseDiv.classList.contains('locked')) {
-                moveToPhase(index, activity.path, index);
+            if (positionLeft) {
+                horizontalPosition = Math.random() * (20 - 5) + 5;
+            } else {
+                horizontalPosition = Math.random() * (95 - 80) + 80;
             }
+
+            positionLeft = !positionLeft;
+
+            phaseDiv.style.top = `${topPosition}px`;
+            phaseDiv.style.left = `${horizontalPosition}%`;
+
+            const phaseImage = document.createElement('img');
+            phaseImage.src = activity.img;
+            phaseImage.alt = activity.name;
+            phaseImage.classList.add('phase-img');
+            phaseDiv.appendChild(phaseImage);
+
+            mapContainer.appendChild(phaseDiv);
+
+            if (index === currentPhase) {
+                phaseDiv.classList.add('active');
+            } else if (index > currentPhase) {
+                phaseDiv.classList.add('locked');
+
+                const lockIcon = document.createElement('img');
+                lockIcon.src = '../../imagens/lock_icon_resized.png';
+                lockIcon.classList.add('lock-icon');
+                mapContainer.appendChild(lockIcon);
+
+                lockIcon.style.top = `${topPosition}px`;
+                lockIcon.style.left = `${horizontalPosition}%`;
+            }
+
+            phaseDiv.addEventListener('click', () => {
+                if (!phaseDiv.classList.contains('locked')) {
+                    moveToPhase(index, activity.path, index);
+                }
+            });
         });
-    });
+    }
 
     function moveToPhase(index, path = null, clickedIndex = null) {
         const phase = document.querySelectorAll('.phase')[index];
@@ -141,7 +132,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 lockIcon.remove();
             }
 
-            // Scroll e zoom para a fase desbloqueada
             const nextPhaseCoords = nextPhase.getBoundingClientRect();
             window.scrollTo({
                 top: nextPhaseCoords.top + window.scrollY - window.innerHeight / 2,
@@ -149,28 +139,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 behavior: 'smooth'
             });
 
-            // Adiciona o zoom temporário
             mapContainer.style.transform = 'scale(1.5)';
             mapContainer.style.transition = 'transform 1s ease';
 
-            // Exibe o gif de cadeado sobre o círculo da fase desbloqueada
             setTimeout(() => {
                 const unlockGif = document.createElement('img');
-                unlockGif.src = '../../imagens/cadeado.gif'; // O GIF de cadeado
+                unlockGif.src = '../../imagens/cadeado.gif'; 
                 unlockGif.classList.add('unlock-gif');
-                nextPhase.appendChild(unlockGif); // Anexado ao círculo desbloqueado
+                nextPhase.appendChild(unlockGif);
 
                 unlockGif.style.position = 'absolute';
                 unlockGif.style.top = '50%';
                 unlockGif.style.left = '50%';
                 unlockGif.style.transform = 'translate(-50%, -50%)';
 
-                // Remove o GIF após 3 segundos e reseta o zoom
                 setTimeout(() => {
                     unlockGif.remove();
                     mapContainer.style.transform = 'scale(1)';
 
-                    // Scroll de volta para a fase que será aberta
                     setTimeout(() => {
                         const clickedPhase = document.querySelectorAll('.phase')[index];
                         const clickedCoords = clickedPhase.getBoundingClientRect();
@@ -179,7 +165,6 @@ document.addEventListener('DOMContentLoaded', function() {
                             behavior: 'smooth'
                         });
 
-                        // Abre a fase (somente agora)
                         setTimeout(() => {
                             window.location.href = path;
                         }, 600);
@@ -220,7 +205,16 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    window.addEventListener('scroll', () => {
+        if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight) {
+            phasesLoaded += phasesPerLoad;
+            loadPhases(phasesLoaded);
+            drawLines();
+        }
+    });
+
     drawLines();
     createPlayer();
+    loadPhases(phasesLoaded); // Carregar as fases iniciais
     window.addEventListener('resize', drawLines);
 });
