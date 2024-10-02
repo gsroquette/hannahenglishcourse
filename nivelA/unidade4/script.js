@@ -166,6 +166,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 unlockGif.style.left = '50%';
                 unlockGif.style.transform = 'translate(-50%, -50%)';
 
+                // Ajusta o scroll para que a fase desbloqueada esteja completamente visível após o zoom
+                setTimeout(() => {
+                    window.scrollTo({
+                        top: nextPhaseCoords.top + window.scrollY - window.innerHeight / 2,
+                        left: nextPhaseCoords.left + window.scrollX - window.innerWidth / 2,
+                        behavior: 'smooth'
+                    });
+                }, 1000);
+
                 // Remove o GIF após 3 segundos e reseta o zoom
                 setTimeout(() => {
                     unlockGif.remove();
