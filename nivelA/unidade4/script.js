@@ -106,8 +106,8 @@ document.addEventListener('DOMContentLoaded', function() {
     function resizeSVG() {
         const svg = document.getElementById('linesSvg');
         const mapContainerRect = mapContainer.getBoundingClientRect();
-        svg.style.width = `${mapContainerRect.width}px`;  // Ajustar a largura
-        svg.style.height = `${mapContainerRect.height}px`;  // Ajustar a altura
+        svg.style.width = `${mapContainer.scrollWidth}px`;  // Ajustar a largura total do conteúdo
+        svg.style.height = `${mapContainer.scrollHeight}px`;  // Ajustar a altura total do conteúdo
     }
 
     // Função para desenhar linhas sinuosas entre as fases
@@ -116,11 +116,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const svg = document.getElementById('linesSvg');
         svg.innerHTML = ''; // Limpa o SVG antes de desenhar as linhas
 
-        // Garantir que as fases sejam iteradas corretamente e todas as linhas sejam desenhadas
         phases.forEach((phase, index) => {
-            if (index < phases.length - 1) { // Certificar-se de que está iterando até a penúltima fase
+            if (index < phases.length - 1) {
                 const startCoords = getAbsolutePosition(phase);
                 const endCoords = getAbsolutePosition(phases[index + 1]);
+
+                // Verificar se as coordenadas estão sendo calculadas corretamente para as últimas fases
+                console.log(`Fase ${index}:`, startCoords);
+                console.log(`Fase ${index + 1}:`, endCoords);
 
                 const startX = startCoords.left + startCoords.width / 2;
                 const startY = startCoords.top + startCoords.height / 2;
