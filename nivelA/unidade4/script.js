@@ -101,12 +101,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 const endX = endCoords.left + endCoords.width / 2;
                 const endY = endCoords.top + endCoords.height / 2 + window.scrollY;
 
+                // Aumentar a "sinuosidade" das linhas
+                const controlX1 = (startX + endX) / 2 - 100; // Mais afastado para sinuosidade
+                const controlY1 = (startY + endY) / 2 - 50;
+                const controlX2 = (startX + endX) / 2 + 100; // Mais afastado para sinuosidade
+                const controlY2 = (startY + endY) / 2 + 50;
+
                 // Desenhando uma linha curva (sinuosa)
                 const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                const controlX = (startX + endX) / 2 + (Math.random() * 100 - 50); // Ponto de controle para curva (ajusta a sinuosidade)
-                const controlY = (startY + endY) / 2 + (Math.random() * 100 - 50); // Ponto de controle para curva (ajusta a sinuosidade)
-
-                const d = `M ${startX},${startY} Q ${controlX},${controlY} ${endX},${endY}`;
+                const d = `M ${startX},${startY} C ${controlX1},${controlY1}, ${controlX2},${controlY2}, ${endX},${endY}`;
                 path.setAttribute('d', d);
                 path.setAttribute('stroke', 'black'); // Cor da linha
                 path.setAttribute('stroke-width', '4'); // Largura da linha mais grossa
@@ -124,5 +127,3 @@ document.addEventListener('DOMContentLoaded', function() {
     // Recalcular e redesenhar as linhas ao redimensionar a janela
     window.addEventListener('resize', drawCurvedLines);
 });
-
-   
