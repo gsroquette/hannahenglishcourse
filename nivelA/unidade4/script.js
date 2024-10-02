@@ -102,6 +102,14 @@ document.addEventListener('DOMContentLoaded', function() {
         return { top, left, width, height };
     }
 
+    // Função para redimensionar o SVG com base no conteúdo
+    function resizeSVG() {
+        const svg = document.getElementById('linesSvg');
+        const mapContainerRect = mapContainer.getBoundingClientRect();
+        svg.style.width = `${mapContainerRect.width}px`;  // Ajustar a largura
+        svg.style.height = `${mapContainerRect.height}px`;  // Ajustar a altura
+    }
+
     // Função para desenhar linhas sinuosas entre as fases
     function drawCurvedLines() {
         const phases = document.querySelectorAll('.phase');
@@ -139,11 +147,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     createPlayer(); // Cria o bonequinho
+    resizeSVG(); // Redimensiona o SVG para cobrir o conteúdo
     drawCurvedLines(); // Desenha as linhas sinuosas entre as fases
 
-    // Recalcular e redesenhar as linhas ao redimensionar a janela
-    window.addEventListener('resize', drawCurvedLines);
+    // Recalcular e redesenhar as linhas ao redimensionar a janela ou fazer scroll
+    window.addEventListener('resize', () => {
+        resizeSVG(); // Redimensiona o SVG quando a janela é redimensionada
+        drawCurvedLines(); // Redesenha as linhas
+    });
 
-    // Forçar o redesenho das linhas ao fazer scroll
-    window.addEventListener('scroll', drawCurvedLines);
+    window.addEventListener('scroll', drawCurvedLines); // Redesenha as linhas ao fazer scroll
 });
