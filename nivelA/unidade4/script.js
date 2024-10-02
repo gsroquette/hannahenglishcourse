@@ -143,4 +143,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Recalcular e redesenhar as linhas ao redimensionar a janela
     window.addEventListener('resize', drawCurvedLines);
+
+    // Forçar o redesenho das linhas ao fazer scroll
+    window.addEventListener('scroll', drawCurvedLines);
 });
