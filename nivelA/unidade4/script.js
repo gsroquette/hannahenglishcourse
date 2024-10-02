@@ -96,16 +96,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 const startCoords = phase.getBoundingClientRect();
                 const endCoords = phases[index + 1].getBoundingClientRect();
 
-                const startX = startCoords.left + startCoords.width / 2;
+                const startX = startCoords.left + startCoords.width / 2 + window.scrollX;
                 const startY = startCoords.top + startCoords.height / 2 + window.scrollY;
-                const endX = endCoords.left + endCoords.width / 2;
+                const endX = endCoords.left + endCoords.width / 2 + window.scrollX;
                 const endY = endCoords.top + endCoords.height / 2 + window.scrollY;
 
-                // Aumentar a "sinuosidade" das linhas
+                // Ajustando os pontos de controle para garantir uma curva mais precisa
                 const controlX1 = (startX + endX) / 2 - 100; // Mais afastado para sinuosidade
-                const controlY1 = (startY + endY) / 2 - 50;
+                const controlY1 = startY + 50; // Ajuste para suavizar a curva
                 const controlX2 = (startX + endX) / 2 + 100; // Mais afastado para sinuosidade
-                const controlY2 = (startY + endY) / 2 + 50;
+                const controlY2 = endY - 50; // Ajuste para suavizar a curva
 
                 // Desenhando uma linha curva (sinuosa)
                 const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
