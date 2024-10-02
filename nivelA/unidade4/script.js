@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 23, name: "MatchingGame", path: "../unidade2/MatchingGame/index.html", img: "../../imagens/botoes/matching_game_button.png" }
     ];
 
-
+  
     const mapContainer = document.getElementById('mapContainer');
     const svgContainer = document.getElementById('linesSvg');
     let currentPage = 0;
