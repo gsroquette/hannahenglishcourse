@@ -29,95 +29,71 @@ document.addEventListener('DOMContentLoaded', function() {
     const svgContainer = document.getElementById('linesSvg');
     let currentPhase = 0;
     let player;
-    let positionLeft = true; // Inicia pela esquerda
-
+    let currentPage = 0;
+    const phasesPerPage = 6;
+    
     function createPlayer() {
         player = document.createElement('img');
-        player.src = '../../imagens/bonequinho.png';
+        player.src = '../../imagens/bonequinho.png'; 
         player.classList.add('player');
         mapContainer.appendChild(player);
         moveToPhase(currentPhase);
     }
 
-    // Função para carregar fases visíveis
-    function loadVisiblePhases(entries, observer) {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                const phaseDiv = entry.target;
-                const phaseIndex = parseInt(phaseDiv.getAttribute('data-index'));
+    function createPhases(page) {
+        mapContainer.innerHTML = ''; // Limpa o contêiner de fases
+        svgContainer.innerHTML = ''; // Limpa as linhas SVG
 
-                if (!phaseDiv.dataset.loaded) {
-                    const activity = activities[phaseIndex];
-                    const phaseImage = document.createElement('img');
-                    phaseImage.src = activity.img;
-                    phaseImage.alt = activity.name;
-                    phaseImage.classList.add('phase-img');
-                    phaseDiv.appendChild(phaseImage);
-                    
-                    phaseDiv.dataset.loaded = true; // Marca a fase como carregada
-
-                    if (phaseIndex === currentPhase) {
-                        phaseDiv.classList.add('active');
-                    } else if (phaseIndex > currentPhase) {
-                        phaseDiv.classList.add('locked');
-                        const lockIcon = document.createElement('img');
-                        lockIcon.src = '../../imagens/lock_icon_resized.png';
-                        lockIcon.classList.add('lock-icon');
-                        phaseDiv.appendChild(lockIcon);
-                    }
-
-                    phaseDiv.addEventListener('click', () => {
-                        if (!phaseDiv.classList.contains('locked')) {
-                            moveToPhase(phaseIndex, activity.path, phaseIndex);
-                        }
-                    });
-
-                    // Chama o desenho das linhas sempre que uma nova fase é carregada
-                    drawLines();
-                }
-            }
-        });
-    }
-
-    const observer = new IntersectionObserver(loadVisiblePhases, {
-        root: null, // Usa a janela do navegador como root
-        rootMargin: '0px',
-        threshold: 0.1 // Carrega quando 10% da fase está visível
-    });
-
-    // Função para criar todas as fases
-    function createPhases() {
-        activities.forEach((activity, index) => {
+        const start = page * phasesPerPage;
+        const end = Math.min(start + phasesPerPage, activities.length);
+        
+        activities.slice(start, end).forEach((activity, index) => {
             const phaseDiv = document.createElement('div');
             phaseDiv.classList.add('phase');
-            phaseDiv.setAttribute('data-index', index); // Adiciona um índice para referência
 
             const baseTopPosition = 200;
+            let topPosition, horizontalPosition;
+
+            // Posição vertical
             const randomVerticalGap = Math.random() * (30 - 20) + 20;
-            let topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
-            let horizontalPosition;
+            topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
 
-            // Alterna entre esquerda e direita
-            if (positionLeft) {
-                horizontalPosition = Math.random() * (20 - 5) + 5; // Posição aleatória à esquerda
-            } else {
-                horizontalPosition = Math.random() * (95 - 80) + 80; // Posição aleatória à direita
-            }
-            positionLeft = !positionLeft; // Alterna a posição para a próxima fase
+            // Alternar entre esquerda e direita
+            const positionLeft = index % 2 === 0;
+            horizontalPosition = positionLeft
+                ? Math.random() * (20 - 5) + 5
+                : Math.random() * (95 - 80) + 80;
 
-            // Define as posições calculadas
             phaseDiv.style.top = `${topPosition}px`;
             phaseDiv.style.left = `${horizontalPosition}%`;
 
+            const phaseImage = document.createElement('img');
+            phaseImage.src = activity.img;
+            phaseImage.alt = activity.name;
+            phaseImage.classList.add('phase-img');
+            phaseDiv.appendChild(phaseImage);
+
             mapContainer.appendChild(phaseDiv);
 
-            // Adiciona a fase ao observer para carregamento
-            observer.observe(phaseDiv);
+            if (index === currentPhase % phasesPerPage) {
+                phaseDiv.classList.add('active');
+            } else if (index + start > currentPhase) {
+                phaseDiv.classList.add('locked');
+            }
+
+            phaseDiv.addEventListener('click', () => {
+                if (!phaseDiv.classList.contains('locked')) {
+                    moveToPhase(index + start, activity.path, index + start);
+                }
+            });
         });
+
+        // Recriar botões de navegação
+        createNavigationButtons(page);
     }
 
     function moveToPhase(index, path = null, clickedIndex = null) {
-        const phase = document.querySelectorAll('.phase')[index];
+        const phase = document.querySelectorAll('.phase')[index % phasesPerPage];
         const coords = phase.getBoundingClientRect();
         document.querySelectorAll('.phase').forEach(phase => { phase.classList.remove('active'); });
         phase.classList.add('active');
@@ -126,81 +102,50 @@ document.addEventListener('DOMContentLoaded', function() {
         player.style.left = `${coords.left + window.scrollX + coords.width / 2}px`;
         player.classList.add('moving');
 
-        const phaseInView = phase.getBoundingClientRect().top >= 0 && phase.getBoundingClientRect().bottom <= window.innerHeight;
-        if (!phaseInView) {
-            window.scrollTo({
-                top: coords.top + window.scrollY - window.innerHeight / 2,
-                behavior: 'smooth'
-            });
-        }
-
-        if (clickedIndex !== null && clickedIndex < activities.length - 1) {
+        if (path && clickedIndex !== null && clickedIndex < activities.length - 1) {
             setTimeout(() => {
-                unlockNextPhase(clickedIndex, path);
-                updateLineColor(clickedIndex);
+                window.location.href = path;
             }, 600);
         }
     }
 
-    function unlockNextPhase(index, path) {
-        if (index < activities.length - 1) {
-            const nextPhase = document.querySelectorAll('.phase')[index + 1];
-            nextPhase.classList.remove('locked');
-            nextPhase.classList.add('unlocked');
+    function createNavigationButtons(page) {
+        const buttonContainer = document.createElement('div');
+        buttonContainer.classList.add('button-container');
 
-            const lockIcon = mapContainer.querySelector('.lock-icon');
-            if (lockIcon) {
-                lockIcon.remove();
-            }
-
-            const nextPhaseCoords = nextPhase.getBoundingClientRect();
-            window.scrollTo({
-                top: nextPhaseCoords.top + window.scrollY - window.innerHeight / 2,
-                behavior: 'smooth'
-            });
-
-            mapContainer.style.transform = 'scale(1.5)';
-            mapContainer.style.transition = 'transform 1s ease';
-
-            setTimeout(() => {
-                const unlockGif = document.createElement('img');
-                unlockGif.src = '../../imagens/cadeado.gif'; 
-                unlockGif.classList.add('unlock-gif');
-                nextPhase.appendChild(unlockGif);
-
-                unlockGif.style.position = 'absolute';
-                unlockGif.style.top = '50%';
-                unlockGif.style.left = '50%';
-                unlockGif.style.transform = 'translate(-50%, -50%)';
-
-                setTimeout(() => {
-                    unlockGif.remove();
-                    mapContainer.style.transform = 'scale(1)';
-
-                    setTimeout(() => {
-                        const clickedPhase = document.querySelectorAll('.phase')[index];
-                        const clickedCoords = clickedPhase.getBoundingClientRect();
-                        window.scrollTo({
-                            top: clickedCoords.top + window.scrollY - window.innerHeight / 2,
-                            behavior: 'smooth'
-                        });
-
-                        setTimeout(() => {
-                            window.location.href = path;
-                        }, 600);
-                    }, 1000);
-                }, 3000);
-            }, 1000);
+        if (page > 0) {
+            const prevButton = document.createElement('button');
+            prevButton.textContent = 'Previous';
+            prevButton.classList.add('nav-button');
+            prevButton.addEventListener('click', () => loadPage(page - 1));
+            buttonContainer.appendChild(prevButton);
         }
+
+        if ((page + 1) * phasesPerPage < activities.length) {
+            const nextButton = document.createElement('button');
+            nextButton.textContent = 'Next';
+            nextButton.classList.add('nav-button');
+            nextButton.addEventListener('click', () => loadPage(page + 1));
+            buttonContainer.appendChild(nextButton);
+        }
+
+        mapContainer.appendChild(buttonContainer);
     }
 
-    // Função para desenhar linhas entre as fases
-    function drawLines() {
-        svgContainer.innerHTML = ''; // Limpa o SVG antes de desenhar as linhas
-        const phases = document.querySelectorAll('.phase');
-        for (let i = 0; i < phases.length - 1; i++) {
-            const phase1 = phases[i];
-            const phase2 = phases[i + 1];
+    function loadPage(page) {
+        currentPage = page;
+        createPhases(page);
+        drawLines(page);
+    }
+
+    function drawLines(page) {
+        svgContainer.innerHTML = ''; // Limpa linhas existentes
+        const start = page * phasesPerPage;
+        const end = Math.min(start + phasesPerPage, activities.length);
+
+        for (let i = start; i < end - 1; i++) {
+            const phase1 = document.querySelectorAll('.phase')[i % phasesPerPage];
+            const phase2 = document.querySelectorAll('.phase')[i % phasesPerPage + 1];
             const coords1 = phase1.getBoundingClientRect();
             const coords2 = phase2.getBoundingClientRect();
 
@@ -219,16 +164,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function updateLineColor(index) {
-        const paths = document.querySelectorAll('.path');
-        if (paths[index]) {
-            paths[index].classList.remove('path-blue');
-            paths[index].classList.add('path-purple');
-        }
-    }
-
-    createPhases();
-    drawLines(); // Desenha as linhas na inicialização
     createPlayer();
-    window.addEventListener('resize', drawLines); // Redesenha as linhas ao redimensionar a janela
+    loadPage(currentPage);
+    window.addEventListener('resize', () => drawLines(currentPage));
 });
