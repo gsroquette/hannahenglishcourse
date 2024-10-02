@@ -48,8 +48,8 @@ document.addEventListener('DOMContentLoaded', function() {
         return distance < minDistance;
     }
 
-    // Exibir apenas 6 fases
-    activities.slice(0, 6).forEach((activity, index) => {
+    // Exibir apenas 5 fases
+    activities.slice(0, 5).forEach((activity, index) => {
         const phaseDiv = document.createElement('div');
         phaseDiv.classList.add('phase');
 
@@ -132,63 +132,115 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function unlockNextPhase(index, path) {
-        if (index < activities.length - 1) {
-            const nextPhase = document.querySelectorAll('.phase')[index + 1];
-            nextPhase.classList.remove('locked');
-            nextPhase.classList.add('unlocked');
+    if (index < activities.length - 1) {
+        const nextPhase = document.querySelectorAll('.phase')[index + 1];
+        nextPhase.classList.remove('locked');
+        nextPhase.classList.add('unlocked');
 
-            const lockIcon = mapContainer.querySelector('.lock-icon');
-            if (lockIcon) {
-                lockIcon.remove();
-            }
+        const lockIcon = mapContainer.querySelector('.lock-icon');
+        if (lockIcon) {
+            lockIcon.remove();
+        }
 
-            // Scroll e zoom para a fase desbloqueada
-            const nextPhaseCoords = nextPhase.getBoundingClientRect();
-            window.scrollTo({
-                top: nextPhaseCoords.top + window.scrollY - window.innerHeight / 2,
-                left: nextPhaseCoords.left + window.scrollX - window.innerWidth / 2,
-                behavior: 'smooth'
-            });
+        // Scroll e zoom para a fase desbloqueada
+        const nextPhaseCoords = nextPhase.getBoundingClientRect();
+        window.scrollTo({
+            top: nextPhaseCoords.top + window.scrollY - window.innerHeight / 2,
+            left: nextPhaseCoords.left + window.scrollX - window.innerWidth / 2,
+            behavior: 'smooth'
+        });
 
-            // Adiciona o zoom temporário
-            mapContainer.style.transform = 'scale(1.5)';
-            mapContainer.style.transition = 'transform 1s ease';
+        // Adiciona o zoom temporário
+        mapContainer.style.transform = 'scale(1.5)';
+        mapContainer.style.transition = 'transform 1s ease';
 
-            // Exibe o gif de cadeado sobre o círculo da fase desbloqueada
+        // Exibe o gif de cadeado sobre o círculo da fase desbloqueada
+        setTimeout(() => {
+            const unlockGif = document.createElement('img');
+            unlockGif.src = '../../imagens/cadeado.gif'; // O GIF de cadeado
+            unlockGif.classList.add('unlock-gif');
+            nextPhase.appendChild(unlockGif); // Anexado ao círculo desbloqueado
+
+            unlockGif.style.position = 'absolute';
+            unlockGif.style.top = '50%';
+            unlockGif.style.left = '50%';
+            unlockGif.style.transform = 'translate(-50%, -50%)';
+
+            // Remove o GIF após 3 segundos e reseta o zoom
             setTimeout(() => {
-                const unlockGif = document.createElement('img');
-                unlockGif.src = '../../imagens/cadeado.gif'; // O GIF de cadeado
-                unlockGif.classList.add('unlock-gif');
-                nextPhase.appendChild(unlockGif); // Anexado ao círculo desbloqueado
+                unlockGif.remove();
+                mapContainer.style.transform = 'scale(1)';
 
-                unlockGif.style.position = 'absolute';
-                unlockGif.style.top = '50%';
-                unlockGif.style.left = '50%';
-                unlockGif.style.transform = 'translate(-50%, -50%)';
-
-                // Remove o GIF após 3 segundos e reseta o zoom
+                // Scroll de volta para a fase que será aberta
                 setTimeout(() => {
-                    unlockGif.remove();
-                    mapContainer.style.transform = 'scale(1)';
+                    const clickedPhase = document.querySelectorAll('.phase')[index];
+                    const clickedCoords = clickedPhase.getBoundingClientRect();
+                    window.scrollTo({
+                        top: clickedCoords.top + window.scrollY - window.innerHeight / 2,
+                        behavior: 'smooth'
+                    });
 
-                    // Scroll de volta para a fase que será aberta
+                    // Abre a fase (somente agora)
                     setTimeout(() => {
-                        const clickedPhase = document.querySelectorAll('.phase')[index];
-                        const clickedCoords = clickedPhase.getBoundingClientRect();
-                        window.scrollTo({
-                            top: clickedCoords.top + window.scrollY - window.innerHeight / 2,
-                            behavior: 'smooth'
-                        });
+                        window.location.href = path;
+                    }, 600);
+                }, 1000);
+            }, 3000);
+        }, 1000);
 
-                        // Abre a fase (somente agora)
-                        setTimeout(() => {
-                            window.location.href = path;
-                        }, 600);
-                    }, 1000);
-                }, 3000);
-            }, 1000);
+        // Se a fase atual for a quinta, desbloqueie o próximo conjunto de fases (6 a 10)
+        if (index === 4) {
+            addNextSetOfPhases(5, 10);  // Adiciona fases 6 a 10
         }
     }
+}
+
+function addNextSetOfPhases(startIndex, endIndex) {
+    activities.slice(startIndex, endIndex).forEach((activity, index) => {
+        const phaseDiv = document.createElement('div');
+        phaseDiv.classList.add('phase');
+
+        const baseTopPosition = 200;
+        const topPosition = baseTopPosition + (startIndex + index) * (Math.random() * (30 - 20) + 20) * window.innerHeight / 100;
+        let horizontalPosition;
+
+        if (positionLeft) {
+            horizontalPosition = Math.random() * (20 - 5) + 5;
+        } else {
+            horizontalPosition = Math.random() * (95 - 80) + 80;
+        }
+        positionLeft = !positionLeft;
+
+        phaseDiv.style.top = `${topPosition}px`;
+        phaseDiv.style.left = `${horizontalPosition}%`;
+
+        const phaseImage = document.createElement('img');
+        phaseImage.src = activity.img;
+        phaseImage.alt = activity.name;
+        phaseImage.classList.add('phase-img');
+        phaseDiv.appendChild(phaseImage);
+
+        mapContainer.appendChild(phaseDiv);
+
+        phaseDiv.classList.add('locked');
+
+        const lockIcon = document.createElement('img');
+        lockIcon.src = '../../imagens/lock_icon_resized.png';
+        lockIcon.classList.add('lock-icon');
+        mapContainer.appendChild(lockIcon);
+
+        lockIcon.style.top = `${topPosition}px`;
+        lockIcon.style.left = `${horizontalPosition}%`;
+
+        phaseDiv.addEventListener('click', () => {
+            if (!phaseDiv.classList.contains('locked')) {
+                moveToPhase(startIndex + index, activity.path, startIndex + index);
+            }
+        });
+    });
+
+    drawLines();  // Redesenha as linhas para conectar as novas fases
+}
 
     function drawLines() {
         svgContainer.innerHTML = '';
