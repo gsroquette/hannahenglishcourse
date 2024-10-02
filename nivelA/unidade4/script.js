@@ -25,14 +25,12 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 23, name: "MatchingGame", path: "../unidade2/MatchingGame/index.html", img: "../../imagens/botoes/matching_game_button.png" }
     ];
 
-   
     const mapContainer = document.getElementById('mapContainer');
     const svgContainer = document.getElementById('linesSvg');
     let currentPhase = 0;
     let currentPhaseGroup = 0; // Grupo de fases atual
-    const phasesPerPage = 6; // Número de fases por página
+    const phasesPerPage = 6; // Exibe 6 fases por página
 
-    // Botões de navegação
     const prevButton = document.getElementById('prevButton');
     const nextButton = document.getElementById('nextButton');
 
@@ -51,7 +49,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function loadPhaseGroup() {
-        // Limpa fases antigas
+        // Limpa as fases antigas
         mapContainer.querySelectorAll('.phase').forEach(phase => phase.remove());
         svgContainer.innerHTML = ''; // Limpa as linhas
 
@@ -62,12 +60,10 @@ document.addEventListener('DOMContentLoaded', function() {
             createPhase(activities[i], i);
         }
 
-        // Atualiza botões
         prevButton.disabled = currentPhaseGroup === 0;
         nextButton.disabled = end >= activities.length;
 
-        // Desenha as linhas novamente entre as fases
-        drawLines();
+        drawLines(); // Desenha as linhas após carregar as fases
     }
 
     function createPhase(activity, index) {
@@ -77,21 +73,16 @@ document.addEventListener('DOMContentLoaded', function() {
         const baseTopPosition = 200;
         let topPosition, horizontalPosition;
 
-        // Definindo a posição vertical
         const randomVerticalGap = Math.random() * (30 - 20) + 20;
         topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
 
-        // Alterna entre esquerda e direita
         let positionLeft = index % 2 === 0;
         if (positionLeft) {
-            // Posição aleatória à esquerda (entre 5% e 20%)
             horizontalPosition = Math.random() * (20 - 5) + 5;
         } else {
-            // Posição aleatória à direita (entre 80% e 95%)
             horizontalPosition = Math.random() * (95 - 80) + 80;
         }
 
-        // Define as posições calculadas
         phaseDiv.style.top = `${topPosition}px`;
         phaseDiv.style.left = `${horizontalPosition}%`;
 
@@ -124,125 +115,33 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function moveToPhase(index, path = null, clickedIndex = null) {
-        const phase = document.querySelectorAll('.phase')[index];
-        const coords = phase.getBoundingClientRect();
-        document.querySelectorAll('.phase').forEach(phase => { phase.classList.remove('active'); });
-        phase.classList.add('active');
-
-        const player = document.querySelector('.player');
-        player.style.top = `${coords.top + window.scrollY + coords.height / 2}px`;
-        player.style.left = `${coords.left + window.scrollX + coords.width / 2}px`;
-        player.classList.add('moving');
-
-        const phaseInView = phase.getBoundingClientRect().top >= 0 && phase.getBoundingClientRect().bottom <= window.innerHeight;
-        if (!phaseInView) {
-            window.scrollTo({
-                top: coords.top + window.scrollY - window.innerHeight / 2,
-                behavior: 'smooth'
-            });
-        }
-
-        if (clickedIndex !== null && clickedIndex < activities.length - 1) {
-            setTimeout(() => {
-                unlockNextPhase(clickedIndex, path);
-                updateLineColor(clickedIndex);
-            }, 600);
-        }
-    }
-
-    function unlockNextPhase(index, path) {
-        if (index < activities.length - 1) {
-            const nextPhase = document.querySelectorAll('.phase')[index + 1];
-            nextPhase.classList.remove('locked');
-            nextPhase.classList.add('unlocked');
-
-            const lockIcon = mapContainer.querySelector('.lock-icon');
-            if (lockIcon) {
-                lockIcon.remove();
-            }
-
-            // Scroll e zoom para a fase desbloqueada
-            const nextPhaseCoords = nextPhase.getBoundingClientRect();
-            window.scrollTo({
-                top: nextPhaseCoords.top + window.scrollY - window.innerHeight / 2,
-                left: nextPhaseCoords.left + window.scrollX - window.innerWidth / 2,
-                behavior: 'smooth'
-            });
-
-            // Adiciona o zoom temporário
-            mapContainer.style.transform = 'scale(1.5)';
-            mapContainer.style.transition = 'transform 1s ease';
-
-            // Exibe o gif de cadeado sobre o círculo da fase desbloqueada
-            setTimeout(() => {
-                const unlockGif = document.createElement('img');
-                unlockGif.src = '../../imagens/cadeado.gif'; // O GIF de cadeado
-                unlockGif.classList.add('unlock-gif');
-                nextPhase.appendChild(unlockGif); // Anexado ao círculo desbloqueado
-
-                unlockGif.style.position = 'absolute';
-                unlockGif.style.top = '50%';
-                unlockGif.style.left = '50%';
-                unlockGif.style.transform = 'translate(-50%, -50%)';
-
-                // Remove o GIF após 3 segundos e reseta o zoom
-                setTimeout(() => {
-                    unlockGif.remove();
-                    mapContainer.style.transform = 'scale(1)';
-
-                    // Scroll de volta para a fase que será aberta
-                    setTimeout(() => {
-                        const clickedPhase = document.querySelectorAll('.phase')[index];
-                        const clickedCoords = clickedPhase.getBoundingClientRect();
-                        window.scrollTo({
-                            top: clickedCoords.top + window.scrollY - window.innerHeight / 2,
-                            behavior: 'smooth'
-                        });
-
-                        // Abre a fase (somente agora)
-                        setTimeout(() => {
-                            window.location.href = path;
-                        }, 600);
-                    }, 1000);
-                }, 3000);
-            }, 1000);
-        }
-    }
-
     function drawLines() {
-        svgContainer.innerHTML = ''; // Limpa o SVG atual
+        svgContainer.innerHTML = '';
         const phases = document.querySelectorAll('.phase');
         
-        // Verificar se há fases suficientes para desenhar as linhas
-        if (phases.length < 2) return; // Sem linhas se houver menos de 2 fases visíveis
+        if (phases.length < 2) return;
 
         for (let i = 0; i < phases.length - 1; i++) {
             const phase1 = phases[i];
             const phase2 = phases[i + 1];
+            const coords1 = phase1.getBoundingClientRect();
+            const coords2 = phase2.getBoundingClientRect();
 
-            // Verifica se ambas as fases existem antes de acessar seus valores
-            if (phase1 && phase2) {
-                const coords1 = phase1.getBoundingClientRect();
-                const coords2 = phase2.getBoundingClientRect();
+            const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
+            const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150;
+            const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
+            const controlPointY2 = coords2.top - 150;
 
-                const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
-                const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 100;  // Ajuste na curva
-                const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
-                const controlPointY2 = coords2.top - 100;  // Ajuste na curva
-
-                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
-                           C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
-                           ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
-                path.setAttribute('d', d);
-                path.setAttribute('class', 'path path-blue');
-                svgContainer.appendChild(path);
-            }
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
+                       C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
+                       ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
+            path.setAttribute('d', d);
+            path.setAttribute('class', `path path-blue`);
+            svgContainer.appendChild(path);
         }
     }
 
-    drawLines();
     loadPhaseGroup(); // Carrega o primeiro grupo de fases
     window.addEventListener('resize', drawLines);
 });
