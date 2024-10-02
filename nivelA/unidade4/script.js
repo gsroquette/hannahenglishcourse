@@ -107,53 +107,52 @@ document.addEventListener('DOMContentLoaded', function() {
         currentPage = page;
         createPhases(page);
     }
+function drawLines() {
+    svgContainer.innerHTML = ''; // Limpa as linhas anteriores
 
-    function drawLines() {
-        svgContainer.innerHTML = ''; // Limpa as linhas anteriores
+    const phases = document.querySelectorAll('.phase');
+    const mapRect = mapContainer.getBoundingClientRect(); // Coordenadas do contêiner do mapa
 
-        const phases = document.querySelectorAll('.phase');
-        const mapRect = mapContainer.getBoundingClientRect(); // Coordenadas do contêiner do mapa
+    for (let i = 0; i < phases.length - 1; i++) {
+        const phase1 = phases[i];
+        const phase2 = phases[i + 1];
 
-        for (let i = 0; i < phases.length - 1; i++) {
-            const phase1 = phases[i];
-            const phase2 = phases[i + 1];
+        if (phase1 && phase2) {
+            const coords1 = phase1.getBoundingClientRect();
+            const coords2 = phase2.getBoundingClientRect();
 
-            if (phase1 && phase2) {
-                const coords1 = phase1.getBoundingClientRect();
-                const coords2 = phase2.getBoundingClientRect();
+            // Exibir as coordenadas detalhadas no console
+            console.log(`Phase ${i} - coords1:`, coords1);
+            console.log(`Phase ${i+1} - coords2:`, coords2);
 
-                // Exibir as coordenadas detalhadas no console
-                console.log(`Phase ${i} - coords1:`, coords1);
-                console.log(`Phase ${i+1} - coords2:`, coords2);
+            // Ajusta as coordenadas em relação ao contêiner do mapa
+            const startX = coords1.left + coords1.width / 2 - mapRect.left;
+            const startY = coords1.top + coords1.height / 2 - mapRect.top;
+            const endX = coords2.left + coords2.width / 2 - mapRect.left;
+            const endY = coords2.top + coords2.height / 2 - mapRect.top;
 
-                // Ajusta as coordenadas em relação ao contêiner do mapa
-                const startX = coords1.left + coords1.width / 2 - mapRect.left;
-                const startY = coords1.top + coords1.height / 2 - mapRect.top;
-                const endX = coords2.left + coords2.width / 2 - mapRect.left;
-                const endY = coords2.top + coords2.height / 2 - mapRect.top;
+            console.log(`Drawing line from (${startX}, ${startY}) to (${endX}, ${endY})`);
 
-                console.log(`Drawing line from (${startX}, ${startY}) to (${endX}, ${endY})`);
+            const controlPointX1 = startX + (endX - startX) * 0.33;
+            const controlPointY1 = startY + (endY - startY) * 0.33 + 150;
+            const controlPointX2 = startX + (endX - startX) * 0.66;
+            const controlPointY2 = endY - 150;
 
-                const controlPointX1 = startX + (endX - startX) * 0.33;
-                const controlPointY1 = startY + (endY - startY) * 0.33 + 150;
-                const controlPointX2 = startX + (endX - startX) * 0.66;
-                const controlPointY2 = endY - 150;
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const d = `M ${startX} ${startY} 
+                       C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
+                       ${endX} ${endY}`;
+            console.log(`SVG path d attribute:`, d);
 
-                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                const d = `M ${startX} ${startY} 
-                           C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
-                           ${endX} ${endY}`;
-                console.log(`SVG path d attribute:`, d);
-
-                path.setAttribute('d', d);
-                path.setAttribute('class', `path path-blue`);
-                path.style.stroke = "blue";
-                path.style.strokeWidth = "4";
-                path.style.fill = "none";
-                svgContainer.appendChild(path);
-            }
+            path.setAttribute('d', d);
+            path.setAttribute('class', `path path-blue`);
+            path.style.stroke = "blue";
+            path.style.strokeWidth = "4";
+            path.style.fill = "none";
+            svgContainer.appendChild(path);
         }
     }
+}
 
     loadPage(currentPage);  // Carrega a primeira página
 });
