@@ -85,8 +85,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Função para desenhar linhas entre as fases
-    function drawLines() {
+    // Função para desenhar linhas sinuosas entre as fases
+    function drawCurvedLines() {
         const phases = document.querySelectorAll('.phase');
         const svg = document.getElementById('linesSvg');
         svg.innerHTML = ''; // Limpa o SVG antes de desenhar as linhas
@@ -101,25 +101,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 const endX = endCoords.left + endCoords.width / 2;
                 const endY = endCoords.top + endCoords.height / 2 + window.scrollY;
 
-                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                line.setAttribute('x1', startX);
-                line.setAttribute('y1', startY);
-                line.setAttribute('x2', endX);
-                line.setAttribute('y2', endY);
-                line.setAttribute('stroke', 'black'); // Cor da linha
-                line.setAttribute('stroke-width', '2'); // Largura da linha
-                line.setAttribute('stroke-dasharray', '5,5'); // Pontilhado
+                // Desenhando uma linha curva (sinuosa)
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                const controlX = (startX + endX) / 2 + (Math.random() * 100 - 50); // Ponto de controle para curva (ajusta a sinuosidade)
+                const controlY = (startY + endY) / 2 + (Math.random() * 100 - 50); // Ponto de controle para curva (ajusta a sinuosidade)
 
-                svg.appendChild(line);
+                const d = `M ${startX},${startY} Q ${controlX},${controlY} ${endX},${endY}`;
+                path.setAttribute('d', d);
+                path.setAttribute('stroke', 'black'); // Cor da linha
+                path.setAttribute('stroke-width', '4'); // Largura da linha mais grossa
+                path.setAttribute('stroke-dasharray', '8,8'); // Efeito pontilhado
+                path.setAttribute('fill', 'none'); // Não preencher a curva
+
+                svg.appendChild(path);
             }
         });
     }
 
     createPlayer(); // Cria o bonequinho
-    drawLines(); // Desenha as linhas entre as fases
+    drawCurvedLines(); // Desenha as linhas sinuosas entre as fases
 
     // Recalcular e redesenhar as linhas ao redimensionar a janela
-    window.addEventListener('resize', drawLines);
+    window.addEventListener('resize', drawCurvedLines);
 });
 
    
