@@ -71,6 +71,9 @@ document.addEventListener('DOMContentLoaded', function() {
                             moveToPhase(phaseIndex, activity.path, phaseIndex);
                         }
                     });
+
+                    // Chama o desenho das linhas sempre que uma nova fase é carregada
+                    drawLines();
                 }
             }
         });
@@ -191,11 +194,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Função para desenhar linhas entre as fases
     function drawLines() {
-        svgContainer.innerHTML = '';
-        for (let i = 0; i < activities.length - 1; i++) {
-            const phase1 = document.querySelectorAll('.phase')[i];
-            const phase2 = document.querySelectorAll('.phase')[i + 1];
+        svgContainer.innerHTML = ''; // Limpa o SVG antes de desenhar as linhas
+        const phases = document.querySelectorAll('.phase');
+        for (let i = 0; i < phases.length - 1; i++) {
+            const phase1 = phases[i];
+            const phase2 = phases[i + 1];
             const coords1 = phase1.getBoundingClientRect();
             const coords2 = phase2.getBoundingClientRect();
 
@@ -223,7 +228,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     createPhases();
-    drawLines();
+    drawLines(); // Desenha as linhas na inicialização
     createPlayer();
-    window.addEventListener('resize', drawLines);
+    window.addEventListener('resize', drawLines); // Redesenha as linhas ao redimensionar a janela
 });
