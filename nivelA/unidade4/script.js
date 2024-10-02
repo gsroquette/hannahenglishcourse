@@ -116,8 +116,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const svg = document.getElementById('linesSvg');
         svg.innerHTML = ''; // Limpa o SVG antes de desenhar as linhas
 
+        // Garantir que as fases sejam iteradas corretamente e todas as linhas sejam desenhadas
         phases.forEach((phase, index) => {
-            if (index < phases.length - 1) {
+            if (index < phases.length - 1) { // Certificar-se de que está iterando até a penúltima fase
                 const startCoords = getAbsolutePosition(phase);
                 const endCoords = getAbsolutePosition(phases[index + 1]);
 
