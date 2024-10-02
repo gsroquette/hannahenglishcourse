@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
     const mapContainer = document.getElementById('mapContainer');
-    let currentPhase = 0; // Fase inicial (fase 1)
+    let currentPhase = 0; // Iniciar na fase 1 (índice 0)
     let player;
 
     // Função para criar o bonequinho
@@ -54,15 +54,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Marcar as fases como ativas ou bloqueadas
         if (index === currentPhase) {
-            phaseDiv.classList.add('active');
+            phaseDiv.classList.add('active'); // Primeira fase está ativa
         } else if (index > currentPhase) {
-            phaseDiv.classList.add('locked'); // Fases bloqueadas acima da fase atual
+            phaseDiv.classList.add('locked'); // Fases posteriores estão bloqueadas
         }
 
         // Adicionar o evento de clique para abrir a atividade, apenas se a fase não estiver bloqueada
         phaseDiv.addEventListener('click', () => {
             if (!phaseDiv.classList.contains('locked')) {
-                // Mover para a fase e abrir o caminho da atividade
+                // Mover o bonequinho para a fase e abrir o caminho da atividade
                 moveToPhase(index, activity.path);
             } else {
                 console.log("Fase bloqueada. Complete a fase anterior para desbloquear.");
@@ -81,8 +81,10 @@ document.addEventListener('DOMContentLoaded', function() {
         player.style.top = `${coords.top + window.scrollY + coords.height / 2 - player.offsetHeight / 2}px`;
         player.style.left = `${coords.left + window.scrollX + coords.width + 20}px`; // 20px à direita da fase
 
+        // Abrir o caminho da atividade se fornecido
         if (path) {
             setTimeout(() => {
+                console.log(`Abrindo caminho: ${path}`);
                 window.location.href = path; // Abre a atividade ao clicar na fase desbloqueada
             }, 600); // Pequeno atraso para o bonequinho se mover antes de abrir a atividade
         }
@@ -90,3 +92,5 @@ document.addEventListener('DOMContentLoaded', function() {
 
     createPlayer(); // Cria e posiciona o bonequinho
 });
+
+   
