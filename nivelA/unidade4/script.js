@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 23, name: "MatchingGame", path: "../unidade2/MatchingGame/index.html", img: "../../imagens/botoes/matching_game_button.png" }
     ];
 
-  
+ 
     const mapContainer = document.getElementById('mapContainer');
     const svgContainer = document.getElementById('linesSvg');
     let currentPage = 0;
@@ -122,6 +122,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 const coords1 = phase1.getBoundingClientRect();
                 const coords2 = phase2.getBoundingClientRect();
 
+                // Verificando as coordenadas no console
+                console.log(`Phase ${i} - coords1:`, coords1);
+                console.log(`Phase ${i+1} - coords2:`, coords2);
+
                 // Ajusta as coordenadas em relação ao contêiner do mapa
                 const startX = coords1.left + coords1.width / 2 - mapRect.left;
                 const startY = coords1.top + coords1.height / 2 - mapRect.top;
@@ -149,3 +153,5 @@ document.addEventListener('DOMContentLoaded', function() {
 
     loadPage(currentPage);  // Carrega a primeira página
 });
+
+    
