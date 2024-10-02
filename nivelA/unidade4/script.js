@@ -29,12 +29,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const svgContainer = document.getElementById('linesSvg');
     let currentPhase = 0;
     let player;
-    let previousPosition = null;
     let positionLeft = true;  // Inicia pela esquerda
 
     function createPlayer() {
         player = document.createElement('img');
-        player.src = '../../imagens/bonequinho.png';
+        player.src = '../../imagens/bonequinho.png'; 
         player.classList.add('player');
         mapContainer.appendChild(player);
         moveToPhase(currentPhase); // Mover para a fase inicial
