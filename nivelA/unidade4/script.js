@@ -29,7 +29,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const svgContainer = document.getElementById('linesSvg');
     let currentPhase = 0;
     let player;
-    let previousPosition = null;
     let positionLeft = true;  // Inicia pela esquerda
 
     function createPlayer() {
@@ -40,16 +39,8 @@ document.addEventListener('DOMContentLoaded', function() {
         moveToPhase(currentPhase);
     }
 
-    function isTooClose(pos1, pos2) {
-        const minDistance = 100;
-        const dx = pos1.left - pos2.left;
-        const dy = pos1.top - pos2.top;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        return distance < minDistance;
-    }
-
-    // Exibir apenas 6 fases
-    activities.slice(0, 6).forEach((activity, index) => {
+    // Exibir apenas 5 fases
+    activities.slice(0, 5).forEach((activity, index) => {
         const phaseDiv = document.createElement('div');
         phaseDiv.classList.add('phase');
 
@@ -62,15 +53,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Alterna entre esquerda e direita
         if (positionLeft) {
-            // Posição aleatória à esquerda (entre 5% e 20%)
-            horizontalPosition = Math.random() * (20 - 5) + 5;
+            horizontalPosition = Math.random() * (20 - 5) + 5; // Posição à esquerda
         } else {
-            // Posição aleatória à direita (entre 80% e 95%)
-            horizontalPosition = Math.random() * (95 - 80) + 80;
+            horizontalPosition = Math.random() * (95 - 80) + 80; // Posição à direita
         }
 
-        // Alterna a posição para a próxima fase
-        positionLeft = !positionLeft;
+        positionLeft = !positionLeft; // Alterna a posição para a próxima fase
 
         // Define as posições calculadas
         phaseDiv.style.top = `${topPosition}px`;
@@ -142,18 +130,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 lockIcon.remove();
             }
 
-            // Scroll e zoom para a fase desbloqueada
-            const nextPhaseCoords = nextPhase.getBoundingClientRect();
-            window.scrollTo({
-                top: nextPhaseCoords.top + window.scrollY - window.innerHeight / 2,
-                left: nextPhaseCoords.left + window.scrollX - window.innerWidth / 2,
-                behavior: 'smooth'
-            });
-
-            // Adiciona o zoom temporário
-            mapContainer.style.transform = 'scale(1.5)';
-            mapContainer.style.transition = 'transform 1s ease';
-
             // Exibe o gif de cadeado sobre o círculo da fase desbloqueada
             setTimeout(() => {
                 const unlockGif = document.createElement('img');
@@ -166,35 +142,42 @@ document.addEventListener('DOMContentLoaded', function() {
                 unlockGif.style.left = '50%';
                 unlockGif.style.transform = 'translate(-50%, -50%)';
 
-                // Ajusta o scroll para que a fase desbloqueada esteja completamente visível após o zoom
+                // Exibe o cadeado primeiro, sem zoom
                 setTimeout(() => {
+                    unlockGif.remove();
+
+                    // Zoom após a remoção do gif para focar na fase desbloqueada
+                    const nextPhaseCoords = nextPhase.getBoundingClientRect();
+                    mapContainer.style.transform = 'scale(1.5)';
+                    mapContainer.style.transition = 'transform 1s ease';
+
+                    // Ajusta o scroll para centralizar a fase desbloqueada durante o zoom
                     window.scrollTo({
                         top: nextPhaseCoords.top + window.scrollY - window.innerHeight / 2,
                         left: nextPhaseCoords.left + window.scrollX - window.innerWidth / 2,
                         behavior: 'smooth'
                     });
-                }, 1000);
 
-                // Remove o GIF após 3 segundos e reseta o zoom
-                setTimeout(() => {
-                    unlockGif.remove();
-                    mapContainer.style.transform = 'scale(1)';
-
-                    // Scroll de volta para a fase que será aberta
+                    // Remove o zoom após 3 segundos
                     setTimeout(() => {
-                        const clickedPhase = document.querySelectorAll('.phase')[index];
-                        const clickedCoords = clickedPhase.getBoundingClientRect();
-                        window.scrollTo({
-                            top: clickedCoords.top + window.scrollY - window.innerHeight / 2,
-                            behavior: 'smooth'
-                        });
+                        mapContainer.style.transform = 'scale(1)';
 
-                        // Abre a fase (somente agora)
+                        // Scroll de volta para a fase que será aberta
                         setTimeout(() => {
-                            window.location.href = path;
-                        }, 600);
-                    }, 1000);
-                }, 3000);
+                            const clickedPhase = document.querySelectorAll('.phase')[index];
+                            const clickedCoords = clickedPhase.getBoundingClientRect();
+                            window.scrollTo({
+                                top: clickedCoords.top + window.scrollY - window.innerHeight / 2,
+                                behavior: 'smooth'
+                            });
+
+                            // Abre a fase (somente agora)
+                            setTimeout(() => {
+                                window.location.href = path;
+                            }, 600);
+                        }, 1000);
+                    }, 3000);
+                }, 1000); // Tempo para exibir o gif do cadeado
             }, 1000);
         }
     }
