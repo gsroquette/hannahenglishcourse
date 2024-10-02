@@ -25,11 +25,12 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 23, name: "MatchingGame", path: "../unidade2/MatchingGame/index.html", img: "../../imagens/botoes/matching_game_button.png" }
     ];
 
-    
+
     const mapContainer = document.getElementById('mapContainer');
     let currentPhase = 0; // Fase inicial (fase 1)
     let player;
 
+    // Função para criar o bonequinho
     function createPlayer() {
         player = document.createElement('img');
         player.src = '../../imagens/bonequinho.png'; 
@@ -38,6 +39,7 @@ document.addEventListener('DOMContentLoaded', function() {
         moveToPhase(currentPhase); // Move o bonequinho para a fase 1
     }
 
+    // Criando as fases
     activities.forEach((activity, index) => {
         const phaseDiv = document.createElement('div');
         phaseDiv.classList.add('phase');
@@ -50,19 +52,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
         mapContainer.appendChild(phaseDiv);
 
+        // Marcar as fases como ativas ou bloqueadas
         if (index === currentPhase) {
             phaseDiv.classList.add('active');
         } else if (index > currentPhase) {
-            phaseDiv.classList.add('locked');
+            phaseDiv.classList.add('locked'); // Fases bloqueadas acima da fase atual
         }
 
+        // Adicionar o evento de clique para abrir a atividade, apenas se a fase não estiver bloqueada
         phaseDiv.addEventListener('click', () => {
             if (!phaseDiv.classList.contains('locked')) {
+                // Mover para a fase e abrir o caminho da atividade
                 moveToPhase(index, activity.path);
+            } else {
+                console.log("Fase bloqueada. Complete a fase anterior para desbloquear.");
             }
         });
     });
 
+    // Função para mover o bonequinho e abrir a atividade correspondente
     function moveToPhase(index, path = null) {
         const phase = document.querySelectorAll('.phase')[index];
         const coords = phase.getBoundingClientRect();
@@ -75,8 +83,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (path) {
             setTimeout(() => {
-                window.location.href = path;
-            }, 600);
+                window.location.href = path; // Abre a atividade ao clicar na fase desbloqueada
+            }, 600); // Pequeno atraso para o bonequinho se mover antes de abrir a atividade
         }
     }
 
