@@ -30,9 +30,13 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentPage = 0;
     const phasesPerPage = 6;
 
-    // Criação das fases e exibição por página
+    // Função para criar as fases e exibir por página
     function createPhases(page) {
-        mapContainer.innerHTML = ''; // Limpa as fases do mapa
+        const titleContainer = document.querySelector('.title-container');
+        
+        mapContainer.innerHTML = ''; // Limpa o mapa
+        mapContainer.appendChild(titleContainer); // Reanexa a imagem do título
+
         svgContainer.innerHTML = ''; // Limpa as linhas
 
         const start = page * phasesPerPage;
@@ -55,7 +59,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 ? Math.random() * (20 - 5) + 5
                 : Math.random() * (95 - 80) + 80;
 
-            // Definindo as posições calculadas
             phaseDiv.style.top = `${topPosition}px`;
             phaseDiv.style.left = `${horizontalPosition}%`;
 
@@ -72,10 +75,16 @@ document.addEventListener('DOMContentLoaded', function() {
         drawLines(start, end); // Redesenha as linhas entre as fases da página
     }
 
-    // Função para criar botões de navegação
+    // Função para criar os botões de navegação (Next/Previous)
     function createNavigationButtons(page) {
         const buttonContainer = document.createElement('div');
         buttonContainer.classList.add('button-container');
+
+        // Estilos para centralizar e fixar os botões na parte inferior
+        buttonContainer.style.position = 'absolute';
+        buttonContainer.style.bottom = '20px';
+        buttonContainer.style.left = '50%';
+        buttonContainer.style.transform = 'translateX(-50%)';
 
         if (page > 0) {
             const prevButton = document.createElement('button');
@@ -93,12 +102,10 @@ document.addEventListener('DOMContentLoaded', function() {
             buttonContainer.appendChild(nextButton);
         }
 
-        // Adiciona os botões no final do contêiner do mapa
         mapContainer.appendChild(buttonContainer);
-        buttonContainer.style.textAlign = "center";  // Centraliza os botões
     }
 
-    // Carregar a página com fases específicas
+    // Função para carregar a página com as fases específicas
     function loadPage(page) {
         currentPage = page;
         createPhases(page);
@@ -108,26 +115,30 @@ document.addEventListener('DOMContentLoaded', function() {
     function drawLines(start, end) {
         svgContainer.innerHTML = ''; // Limpa as linhas anteriores
 
-        for (let i = start; i < end - 1; i++) {
-            const phase1 = document.querySelectorAll('.phase')[i % phasesPerPage];
-            const phase2 = document.querySelectorAll('.phase')[i % phasesPerPage + 1];
-            const coords1 = phase1.getBoundingClientRect();
-            const coords2 = phase2.getBoundingClientRect();
+        for (let i = 0; i < end - start - 1; i++) {
+            const phase1 = document.querySelectorAll('.phase')[i];
+            const phase2 = document.querySelectorAll('.phase')[i + 1];
 
-            const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
-            const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150;
-            const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
-            const controlPointY2 = coords2.top - 150;
+            if (phase1 && phase2) {
+                const coords1 = phase1.getBoundingClientRect();
+                const coords2 = phase2.getBoundingClientRect();
 
-            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
-                       C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
-                       ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
-            path.setAttribute('d', d);
-            path.setAttribute('class', `path path-blue`);
-            svgContainer.appendChild(path);
+                const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
+                const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150;
+                const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
+                const controlPointY2 = coords2.top - 150;
+
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
+                           C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
+                           ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
+                path.setAttribute('d', d);
+                path.setAttribute('class', `path path-blue`);
+                svgContainer.appendChild(path);
+            }
         }
     }
 
-    loadPage(currentPage);  // Carrega a primeira página
+    // Inicia carregando a primeira página
+    loadPage(currentPage);
 });
