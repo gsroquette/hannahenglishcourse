@@ -30,12 +30,14 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentPage = 0;
     const phasesPerPage = 6;
 
+    // Criação das fases e exibição por página
     function createPhases(page) {
-        mapContainer.innerHTML = ''; // Limpa o mapa para recriar
+        mapContainer.innerHTML = ''; // Limpa as fases do mapa
+        svgContainer.innerHTML = ''; // Limpa as linhas
+
         const start = page * phasesPerPage;
         const end = Math.min(start + phasesPerPage, activities.length);
 
-        // Carregar as fases da página atual
         activities.slice(start, end).forEach((activity, index) => {
             const phaseDiv = document.createElement('div');
             phaseDiv.classList.add('phase');
@@ -43,16 +45,17 @@ document.addEventListener('DOMContentLoaded', function() {
             const baseTopPosition = 200;
             let topPosition, horizontalPosition;
 
-            // Posição vertical dinâmica
+            // Definindo a posição vertical
             const randomVerticalGap = Math.random() * (30 - 20) + 20;
             topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
 
-            // Alternar entre esquerda e direita
+            // Alterna entre esquerda e direita
             const positionLeft = index % 2 === 0;
             horizontalPosition = positionLeft
                 ? Math.random() * (20 - 5) + 5
                 : Math.random() * (95 - 80) + 80;
 
+            // Definindo as posições calculadas
             phaseDiv.style.top = `${topPosition}px`;
             phaseDiv.style.left = `${horizontalPosition}%`;
 
@@ -66,8 +69,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         createNavigationButtons(page);
+        drawLines(start, end); // Redesenha as linhas entre as fases da página
     }
 
+    // Função para criar botões de navegação
     function createNavigationButtons(page) {
         const buttonContainer = document.createElement('div');
         buttonContainer.classList.add('button-container');
@@ -88,13 +93,41 @@ document.addEventListener('DOMContentLoaded', function() {
             buttonContainer.appendChild(nextButton);
         }
 
+        // Adiciona os botões no final do contêiner do mapa
         mapContainer.appendChild(buttonContainer);
+        buttonContainer.style.textAlign = "center";  // Centraliza os botões
     }
 
+    // Carregar a página com fases específicas
     function loadPage(page) {
         currentPage = page;
         createPhases(page);
     }
 
-    loadPage(currentPage);
+    // Função para desenhar as linhas entre as fases da página atual
+    function drawLines(start, end) {
+        svgContainer.innerHTML = ''; // Limpa as linhas anteriores
+
+        for (let i = start; i < end - 1; i++) {
+            const phase1 = document.querySelectorAll('.phase')[i % phasesPerPage];
+            const phase2 = document.querySelectorAll('.phase')[i % phasesPerPage + 1];
+            const coords1 = phase1.getBoundingClientRect();
+            const coords2 = phase2.getBoundingClientRect();
+
+            const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
+            const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150;
+            const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
+            const controlPointY2 = coords2.top - 150;
+
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
+                       C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
+                       ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
+            path.setAttribute('d', d);
+            path.setAttribute('class', `path path-blue`);
+            svgContainer.appendChild(path);
+        }
+    }
+
+    loadPage(currentPage);  // Carrega a primeira página
 });
