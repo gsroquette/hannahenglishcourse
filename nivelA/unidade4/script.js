@@ -29,68 +29,87 @@ document.addEventListener('DOMContentLoaded', function() {
     const svgContainer = document.getElementById('linesSvg');
     let currentPhase = 0;
     let player;
-    let positionLeft = true;  // Inicia pela esquerda
-
-    let phasesLoaded = 5;  // Quantidade inicial de fases carregadas
-    const phasesPerLoad = 5;  // Quantidade de fases carregadas a cada scroll
+    let positionLeft = true; // Inicia pela esquerda
 
     function createPlayer() {
         player = document.createElement('img');
-        player.src = '../../imagens/bonequinho.png'; 
+        player.src = '../../imagens/bonequinho.png';
         player.classList.add('player');
         mapContainer.appendChild(player);
         moveToPhase(currentPhase);
     }
 
-    function loadPhases(limit) {
-        activities.slice(0, limit).forEach((activity, index) => {
+    // Função para carregar fases visíveis
+    function loadVisiblePhases(entries, observer) {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const phaseDiv = entry.target;
+                const phaseIndex = parseInt(phaseDiv.getAttribute('data-index'));
+
+                if (!phaseDiv.dataset.loaded) {
+                    const activity = activities[phaseIndex];
+                    const phaseImage = document.createElement('img');
+                    phaseImage.src = activity.img;
+                    phaseImage.alt = activity.name;
+                    phaseImage.classList.add('phase-img');
+                    phaseDiv.appendChild(phaseImage);
+                    
+                    phaseDiv.dataset.loaded = true; // Marca a fase como carregada
+
+                    if (phaseIndex === currentPhase) {
+                        phaseDiv.classList.add('active');
+                    } else if (phaseIndex > currentPhase) {
+                        phaseDiv.classList.add('locked');
+                        const lockIcon = document.createElement('img');
+                        lockIcon.src = '../../imagens/lock_icon_resized.png';
+                        lockIcon.classList.add('lock-icon');
+                        phaseDiv.appendChild(lockIcon);
+                    }
+
+                    phaseDiv.addEventListener('click', () => {
+                        if (!phaseDiv.classList.contains('locked')) {
+                            moveToPhase(phaseIndex, activity.path, phaseIndex);
+                        }
+                    });
+                }
+            }
+        });
+    }
+
+    const observer = new IntersectionObserver(loadVisiblePhases, {
+        root: null, // Usa a janela do navegador como root
+        rootMargin: '0px',
+        threshold: 0.1 // Carrega quando 10% da fase está visível
+    });
+
+    // Função para criar todas as fases
+    function createPhases() {
+        activities.forEach((activity, index) => {
             const phaseDiv = document.createElement('div');
             phaseDiv.classList.add('phase');
+            phaseDiv.setAttribute('data-index', index); // Adiciona um índice para referência
 
             const baseTopPosition = 200;
-            let topPosition, horizontalPosition;
-
             const randomVerticalGap = Math.random() * (30 - 20) + 20;
-            topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
+            let topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
+            let horizontalPosition;
 
+            // Alterna entre esquerda e direita
             if (positionLeft) {
-                horizontalPosition = Math.random() * (20 - 5) + 5;
+                horizontalPosition = Math.random() * (20 - 5) + 5; // Posição aleatória à esquerda
             } else {
-                horizontalPosition = Math.random() * (95 - 80) + 80;
+                horizontalPosition = Math.random() * (95 - 80) + 80; // Posição aleatória à direita
             }
+            positionLeft = !positionLeft; // Alterna a posição para a próxima fase
 
-            positionLeft = !positionLeft;
-
+            // Define as posições calculadas
             phaseDiv.style.top = `${topPosition}px`;
             phaseDiv.style.left = `${horizontalPosition}%`;
 
-            const phaseImage = document.createElement('img');
-            phaseImage.src = activity.img;
-            phaseImage.alt = activity.name;
-            phaseImage.classList.add('phase-img');
-            phaseDiv.appendChild(phaseImage);
-
             mapContainer.appendChild(phaseDiv);
 
-            if (index === currentPhase) {
-                phaseDiv.classList.add('active');
-            } else if (index > currentPhase) {
-                phaseDiv.classList.add('locked');
-
-                const lockIcon = document.createElement('img');
-                lockIcon.src = '../../imagens/lock_icon_resized.png';
-                lockIcon.classList.add('lock-icon');
-                mapContainer.appendChild(lockIcon);
-
-                lockIcon.style.top = `${topPosition}px`;
-                lockIcon.style.left = `${horizontalPosition}%`;
-            }
-
-            phaseDiv.addEventListener('click', () => {
-                if (!phaseDiv.classList.contains('locked')) {
-                    moveToPhase(index, activity.path, index);
-                }
-            });
+            // Adiciona a fase ao observer para carregamento
+            observer.observe(phaseDiv);
         });
     }
 
@@ -134,7 +153,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const nextPhaseCoords = nextPhase.getBoundingClientRect();
             window.scrollTo({
                 top: nextPhaseCoords.top + window.scrollY - window.innerHeight / 2,
-                left: nextPhaseCoords.left + window.scrollX - window.innerWidth / 2,
                 behavior: 'smooth'
             });
 
@@ -204,16 +222,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    window.addEventListener('scroll', () => {
-        if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight) {
-            phasesLoaded += phasesPerLoad;
-            loadPhases(phasesLoaded);
-            drawLines();
-        }
-    });
-
+    createPhases();
     drawLines();
     createPlayer();
-    loadPhases(phasesLoaded); // Carregar as fases iniciais
     window.addEventListener('resize', drawLines);
 });
