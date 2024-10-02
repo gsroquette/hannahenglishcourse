@@ -27,26 +27,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const mapContainer = document.getElementById('mapContainer');
     const svgContainer = document.getElementById('linesSvg');
-    let currentPhase = 0;
-    let player;
     let currentPage = 0;
     const phasesPerPage = 6;
-    
-    function createPlayer() {
-        player = document.createElement('img');
-        player.src = '../../imagens/bonequinho.png'; 
-        player.classList.add('player');
-        mapContainer.appendChild(player);
-        moveToPhase(currentPhase);
-    }
 
     function createPhases(page) {
-        mapContainer.innerHTML = ''; // Limpa o contêiner de fases
-        svgContainer.innerHTML = ''; // Limpa as linhas SVG
-
+        mapContainer.innerHTML = ''; // Limpa o mapa para recriar
         const start = page * phasesPerPage;
         const end = Math.min(start + phasesPerPage, activities.length);
-        
+
+        // Carregar as fases da página atual
         activities.slice(start, end).forEach((activity, index) => {
             const phaseDiv = document.createElement('div');
             phaseDiv.classList.add('phase');
@@ -54,7 +43,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const baseTopPosition = 200;
             let topPosition, horizontalPosition;
 
-            // Posição vertical
+            // Posição vertical dinâmica
             const randomVerticalGap = Math.random() * (30 - 20) + 20;
             topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
 
@@ -74,39 +63,9 @@ document.addEventListener('DOMContentLoaded', function() {
             phaseDiv.appendChild(phaseImage);
 
             mapContainer.appendChild(phaseDiv);
-
-            if (index === currentPhase % phasesPerPage) {
-                phaseDiv.classList.add('active');
-            } else if (index + start > currentPhase) {
-                phaseDiv.classList.add('locked');
-            }
-
-            phaseDiv.addEventListener('click', () => {
-                if (!phaseDiv.classList.contains('locked')) {
-                    moveToPhase(index + start, activity.path, index + start);
-                }
-            });
         });
 
-        // Recriar botões de navegação
         createNavigationButtons(page);
-    }
-
-    function moveToPhase(index, path = null, clickedIndex = null) {
-        const phase = document.querySelectorAll('.phase')[index % phasesPerPage];
-        const coords = phase.getBoundingClientRect();
-        document.querySelectorAll('.phase').forEach(phase => { phase.classList.remove('active'); });
-        phase.classList.add('active');
-
-        player.style.top = `${coords.top + window.scrollY + coords.height / 2}px`;
-        player.style.left = `${coords.left + window.scrollX + coords.width / 2}px`;
-        player.classList.add('moving');
-
-        if (path && clickedIndex !== null && clickedIndex < activities.length - 1) {
-            setTimeout(() => {
-                window.location.href = path;
-            }, 600);
-        }
     }
 
     function createNavigationButtons(page) {
@@ -135,36 +94,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function loadPage(page) {
         currentPage = page;
         createPhases(page);
-        drawLines(page);
     }
 
-    function drawLines(page) {
-        svgContainer.innerHTML = ''; // Limpa linhas existentes
-        const start = page * phasesPerPage;
-        const end = Math.min(start + phasesPerPage, activities.length);
-
-        for (let i = start; i < end - 1; i++) {
-            const phase1 = document.querySelectorAll('.phase')[i % phasesPerPage];
-            const phase2 = document.querySelectorAll('.phase')[i % phasesPerPage + 1];
-            const coords1 = phase1.getBoundingClientRect();
-            const coords2 = phase2.getBoundingClientRect();
-
-            const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
-            const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150;
-            const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
-            const controlPointY2 = coords2.top - 150;
-
-            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
-                       C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
-                       ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
-            path.setAttribute('d', d);
-            path.setAttribute('class', `path path-blue`);
-            svgContainer.appendChild(path);
-        }
-    }
-
-    createPlayer();
     loadPage(currentPage);
-    window.addEventListener('resize', () => drawLines(currentPage));
 });
