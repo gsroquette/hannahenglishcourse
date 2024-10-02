@@ -30,7 +30,6 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentPage = 0;
     const phasesPerPage = 6;
 
-    // Função para criar as fases e exibir por página
     function createPhases(page) {
         const titleContainer = document.querySelector('.title-container');
         
@@ -75,12 +74,10 @@ document.addEventListener('DOMContentLoaded', function() {
         drawLines(start, end); // Redesenha as linhas entre as fases da página
     }
 
-    // Função para criar os botões de navegação (Next/Previous)
     function createNavigationButtons(page) {
         const buttonContainer = document.createElement('div');
         buttonContainer.classList.add('button-container');
 
-        // Estilos para centralizar e fixar os botões na parte inferior
         buttonContainer.style.position = 'absolute';
         buttonContainer.style.bottom = '20px';
         buttonContainer.style.left = '50%';
@@ -105,13 +102,11 @@ document.addEventListener('DOMContentLoaded', function() {
         mapContainer.appendChild(buttonContainer);
     }
 
-    // Função para carregar a página com as fases específicas
     function loadPage(page) {
         currentPage = page;
         createPhases(page);
     }
 
-    // Função para desenhar as linhas entre as fases da página atual
     function drawLines(start, end) {
         svgContainer.innerHTML = ''; // Limpa as linhas anteriores
 
@@ -134,11 +129,13 @@ document.addEventListener('DOMContentLoaded', function() {
                            ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
                 path.setAttribute('d', d);
                 path.setAttribute('class', `path path-blue`);
+                path.style.stroke = "blue";
+                path.style.strokeWidth = "4";
+                path.style.fill = "none";
                 svgContainer.appendChild(path);
             }
         }
     }
 
-    // Inicia carregando a primeira página
-    loadPage(currentPage);
+    loadPage(currentPage);  // Carrega a primeira página
 });
