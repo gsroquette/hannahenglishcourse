@@ -75,8 +75,8 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.phase').forEach(phase => { phase.classList.remove('active'); });
         phase.classList.add('active');
 
-        player.style.top = `${coords.top + window.scrollY + coords.height / 2 - player.offsetHeight / 2}px`;
-        player.style.left = `${coords.left + window.scrollX + coords.width / 2 - player.offsetWidth / 2}px`;
+        player.style.top = `${coords.top + window.pageYOffset + coords.height / 2 - player.offsetHeight / 2}px`;
+        player.style.left = `${coords.left + window.pageXOffset + coords.width / 2 - player.offsetWidth / 2}px`;
 
         if (path) {
             setTimeout(() => {
@@ -96,10 +96,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 const startCoords = phase.getBoundingClientRect();
                 const endCoords = phases[index + 1].getBoundingClientRect();
 
-                const startX = startCoords.left + startCoords.width / 2 + window.scrollX;
-                const startY = startCoords.top + startCoords.height / 2 + window.scrollY;
-                const endX = endCoords.left + endCoords.width / 2 + window.scrollX;
-                const endY = endCoords.top + endCoords.height / 2 + window.scrollY;
+                const startX = startCoords.left + startCoords.width / 2 + window.pageXOffset;
+                const startY = startCoords.top + startCoords.height / 2 + window.pageYOffset;
+                const endX = endCoords.left + endCoords.width / 2 + window.pageXOffset;
+                const endY = endCoords.top + endCoords.height / 2 + window.pageYOffset;
 
                 // Ajustando os pontos de controle para garantir uma curva mais precisa
                 const controlX1 = (startX + endX) / 2 - 100; // Mais afastado para sinuosidade
@@ -127,3 +127,5 @@ document.addEventListener('DOMContentLoaded', function() {
     // Recalcular e redesenhar as linhas ao redimensionar a janela
     window.addEventListener('resize', drawCurvedLines);
 });
+
+   
