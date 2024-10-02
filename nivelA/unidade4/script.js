@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 23, name: "MatchingGame", path: "../unidade2/MatchingGame/index.html", img: "../../imagens/botoes/matching_game_button.png" }
     ];
 
- 
+
     const mapContainer = document.getElementById('mapContainer');
     const svgContainer = document.getElementById('linesSvg');
     let currentPage = 0;
@@ -107,52 +107,53 @@ document.addEventListener('DOMContentLoaded', function() {
         currentPage = page;
         createPhases(page);
     }
-function drawLines() {
-    svgContainer.innerHTML = ''; // Limpa as linhas anteriores
 
-    const phases = document.querySelectorAll('.phase');
-    const mapRect = mapContainer.getBoundingClientRect(); // Coordenadas do contêiner do mapa
+    function drawLines() {
+        svgContainer.innerHTML = ''; // Limpa as linhas anteriores
 
-    for (let i = 0; i < phases.length - 1; i++) {
-        const phase1 = phases[i];
-        const phase2 = phases[i + 1];
+        const phases = document.querySelectorAll('.phase');
+        const mapRect = mapContainer.getBoundingClientRect(); // Coordenadas do contêiner do mapa
 
-        if (phase1 && phase2) {
-            const coords1 = phase1.getBoundingClientRect();
-            const coords2 = phase2.getBoundingClientRect();
+        for (let i = 0; i < phases.length - 1; i++) {
+            const phase1 = phases[i];
+            const phase2 = phases[i + 1];
 
-            // Exibir as coordenadas detalhadas no console
-            console.log(`Phase ${i} - coords1:`, coords1);
-            console.log(`Phase ${i+1} - coords2:`, coords2);
+            if (phase1 && phase2) {
+                const coords1 = phase1.getBoundingClientRect();
+                const coords2 = phase2.getBoundingClientRect();
 
-            // Ajusta as coordenadas em relação ao contêiner do mapa
-            const startX = coords1.left + coords1.width / 2 - mapRect.left;
-            const startY = coords1.top + coords1.height / 2 - mapRect.top;
-            const endX = coords2.left + coords2.width / 2 - mapRect.left;
-            const endY = coords2.top + coords2.height / 2 - mapRect.top;
+                // Exibir as coordenadas detalhadas no console
+                console.log(`Phase ${i} - coords1:`, coords1);
+                console.log(`Phase ${i+1} - coords2:`, coords2);
 
-            console.log(`Drawing line from (${startX}, ${startY}) to (${endX}, ${endY})`);
+                // Ajusta as coordenadas em relação ao contêiner do mapa
+                const startX = coords1.left + coords1.width / 2 - mapRect.left;
+                const startY = coords1.top + coords1.height / 2 - mapRect.top;
+                const endX = coords2.left + coords2.width / 2 - mapRect.left;
+                const endY = coords2.top + coords2.height / 2 - mapRect.top;
 
-            const controlPointX1 = startX + (endX - startX) * 0.33;
-            const controlPointY1 = startY + (endY - startY) * 0.33 + 150;
-            const controlPointX2 = startX + (endX - startX) * 0.66;
-            const controlPointY2 = endY - 150;
+                console.log(`Drawing line from (${startX}, ${startY}) to (${endX}, ${endY})`);
 
-            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const d = `M ${startX} ${startY} 
-                       C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
-                       ${endX} ${endY}`;
-            console.log(`SVG path d attribute:`, d);
+                const controlPointX1 = startX + (endX - startX) * 0.33;
+                const controlPointY1 = startY + (endY - startY) * 0.33 + 150;
+                const controlPointX2 = startX + (endX - startX) * 0.66;
+                const controlPointY2 = endY - 150;
 
-            path.setAttribute('d', d);
-            path.setAttribute('class', `path path-blue`);
-            path.style.stroke = "blue";
-            path.style.strokeWidth = "4";
-            path.style.fill = "none";
-            svgContainer.appendChild(path);
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                const d = `M ${startX} ${startY} 
+                           C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
+                           ${endX} ${endY}`;
+                console.log(`SVG path d attribute:`, d);
+
+                path.setAttribute('d', d);
+                path.setAttribute('class', `path path-blue`);
+                path.style.stroke = "blue";
+                path.style.strokeWidth = "4";
+                path.style.fill = "none";
+                svgContainer.appendChild(path);
+            }
         }
     }
-}
 
     loadPage(currentPage);  // Carrega a primeira página
 });
