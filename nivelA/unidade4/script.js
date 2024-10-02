@@ -158,4 +158,3 @@ document.addEventListener('DOMContentLoaded', function() {
     loadPage(currentPage);  // Carrega a primeira página
 });
 
-  
