@@ -25,7 +25,6 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 23, name: "MatchingGame", path: "../unidade2/MatchingGame/index.html", img: "../../imagens/botoes/matching_game_button.png" }
     ];
 
-
     const mapContainer = document.getElementById('mapContainer');
     const svgContainer = document.getElementById('linesSvg');
     let currentPhase = 0;
@@ -49,7 +48,8 @@ document.addEventListener('DOMContentLoaded', function() {
         return distance < minDistance;
     }
 
-    activities.forEach((activity, index) => {
+    // Exibir apenas 5 fases
+    activities.slice(0, 5).forEach((activity, index) => { // Alterado para limitar a 5 fases
         const phaseDiv = document.createElement('div');
         phaseDiv.classList.add('phase');
 
@@ -192,7 +192,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function drawLines() {
         svgContainer.innerHTML = '';
-        for (let i = 0; i < activities.length - 1; i++) {
+        for (let i = 0; i < activities.length - 1 && i < 5; i++) {  // Desenha apenas 5 linhas (conectando as 5 fases)
             const phase1 = document.querySelectorAll('.phase')[i];
             const phase2 = document.querySelectorAll('.phase')[i + 1];
             const coords1 = phase1.getBoundingClientRect();
