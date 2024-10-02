@@ -49,8 +49,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return distance < minDistance;
     }
 
-      // Exibir apenas 5 fases
-    activities.slice(0, 5).forEach((activity, index) => {
+    activities.forEach((activity, index) => {
         const phaseDiv = document.createElement('div');
         phaseDiv.classList.add('phase');
 
