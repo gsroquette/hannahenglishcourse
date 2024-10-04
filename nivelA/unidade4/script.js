@@ -1,10 +1,10 @@
 document.addEventListener('DOMContentLoaded', function() {
     const activities = [
-        { id: 1, name: "StoryCards", path: "../unidade2/StoryCards/index.html", img: "../../imagens/botoes/storycards_button.png" },
-        { id: 2, name: "Flashcards", path: "../unidade2/Flashcards/index.html", img: "../../imagens/botoes/flashcards_button.png" },
-        { id: 3, name: "Flashcards2", path: "../unidade2/Flashcards2/index.html", img: "../../imagens/botoes/flashcards_button.png" },
-        { id: 4, name: "Flashcards3", path: "../unidade2/Flashcards3/index.html", img: "../../imagens/botoes/flashcards_button.png" },
-        { id: 8, name: "QUIZ", path: "../unidade2/QUIZ/index.html", img: "../../imagens/botoes/quiz_button.png" },
+        { id: 1, name: "StoryCards", path: "../unidade2/StoryCards/index.html", img: "../../imagens/botoes/storycards_button.png", unlocked: false },
+        { id: 2, name: "Flashcards", path: "../unidade2/Flashcards/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+        { id: 3, name: "Flashcards2", path: "../unidade2/Flashcards2/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+        { id: 4, name: "Flashcards3", path: "../unidade2/Flashcards3/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+        { id: 8, name: "QUIZ", path: "../unidade2/QUIZ/index.html", img: "../../imagens/botoes/quiz_button.png", unlocked: false },
     ];
 
     const mapContainer = document.getElementById('mapContainer');
@@ -103,67 +103,84 @@ document.addEventListener('DOMContentLoaded', function() {
                 unlockNextPhase(clickedIndex, path);
                 updateLineColor(clickedIndex);
             }, 600);
+        } else if (path) {
+            // Abrir a fase se não houver próxima fase para desbloquear
+            setTimeout(() => {
+                window.location.href = path;
+            }, 600);
         }
     }
 
     function unlockNextPhase(index, path) {
         if (index < activities.length - 1) {
             const nextPhase = document.querySelectorAll('.phase')[index + 1];
-            nextPhase.classList.remove('locked');
-            nextPhase.classList.add('unlocked');
+            const nextActivity = activities[index + 1];
 
-            const lockIcon = mapContainer.querySelector('.lock-icon');
-            if (lockIcon) {
-                lockIcon.remove();
-            }
+            if (!nextActivity.unlocked) {
+                nextActivity.unlocked = true; // Marcar a fase como desbloqueada
 
-            const nextPhaseCoords = nextPhase.getBoundingClientRect();
+                nextPhase.classList.remove('locked');
+                nextPhase.classList.add('unlocked');
 
-            window.scrollTo({
-                top: nextPhaseCoords.top + window.scrollY - window.innerHeight / 2,
-                left: nextPhaseCoords.left + window.scrollX - window.innerWidth / 2,
-                behavior: 'smooth'
-            });
+                const lockIcon = mapContainer.querySelector('.lock-icon');
+                if (lockIcon) {
+                    lockIcon.remove();
+                }
 
-            setTimeout(() => {
-                const zoomFactor = 1.5;
-                const zoomX = nextPhaseCoords.left + window.scrollX + nextPhaseCoords.width / 2;
-                const zoomY = nextPhaseCoords.top + window.scrollY + nextPhaseCoords.height / 2;
+                const nextPhaseCoords = nextPhase.getBoundingClientRect();
 
-                mapContainer.style.transformOrigin = `${zoomX}px ${zoomY}px`;
-                mapContainer.style.transform = `scale(${zoomFactor})`;
-                mapContainer.style.transition = 'transform 1s ease';
+                window.scrollTo({
+                    top: nextPhaseCoords.top + window.scrollY - window.innerHeight / 2,
+                    left: nextPhaseCoords.left + window.scrollX - window.innerWidth / 2,
+                    behavior: 'smooth'
+                });
 
                 setTimeout(() => {
-                    const unlockGif = document.createElement('img');
-                    unlockGif.src = '../../imagens/cadeado.gif'; 
-                    unlockGif.classList.add('unlock-gif');
-                    nextPhase.appendChild(unlockGif);
+                    const zoomFactor = 1.5;
+                    const zoomX = nextPhaseCoords.left + window.scrollX + nextPhaseCoords.width / 2;
+                    const zoomY = nextPhaseCoords.top + window.scrollY + nextPhaseCoords.height / 2;
 
-                    unlockGif.style.position = 'absolute';
-                    unlockGif.style.top = '50%';
-                    unlockGif.style.left = '50%';
-                    unlockGif.style.transform = 'translate(-50%, -50%)';
+                    mapContainer.style.transformOrigin = `${zoomX}px ${zoomY}px`;
+                    mapContainer.style.transform = `scale(${zoomFactor})`;
+                    mapContainer.style.transition = 'transform 1s ease';
 
                     setTimeout(() => {
-                        unlockGif.remove();
-                        mapContainer.style.transform = 'scale(1)';
+                        const unlockGif = document.createElement('img');
+                        unlockGif.src = '../../imagens/cadeado.gif'; 
+                        unlockGif.classList.add('unlock-gif');
+                        nextPhase.appendChild(unlockGif);
+
+                        unlockGif.style.position = 'absolute';
+                        unlockGif.style.top = '50%';
+                        unlockGif.style.left = '50%';
+                        unlockGif.style.transform = 'translate(-50%, -50%)';
 
                         setTimeout(() => {
-                            const clickedPhase = document.querySelectorAll('.phase')[index];
-                            const clickedCoords = clickedPhase.getBoundingClientRect();
-                            window.scrollTo({
-                                top: clickedCoords.top + window.scrollY - window.innerHeight / 2,
-                                behavior: 'smooth'
-                            });
+                            unlockGif.remove();
+                            mapContainer.style.transform = 'scale(1)';
 
                             setTimeout(() => {
-                                window.location.href = path;
-                            }, 600);
-                        }, 1000);
-                    }, 3000);
-                }, 1000);
-            }, 600);
+                                const clickedPhase = document.querySelectorAll('.phase')[index];
+                                const clickedCoords = clickedPhase.getBoundingClientRect();
+                                window.scrollTo({
+                                    top: clickedCoords.top + window.scrollY - window.innerHeight / 2,
+                                    behavior: 'smooth'
+                                });
+
+                                setTimeout(() => {
+                                    window.location.href = path;
+                                }, 600);
+                            }, 1000);
+                        }, 3000);
+                    }, 1000);
+                }, 600);
+            } else {
+                // Se a fase já estiver desbloqueada, apenas abrir a fase atual
+                window.location.href = path;
+            }
+        } else {
+            // Se não houver próxima fase, apenas abrir a fase atual
+            window.location.href = path;
         }
     }
 
