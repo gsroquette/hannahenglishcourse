@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 2, name: "Flashcards", path: "../unidade2/Flashcards/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
         { id: 3, name: "Flashcards2", path: "../unidade2/Flashcards2/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
         { id: 4, name: "Flashcards3", path: "../unidade2/Flashcards3/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-        { id: 5, name: "QUIZ", path: "../unidade2/QUIZ/index.html", img: "../../imagens/botoes/quiz_button.png", unlocked: false },
+        { id: 8, name: "QUIZ", path: "../unidade2/QUIZ/index.html", img: "../../imagens/botoes/quiz_button.png", unlocked: false },
     ];
 
     const mapContainer = document.getElementById('mapContainer');
@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentPhase = 0;
     let player;
 
+    // Função para criar o bonequinho (player)
     function createPlayer() {
         player = document.createElement('img');
         player.src = '../../imagens/bonequinho.png'; 
@@ -20,6 +21,7 @@ document.addEventListener('DOMContentLoaded', function() {
         moveToPhase(currentPhase);
     }
 
+    // Movimenta o bonequinho para a fase selecionada
     function moveToPhase(index) {
         const phase = document.querySelectorAll('.phase')[index];
         const coords = phase.getBoundingClientRect();
@@ -35,7 +37,7 @@ document.addEventListener('DOMContentLoaded', function() {
         activities.forEach((activity, index) => {
             const phaseCompleted = localStorage.getItem(`phase_${index}_completed`);
             if (phaseCompleted && !activity.unlocked) {
-                unlockNextPhase(index);
+                unlockNextPhase(index);  // Desbloqueia a fase se a anterior foi concluída
             }
         });
     }
@@ -64,6 +66,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const phaseDiv = document.createElement('div');
         phaseDiv.classList.add('phase');
 
+        // Define a posição das fases no mapa
         const baseTopPosition = 200;
         const randomVerticalGap = Math.random() * (30 - 20) + 20;
         let topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
@@ -72,12 +75,14 @@ document.addEventListener('DOMContentLoaded', function() {
         phaseDiv.style.top = `${topPosition}px`;
         phaseDiv.style.left = `${horizontalPosition}`;
 
+        // Adiciona a imagem da fase
         const phaseImage = document.createElement('img');
         phaseImage.src = activity.img;
         phaseImage.alt = activity.name;
         phaseImage.classList.add('phase-img');
         phaseDiv.appendChild(phaseImage);
 
+        // Bloqueia as fases não desbloqueadas
         if (!activity.unlocked) {
             phaseDiv.classList.add('locked');
             const lockIcon = document.createElement('img');
@@ -88,21 +93,21 @@ document.addEventListener('DOMContentLoaded', function() {
             lockIcon.style.left = `${horizontalPosition}`;
         }
 
-        mapContainer.appendChild(phaseDiv);
-
-        // Evento de clique na fase para ir para a fase
+        // Adiciona o evento de clique para entrar na fase
         phaseDiv.addEventListener('click', () => {
             if (!phaseDiv.classList.contains('locked')) {
                 moveToPhase(index);
                 setTimeout(() => {
-                    window.location.href = activity.path;
+                    window.location.href = activity.path;  // Redireciona para a fase
                 }, 600);
             }
         });
+
+        mapContainer.appendChild(phaseDiv);
     });
 
-    createPlayer();
-    checkPhaseCompletion(); // Verifica se a fase anterior foi concluída ao carregar o mapa
+    createPlayer();  // Cria o bonequinho no mapa
+    checkPhaseCompletion();  // Verifica o progresso ao carregar o mapa
 
     // Desenha as linhas entre as fases
     function drawLines() {
@@ -123,6 +128,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    drawLines();
-    window.addEventListener('resize', drawLines);
+    drawLines();  // Desenha as linhas iniciais
+    window.addEventListener('resize', drawLines);  // Redesenha as linhas ao redimensionar a tela
 });
