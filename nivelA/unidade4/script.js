@@ -34,10 +34,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Verifica o progresso ao retornar ao mapa
     function checkPhaseCompletion() {
+        console.log('Verificando se as fases foram completadas...');
         activities.forEach((activity, index) => {
             const phaseCompleted = localStorage.getItem(`phase_${index}_completed`);
-            if (phaseCompleted && !activity.unlocked) {
-                unlockNextPhase(index);  // Desbloqueia a fase se a anterior foi concluída
+            if (phaseCompleted) {
+                console.log(`Fase ${index} foi completada. Tentando desbloquear a próxima fase.`);
+                unlockNextPhase(index);
             }
         });
     }
@@ -58,15 +60,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (lockIcon) {
                     lockIcon.remove();
                 }
+
+                console.log('Próxima fase desbloqueada:', nextActivity.name);
             }
         }
     }
 
+    // Configurações iniciais
     activities.forEach((activity, index) => {
         const phaseDiv = document.createElement('div');
         phaseDiv.classList.add('phase');
 
-        // Define a posição das fases no mapa
         const baseTopPosition = 200;
         const randomVerticalGap = Math.random() * (30 - 20) + 20;
         let topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
@@ -75,14 +79,12 @@ document.addEventListener('DOMContentLoaded', function() {
         phaseDiv.style.top = `${topPosition}px`;
         phaseDiv.style.left = `${horizontalPosition}`;
 
-        // Adiciona a imagem da fase
         const phaseImage = document.createElement('img');
         phaseImage.src = activity.img;
         phaseImage.alt = activity.name;
         phaseImage.classList.add('phase-img');
         phaseDiv.appendChild(phaseImage);
 
-        // Bloqueia as fases não desbloqueadas
         if (!activity.unlocked) {
             phaseDiv.classList.add('locked');
             const lockIcon = document.createElement('img');
@@ -93,7 +95,6 @@ document.addEventListener('DOMContentLoaded', function() {
             lockIcon.style.left = `${horizontalPosition}`;
         }
 
-        // Adiciona o evento de clique para entrar na fase
         phaseDiv.addEventListener('click', () => {
             if (!phaseDiv.classList.contains('locked')) {
                 moveToPhase(index);
