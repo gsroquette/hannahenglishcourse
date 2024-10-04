@@ -4,14 +4,12 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 2, name: "Flashcards", path: "../unidade2/Flashcards/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false, completed: false },
         { id: 3, name: "Flashcards2", path: "../unidade2/Flashcards2/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false, completed: false },
         { id: 4, name: "Flashcards3", path: "../unidade2/Flashcards3/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false, completed: false },
-        { id: 5, name: "QUIZ", path: "../unidade2/QUIZ/index.html", img: "../../imagens/botoes/quiz_button.png", unlocked: false, completed: false },
+        { id: 8, name: "QUIZ", path: "../unidade2/QUIZ/index.html", img: "../../imagens/botoes/quiz_button.png", unlocked: false, completed: false },
     ];
 
     const mapContainer = document.getElementById('mapContainer');
-    const svgContainer = document.getElementById('linesSvg');
     let currentPhase = 0;
     let player;
-    let positionLeft = true;
 
     function createPlayer() {
         player = document.createElement('img');
@@ -21,121 +19,80 @@ document.addEventListener('DOMContentLoaded', function() {
         moveToPhase(currentPhase);
     }
 
-    function loadPhases() {
-        // Limpar fases anteriores, se existirem
-        mapContainer.innerHTML = '';
-
-        activities.forEach((activity, index) => {
-            const phaseDiv = document.createElement('div');
-            phaseDiv.classList.add('phase');
-
-            const baseTopPosition = 200;
-            let topPosition, horizontalPosition;
-
-            const randomVerticalGap = Math.random() * (30 - 20) + 20;
-            topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
-
-            if (positionLeft) {
-                horizontalPosition = Math.random() * (20 - 5) + 5;
-            } else {
-                horizontalPosition = Math.random() * (95 - 80) + 80;
-            }
-
-            positionLeft = !positionLeft;
-
-            phaseDiv.style.top = `${topPosition}px`;
-            phaseDiv.style.left = `${horizontalPosition}%`;
-
-            const phaseImage = document.createElement('img');
-            phaseImage.src = activity.img;
-            phaseImage.alt = activity.name;
-            phaseImage.classList.add('phase-img');
-            phaseDiv.appendChild(phaseImage);
-
-            mapContainer.appendChild(phaseDiv);
-
-            if (activity.unlocked || index === currentPhase) {
-                phaseDiv.classList.add('active');
-            } else if (!activity.unlocked && !activity.completed) {
-                phaseDiv.classList.add('locked');
-                const lockIcon = document.createElement('img');
-                lockIcon.src = '../../imagens/lock_icon_resized.png';
-                lockIcon.classList.add('lock-icon');
-                mapContainer.appendChild(lockIcon);
-                lockIcon.style.top = `${topPosition}px`;
-                lockIcon.style.left = `${horizontalPosition}%`;
-            }
-
-            phaseDiv.addEventListener('click', () => {
-                if (!phaseDiv.classList.contains('locked')) {
-                    enterPhase(index, activity.path);
-                }
-            });
-        });
-        drawLines(); // Garantir que as linhas também sejam desenhadas
-    }
-
-    function enterPhase(index, path) {
+    function moveToPhase(index, path = null, clickedIndex = null) {
         const phase = document.querySelectorAll('.phase')[index];
         const coords = phase.getBoundingClientRect();
+        document.querySelectorAll('.phase').forEach(phase => { phase.classList.remove('active'); });
+        phase.classList.add('active');
 
         player.style.top = `${coords.top + window.scrollY + coords.height / 2}px`;
         player.style.left = `${coords.left + window.scrollX + coords.width / 2}px`;
         player.classList.add('moving');
 
-        // Depois de mover o boneco, redirecionar para a fase
-        setTimeout(() => {
-            window.location.href = path;
-        }, 600);
+        const phaseInView = phase.getBoundingClientRect().top >= 0 && phase.getBoundingClientRect().bottom <= window.innerHeight;
+        if (!phaseInView) {
+            window.scrollTo({
+                top: coords.top + window.scrollY - window.innerHeight / 2,
+                behavior: 'smooth'
+            });
+        }
+
+        if (path) {
+            // Abrir a fase atual e esperar a conclusão
+            setTimeout(() => {
+                window.location.href = path;
+            }, 600);
+        }
     }
 
     function unlockNextPhase() {
-        if (currentPhase < activities.length - 1 && !activities[currentPhase + 1].unlocked) {
-            activities[currentPhase + 1].unlocked = true;
-            console.log(`Fase ${currentPhase + 2} desbloqueada!`);
+        if (currentPhase < activities.length - 1) {
+            const nextActivity = activities[currentPhase + 1];
+            nextActivity.unlocked = true;
+
+            const nextPhase = document.querySelectorAll('.phase')[currentPhase + 1];
+            nextPhase.classList.remove('locked');
+            nextPhase.classList.add('unlocked');
         }
     }
 
-    function checkIfReturning() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const completedPhase = urlParams.get('completedPhase');
-
-        if (completedPhase) {
-            activities[completedPhase].completed = true;
-            currentPhase = parseInt(completedPhase);
-
+    function checkCompletion() {
+        // Verificar se a fase foi completada quando o jogador retorna ao mapa
+        const savedPhase = parseInt(localStorage.getItem('completedPhase')) || 0;
+        if (savedPhase > currentPhase) {
+            currentPhase = savedPhase;
             unlockNextPhase();
-            loadPhases();
-        } else {
-            // Carregar fases inicialmente
-            loadPhases();
         }
     }
 
-    function drawLines() {
-        svgContainer.innerHTML = '';
-        for (let i = 0; i < activities.length - 1; i++) {
-            const phase1 = document.querySelectorAll('.phase')[i];
-            const phase2 = document.querySelectorAll('.phase')[i + 1];
-            const coords1 = phase1.getBoundingClientRect();
-            const coords2 = phase2.getBoundingClientRect();
+    activities.forEach((activity, index) => {
+        const phaseDiv = document.createElement('div');
+        phaseDiv.classList.add('phase');
+        
+        const phaseImage = document.createElement('img');
+        phaseImage.src = activity.img;
+        phaseImage.alt = activity.name;
+        phaseImage.classList.add('phase-img');
+        phaseDiv.appendChild(phaseImage);
 
-            const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
-            const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150;
-            const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
-            const controlPointY2 = coords2.top - 150;
-
-            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
-                       C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
-                       ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
-            path.setAttribute('d', d);
-            path.setAttribute('class', `path path-blue`);
-            svgContainer.appendChild(path);
+        if (!activity.unlocked) {
+            phaseDiv.classList.add('locked');
         }
-    }
+
+        mapContainer.appendChild(phaseDiv);
+
+        phaseDiv.addEventListener('click', () => {
+            if (!phaseDiv.classList.contains('locked')) {
+                moveToPhase(index, activity.path, index);
+            }
+        });
+    });
 
     createPlayer();
-    checkIfReturning(); // Verifica se o jogador está retornando e desbloqueia a próxima fase
-    window.addEventListener('resize', drawLines);
+    checkCompletion();
+    
+    window.addEventListener('beforeunload', function() {
+        // Salvar o progresso quando o jogador sai da fase atual
+        localStorage.setItem('completedPhase', currentPhase);
+    });
 });
