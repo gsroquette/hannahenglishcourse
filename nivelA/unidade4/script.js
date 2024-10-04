@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', function() {
     const activities = [
-        { id: 1, name: "StoryCards", path: "../unidade2/StoryCards/index.html", img: "../../imagens/botoes/storycards_button.png", unlocked: true },  // Primeira fase desbloqueada
+        { id: 1, name: "StoryCards", path: "../unidade2/StoryCards/index.html", img: "../../imagens/botoes/storycards_button.png", unlocked: true },  // Primeira fase já desbloqueada
         { id: 2, name: "Flashcards", path: "../unidade2/Flashcards/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
         { id: 3, name: "Flashcards2", path: "../unidade2/Flashcards2/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
         { id: 4, name: "Flashcards3", path: "../unidade2/Flashcards3/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
@@ -30,17 +30,17 @@ document.addEventListener('DOMContentLoaded', function() {
         player.style.left = `${coords.left + window.scrollX + coords.width / 2}px`;
     }
 
-    // Função para checar o progresso ao retornar ao mapa
+    // Verifica o progresso ao retornar ao mapa
     function checkPhaseCompletion() {
         activities.forEach((activity, index) => {
             const phaseCompleted = localStorage.getItem(`phase_${index}_completed`);
             if (phaseCompleted && !activity.unlocked) {
-                unlockNextPhase(index - 1);
+                unlockNextPhase(index);
             }
         });
     }
 
-    // Função para desbloquear a próxima fase
+    // Desbloqueia a próxima fase
     function unlockNextPhase(index) {
         if (index < activities.length - 1) {
             const nextPhase = document.querySelectorAll('.phase')[index + 1];
@@ -65,7 +65,8 @@ document.addEventListener('DOMContentLoaded', function() {
         phaseDiv.classList.add('phase');
 
         const baseTopPosition = 200;
-        let topPosition = baseTopPosition + index * 15;
+        const randomVerticalGap = Math.random() * (30 - 20) + 20;
+        let topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
         let horizontalPosition = (index % 2 === 0) ? '20%' : '80%';
 
         phaseDiv.style.top = `${topPosition}px`;
@@ -88,10 +89,20 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         mapContainer.appendChild(phaseDiv);
+
+        // Evento de clique na fase para ir para a fase
+        phaseDiv.addEventListener('click', () => {
+            if (!phaseDiv.classList.contains('locked')) {
+                moveToPhase(index);
+                setTimeout(() => {
+                    window.location.href = activity.path;
+                }, 600);
+            }
+        });
     });
 
     createPlayer();
-    checkPhaseCompletion();
+    checkPhaseCompletion(); // Verifica se a fase anterior foi concluída ao carregar o mapa
 
     // Desenha as linhas entre as fases
     function drawLines() {
