@@ -1,17 +1,16 @@
 document.addEventListener('DOMContentLoaded', function() {
     const activities = [
-        { id: 1, name: "StoryCards", path: "../unidade2/StoryCards/index.html", img: "../../imagens/botoes/storycards_button.png", unlocked: false, completed: false },
+        { id: 1, name: "StoryCards", path: "../unidade2/StoryCards/index.html", img: "../../imagens/botoes/storycards_button.png", unlocked: true, completed: false },
         { id: 2, name: "Flashcards", path: "../unidade2/Flashcards/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false, completed: false },
         { id: 3, name: "Flashcards2", path: "../unidade2/Flashcards2/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false, completed: false },
         { id: 4, name: "Flashcards3", path: "../unidade2/Flashcards3/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false, completed: false },
-        { id: 8, name: "QUIZ", path: "../unidade2/QUIZ/index.html", img: "../../imagens/botoes/quiz_button.png", unlocked: false, completed: false },
+        { id: 5, name: "QUIZ", path: "../unidade2/QUIZ/index.html", img: "../../imagens/botoes/quiz_button.png", unlocked: false, completed: false },
     ];
 
     const mapContainer = document.getElementById('mapContainer');
     const svgContainer = document.getElementById('linesSvg');
     let currentPhase = 0;
     let player;
-    let previousPosition = null;
     let positionLeft = true;
 
     function createPlayer() {
@@ -22,8 +21,10 @@ document.addEventListener('DOMContentLoaded', function() {
         moveToPhase(currentPhase);
     }
 
-    // Carregar as fases e verificar se alguma fase foi completada
     function loadPhases() {
+        // Limpar fases anteriores, se existirem
+        mapContainer.innerHTML = '';
+
         activities.forEach((activity, index) => {
             const phaseDiv = document.createElement('div');
             phaseDiv.classList.add('phase');
@@ -53,10 +54,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
             mapContainer.appendChild(phaseDiv);
 
-            if (activity.completed) {
-                phaseDiv.classList.add('completed');
-            }
-
             if (activity.unlocked || index === currentPhase) {
                 phaseDiv.classList.add('active');
             } else if (!activity.unlocked && !activity.completed) {
@@ -75,9 +72,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         });
+        drawLines(); // Garantir que as linhas também sejam desenhadas
     }
 
-    // Função para entrar na fase
     function enterPhase(index, path) {
         const phase = document.querySelectorAll('.phase')[index];
         const coords = phase.getBoundingClientRect();
@@ -92,29 +89,25 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 600);
     }
 
-    // Função para liberar a próxima fase quando o jogador retornar ao mapa
     function unlockNextPhase() {
-        // A fase atual foi completada, desbloquear a próxima
         if (currentPhase < activities.length - 1 && !activities[currentPhase + 1].unlocked) {
             activities[currentPhase + 1].unlocked = true;
             console.log(`Fase ${currentPhase + 2} desbloqueada!`);
         }
     }
 
-    // Verifica se o jogador está retornando ao mapa
     function checkIfReturning() {
         const urlParams = new URLSearchParams(window.location.search);
         const completedPhase = urlParams.get('completedPhase');
 
         if (completedPhase) {
-            // Marcar a fase como concluída
             activities[completedPhase].completed = true;
             currentPhase = parseInt(completedPhase);
 
-            // Liberar a próxima fase
             unlockNextPhase();
-
-            // Carregar novamente as fases com a nova fase liberada
+            loadPhases();
+        } else {
+            // Carregar fases inicialmente
             loadPhases();
         }
     }
@@ -142,7 +135,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    drawLines();
     createPlayer();
     checkIfReturning(); // Verifica se o jogador está retornando e desbloqueia a próxima fase
     window.addEventListener('resize', drawLines);
