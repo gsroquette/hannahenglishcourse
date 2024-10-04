@@ -5,15 +5,14 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 3, name: "Flashcards2", path: "../unidade2/Flashcards2/index.html", img: "../../imagens/botoes/flashcards_button.png" },
         { id: 4, name: "Flashcards3", path: "../unidade2/Flashcards3/index.html", img: "../../imagens/botoes/flashcards_button.png" },
         { id: 8, name: "QUIZ", path: "../unidade2/QUIZ/index.html", img: "../../imagens/botoes/quiz_button.png" },
- ];
-
+    ];
 
     const mapContainer = document.getElementById('mapContainer');
     const svgContainer = document.getElementById('linesSvg');
     let currentPhase = 0;
     let player;
     let previousPosition = null;
-    let positionLeft = true;  // Inicia pela esquerda
+    let positionLeft = true;
 
     function createPlayer() {
         player = document.createElement('img');
@@ -38,23 +37,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const baseTopPosition = 200;
         let topPosition, horizontalPosition;
 
-        // Definindo a posição vertical
         const randomVerticalGap = Math.random() * (30 - 20) + 20;
         topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
 
-        // Alterna entre esquerda e direita
         if (positionLeft) {
-            // Posição aleatória à esquerda (entre 5% e 20%)
             horizontalPosition = Math.random() * (20 - 5) + 5;
         } else {
-            // Posição aleatória à direita (entre 80% e 95%)
             horizontalPosition = Math.random() * (95 - 80) + 80;
         }
 
-        // Alterna a posição para a próxima fase
         positionLeft = !positionLeft;
 
-        // Define as posições calculadas
         phaseDiv.style.top = `${topPosition}px`;
         phaseDiv.style.left = `${horizontalPosition}%`;
 
@@ -124,51 +117,53 @@ document.addEventListener('DOMContentLoaded', function() {
                 lockIcon.remove();
             }
 
-            // Scroll e zoom para a fase desbloqueada
             const nextPhaseCoords = nextPhase.getBoundingClientRect();
+
             window.scrollTo({
                 top: nextPhaseCoords.top + window.scrollY - window.innerHeight / 2,
                 left: nextPhaseCoords.left + window.scrollX - window.innerWidth / 2,
                 behavior: 'smooth'
             });
 
-            // Adiciona o zoom temporário
-            mapContainer.style.transform = 'scale(1.5)';
-            mapContainer.style.transition = 'transform 1s ease';
-
-            // Exibe o gif de cadeado sobre o círculo da fase desbloqueada
             setTimeout(() => {
-                const unlockGif = document.createElement('img');
-                unlockGif.src = '../../imagens/cadeado.gif'; // O GIF de cadeado
-                unlockGif.classList.add('unlock-gif');
-                nextPhase.appendChild(unlockGif); // Anexado ao círculo desbloqueado
+                const zoomFactor = 1.5;
+                const zoomX = nextPhaseCoords.left + window.scrollX + nextPhaseCoords.width / 2;
+                const zoomY = nextPhaseCoords.top + window.scrollY + nextPhaseCoords.height / 2;
 
-                unlockGif.style.position = 'absolute';
-                unlockGif.style.top = '50%';
-                unlockGif.style.left = '50%';
-                unlockGif.style.transform = 'translate(-50%, -50%)';
+                mapContainer.style.transformOrigin = `${zoomX}px ${zoomY}px`;
+                mapContainer.style.transform = `scale(${zoomFactor})`;
+                mapContainer.style.transition = 'transform 1s ease';
 
-                // Remove o GIF após 3 segundos e reseta o zoom
                 setTimeout(() => {
-                    unlockGif.remove();
-                    mapContainer.style.transform = 'scale(1)';
+                    const unlockGif = document.createElement('img');
+                    unlockGif.src = '../../imagens/cadeado.gif'; 
+                    unlockGif.classList.add('unlock-gif');
+                    nextPhase.appendChild(unlockGif);
 
-                    // Scroll de volta para a fase que será aberta
+                    unlockGif.style.position = 'absolute';
+                    unlockGif.style.top = '50%';
+                    unlockGif.style.left = '50%';
+                    unlockGif.style.transform = 'translate(-50%, -50%)';
+
                     setTimeout(() => {
-                        const clickedPhase = document.querySelectorAll('.phase')[index];
-                        const clickedCoords = clickedPhase.getBoundingClientRect();
-                        window.scrollTo({
-                            top: clickedCoords.top + window.scrollY - window.innerHeight / 2,
-                            behavior: 'smooth'
-                        });
+                        unlockGif.remove();
+                        mapContainer.style.transform = 'scale(1)';
 
-                        // Abre a fase (somente agora)
                         setTimeout(() => {
-                            window.location.href = path;
-                        }, 600);
-                    }, 1000);
-                }, 3000);
-            }, 1000);
+                            const clickedPhase = document.querySelectorAll('.phase')[index];
+                            const clickedCoords = clickedPhase.getBoundingClientRect();
+                            window.scrollTo({
+                                top: clickedCoords.top + window.scrollY - window.innerHeight / 2,
+                                behavior: 'smooth'
+                            });
+
+                            setTimeout(() => {
+                                window.location.href = path;
+                            }, 600);
+                        }, 1000);
+                    }, 3000);
+                }, 1000);
+            }, 600);
         }
     }
 
