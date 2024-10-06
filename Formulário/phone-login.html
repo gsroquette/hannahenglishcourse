@@ -3,88 +3,87 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Phone Login</title>
+    <title>Phone Login with Firebase</title>
     <!-- Incluindo o Firebase via CDN -->
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js"></script>
 </head>
 <body>
     <div id="login-box" style="text-align: center;">
-        <h2>Login with Phone</h2>
-        <input type="text" id="phoneNumber" placeholder="Phone Number">
+        <h2>Login with Phone Number</h2>
+        <input type="text" id="phoneNumber" placeholder="+1 555-555-5555" required>
         <br><br>
-        <button id="sendCode">Send Code</button>
+        <div id="recaptcha-container"></div>
         <br><br>
-        <input type="text" id="verificationCode" placeholder="Verification Code">
+        <button id="sendCode">Send Verification Code</button>
+        <br><br>
+        <input type="text" id="verificationCode" placeholder="Enter verification code" required>
         <br><br>
         <button id="verifyCode">Verify Code</button>
         <br><br>
-        <!-- Contêiner para o reCAPTCHA -->
-        <div id="recaptcha-container"></div>
     </div>
 
     <script>
-        // Certifique-se de que o Firebase está sendo inicializado corretamente após o carregamento da página
-        document.addEventListener("DOMContentLoaded", function() {
+        // Configurações do Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+            authDomain: "hannahenglishcourse.firebaseapp.com",
+            projectId: "hannahenglishcourse",
+            storageBucket: "hannahenglishcourse.appspot.com",
+            messagingSenderId: "449818788486",
+            appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+            measurementId: "G-07VVJG9LRS"
+        };
 
-            // Configurações do Firebase
-            const firebaseConfig = {
-                apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
-                authDomain: "hannahenglishcourse.firebaseapp.com",
-                projectId: "hannahenglishcourse",
-                storageBucket: "hannahenglishcourse.appspot.com",
-                messagingSenderId: "449818788486",
-                appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
-                measurementId: "G-07VVJG9LRS"
-            };
+        // Inicializando o Firebase
+        firebase.initializeApp(firebaseConfig);
 
-            // Inicializando o Firebase
-            firebase.initializeApp(firebaseConfig);
-
-            // Configurando reCAPTCHA
+        // Passo 1: Renderizando o reCAPTCHA quando o DOM estiver pronto
+        window.onload = function () {
             window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
-                'size': 'normal', // 'normal' para exibir o reCAPTCHA visível
+                'size': 'normal',
                 'callback': (response) => {
                     // reCAPTCHA resolvido
-                    console.log('reCAPTCHA resolvido');
+                    console.log('reCAPTCHA verificado');
                 },
                 'expired-callback': () => {
+                    // O reCAPTCHA expirou
                     console.log('reCAPTCHA expirado');
                 }
             });
 
             // Renderizando o reCAPTCHA
-            recaptchaVerifier.render().then(function(widgetId) {
-                window.recaptchaWidgetId = widgetId;
-            });
+            recaptchaVerifier.render();
+        };
 
-            // Função para enviar código SMS
-            document.getElementById('sendCode').addEventListener('click', function () {
-                var phoneNumber = document.getElementById('phoneNumber').value;
-                var appVerifier = window.recaptchaVerifier;
+        // Passo 2: Enviar código de verificação para o número de telefone
+        document.getElementById('sendCode').addEventListener('click', function () {
+            var phoneNumber = document.getElementById('phoneNumber').value;
+            var appVerifier = window.recaptchaVerifier;
 
-                firebase.auth().signInWithPhoneNumber(phoneNumber, appVerifier)
-                    .then(function (confirmationResult) {
-                        // Código SMS enviado
-                        window.confirmationResult = confirmationResult;
-                        alert('Código de verificação enviado!');
-                    }).catch(function (error) {
-                        console.error('Erro ao enviar código:', error);
-                        alert('Erro ao enviar o código de verificação: ' + error.message);
-                    });
-            });
-
-            // Função para verificar código
-            document.getElementById('verifyCode').addEventListener('click', function () {
-                var code = document.getElementById('verificationCode').value;
-                confirmationResult.confirm(code).then(function (result) {
-                    var user = result.user;
-                    alert('Código verificado, login bem-sucedido!');
-                    console.log('Login bem-sucedido:', user);
+            firebase.auth().signInWithPhoneNumber(phoneNumber, appVerifier)
+                .then(function (confirmationResult) {
+                    // Código SMS enviado
+                    window.confirmationResult = confirmationResult;
+                    alert('Código de verificação enviado!');
                 }).catch(function (error) {
-                    console.error('Erro ao verificar código:', error);
-                    alert('Erro ao verificar o código: ' + error.message);
+                    console.error('Erro ao enviar código:', error);
+                    alert('Erro ao enviar o código: ' + error.message);
                 });
+        });
+
+        // Passo 3: Verificar o código recebido
+        document.getElementById('verifyCode').addEventListener('click', function () {
+            var code = document.getElementById('verificationCode').value;
+
+            confirmationResult.confirm(code).then(function (result) {
+                // Verificação bem-sucedida
+                var user = result.user;
+                alert('Código verificado com sucesso! Bem-vindo, ' + user.phoneNumber);
+            }).catch(function (error) {
+                // Erro ao verificar o código
+                console.error('Erro ao verificar código:', error);
+                alert('Erro ao verificar o código: ' + error.message);
             });
         });
     </script>
