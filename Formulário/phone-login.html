@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login com Telefone</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f5f5f5;
+        }
+        .login-container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        .login-container h2 {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .login-container input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .login-container button {
+            width: 100%;
+            padding: 10px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .login-container button:hover {
+            background-color: #218838;
+        }
+        .message {
+            margin-top: 20px;
+            color: red;
+        }
+        #recaptcha-container {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h2>Login com Telefone</h2>
+        <div>
+            <input type="text" id="phoneNumber" placeholder="Número de Telefone" required>
+            <button id="sendCodeBtn">Enviar Código</button>
+        </div>
+
+        <div id="recaptcha-container"></div> <!-- reCAPTCHA vai aqui -->
+
+        <div style="margin-top: 20px;">
+            <input type="text" id="verificationCode" placeholder="Código de Verificação">
+            <button id="verifyCodeBtn">Verificar Código</button>
+        </div>
+
+        <div id="message" class="message"></div>
+    </div>
+
+    <script type="module">
+        // Importar o Firebase SDK
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-app.js";
+        import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-auth.js";
+
+        // Suas credenciais Firebase
+        const firebaseConfig = {
+            apiKey: "sua-api-key",
+            authDomain: "seu-projeto.firebaseapp.com",
+            projectId: "seu-project-id",
+            storageBucket: "seu-project-id.appspot.com",
+            messagingSenderId: "seu-messaging-id",
+            appId: "seu-app-id"
+        };
+
+        // Inicializar Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        // Configurar reCAPTCHA
+        const setupRecaptcha = () => {
+            window.recaptchaVerifier = new RecaptchaVerifier('recaptcha-container', {
+                'size': 'invisible',
+                'callback': (response) => {
+                    console.log('reCAPTCHA resolvido');
+                }
+            }, auth);
+        };
+
+        // Enviar código de verificação via SMS
+        const sendCode = () => {
+            const phoneNumber = document.getElementById('phoneNumber').value;
+            setupRecaptcha();
+            const appVerifier = window.recaptchaVerifier;
+
+            signInWithPhoneNumber(auth, phoneNumber, appVerifier)
+                .then((confirmationResult) => {
+                    window.confirmationResult = confirmationResult;
+                    document.getElementById('message').textContent = 'Código enviado. Verifique seu SMS.';
+                }).catch((error) => {
+                    console.error('Erro ao enviar o código:', error);
+                    document.getElementById('message').textContent = 'Erro ao enviar o código.';
+                });
+        };
+
+        // Verificar o código inserido pelo usuário
+        const verifyCode = () => {
+            const code = document.getElementById('verificationCode').value;
+            window.confirmationResult.confirm(code)
+                .then((result) => {
+                    const user = result.user;
+                    document.getElementById('message').textContent = 'Login bem-sucedido!';
+                    console.log('Usuário autenticado:', user);
+                }).catch((error) => {
+                    console.error('Erro ao verificar o código:', error);
+                    document.getElementById('message').textContent = 'Código incorreto.';
+                });
+        };
+
+        // Adicionar eventos aos botões
+        document.getElementById('sendCodeBtn').addEventListener('click', sendCode);
+        document.getElementById('verifyCodeBtn').addEventListener('click', verifyCode);
+    </script>
+</body>
+</html>
