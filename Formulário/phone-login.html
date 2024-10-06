@@ -94,23 +94,30 @@
         const analytics = getAnalytics(app);
         const auth = getAuth(app);
 
-        // Set up reCAPTCHA
+        // Function to setup reCAPTCHA
         const setupRecaptcha = () => {
-            window.recaptchaVerifier = new RecaptchaVerifier('recaptcha-container', {
-                'size': 'normal',  // Visible reCAPTCHA for testing
-                'callback': (response) => {
-                    console.log('reCAPTCHA solved');
-                }
-            }, auth);
-            recaptchaVerifier.render().then(function(widgetId) {
+            if (!window.recaptchaVerifier) {
+                window.recaptchaVerifier = new RecaptchaVerifier('recaptcha-container', {
+                    'size': 'normal',  // Visible reCAPTCHA for testing
+                    'callback': (response) => {
+                        console.log('reCAPTCHA solved');
+                    },
+                    'expired-callback': () => {
+                        console.log('reCAPTCHA expired');
+                    }
+                }, auth);
+            }
+            recaptchaVerifier.render().then((widgetId) => {
                 window.recaptchaWidgetId = widgetId;
+            }).catch((error) => {
+                console.error("reCAPTCHA error:", error);
             });
         };
 
         // Send verification code via SMS
         const sendCode = () => {
             const phoneNumber = document.getElementById('phoneNumber').value;
-            setupRecaptcha();  // Ensure reCAPTCHA is ready before sending the code
+            setupRecaptcha();
             const appVerifier = window.recaptchaVerifier;
 
             signInWithPhoneNumber(auth, phoneNumber, appVerifier)
