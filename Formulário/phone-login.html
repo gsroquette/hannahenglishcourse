@@ -58,95 +58,91 @@
         <h2>Login with Phone</h2>
         <div>
             <input type="text" id="phoneNumber" placeholder="Phone Number" required>
-            <button id="sendCodeBtn">Send Code</button>
+            <button id="sendCodeBtn" onclick="sendCode()">Send Code</button>
         </div>
 
         <div id="recaptcha-container"></div> <!-- reCAPTCHA will appear here -->
 
         <div style="margin-top: 20px;">
             <input type="text" id="verificationCode" placeholder="Verification Code">
-            <button id="verifyCodeBtn">Verify Code</button>
+            <button id="verifyCodeBtn" onclick="verifyCode()">Verify Code</button>
         </div>
 
         <div id="message" class="message"></div>
     </div>
 
     <!-- Firebase SDK and configuration -->
-    <script type="module">
-        // Import the functions you need from the SDKs you need
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
-        import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-analytics.js";
-        import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js";
+    <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js"></script>
 
-        // Your web app's Firebase configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
-            authDomain: "hannahenglishcourse.firebaseapp.com",
-            projectId: "hannahenglishcourse",
-            storageBucket: "hannahenglishcourse.appspot.com",
-            messagingSenderId: "449818788486",
-            appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
-            measurementId: "G-07VVJG9LRS"
-        };
-
+    <script>
         // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const analytics = getAnalytics(app);
-        const auth = getAuth(app);
-
-        // Function to setup reCAPTCHA
-        const setupRecaptcha = () => {
-            if (!window.recaptchaVerifier) {
-                window.recaptchaVerifier = new RecaptchaVerifier('recaptcha-container', {
-                    'size': 'normal',  // Visible reCAPTCHA for testing
-                    'callback': (response) => {
-                        console.log('reCAPTCHA solved');
-                    },
-                    'expired-callback': () => {
-                        console.log('reCAPTCHA expired');
-                    }
-                }, auth);
-            }
-            recaptchaVerifier.render().then((widgetId) => {
-                window.recaptchaWidgetId = widgetId;
-            }).catch((error) => {
-                console.error("reCAPTCHA error:", error);
-            });
+        const firebaseConfig = {
+          apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+          authDomain: "hannahenglishcourse.firebaseapp.com",
+          projectId: "hannahenglishcourse",
+          storageBucket: "hannahenglishcourse.appspot.com",
+          messagingSenderId: "449818788486",
+          appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+          measurementId: "G-07VVJG9LRS"
         };
+        firebase.initializeApp(firebaseConfig);
 
-        // Send verification code via SMS
-        const sendCode = () => {
-            const phoneNumber = document.getElementById('phoneNumber').value;
+        // Função para renderizar o reCAPTCHA
+        function setupRecaptcha() {
+            window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
+                'size': 'normal', // Pode ser 'invisible' para reCAPTCHA invisível
+                'callback': function(response) {
+                    console.log('reCAPTCHA resolvido, pronto para enviar o código.');
+                },
+                'expired-callback': function() {
+                    console.log('reCAPTCHA expirado. Por favor, tente novamente.');
+                }
+            });
+
+            recaptchaVerifier.render().then(function(widgetId) {
+                window.recaptchaWidgetId = widgetId;
+            }).catch(function(error) {
+                console.error("Erro ao renderizar reCAPTCHA: ", error);
+            });
+        }
+
+        // Chama a renderização do reCAPTCHA quando a página carrega
+        window.onload = function() {
             setupRecaptcha();
+        }
+
+        // Função para enviar o código SMS
+        function sendCode() {
+            const phoneNumber = document.getElementById("phoneNumber").value;
             const appVerifier = window.recaptchaVerifier;
 
-            signInWithPhoneNumber(auth, phoneNumber, appVerifier)
-                .then((confirmationResult) => {
+            firebase.auth().signInWithPhoneNumber(phoneNumber, appVerifier)
+                .then(function (confirmationResult) {
                     window.confirmationResult = confirmationResult;
-                    document.getElementById('message').textContent = 'Code sent. Please check your SMS.';
-                }).catch((error) => {
-                    console.error('Error sending the code:', error);
-                    document.getElementById('message').textContent = 'Error sending the code.';
+                    console.log("Código enviado com sucesso.");
+                    document.getElementById("message").innerHTML = "Código enviado. Verifique o seu telefone.";
+                })
+                .catch(function (error) {
+                    console.error("Erro ao enviar o código: ", error);
+                    document.getElementById("message").innerHTML = "Erro ao enviar o código: " + error.message;
                 });
-        };
+        }
 
-        // Verify the code entered by the user
-        const verifyCode = () => {
-            const code = document.getElementById('verificationCode').value;
-            window.confirmationResult.confirm(code)
-                .then((result) => {
+        // Função para verificar o código SMS
+        function verifyCode() {
+            const code = document.getElementById("verificationCode").value;
+            confirmationResult.confirm(code)
+                .then(function (result) {
                     const user = result.user;
-                    document.getElementById('message').textContent = 'Login successful!';
-                    console.log('User authenticated:', user);
-                }).catch((error) => {
-                    console.error('Error verifying the code:', error);
-                    document.getElementById('message').textContent = 'Invalid code.';
+                    console.log("Usuário autenticado com sucesso:", user);
+                    document.getElementById("message").innerHTML = "Autenticado com sucesso!";
+                })
+                .catch(function (error) {
+                    console.error("Erro ao verificar o código:", error);
+                    document.getElementById("message").innerHTML = "Erro ao verificar o código: " + error.message;
                 });
-        };
-
-        // Add event listeners to buttons
-        document.getElementById('sendCodeBtn').addEventListener('click', sendCode);
-        document.getElementById('verifyCodeBtn').addEventListener('click', verifyCode);
+        }
     </script>
 </body>
 </html>
