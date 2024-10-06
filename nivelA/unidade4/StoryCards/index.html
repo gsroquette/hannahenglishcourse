@@ -54,9 +54,7 @@
             width: 100%;
             max-width: 100%;
             min-height: 100px;
-        }
-        .active {
-            display: flex;
+            position: relative; /* Para posicionar a imagem */
         }
         .card img {
             max-width: 100%;
@@ -78,6 +76,14 @@
             justify-content: center;
             min-height: 100px;
             width: 100%;
+        }
+        .businessman {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
         }
         button {
             margin: 20px;
@@ -105,6 +111,7 @@
 
     <div class="container">
         <h1>Hannah StoryCard</h1>
+        <button id="toggleButton" onclick="toggleView()">Read the story</button>
         <div class="title" id="storyTitle"></div>
         <div id="cardsContainer"></div>
         <div class="navigation">
@@ -116,12 +123,23 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script>
+        let showText = false; // Variável para alternar entre texto e imagens
         let currentCardIndex = 0;
         let cardsData = [];
         let storyText = ''; // Variável para armazenar o texto da história para o PDF
+        let speechSynthesis = window.speechSynthesis;
+        let currentUtterance = null;
 
+        // Função para alternar entre ver imagens e ler o texto
+        function toggleView() {
+            showText = !showText;
+            document.getElementById("toggleButton").innerText = showText ? "See the story" : "Read the story";
+            displayCard(currentCardIndex);
+        }
+
+        // Função para carregar o conteúdo do arquivo images.txt
         async function loadContent() {
-            const response = await fetch('images.txt'); // Certifique-se de que o arquivo 'images.txt' esteja no local correto
+            const response = await fetch('images.txt');
             const text = await response.text();
             const lines = text.split('\n');
             let cards = [];
@@ -151,26 +169,60 @@
             return cards;
         }
 
+        // Função para exibir o card atual
         function displayCard(index) {
             const container = document.getElementById('cardsContainer');
             container.innerHTML = '';
             const cardData = cardsData[index];
             const cardElement = document.createElement('div');
             cardElement.className = 'card active';
-            cardElement.innerHTML = `<img src="images/${cardData.image}.jpeg" alt="Image"><p>${cardData.text}</p>`;
+            
+            // Alterna entre mostrar imagens ou texto com base em showText
+            if (showText) {
+                cardElement.innerHTML = `<div class="card-text"><p>${cardData.text}</p></div>`;
+            } else {
+                cardElement.innerHTML = `<img src="images/${cardData.image}.jpeg" alt="Image">`;
+            }
+
+            // Adiciona a imagem do businessman no topo direito
+            const businessmanImage = document.createElement('img');
+            businessmanImage.src = 'businessman.png'; // Caminho para a imagem businessman.png
+            businessmanImage.className = 'businessman';
+            businessmanImage.onclick = () => toggleSpeech(cardData.text); // Faz a leitura do texto ao clicar no businessman
+
+            cardElement.appendChild(businessmanImage);
             container.appendChild(cardElement);
+
+            // Adiciona evento de leitura de texto ao clicar no card
+            cardElement.addEventListener('click', () => {
+                toggleSpeech(cardData.text);
+            });
         }
 
+        // Função para iniciar ou parar a leitura do texto
+        function toggleSpeech(text) {
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel(); // Para a fala atual
+            } else {
+                currentUtterance = new SpeechSynthesisUtterance(text);
+                currentUtterance.lang = 'en-US'; // Configura o idioma para Inglês (US)
+                speechSynthesis.speak(currentUtterance); // Inicia a fala
+            }
+        }
+
+        // Função para exibir o próximo card
         function showNextCard() {
             currentCardIndex = (currentCardIndex + 1) % cardsData.length;
             displayCard(currentCardIndex);
         }
 
+        // Função para exibir o card anterior
         function showPreviousCard() {
             currentCardIndex = (currentCardIndex - 1 + cardsData.length) % cardsData.length;
             displayCard(currentCardIndex);
         }
 
+        // Função para inicializar a página com o primeiro card
         async function init() {
             cardsData = await loadContent();
             displayCard(0); // Exibe o primeiro card ao carregar a página
