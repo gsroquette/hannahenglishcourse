@@ -60,7 +60,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: flex-start; /* Faz com que o conteúdo comece no topo */
+            justify-content: flex-start;
         }
         .card img {
             max-width: 100%;
@@ -82,19 +82,19 @@
             justify-content: center;
             min-height: 100px;
             width: 100%;
-            margin-top: 60px; /* Adiciona um espaço extra para garantir que o texto fique abaixo do ícone */
+            margin-top: 60px;
         }
         .businessman {
             position: absolute;
-            top: 10px; /* Levanta o ícone para cima */
-            right: 30px; /* Mantém o espaçamento à direita */
-            width: 40px;  /* Aumenta o tamanho do ícone */
-            height: 40px;  /* Aumenta o tamanho do ícone */
-            object-fit: contain; /* Mantém as proporções */
+            top: -30px;
+            right: 10px;
+            width: 40px;
+            height: 40px;
+            object-fit: contain;
             cursor: pointer;
-            z-index: 10; /* Garante que a imagem fique visível */
-            background-color: rgba(255, 255, 255, 0.8); /* Fundo semitransparente */
-            border-radius: 50%; /* Borda arredondada */
+            z-index: 10;
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
         }
         button {
             margin: 20px;
@@ -152,14 +152,14 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script>
-        let showText = false; // Alterna entre texto e imagens
+        let showText = false;
         let currentCardIndex = 0;
         let cardsData = [];
-        let storyText = ''; // Variável para armazenar o texto da história para o PDF
+        let storyText = '';
         let speechSynthesis = window.speechSynthesis;
         let currentUtterance = null;
 
-        // Função para alternar entre ver imagens e ler o texto
+        // Função para alternar entre texto e imagem
         function toggleView() {
             showText = !showText;
             document.getElementById("toggleButton").innerText = showText ? "See the story" : "Read the story";
@@ -174,25 +174,26 @@
             let cards = [];
             let currentImage = '';
             let currentText = '';
-            storyText = ''; // Reseta o texto da história
+            storyText = '';
 
             lines.forEach(line => {
                 if (line.startsWith('#title:')) {
-                    document.getElementById('storyTitle').innerText = line.replace('#title:', '').trim(); // Define o título
+                    document.getElementById('storyTitle').innerText = line.replace('#title:', '').trim();
                 } else if (line.startsWith('#imagem')) {
                     if (currentImage && currentText) {
                         cards.push({ image: currentImage, text: currentText });
-                        storyText += currentText + '\n\n'; // Adiciona o texto ao storyText
+                        storyText += currentText + '\n\n';
                     }
-                    currentImage = line.replace('#', '').trim(); // Define o nome da imagem (ex: imagem1, imagem2, etc)
-                    currentText = ''; // Reseta o texto
+                    currentImage = line.replace('#', '').trim();
+                    currentText = '';
                 } else {
-                    currentText += line + ' '; // Adiciona o texto à história
+                    currentText += line + ' ';
                 }
             });
+
             if (currentImage && currentText) {
                 cards.push({ image: currentImage, text: currentText });
-                storyText += currentText + '\n\n'; // Adiciona o texto ao storyText
+                storyText += currentText + '\n\n';
             }
 
             return cards;
@@ -205,107 +206,108 @@
             const cardData = cardsData[index];
             const cardElement = document.createElement('div');
             cardElement.className = 'card active';
-            
-            // Alterna entre mostrar imagens ou texto com base em showText
+
             if (showText) {
                 cardElement.innerHTML = `<div class="card-text"><p>${cardData.text}</p></div>`;
             } else {
                 cardElement.innerHTML = `<img src="images/${cardData.image}.jpeg" alt="Image">`;
             }
 
-            // Adiciona a imagem do businessman no topo direito
             const businessmanImage = document.createElement('img');
-            businessmanImage.src = 'businessman.png'; // Caminho para a imagem businessman.png
+            businessmanImage.src = 'businessman.png';
             businessmanImage.className = 'businessman';
-            businessmanImage.onclick = () => toggleSpeech(cardData.text); // Faz a leitura do texto ao clicar no businessman
+            businessmanImage.onclick = () => toggleSpeech(cardData.text);
 
             cardElement.appendChild(businessmanImage);
             container.appendChild(cardElement);
 
-            // Esconde o botão "Previous" se estivermos na primeira imagem
-            const prevButton = document.getElementById('prevBtn');
-            if (index === 0) {
-                prevButton.style.display = 'none'; // Esconde o botão "Previous" na primeira imagem
-            } else {
-                prevButton.style.display = 'block'; // Exibe o botão "Previous" se não estivermos na primeira imagem
+            // Verifica se este é o último card
+            if (index === cardsData.length - 1) {
+                console.log("Último card!");
+                salvarProgressoAluno(user.uid, 'unidade1', 'fase1', 'completa');
             }
+
+            // Atualiza botões de navegação
+            const prevButton = document.getElementById('prevBtn');
+            const nextButton = document.getElementById('nextBtn');
+            prevButton.style.display = (index === 0) ? 'none' : 'block';
+            nextButton.style.display = (index === cardsData.length - 1) ? 'none' : 'block';
         }
 
         // Função para iniciar ou parar a leitura do texto
         function toggleSpeech(text) {
             if (speechSynthesis.speaking) {
-                speechSynthesis.cancel(); // Para a fala atual
+                speechSynthesis.cancel();
             } else {
                 currentUtterance = new SpeechSynthesisUtterance(text);
-                currentUtterance.lang = 'en-US'; // Configura o idioma para Inglês (US)
-                speechSynthesis.speak(currentUtterance); // Inicia a fala
+                currentUtterance.lang = 'en-US';
+                speechSynthesis.speak(currentUtterance);
             }
         }
 
         // Função para exibir o próximo card
         function showNextCard() {
-            // Cancela a leitura atual, se estiver acontecendo
             if (speechSynthesis.speaking) {
                 speechSynthesis.cancel();
             }
-
             currentCardIndex = (currentCardIndex + 1) % cardsData.length;
             displayCard(currentCardIndex);
         }
 
         // Função para exibir o card anterior
         function showPreviousCard() {
-            // Cancela a leitura atual, se estiver acontecendo
             if (speechSynthesis.speaking) {
                 speechSynthesis.cancel();
             }
-
             currentCardIndex = (currentCardIndex - 1 + cardsData.length) % cardsData.length;
             displayCard(currentCardIndex);
+        }
+
+        // Função para salvar o progresso no Firebase
+        function salvarProgressoAluno(uid, unidade, fase, status) {
+            firebase.database().ref('usuarios/' + uid + '/progresso/' + unidade + '/' + fase).set(status)
+                .then(function() {
+                    console.log("Progresso salvo com sucesso!");
+                })
+                .catch(function(error) {
+                    console.error("Erro ao salvar o progresso:", error);
+                });
         }
 
         // Função para inicializar a página com o primeiro card
         async function init() {
             cardsData = await loadContent();
-            displayCard(0); // Exibe o primeiro card ao carregar a página
+            displayCard(0);
         }
 
-        // Função para gerar o PDF com o texto da história e a logo
+        // Função para gerar o PDF com o texto da história
         function generatePDF() {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
 
-            // Adiciona a logo (certifique-se de que o caminho para 'Logo.png' está correto)
-            doc.addImage('Logo.png', 'PNG', 85, 10, 40, 40);  // Adiciona a logo no PDF
-
-            // Adiciona o título e o nome/dados
+            doc.addImage('Logo.png', 'PNG', 85, 10, 40, 40);
             doc.setFontSize(12);
             doc.text("Name:_______________________________________________________  Date:_______________", 10, 60);
-
-            // Adiciona o título principal
             doc.setFontSize(20);
             doc.text("Hannah StoryCard", 105, 80, { align: "center" });
-
-            // Adiciona o texto da história
             doc.setFontSize(12);
-            let y = 100; // Posição inicial
+            let y = 100;
             const lineHeight = 10;
-            const lines = doc.splitTextToSize(storyText, 180); // Divide o texto para caber na página
+            const lines = doc.splitTextToSize(storyText, 180);
 
             lines.forEach(line => {
-                if (y > 280) { // Se o texto passar do limite da página, cria uma nova página
+                if (y > 280) {
                     doc.addPage();
-                    y = 20; // Reinicia a posição vertical
+                    y = 20;
                 }
                 doc.text(line, 10, y);
                 y += lineHeight;
             });
 
-            // Salva o PDF
             doc.save('story.pdf');
         }
 
-        init(); // Carrega e exibe o primeiro card
+        init();
     </script>
 </body>
 </html>
