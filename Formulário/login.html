@@ -84,8 +84,7 @@
     <div class="login-container">
         <h2>Login</h2>
         <form id="loginForm">
-            <input type="text" id="username" placeholder="Username or Phone" required>
-            <input type="password" id="password" placeholder="Password" required>
+            <input type="text" id="phoneNumber" placeholder="Phone Number" required>
             <button type="submit">Login</button>
         </form>
         <div class="register-link">
@@ -98,37 +97,38 @@
         document.getElementById('loginForm').addEventListener('submit', async function(event) {
             event.preventDefault();
 
-            const email = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
+            const phoneNumber = document.getElementById('phoneNumber').value;
 
-            try {
-                // Configurar persistência de login no local storage
-                firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL)
-                    .then(function() {
-                        // Fazer o login com Firebase Authentication
-                        return firebase.auth().signInWithEmailAndPassword(email, password);
-                    })
-                    .then((userCredential) => {
-                        // Login bem-sucedido
-                        var user = userCredential.user;
-                        document.getElementById('message').style.color = 'green';
-                        document.getElementById('message').textContent = `Login successful! Welcome, ${user.email}.`;
+            // Configurar o recaptcha
+            window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('loginForm', {
+                'size': 'invisible'
+            });
 
-                        // Redirecionar para o index.html após login
-                        setTimeout(() => {
-                            window.location.href = "../index.html";
-                        }, 2000);
-                    })
-                    .catch((error) => {
-                        var errorCode = error.code;
-                        var errorMessage = error.message;
-                        document.getElementById('message').style.color = 'red';
-                        document.getElementById('message').textContent = errorMessage;
-                    });
-            } catch (error) {
-                console.error('Error:', error);
-                document.getElementById('message').textContent = 'Login failed. Try again later.';
-            }
+            const appVerifier = window.recaptchaVerifier;
+
+            firebase.auth().signInWithPhoneNumber(phoneNumber, appVerifier)
+                .then((confirmationResult) => {
+                    // SMS enviado. O usuário deve inserir o código SMS.
+                    const code = prompt('Digite o código que você recebeu por SMS:');
+                    return confirmationResult.confirm(code);
+                })
+                .then((userCredential) => {
+                    // Login bem-sucedido
+                    var user = userCredential.user;
+                    document.getElementById('message').style.color = 'green';
+                    document.getElementById('message').textContent = `Login successful! Welcome, ${user.phoneNumber}.`;
+
+                    // Redirecionar para o index.html após login
+                    setTimeout(() => {
+                        window.location.href = "../index.html";
+                    }, 2000);
+                })
+                .catch((error) => {
+                    var errorCode = error.code;
+                    var errorMessage = error.message;
+                    document.getElementById('message').style.color = 'red';
+                    document.getElementById('message').textContent = errorMessage;
+                });
         });
     </script>
 </body>
