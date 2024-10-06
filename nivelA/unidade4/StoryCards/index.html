@@ -118,10 +118,8 @@
     <script>
         let currentCardIndex = 0;
         let cardsData = [];
-        let speechSynthesis = window.speechSynthesis;
-        let currentUtterance = null;
+        let storyText = ''; // Variável para armazenar o texto da história para o PDF
 
-        // Função para carregar o conteúdo do arquivo images.txt
         async function loadContent() {
             const response = await fetch('images.txt'); // Certifique-se de que o arquivo 'images.txt' esteja no local correto
             const text = await response.text();
@@ -129,11 +127,13 @@
             let cards = [];
             let currentImage = '';
             let currentText = '';
+            storyText = ''; // Reseta o texto da história
 
             lines.forEach(line => {
                 if (line.startsWith('#')) {
                     if (currentImage && currentText) {
                         cards.push({ image: currentImage, text: currentText });
+                        storyText += currentText + '\n\n'; // Adiciona o texto ao storyText
                     }
                     currentImage = line.replace('#', '').trim();
                     currentText = '';
@@ -143,11 +143,12 @@
             });
             if (currentImage && currentText) {
                 cards.push({ image: currentImage, text: currentText });
+                storyText += currentText + '\n\n'; // Adiciona o texto ao storyText
             }
+
             return cards;
         }
 
-        // Função para exibir o card atual
         function displayCard(index) {
             const container = document.getElementById('cardsContainer');
             container.innerHTML = '';
@@ -156,43 +157,54 @@
             cardElement.className = 'card active';
             cardElement.innerHTML = `<img src="images/${cardData.image}.jpeg" alt="Image"><p>${cardData.text}</p>`;
             container.appendChild(cardElement);
-
-            // Configuração de leitura do texto ao clicar no card
-            cardElement.addEventListener('click', () => {
-                toggleSpeech(cardData.text);
-            });
         }
 
-        // Função para iniciar ou parar a leitura do texto
-        function toggleSpeech(text) {
-            if (speechSynthesis.speaking) {
-                speechSynthesis.cancel(); // Para a fala atual
-            } else {
-                currentUtterance = new SpeechSynthesisUtterance(text);
-                currentUtterance.lang = 'en-US'; // Configura o idioma para Inglês (EUA)
-                speechSynthesis.speak(currentUtterance); // Inicia a fala
-            }
-        }
-
-        // Função para exibir o próximo card
         function showNextCard() {
             currentCardIndex = (currentCardIndex + 1) % cardsData.length;
             displayCard(currentCardIndex);
         }
 
-        // Função para exibir o card anterior
         function showPreviousCard() {
             currentCardIndex = (currentCardIndex - 1 + cardsData.length) % cardsData.length;
             displayCard(currentCardIndex);
         }
 
-        // Função para inicializar a página com o primeiro card
         async function init() {
             cardsData = await loadContent();
-            displayCard(0); // Garante que o primeiro card seja exibido ao carregar a página
+            displayCard(0); // Exibe o primeiro card ao carregar a página
         }
 
-        init(); // Chama a função para carregar e exibir o primeiro card
+        // Função para gerar o PDF com o texto da história
+        function generatePDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            // Adiciona o título e o nome/dados
+            doc.setFontSize(20);
+            doc.text("Hannah StoryCard", 105, 20, { align: "center" });
+            doc.setFontSize(12);
+            doc.text("Name: __________________________________ Date: ____________", 10, 30);
+
+            // Adiciona o texto da história
+            doc.setFontSize(12);
+            let y = 40; // Posição inicial
+            const lineHeight = 10;
+            const lines = doc.splitTextToSize(storyText, 180); // Divide o texto para caber na página
+
+            lines.forEach(line => {
+                if (y > 280) { // Se o texto passar do limite da página, cria uma nova página
+                    doc.addPage();
+                    y = 20; // Reinicia a posição vertical
+                }
+                doc.text(line, 10, y);
+                y += lineHeight;
+            });
+
+            // Salva o PDF
+            doc.save('story.pdf');
+        }
+
+        init(); // Carrega e exibe o primeiro card
     </script>
 </body>
 </html>
