@@ -151,7 +151,22 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <script>
+        // Configuração do Firebase
+        var firebaseConfig = {
+            apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+            authDomain: "hannahenglishcourse.firebaseapp.com",
+            projectId: "hannahenglishcourse",
+            storageBucket: "hannahenglishcourse.appspot.com",
+            messagingSenderId: "449818788486",
+            appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+            measurementId: "G-07VVJG9LRS"
+        };
+        firebase.initializeApp(firebaseConfig);
+
         let showText = false;
         let currentCardIndex = 0;
         let cardsData = [];
@@ -221,10 +236,17 @@
             cardElement.appendChild(businessmanImage);
             container.appendChild(cardElement);
 
-            // Verifica se este é o último card
+            // Verifica se este é o último card e salva o progresso
             if (index === cardsData.length - 1) {
                 console.log("Último card!");
-                salvarProgressoAluno(user.uid, 'unidade1', 'fase1', 'completa');
+
+                firebase.auth().onAuthStateChanged(function(user) {
+                    if (user) {
+                        salvarProgressoAluno(user.uid, 'unidade1', 'fase1', 'completa');
+                    } else {
+                        console.log("Nenhum usuário logado");
+                    }
+                });
             }
 
             // Atualiza botões de navegação
@@ -234,15 +256,15 @@
             nextButton.style.display = (index === cardsData.length - 1) ? 'none' : 'block';
         }
 
-        // Função para iniciar ou parar a leitura do texto
-        function toggleSpeech(text) {
-            if (speechSynthesis.speaking) {
-                speechSynthesis.cancel();
-            } else {
-                currentUtterance = new SpeechSynthesisUtterance(text);
-                currentUtterance.lang = 'en-US';
-                speechSynthesis.speak(currentUtterance);
-            }
+        // Função para salvar progresso no Firebase
+        function salvarProgressoAluno(uid, unidade, fase, status) {
+            firebase.database().ref('usuarios/' + uid + '/progresso/' + unidade + '/' + fase).set(status)
+                .then(function() {
+                    console.log("Progresso salvo com sucesso!");
+                })
+                .catch(function(error) {
+                    console.error("Erro ao salvar o progresso:", error);
+                });
         }
 
         // Função para exibir o próximo card
@@ -263,15 +285,15 @@
             displayCard(currentCardIndex);
         }
 
-        // Função para salvar o progresso no Firebase
-        function salvarProgressoAluno(uid, unidade, fase, status) {
-            firebase.database().ref('usuarios/' + uid + '/progresso/' + unidade + '/' + fase).set(status)
-                .then(function() {
-                    console.log("Progresso salvo com sucesso!");
-                })
-                .catch(function(error) {
-                    console.error("Erro ao salvar o progresso:", error);
-                });
+        // Função para iniciar ou parar a leitura do texto
+        function toggleSpeech(text) {
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+            } else {
+                currentUtterance = new SpeechSynthesisUtterance(text);
+                currentUtterance.lang = 'en-US';
+                speechSynthesis.speak(currentUtterance);
+            }
         }
 
         // Função para inicializar a página com o primeiro card
