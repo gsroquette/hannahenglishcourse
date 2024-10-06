@@ -25,7 +25,7 @@
             background-color: #fff;
             box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
             border-radius: 10px;
-            overflow: hidden; /* Garante que nenhum conteúdo saia do contêiner */
+            overflow: hidden;
         }
         h1 {
             font-size: 2.5em;
@@ -40,7 +40,7 @@
             text-align: center;
         }
         .card {
-            display: flex;
+            display: none;
             flex-direction: column;
             align-items: center;
             justify-content: center;
@@ -54,14 +54,13 @@
             width: 100%;
             max-width: 100%;
             min-height: 100px;
-            box-sizing: border-box; /* Inclui padding e borda na largura e altura do card */
         }
-        .card:hover {
-            transform: translateY(-5px);
+        .active {
+            display: flex;
         }
         .card img {
             max-width: 100%;
-            max-height: calc(100vh - 150px); /* Garante que a imagem não ultrapasse a altura da viewport */
+            max-height: calc(100vh - 150px);
             width: auto;
             height: auto;
             border-radius: 10px;
@@ -79,15 +78,6 @@
             justify-content: center;
             min-height: 100px;
             width: 100%;
-            box-sizing: border-box;
-        }
-        .card-text {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 300px; /* Tamanho mínimo para igualar ao tamanho da imagem */
-            width: 100%;
-            box-sizing: border-box;
         }
         button {
             margin: 20px;
@@ -97,78 +87,50 @@
             color: white;
             border: none;
             border-radius: 50px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
             cursor: pointer;
-            transition: background-color 0.3s ease, box-shadow 0.3s ease;
         }
         button:hover {
             background-color: #45a049;
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
         }
-        button:active {
-            transform: scale(0.98);
-        }
-        .pdf-button {
-            margin-top: 30px;
-        }
-
-        /* Ajustes específicos para dispositivos móveis */
-        @media (max-width: 768px) {
-            .card img {
-                max-width: 100%;
-                max-height: 70vh;
-            }
-            .card p {
-                font-size: 1.2em;
-            }
+        .navigation {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-top: 20px;
         }
     </style>
 </head>
 <body>
-<button onclick="window.location.href='../index.html'" style="margin: 20px; padding: 15px 30px; font-size: 18px; background-color: #4CAF50; color: white; border: none; border-radius: 50px; cursor: pointer;">
-    Back
-</button>
+    <button onclick="window.location.href='../index.html'">Back</button>
 
     <div class="container">
         <h1>Hannah StoryCard</h1>
-        <button id="toggleButton" onclick="toggleView()">Read the story</button>
-        <div class="title" id="storyTitle"></div> <!-- Title of the story will appear here -->
+        <div class="title" id="storyTitle"></div>
         <div id="cardsContainer"></div>
-        <button class="pdf-button" onclick="generatePDF()">Generate PDF</button> <!-- PDF button here -->
+        <div class="navigation">
+            <button id="prevBtn" onclick="showPreviousCard()">Previous</button>
+            <button id="nextBtn" onclick="showNextCard()">Next</button>
+        </div>
+        <button class="pdf-button" onclick="generatePDF()">Generate PDF</button>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script>
-        let showText = false;
-        let speechSynthesis = window.speechSynthesis;
-        let currentUtterance = null;
-        let storyTitle = ''; // Variable to hold the title for PDF generation
-        let storyText = '';  // Variable to hold the full story text for PDF
+        let currentCardIndex = 0;
+        let cardsData = [];
 
-        // Function to toggle between images and text
-        function toggleView() {
-            showText = !showText;
-            document.getElementById("toggleButton").innerText = showText ? "See the story" : "Read the story";
-            displayCards();
-        }
-
-        // Function to load images, text, and title dynamically
         async function loadContent() {
             const response = await fetch('images.txt');
             const text = await response.text();
             const lines = text.split('\n');
-            const cards = [];
+            let cards = [];
             let currentImage = '';
             let currentText = '';
-            storyText = '';  // Clear the story text for PDF
 
             lines.forEach(line => {
-                if (line.startsWith('#title:')) {
-                    storyTitle = line.replace('#title:', '').trim();  // Extracting the title
-                } else if (line.startsWith('#')) {
+                if (line.startsWith('#')) {
                     if (currentImage && currentText) {
                         cards.push({ image: currentImage, text: currentText });
-                        storyText += '    ' + currentText + '\n';  // Add indentation to each paragraph in PDF
                     }
                     currentImage = line.replace('#', '').trim();
                     currentText = '';
@@ -178,84 +140,36 @@
             });
             if (currentImage && currentText) {
                 cards.push({ image: currentImage, text: currentText });
-                storyText += '    ' + currentText + '\n';  // Add indentation to last paragraph
             }
-
-            document.getElementById('storyTitle').innerText = storyTitle;
             return cards;
         }
 
-        // Function to display the cards dynamically
-        async function displayCards() {
-            const cards = await loadContent();
+        function displayCard(index) {
             const container = document.getElementById('cardsContainer');
             container.innerHTML = '';
-            cards.forEach(card => {
-                const cardElement = document.createElement('div');
-                cardElement.className = 'card';
-                cardElement.innerHTML = showText 
-                    ? `<div class="card-text"><p>${card.text}</p></div>`
-                    : `<img src="images/${card.image}.jpeg" alt="Image">`;
-                
-                // Adding event listener to each card for text-to-speech functionality
-                cardElement.addEventListener('click', () => {
-                    toggleSpeech(card.text);
-                });
-
-                container.appendChild(cardElement);
-            });
+            const cardData = cardsData[index];
+            const cardElement = document.createElement('div');
+            cardElement.className = 'card active';
+            cardElement.innerHTML = `<img src="images/${cardData.image}.jpeg" alt="Image"><p>${cardData.text}</p>`;
+            container.appendChild(cardElement);
         }
 
-        // Function to start or stop speech synthesis
-        function toggleSpeech(text) {
-            if (speechSynthesis.speaking) {
-                speechSynthesis.cancel();  // Stop current speech
-            } else {
-                currentUtterance = new SpeechSynthesisUtterance(text);
-                currentUtterance.lang = 'en-US'; // Set the language to English (US)
-                speechSynthesis.speak(currentUtterance);  // Start speaking the text
-            }
+        function showNextCard() {
+            currentCardIndex = (currentCardIndex + 1) % cardsData.length;
+            displayCard(currentCardIndex);
         }
 
-        // Function to generate PDF with explicit paragraph indentation
-        function generatePDF() {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-
-            // Adding the logo
-            doc.addImage('Logo.png', 'PNG', 85, 10, 40, 40);  // Add logo with size 3x3 cm (40x40 in PDF units)
-
-            // Adding name and date fields
-            doc.setFontSize(12);
-            doc.text("Name:_______________________________________________________  Date:_______________", 10, 60);
-
-            // Adding the title after name and date
-            doc.setFontSize(20);
-            doc.text(storyTitle, 105, 80, { align: "center" });
-
-            // Adding the story text with explicit paragraph indentation
-            doc.setFontSize(12);  // Ensure the font size is set to 12
-            let y = 100;  // Initial position for the text
-            const marginLeft = 10;
-            const maxLineWidth = 180;  // Maximum width for the text
-            const lineHeight = 10;  // Line height for the text
-
-            const splitText = doc.splitTextToSize(storyText, maxLineWidth);  // Split the text to fit within the page width
-            splitText.forEach(line => {
-                if (y > 280) {  // Check if the text exceeds the page height
-                    doc.addPage();  // Add a new page if needed
-                    y = 20;  // Reset the y position for the new page
-                }
-                doc.text(line, marginLeft, y);
-                y += lineHeight;  // Move to the next line
-            });
-
-            doc.save("story.pdf");  // Save the PDF with filename 'story.pdf'
+        function showPreviousCard() {
+            currentCardIndex = (currentCardIndex - 1 + cardsData.length) % cardsData.length;
+            displayCard(currentCardIndex);
         }
 
-        // Initial load of the images and title
-        displayCards();
+        async function init() {
+            cardsData = await loadContent();
+            displayCard(currentCardIndex);
+        }
+
+        init();
     </script>
-
 </body>
 </html>
