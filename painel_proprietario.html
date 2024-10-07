@@ -65,6 +65,10 @@
   <h2>Resultados da Pesquisa</h2>
   <div id="resultados"></div>
 
+  <!-- Progresso do Aluno -->
+  <h2>Progresso do Aluno</h2>
+  <div id="progressoAluno">Selecione um aluno para ver o progresso</div>
+
   <script>
     const db = firebase.database();
 
@@ -153,12 +157,51 @@
               <p>Localização: ${usuario.localizacao ? `Lat: ${usuario.localizacao.latitude}, Lng: ${usuario.localizacao.longitude}` : "Não disponível"}</p>
               <button onclick="editarUsuario('${uid}')">Editar</button>
               <button onclick="confirmarExclusao('${uid}')">Excluir</button>
+              ${usuario.role === 'aluno' ? `<button onclick="carregarProgressoAluno('${uid}')">Ver Progresso</button>` : ''}
             </div><hr>`;
           }
         }
         
         document.getElementById('resultados').innerHTML = html;
       });
+    }
+
+    // Função para carregar o progresso do aluno
+    function carregarProgressoAluno(uid) {
+      db.ref('usuarios/' + uid + '/progresso').once('value', snapshot => {
+        const progresso = snapshot.val();
+        let html = '<h3>Progresso de Níveis e Unidades</h3>';
+        
+        for (let nivelId in progresso) {
+          html += `<h4>Nível ${nivelId}</h4><ul>`;
+          for (let unidadeId in progresso[nivelId]) {
+            html += `<li>Unidade ${unidadeId}<ul>`;
+            for (let faseId in progresso[nivelId][unidadeId]) {
+              const status = progresso[nivelId][unidadeId][faseId];
+              html += `<li>Fase ${faseId}: ${status ? 'Completa' : 'Incompleta'}`;
+              html += `<button onclick="atualizarProgressoAluno('${uid}', '${nivelId}', '${unidadeId}', '${faseId}', ${!status})">
+                          Marcar como ${status ? 'Incompleta' : 'Completa'}
+                       </button></li>`;
+            }
+            html += `</ul></li>`;
+          }
+          html += `</ul>`;
+        }
+        
+        document.getElementById('progressoAluno').innerHTML = html;
+      });
+    }
+
+    // Função para atualizar o progresso do aluno
+    function atualizarProgressoAluno(uid, nivel, unidade, fase, status) {
+      db.ref('usuarios/' + uid + '/progresso/' + nivel + '/' + unidade + '/' + fase).set(status)
+        .then(() => {
+          alert("Progresso atualizado com sucesso!");
+          carregarProgressoAluno(uid);  // Recarrega para atualizar a interface
+        })
+        .catch(error => {
+          console.error("Erro ao atualizar o progresso:", error);
+        });
     }
 
     // Função para editar o usuário
