@@ -1,14 +1,19 @@
-
 const cacheName = 'hannah-course-v1';
 const assetsToCache = [
   '/',
   '/index.html',
-  '/CSS/style.css',
+  '/CSS/styles.css', // Ajuste conforme o nome exato do arquivo CSS
+  '/imagens/hannah_logo.png',
   '/imagens/icon-192x192.png',
-  '/imagens/icon-512x512.png'
+  '/imagens/icon-512x512.png',
+  '/Formulario/login.html', // Inclua outras páginas necessárias para o funcionamento offline
+  '/nivelA/index.html',
+  '/nivelB/index.html',
+  '/nivelC/index.html',
+  '/nivelD/index.html'
 ];
 
-// Install event to cache assets
+// Evento de instalação: Armazena em cache os arquivos essenciais
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(cacheName).then(cache => {
@@ -17,7 +22,7 @@ self.addEventListener('install', event => {
   );
 });
 
-// Activate event to clear old caches
+// Evento de ativação: Remove caches antigos
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => {
@@ -28,7 +33,7 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Fetch event to serve cached assets if available
+// Evento de fetch: Serve recursos do cache quando disponíveis
 self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request).then(response => {
