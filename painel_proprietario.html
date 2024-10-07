@@ -119,7 +119,7 @@
   <script>
     // Configuração do Firebase
     var firebaseConfig = {
-        apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+        apiKey: "API_KEY",
         authDomain: "hannahenglishcourse.firebaseapp.com",
         databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
         projectId: "hannahenglishcourse",
@@ -129,61 +129,7 @@
         measurementId: "G-07VVJG9LRS"
     };
     firebase.initializeApp(firebaseConfig);
-  </script>
-</head>
 
-<body>
-  <!-- Botão Back -->
-  <button class="back-button" onclick="window.history.back()">Back</button>
-
-  <h1>Gerenciamento de Usuários</h1>
-
-  <!-- Formulário de Cadastro -->
-  <form id="cadastroForm">
-    <h2>Cadastrar Novo Usuário</h2>
-    <label>Email: <input type="email" id="email" required></label>
-    <label>Senha: <input type="password" id="senha" required></label>
-    <small>A senha deve ter pelo menos 6 caracteres.</small>
-    <label>Nome: <input type="text" id="nome" required></label>
-    <label>Telefone: <input type="tel" id="telefone" required></label>
-    <label>Tipo de Usuário: 
-      <select id="tipo">
-        <option value="aluno">Aluno</option>
-        <option value="professor">Professor</option>
-        <option value="visitante">Visitante</option>
-        <option value="proprietario">Proprietário</option>
-      </select>
-    </label>
-    <button type="submit">Cadastrar</button>
-  </form>
-
-  <p id="feedback"></p>
-
-  <hr>
-
-  <!-- Filtros de Pesquisa -->
-  <div class="unit-container">
-    <h2>Pesquisar Usuários</h2>
-    <label>Tipo de Usuário: 
-      <select id="filtroTipo">
-        <option value="">Todos</option>
-        <option value="aluno">Aluno</option>
-        <option value="professor">Professor</option>
-        <option value="visitante">Visitante</option>
-      </select>
-    </label>
-    <button onclick="buscarUsuarios()">Pesquisar</button>
-  </div>
-
-  <!-- Resultados da Pesquisa -->
-  <h2>Resultados da Pesquisa</h2>
-  <div id="resultados"></div>
-
-  <!-- Progresso do Aluno -->
-  <h2>Progresso do Aluno</h2>
-  <div id="progressoAluno">Selecione um aluno para ver o progresso</div>
-
-  <script>
     const db = firebase.database();
 
     // Função para obter a localização do usuário
@@ -280,7 +226,124 @@
       });
     }
 
-    // Outras funções JavaScript continuam aqui...
+    // Função para carregar o progresso do aluno
+    function carregarProgressoAluno(uid) {
+      db.ref('usuarios/' + uid + '/progresso').once('value', snapshot => {
+        const progresso = snapshot.val();
+        let html = '<h3>Progresso de Níveis e Unidades</h3>';
+        
+        for (let nivelId in progresso) {
+          html += `<h4>Nível ${nivelId}</h4><ul>`;
+          for (let unidadeId in progresso[nivelId]) {
+            html += `<li>Unidade ${unidadeId}<ul>`;
+            for (let faseId in progresso[nivelId][unidadeId]) {
+              const status = progresso[nivelId][unidadeId][faseId];
+              html += `<li>Fase ${faseId}: ${status ? 'Completa' : 'Incompleta'}`;
+              html += `<button onclick="atualizarProgressoAluno('${uid}', '${nivelId}', '${unidadeId}', '${faseId}', ${!status})">
+                          Marcar como ${status ? 'Incompleta' : 'Completa'}
+                       </button></li>`;
+            }
+            html += `</ul></li>`;
+          }
+          html += `</ul>`;
+        }
+        
+        document.getElementById('progressoAluno').innerHTML = html;
+      });
+    }
+
+    // Função para atualizar o progresso do aluno
+    function atualizarProgressoAluno(uid, nivel, unidade, fase, status) {
+      db.ref('usuarios/' + uid + '/progresso/' + nivel + '/' + unidade + '/' + fase).set(status)
+        .then(() => {
+          alert("Progresso atualizado com sucesso!");
+          carregarProgressoAluno(uid);  // Recarrega para atualizar a interface
+        })
+        .catch(error => {
+          console.error("Erro ao atualizar o progresso:", error);
+        });
+    }
+
+    // Função para editar o usuário
+    function editarUsuario(uid) {
+      db.ref('usuarios/' + uid).once('value').then(snapshot => {
+        const usuario = snapshot.val();
+        const novoNome = prompt("Edite o nome:", usuario.nome);
+        const novoTelefone = prompt("Edite o telefone:", usuario.telefone);
+        const novoTipo = prompt("Edite o tipo (aluno, professor, visitante, proprietário):", usuario.role);
+        if (novoNome && novoTelefone && novoTipo) {
+          db.ref('usuarios/' + uid).update({
+            nome: novoNome,
+            telefone: novoTelefone,
+            role: novoTipo
+          });
+          alert("Usuário atualizado com sucesso.");
+          buscarUsuarios();
+        }
+      });
+    }
+
+    // Função para confirmar e excluir o usuário
+    function confirmarExclusao(uid) {
+      if (confirm("Tem certeza de que deseja excluir este usuário?")) {
+        db.ref('usuarios/' + uid).remove().then(() => {
+          alert("Usuário excluído com sucesso.");
+          buscarUsuarios();
+        });
+      }
+    }
   </script>
+</head>
+
+<body>
+  <!-- Botão Back -->
+  <button class="back-button" onclick="window.history.back()">Back</button>
+
+  <h1>Gerenciamento de Usuários</h1>
+
+  <!-- Formulário de Cadastro -->
+  <form id="cadastroForm">
+    <h2>Cadastrar Novo Usuário</h2>
+    <label>Email: <input type="email" id="email" required></label>
+    <label>Senha: <input type="password" id="senha" required></label>
+    <small>A senha deve ter pelo menos 6 caracteres.</small>
+    <label>Nome: <input type="text" id="nome" required></label>
+    <label>Telefone: <input type="tel" id="telefone" required></label>
+    <label>Tipo de Usuário: 
+      <select id="tipo">
+        <option value="aluno">Aluno</option>
+        <option value="professor">Professor</option>
+        <option value="visitante">Visitante</option>
+        <option value="proprietario">Proprietário</option>
+      </select>
+    </label>
+    <button type="submit">Cadastrar</button>
+  </form>
+
+  <p id="feedback"></p>
+
+  <hr>
+
+  <!-- Filtros de Pesquisa -->
+  <div class="unit-container">
+    <h2>Pesquisar Usuários</h2>
+    <label>Tipo de Usuário: 
+      <select id="filtroTipo">
+        <option value="">Todos</option>
+        <option value="aluno">Aluno</option>
+        <option value="professor">Professor</option>
+        <option value="visitante">Visitante</option>
+      </select>
+    </label>
+    <button onclick="buscarUsuarios()">Pesquisar</button>
+  </div>
+
+  <!-- Resultados da Pesquisa -->
+  <h2>Resultados da Pesquisa</h2>
+  <div id="resultados"></div>
+
+  <!-- Progresso do Aluno -->
+  <h2>Progresso do Aluno</h2>
+  <div id="progressoAluno">Selecione um aluno para ver o progresso</div>
 </body>
 </html>
