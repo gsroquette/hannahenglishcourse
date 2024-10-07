@@ -204,21 +204,41 @@
       });
     }
 
-    // Função para visualizar o progresso do aluno
+    // Função para visualizar e editar o progresso do aluno
     function verProgresso(uid) {
       db.ref(`usuarios/${uid}/progresso`).once('value', snapshot => {
         const progresso = snapshot.val();
         let progressoHTML = `<h3>Progresso do Aluno</h3><ul>`;
         for (let nivel in progresso) {
-          progressoHTML += `<li>Nível ${nivel}</li><ul>`;
+          progressoHTML += `<li><strong>Nível ${nivel}</strong><ul>`;
           for (let unidade in progresso[nivel]) {
-            progressoHTML += `<li>Unidade ${unidade}: ${progresso[nivel][unidade]}</li>`;
+            progressoHTML += `<li>Unidade ${unidade}: <ul>`;
+            for (let fase in progresso[nivel][unidade]) {
+              const status = progresso[nivel][unidade][fase] ? 'Completo' : 'Incompleto';
+              progressoHTML += `<li>Fase ${fase}: ${status}
+                                <button onclick="alterarStatusFase('${uid}', '${nivel}', '${unidade}', '${fase}', ${!progresso[nivel][unidade][fase]})">
+                                  Marcar como ${status === 'Completo' ? 'Incompleto' : 'Completo'}
+                                </button></li>`;
+            }
+            progressoHTML += `</ul></li>`;
           }
-          progressoHTML += `</ul>`;
+          progressoHTML += `</ul></li>`;
         }
         progressoHTML += `</ul>`;
         document.getElementById('progressoAluno').innerHTML = progressoHTML;
       });
+    }
+
+    // Função para alterar o status de uma fase
+    function alterarStatusFase(uid, nivel, unidade, fase, status) {
+      db.ref(`usuarios/${uid}/progresso/${nivel}/${unidade}/${fase}`).set(status)
+        .then(() => {
+          alert("Status da fase atualizado com sucesso!");
+          verProgresso(uid);  // Recarrega o progresso atualizado
+        })
+        .catch(error => {
+          console.error("Erro ao atualizar o status da fase:", error);
+        });
     }
 
     // Função para editar usuário
