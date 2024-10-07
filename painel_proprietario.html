@@ -133,25 +133,6 @@
 
     const db = firebase.database();
 
-    // Função para obter a localização do usuário
-    function obterLocalizacao(callback) {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition((position) => {
-          const localizacao = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude
-          };
-          callback(localizacao);
-        }, () => {
-          alert("Não foi possível obter a localização.");
-          callback(null);
-        });
-      } else {
-        alert("Geolocalização não é suportada por este navegador.");
-        callback(null);
-      }
-    }
-
     // Função para cadastrar um novo usuário
     document.getElementById('cadastroForm').addEventListener('submit', function(e) {
       e.preventDefault();
@@ -170,34 +151,28 @@
         return;
       }
 
-      obterLocalizacao((localizacao) => {
-        firebase.auth().createUserWithEmailAndPassword(email, senha)
-          .then(userCredential => {
-            const userId = userCredential.user.uid;
-            const userData = {
-              email: email,
-              nome: nome,
-              telefone: telefone,
-              role: tipo,
-              progresso: tipo === 'aluno' ? {} : null,
-              dataHoraCadastro: dataHora,
-              localizacao: localizacao
-            };
-            return db.ref('usuarios/' + userId).set(userData);
-          })
-          .then(() => {
-            alert("Usuário cadastrado com sucesso!");
-            document.getElementById('cadastroForm').reset();
-          })
-          .catch(error => {
-            console.error("Erro ao cadastrar usuário:", error);
-            if (error.code === 'auth/weak-password') {
-              feedback.textContent = 'Erro: A senha deve ter pelo menos 6 caracteres.';
-            } else {
-              feedback.textContent = `Erro: ${error.message}`;
-            }
-          });
-      });
+      const userData = {
+        email: email,
+        nome: nome,
+        telefone: telefone,
+        role: tipo,
+        progresso: tipo === 'aluno' ? {} : null,
+        dataHoraCadastro: dataHora
+      };
+
+      firebase.auth().createUserWithEmailAndPassword(email, senha)
+        .then(userCredential => {
+          const userId = userCredential.user.uid;
+          return db.ref('usuarios/' + userId).set(userData);
+        })
+        .then(() => {
+          alert("Usuário cadastrado com sucesso!");
+          document.getElementById('cadastroForm').reset();
+        })
+        .catch(error => {
+          console.error("Erro ao cadastrar usuário:", error);
+          feedback.textContent = `Erro: ${error.message}`;
+        });
     });
 
     // Função para buscar usuários por tipo
@@ -215,10 +190,10 @@
               <p>Email: ${usuario.email}</p>
               <p>Telefone: ${usuario.telefone}</p>
               <p>Data de Cadastro: ${usuario.dataHoraCadastro}</p>
-              <p>Localização: ${usuario.localizacao ? `Lat: ${usuario.localizacao.latitude}, Lng: ${usuario.localizacao.longitude}` : "Não disponível"}</p>
+              ${usuario.role === 'professor' ? `<div id="turmas-${uid}">${listarTurmas(uid)}</div>` : ''}
               <button onclick="editarUsuario('${uid}')">Editar</button>
               <button onclick="confirmarExclusao('${uid}')">Excluir</button>
-              ${usuario.role === 'aluno' ? `<button onclick="carregarProgressoAluno('${uid}')">Ver Progresso</button>` : ''}
+              ${usuario.role === 'professor' ? `<button onclick="cadastrarTurma('${uid}')">Adicionar Turma</button>` : ''}
             </div>`;
           }
         }
@@ -227,69 +202,56 @@
       });
     }
 
-    // Função para carregar o progresso do aluno
-    function carregarProgressoAluno(uid) {
-      db.ref('usuarios/' + uid + '/progresso').once('value', snapshot => {
-        const progresso = snapshot.val();
-        let html = '<h3>Progresso de Níveis e Unidades</h3>';
-        
-        for (let nivelId in progresso) {
-          html += `<h4>Nível ${nivelId}</h4><ul>`;
-          for (let unidadeId in progresso[nivelId]) {
-            html += `<li>Unidade ${unidadeId}<ul>`;
-            for (let faseId in progresso[nivelId][unidadeId]) {
-              const status = progresso[nivelId][unidadeId][faseId];
-              html += `<li>Fase ${faseId}: ${status ? 'Completa' : 'Incompleta'}`;
-              html += `<button onclick="atualizarProgressoAluno('${uid}', '${nivelId}', '${unidadeId}', '${faseId}', ${!status})">
-                          Marcar como ${status ? 'Incompleta' : 'Completa'}
-                       </button></li>`;
-            }
-            html += `</ul></li>`;
-          }
-          html += `</ul>`;
-        }
-        
-        document.getElementById('progressoAluno').innerHTML = html;
-      });
-    }
-
-    // Função para atualizar o progresso do aluno
-    function atualizarProgressoAluno(uid, nivel, unidade, fase, status) {
-      db.ref('usuarios/' + uid + '/progresso/' + nivel + '/' + unidade + '/' + fase).set(status)
-        .then(() => {
-          alert("Progresso atualizado com sucesso!");
-          carregarProgressoAluno(uid);  // Recarrega para atualizar a interface
-        })
-        .catch(error => {
-          console.error("Erro ao atualizar o progresso:", error);
+    function listarTurmas(uid) {
+      db.ref(`usuarios/${uid}/turmas`).once('value').then(snapshot => {
+        let turmasHTML = '<h4>Turmas:</h4><ul>';
+        snapshot.forEach(childSnapshot => {
+          const turmaId = childSnapshot.key;
+          const turma = childSnapshot.val();
+          turmasHTML += `<li>${turma.nome} - ${turma.alunos} alunos 
+                         <button onclick="editarTurma('${uid}', '${turmaId}')">Editar</button>
+                         <button onclick="excluirTurma('${uid}', '${turmaId}')">Excluir</button>
+                         </li>`;
         });
-    }
-
-    // Função para editar o usuário
-    function editarUsuario(uid) {
-      db.ref('usuarios/' + uid).once('value').then(snapshot => {
-        const usuario = snapshot.val();
-        const novoNome = prompt("Edite o nome:", usuario.nome);
-        const novoTelefone = prompt("Edite o telefone:", usuario.telefone);
-        const novoTipo = prompt("Edite o tipo (aluno, professor, visitante, proprietário):", usuario.role);
-        if (novoNome && novoTelefone && novoTipo) {
-          db.ref('usuarios/' + uid).update({
-            nome: novoNome,
-            telefone: novoTelefone,
-            role: novoTipo
-          });
-          alert("Usuário atualizado com sucesso.");
-          buscarUsuarios();
-        }
+        turmasHTML += '</ul>';
+        document.getElementById(`turmas-${uid}`).innerHTML = turmasHTML;
       });
     }
 
-    // Função para confirmar e excluir o usuário
-    function confirmarExclusao(uid) {
-      if (confirm("Tem certeza de que deseja excluir este usuário?")) {
-        db.ref('usuarios/' + uid).remove().then(() => {
-          alert("Usuário excluído com sucesso.");
-          buscarUsuarios();
+    function cadastrarTurma(uid) {
+      const nome = prompt("Nome da nova turma:");
+      const alunos = prompt("Número de alunos:");
+      if (nome && alunos) {
+        const novaTurmaRef = db.ref(`usuarios/${uid}/turmas`).push();
+        novaTurmaRef.set({
+          nome: nome,
+          alunos: parseInt(alunos)
+        }).then(() => {
+          alert("Turma adicionada com sucesso!");
+          listarTurmas(uid);
+        });
+      }
+    }
+
+    function editarTurma(uid, turmaId) {
+      const nome = prompt("Nome da turma:");
+      const alunos = prompt("Número de alunos:");
+      if (nome && alunos) {
+        db.ref(`usuarios/${uid}/turmas/${turmaId}`).update({
+          nome: nome,
+          alunos: parseInt(alunos)
+        }).then(() => {
+          alert("Turma atualizada com sucesso!");
+          listarTurmas(uid);
+        });
+      }
+    }
+
+    function excluirTurma(uid, turmaId) {
+      if (confirm("Tem certeza de que deseja excluir esta turma?")) {
+        db.ref(`usuarios/${uid}/turmas/${turmaId}`).remove().then(() => {
+          alert("Turma excluída com sucesso!");
+          listarTurmas(uid);
         });
       }
     }
@@ -342,9 +304,5 @@
   <!-- Resultados da Pesquisa -->
   <h2>Resultados da Pesquisa</h2>
   <div id="resultados"></div>
-
-  <!-- Progresso do Aluno -->
-  <h2>Progresso do Aluno</h2>
-  <div id="progressoAluno">Selecione um aluno para ver o progresso</div>
 </body>
 </html>
