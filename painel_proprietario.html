@@ -3,136 +3,190 @@
 <head>
   <meta charset="UTF-8">
   <title>Gerenciamento de Usuários</title>
-  
-  <!-- Configuração do Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-database.js"></script>
 
   <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
-      authDomain: "hannahenglishcourse.firebaseapp.com",
-      databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "hannahenglishcourse",
-      storageBucket: "hannahenglishcourse.appspot.com",
-      messagingSenderId: "449818788486",
-      appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
-      measurementId: "G-07VVJG9LRS"
+    // Configuração do Firebase
+    var firebaseConfig = {
+        apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+        authDomain: "hannahenglishcourse.firebaseapp.com",
+        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "hannahenglishcourse",
+        storageBucket: "hannahenglishcourse.appspot.com",
+        messagingSenderId: "449818788486",
+        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+        measurementId: "G-07VVJG9LRS"
     };
     firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
   </script>
 </head>
+
 <body>
   <h1>Gerenciamento de Usuários</h1>
 
-  <!-- Botão Voltar -->
-  <button onclick="window.history.back();">Back</button>
-
-  <!-- Cadastro de Novo Usuário -->
+  <!-- Formulário de Cadastro -->
   <h2>Cadastrar Novo Usuário</h2>
-  <input type="text" id="email" placeholder="Email">
-  <input type="password" id="senha" placeholder="Senha">
-  <input type="text" id="nome" placeholder="Nome">
-  <input type="text" id="telefone" placeholder="Telefone">
-  <select id="tipoUsuario">
-    <option value="aluno">Aluno</option>
-    <option value="professor">Professor</option>
-    <option value="proprietario">Proprietário</option>
-  </select>
-  <button onclick="cadastrarUsuario()">Cadastrar</button>
+  <form id="cadastroForm">
+    <label>Email: <input type="email" id="email" required></label><br>
+    <label>Senha: <input type="password" id="senha" required></label><br>
+    <small>A senha deve ter pelo menos 6 caracteres.</small><br>
+    <label>Nome: <input type="text" id="nome" required></label><br>
+    <label>Telefone: <input type="tel" id="telefone" required></label><br>
+    <label>Tipo de Usuário: 
+      <select id="tipo">
+        <option value="aluno">Aluno</option>
+        <option value="professor">Professor</option>
+        <option value="visitante">Visitante</option>
+        <option value="proprietario">Proprietário</option>
+      </select>
+    </label><br>
+    <button type="submit">Cadastrar</button>
+  </form>
 
-  <!-- Pesquisa de Usuários -->
+  <p id="feedback" style="color: red; font-weight: bold;"></p>
+
+  <hr>
+
+  <!-- Filtros de Pesquisa -->
   <h2>Pesquisar Usuários</h2>
-  <select id="filtroTipoUsuario">
-    <option value="todos">Todos</option>
-    <option value="aluno">Aluno</option>
-    <option value="professor">Professor</option>
-    <option value="proprietario">Proprietário</option>
-  </select>
-  <button onclick="pesquisarUsuarios()">Pesquisar</button>
+  <label>Tipo de Usuário: 
+    <select id="filtroTipo">
+      <option value="">Todos</option>
+      <option value="aluno">Aluno</option>
+      <option value="professor">Professor</option>
+      <option value="visitante">Visitante</option>
+    </select>
+  </label>
+  <button onclick="buscarUsuarios()">Pesquisar</button>
 
   <!-- Resultados da Pesquisa -->
-  <div id="resultadosPesquisa"></div>
+  <h2>Resultados da Pesquisa</h2>
+  <div id="resultados"></div>
 
   <script>
-    // Função para cadastrar um novo usuário
-    function cadastrarUsuario() {
-      const email = document.getElementById("email").value;
-      const senha = document.getElementById("senha").value;
-      const nome = document.getElementById("nome").value;
-      const telefone = document.getElementById("telefone").value;
-      const tipoUsuario = document.getElementById("tipoUsuario").value;
+    const db = firebase.database();
 
-      firebase.auth().createUserWithEmailAndPassword(email, senha)
-        .then(userCredential => {
-          const uid = userCredential.user.uid;
-          firebase.database().ref('usuarios/' + uid).set({
-            email: email,
-            nome: nome,
-            telefone: telefone,
-            role: tipoUsuario,
-            progresso: { nivel: "nivel1", unidade: "unidade1", fase: "fase1" }
-          });
-          alert("Usuário cadastrado com sucesso!");
-        })
-        .catch(error => {
-          alert("Erro ao cadastrar usuário: " + error.message);
+    // Função para obter a localização do usuário
+    function obterLocalizacao(callback) {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((position) => {
+          const localizacao = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          };
+          callback(localizacao);
+        }, () => {
+          alert("Não foi possível obter a localização.");
+          callback(null);
         });
-    }
-
-    // Função para pesquisar usuários
-    function pesquisarUsuarios() {
-      const filtro = document.getElementById("filtroTipoUsuario").value;
-      const resultadosDiv = document.getElementById("resultadosPesquisa");
-      resultadosDiv.innerHTML = "";
-
-      firebase.database().ref('usuarios').once('value')
-        .then(snapshot => {
-          snapshot.forEach(childSnapshot => {
-            const usuario = childSnapshot.val();
-            const uid = childSnapshot.key;
-
-            if (filtro === "todos" || usuario.role === filtro) {
-              const div = document.createElement("div");
-              div.innerHTML = `
-                <strong>${usuario.nome}</strong> (${usuario.role}) - ${usuario.email}<br>
-                Telefone: ${usuario.telefone} <br>
-                Progresso: Nível ${usuario.progresso.nivel}, Unidade ${usuario.progresso.unidade}, Fase ${usuario.progresso.fase} <br>
-                <button onclick="editarProgresso('${uid}', '${usuario.progresso.nivel}', '${usuario.progresso.unidade}', '${usuario.progresso.fase}')">Editar Progresso</button>
-                <button onclick="deletarUsuario('${uid}')">Deletar</button>
-              `;
-              resultadosDiv.appendChild(div);
-            }
-          });
-        });
-    }
-
-    // Função para editar o progresso do aluno
-    function editarProgresso(uid, nivelAtual, unidadeAtual, faseAtual) {
-      const nivel = prompt("Digite o novo Nível:", nivelAtual);
-      const unidade = prompt("Digite a nova Unidade:", unidadeAtual);
-      const fase = prompt("Digite a nova Fase:", faseAtual);
-
-      if (nivel && unidade && fase) {
-        firebase.database().ref('usuarios/' + uid + '/progresso').set({
-          nivel: nivel,
-          unidade: unidade,
-          fase: fase
-        })
-        .then(() => alert("Progresso atualizado com sucesso!"))
-        .catch(error => alert("Erro ao atualizar progresso: " + error.message));
+      } else {
+        alert("Geolocalização não é suportada por este navegador.");
+        callback(null);
       }
     }
 
-    // Função para deletar um usuário
-    function deletarUsuario(uid) {
-      const confirmar = confirm("Tem certeza que deseja deletar este usuário?");
-      if (confirmar) {
-        firebase.database().ref('usuarios/' + uid).remove()
-          .then(() => alert("Usuário deletado com sucesso!"))
-          .catch(error => alert("Erro ao deletar usuário: " + error.message));
+    // Função para cadastrar um novo usuário
+    document.getElementById('cadastroForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const email = document.getElementById('email').value;
+      const senha = document.getElementById('senha').value;
+      const nome = document.getElementById('nome').value;
+      const telefone = document.getElementById('telefone').value;
+      const tipo = document.getElementById('tipo').value;
+      const dataHora = new Date().toLocaleString();
+      const feedback = document.getElementById('feedback');
+      feedback.textContent = ''; // Limpa o feedback anterior
+
+      if (senha.length < 6) {
+        feedback.textContent = 'A senha deve ter pelo menos 6 caracteres.';
+        return;
+      }
+
+      obterLocalizacao((localizacao) => {
+        firebase.auth().createUserWithEmailAndPassword(email, senha)
+          .then(userCredential => {
+            const userId = userCredential.user.uid;
+            const userData = {
+              email: email,
+              nome: nome,
+              telefone: telefone,
+              role: tipo,
+              progresso: tipo === 'aluno' ? {} : null,
+              dataHoraCadastro: dataHora,
+              localizacao: localizacao
+            };
+            return db.ref('usuarios/' + userId).set(userData);
+          })
+          .then(() => {
+            alert("Usuário cadastrado com sucesso!");
+            document.getElementById('cadastroForm').reset();
+          })
+          .catch(error => {
+            console.error("Erro ao cadastrar usuário:", error);
+            if (error.code === 'auth/weak-password') {
+              feedback.textContent = 'Erro: A senha deve ter pelo menos 6 caracteres.';
+            } else {
+              feedback.textContent = `Erro: ${error.message}`;
+            }
+          });
+      });
+    });
+
+    // Função para buscar usuários por tipo
+    function buscarUsuarios() {
+      const filtroTipo = document.getElementById('filtroTipo').value;
+      db.ref('usuarios').once('value', snapshot => {
+        const resultados = snapshot.val();
+        let html = '';
+        
+        for (let uid in resultados) {
+          const usuario = resultados[uid];
+          if (filtroTipo === '' || usuario.role === filtroTipo) {
+            html += `<div>
+              <h3>${usuario.nome} (${usuario.role})</h3>
+              <p>Email: ${usuario.email}</p>
+              <p>Telefone: ${usuario.telefone}</p>
+              <p>Data de Cadastro: ${usuario.dataHoraCadastro}</p>
+              <p>Localização: ${usuario.localizacao ? `Lat: ${usuario.localizacao.latitude}, Lng: ${usuario.localizacao.longitude}` : "Não disponível"}</p>
+              <button onclick="editarUsuario('${uid}')">Editar</button>
+              <button onclick="confirmarExclusao('${uid}')">Excluir</button>
+            </div><hr>`;
+          }
+        }
+        
+        document.getElementById('resultados').innerHTML = html;
+      });
+    }
+
+    // Função para editar o usuário
+    function editarUsuario(uid) {
+      db.ref('usuarios/' + uid).once('value').then(snapshot => {
+        const usuario = snapshot.val();
+        const novoNome = prompt("Edite o nome:", usuario.nome);
+        const novoTelefone = prompt("Edite o telefone:", usuario.telefone);
+        const novoTipo = prompt("Edite o tipo (aluno, professor, visitante, proprietário):", usuario.role);
+        if (novoNome && novoTelefone && novoTipo) {
+          db.ref('usuarios/' + uid).update({
+            nome: novoNome,
+            telefone: novoTelefone,
+            role: novoTipo
+          });
+          alert("Usuário atualizado com sucesso.");
+          buscarUsuarios();
+        }
+      });
+    }
+
+    // Função para confirmar e excluir o usuário
+    function confirmarExclusao(uid) {
+      if (confirm("Tem certeza de que deseja excluir este usuário?")) {
+        db.ref('usuarios/' + uid).remove().then(() => {
+          alert("Usuário excluído com sucesso.");
+          buscarUsuarios();
+        });
       }
     }
   </script>
