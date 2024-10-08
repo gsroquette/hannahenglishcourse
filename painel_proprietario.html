@@ -5,14 +5,123 @@
   <title>Gerenciamento de Usuários</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
   <style>
-    /* Estilos de CSS aqui (igual ao original) */
+    body {
+      font-family: 'Poppins', sans-serif;
+      background-color: #f0f8ff;
+      color: #333;
+      text-align: center;
+    }
+
+    h1 {
+      color: #4CAF50;
+      margin-top: 20px;
+      font-size: 32px;
+    }
+
+    h2 {
+      color: #333;
+      font-size: 24px;
+      margin-top: 20px;
+    }
+
+    form, .unit-container, #progressoAluno {
+      background-color: #ffffff;
+      padding: 20px;
+      margin: 20px auto;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      max-width: 500px;
+      text-align: left;
+    }
+
+    label {
+      display: block;
+      margin: 10px 0 5px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    input[type="email"], input[type="password"], input[type="text"], input[type="tel"], select {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      box-sizing: border-box;
+    }
+
+    button {
+      background-color: #4CAF50;
+      color: white;
+      padding: 12px 20px;
+      margin: 10px 0;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background-color 0.3s ease;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    }
+
+    button:hover {
+      background-color: #45A049;
+    }
+
+    .back-button {
+      background-color: #3B82F6;
+      margin-top: 15px;
+    }
+
+    .back-button:hover {
+      background-color: #2F66B8;
+    }
+
+    .disabled {
+      background-color: #ccc;
+      color: #777;
+      cursor: not-allowed;
+    }
+
+    #feedback {
+      color: red;
+      font-weight: bold;
+    }
+
+    #resultados {
+      text-align: left;
+      max-width: 600px;
+      margin: auto;
+    }
+
+    .result-container {
+      background-color: #ffffff;
+      padding: 15px;
+      margin: 10px 0;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .result-container h3 {
+      color: #4CAF50;
+      font-size: 20px;
+    }
+
+    hr {
+      border: 0;
+      height: 1px;
+      background: #ddd;
+      margin: 20px 0;
+    }
   </style>
 </head>
 
 <body>
+  <!-- Botão Back -->
   <button class="back-button" onclick="window.history.back()">Back</button>
+
   <h1>Gerenciamento de Usuários</h1>
-  
+
+  <!-- Formulário de Cadastro -->
   <form id="cadastroForm">
     <h2>Cadastrar Novo Usuário</h2>
     <label>Email: <input type="email" id="email" required></label>
@@ -32,7 +141,10 @@
   </form>
 
   <p id="feedback"></p>
+
   <hr>
+
+  <!-- Filtros de Pesquisa -->
   <div class="unit-container">
     <h2>Pesquisar Usuários</h2>
     <label>Tipo de Usuário: 
@@ -43,19 +155,23 @@
         <option value="visitante">Visitante</option>
       </select>
     </label>
-    <button onclick="pesquisarUsuarios()">Pesquisar</button>
+    <button onclick="buscarUsuarios()">Pesquisar</button>
   </div>
 
+  <!-- Resultados da Pesquisa -->
   <h2>Resultados da Pesquisa</h2>
   <div id="resultados"></div>
+
+  <!-- Progresso do Aluno -->
   <div id="progressoAluno"></div>
 
   <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-database.js"></script>
+
   <script>
-    // Configuração do Firebase
-    function configurarFirebase() {
+    document.addEventListener('DOMContentLoaded', function() {
+      // Configuração do Firebase
       var firebaseConfig = {
         apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
         authDomain: "hannahenglishcourse.firebaseapp.com",
@@ -67,132 +183,174 @@
         measurementId: "G-07VVJG9LRS"
       };
       firebase.initializeApp(firebaseConfig);
-      return firebase.database();
-    }
 
-    const db = configurarFirebase();
+      const db = firebase.database();
 
-    // Verificar se o usuário é "proprietário"
-    function verificarProprietario(callback) {
-      const user = firebase.auth().currentUser;
-      if (user) {
-        db.ref('usuarios/' + user.uid + '/role').once('value').then(snapshot => {
-          const role = snapshot.val();
-          if (role === 'proprietario') {
-            callback(); // Permite o acesso
-          } else {
-            alert("Acesso negado. Somente proprietários podem acessar esta área.");
-          }
-        }).catch(error => {
-          console.error("Erro ao verificar papel do usuário:", error);
-        });
-      } else {
-        alert("Usuário não autenticado.");
-      }
-    }
-
-    // Cadastro de Usuários
-    function cadastrarUsuario(email, senha, nome, telefone, tipo) {
-      verificarProprietario(async () => {
-        const feedback = document.getElementById('feedback');
-        feedback.textContent = '';
-        if (senha.length < 6) {
-          feedback.textContent = 'A senha deve ter pelo menos 6 caracteres.';
-          return;
-        }
-
-        try {
-          const userCredential = await firebase.auth().createUserWithEmailAndPassword(email, senha);
-          const userId = userCredential.user.uid;
-          const dataHora = new Date().toLocaleString();
-          const userData = {
-            email: email,
-            nome: nome,
-            telefone: telefone,
-            role: tipo,
-            progresso: tipo === 'aluno' ? {} : null,
-            dataHoraCadastro: dataHora
-          };
-          await db.ref('usuarios/' + userId).set(userData);
-          alert("Usuário cadastrado com sucesso!");
-          document.getElementById('cadastroForm').reset();
-          buscarUsuarios();
-        } catch (error) {
-          feedback.textContent = `Erro: ${error.message}`;
-        }
-      });
-    }
-
-    // Função para buscar usuários com filtro
-    function pesquisarUsuarios() {
-      const filtroTipo = document.getElementById('filtroTipo').value;
-      console.log("Filtrando por tipo:", filtroTipo); // Log para debug
-      buscarUsuarios(filtroTipo);
-    }
-
-    // Função que busca todos os usuários ou por tipo específico
-    function buscarUsuarios(filtroTipo = '') {
-      verificarProprietario(() => {
-        db.ref('usuarios').once('value').then(snapshot => {
-          const resultados = snapshot.val();
-          console.log("Usuários encontrados:", resultados); // Log para debug
-          renderizarResultados(resultados, filtroTipo);
-        }).catch(error => {
-          console.error("Erro ao buscar usuários:", error);
-        });
-      });
-    }
-
-    // Função para renderizar os resultados da busca
-    function renderizarResultados(resultados, filtroTipo) {
-      const resultadosContainer = document.getElementById('resultados');
-      resultadosContainer.innerHTML = '';
-      for (let uid in resultados) {
-        const usuario = resultados[uid];
-        if (filtroTipo === '' || usuario.role === filtroTipo) {
-          resultadosContainer.innerHTML += `
-            <div class="result-container">
-              <h3>${usuario.nome} (${usuario.role})</h3>
-              <p>Email: ${usuario.email}</p>
-              <p>Telefone: ${usuario.telefone}</p>
-              <p>Data de Cadastro: ${usuario.dataHoraCadastro}</p>
-              ${usuario.role === 'aluno' ? `<button onclick="verProgresso('${uid}')">Ver Progresso</button>` : ''}
-              <button onclick="editarUsuario('${uid}')">Editar</button>
-              <button onclick="confirmarExclusaoUsuario('${uid}')">Excluir</button>
-              ${usuario.role === 'professor' ? `
-                <div id="turmas-${uid}"></div>
-                <button onclick="cadastrarTurma('${uid}')">Adicionar Turma</button>
-                <button onclick="listarTurmas('${uid}')">Ver Turmas</button>` : ''}
-            </div>`;
-        }
-      }
-      console.log("Resultados renderizados com filtro:", filtroTipo); // Log para debug
-    }
-
-    // Funções restantes (verificarProprietario, listarTurmas, editarUsuario, etc.) permanecem as mesmas
-
-    // Função de Inicialização
-    function inicializarAplicacao() {
-      document.getElementById('cadastroForm').addEventListener('submit', function (e) {
+      // Função para cadastrar um novo usuário
+      document.getElementById('cadastroForm').addEventListener('submit', function(e) {
         e.preventDefault();
+        
         const email = document.getElementById('email').value;
         const senha = document.getElementById('senha').value;
         const nome = document.getElementById('nome').value;
         const telefone = document.getElementById('telefone').value;
         const tipo = document.getElementById('tipo').value;
-        cadastrarUsuario(email, senha, nome, telefone, tipo);
-      });
-      // Carrega todos os usuários na inicialização
-      buscarUsuarios();
-    }
+        const dataHora = new Date().toLocaleString();
+        const feedback = document.getElementById('feedback');
+        feedback.textContent = ''; // Limpa o feedback anterior
 
-    // Autenticação e verificação de papel
-    firebase.auth().onAuthStateChanged(user => {
-      if (user) {
-        verificarProprietario(inicializarAplicacao);
-      } else {
-        alert("Por favor, faça login para continuar.");
-      }
+        if (senha.length < 6) {
+          feedback.textContent = 'A senha deve ter pelo menos 6 caracteres.';
+          return;
+        }
+
+        firebase.auth().createUserWithEmailAndPassword(email, senha)
+          .then(userCredential => {
+            const userId = userCredential.user.uid;
+            const userData = {
+              email: email,
+              nome: nome,
+              telefone: telefone,
+              role: tipo,
+              progresso: tipo === 'aluno' ? {} : null,
+              dataHoraCadastro: dataHora
+            };
+            return db.ref('usuarios/' + userId).set(userData);
+          })
+          .then(() => {
+            alert("Usuário cadastrado com sucesso!");
+            document.getElementById('cadastroForm').reset();
+            buscarUsuarios(); // Atualiza a lista após salvar ou editar
+          })
+          .catch(error => {
+            console.error("Erro ao cadastrar usuário:", error);
+            feedback.textContent = `Erro: ${error.message}`;
+          });
+      });
+
+      // Função para buscar usuários por tipo
+      window.buscarUsuarios = function() {
+        const filtroTipo = document.getElementById('filtroTipo').value;
+        db.ref('usuarios').once('value', snapshot => {
+          const resultados = snapshot.val();
+          let html = '';
+          
+          for (let uid in resultados) {
+            const usuario = resultados[uid];
+            if (filtroTipo === '' || usuario.role === filtroTipo) {
+              html += `<div class="result-container">
+                <h3>${usuario.nome} (${usuario.role})</h3>
+                <p>Email: ${usuario.email}</p>
+                <p>Telefone: ${usuario.telefone}</p>
+                <p>Data de Cadastro: ${usuario.dataHoraCadastro}</p>
+                ${usuario.role === 'aluno' ? `<button onclick="verProgresso('${uid}')">Ver Progresso</button>` : ''}
+                <button onclick="editarUsuario('${uid}')">Editar</button>
+                <button onclick="confirmarExclusaoUsuario('${uid}')">Excluir</button>
+                ${usuario.role === 'professor' ? `
+                  <div id="turmas-${uid}"></div>
+                  <button onclick="cadastrarTurma('${uid}')">Adicionar Turma</button>
+                  <button onclick="listarTurmas('${uid}')">Ver Turmas</button>` : ''}
+              </div>`;
+            }
+          }
+          
+          document.getElementById('resultados').innerHTML = html;
+        });
+      };
+
+      // Função para listar turmas do professor
+      window.listarTurmas = function(uid) {
+        db.ref(`usuarios/${uid}/turmas`).once('value').then(snapshot => {
+          let turmasHTML = '<h4>Turmas:</h4><ul>';
+          snapshot.forEach(childSnapshot => {
+            const turmaId = childSnapshot.key;
+            const turma = childSnapshot.val();
+            turmasHTML += `<li>${turma.nome} - ${turma.alunos} alunos 
+                           <button onclick="editarTurma('${uid}', '${turmaId}')">Editar</button>
+                           <button onclick="excluirTurma('${uid}', '${turmaId}')">Excluir</button>
+                           </li>`;
+          });
+          turmasHTML += '</ul>';
+          document.getElementById(`turmas-${uid}`).innerHTML = turmasHTML;
+        });
+      };
+
+      // Funções de edição e exclusão de turma
+      window.editarTurma = function(uid, turmaId) {
+        const nome = prompt("Nome da turma:");
+        const alunos = prompt("Número de alunos:");
+        if (nome && alunos) {
+          db.ref(`usuarios/${uid}/turmas/${turmaId}`).update({
+            nome: nome,
+            alunos: parseInt(alunos)
+          }).then(() => {
+            alert("Turma atualizada com sucesso!");
+            listarTurmas(uid);
+          });
+        }
+      };
+
+      window.excluirTurma = function(uid, turmaId) {
+        if (confirm("Tem certeza de que deseja excluir esta turma?")) {
+          db.ref(`usuarios/${uid}/turmas/${turmaId}`).remove().then(() => {
+            alert("Turma excluída com sucesso!");
+            listarTurmas(uid);
+          });
+        }
+      };
+
+      // Funções relacionadas ao progresso do aluno
+      window.verProgresso = function(uid) {
+        db.ref(`usuarios/${uid}/progresso`).once('value', snapshot => {
+          const progresso = snapshot.val();
+          let progressoHTML = `<h3>Progresso do Aluno</h3><ul>`;
+          for (let nivel in progresso) {
+            progressoHTML += `<li><strong>Nível ${nivel}</strong><ul>`;
+            for (let unidade in progresso[nivel]) {
+              progressoHTML += `<li>Unidade ${unidade}: <ul>`;
+              for (let fase in progresso[nivel][unidade]) {
+                const status = progresso[nivel][unidade][fase] ? 'Completo' : 'Incompleto';
+                progressoHTML += `<li>Fase ${fase}: ${status}</li>`;
+              }
+              progressoHTML += `</ul></li>`;
+            }
+            progressoHTML += `</ul></li>`;
+          }
+          progressoHTML += `</ul>`;
+          document.getElementById('progressoAluno').innerHTML = progressoHTML;
+        });
+      };
+
+      // Função para excluir um usuário
+      window.confirmarExclusaoUsuario = function(uid) {
+        if (confirm("Tem certeza de que deseja excluir este usuário?")) {
+          db.ref('usuarios/' + uid).remove().then(() => {
+            alert("Usuário excluído com sucesso.");
+            buscarUsuarios(); // Atualiza a lista após a exclusão
+          });
+        }
+      };
+
+      // Função para editar um usuário
+      window.editarUsuario = function(uid) {
+        db.ref('usuarios/' + uid).once('value').then(snapshot => {
+          const usuario = snapshot.val();
+          const novoNome = prompt("Edite o nome:", usuario.nome);
+          const novoTelefone = prompt("Edite o telefone:", usuario.telefone);
+          const novoTipo = prompt("Edite o tipo (aluno, professor, visitante, proprietário):", usuario.role);
+          if (novoNome && novoTelefone && novoTipo) {
+            db.ref('usuarios/' + uid).update({
+              nome: novoNome,
+              telefone: novoTelefone,
+              role: novoTipo
+            }).then(() => {
+              alert("Usuário atualizado com sucesso.");
+              buscarUsuarios(); // Atualiza a lista após a edição
+            });
+          }
+        });
+      };
+
     });
   </script>
 </body>
