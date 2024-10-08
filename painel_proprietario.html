@@ -186,7 +186,7 @@
 
       const db = firebase.database();
 
-      // Função para cadastrar um novo usuário
+      // Função para cadastrar um novo usuário e reautenticar o proprietário
       document.getElementById('cadastroForm').addEventListener('submit', function(e) {
         e.preventDefault();
         
@@ -204,6 +204,11 @@
           return;
         }
 
+        // Salvar as credenciais do proprietário
+        const proprietario = firebase.auth().currentUser;
+        const proprietarioEmail = proprietario.email;
+        const proprietarioPassword = prompt("Por favor, digite novamente sua senha para confirmar:");
+
         firebase.auth().createUserWithEmailAndPassword(email, senha)
           .then(userCredential => {
             const userId = userCredential.user.uid;
@@ -220,7 +225,13 @@
           .then(() => {
             alert("Usuário cadastrado com sucesso!");
             document.getElementById('cadastroForm').reset();
-            buscarUsuarios(); // Atualiza a lista após salvar ou editar
+            return firebase.auth().signOut();
+          })
+          .then(() => {
+            return firebase.auth().signInWithEmailAndPassword(proprietarioEmail, proprietarioPassword);
+          })
+          .then(() => {
+            buscarUsuarios(); // Atualiza a lista após reautenticar o proprietário
           })
           .catch(error => {
             console.error("Erro ao cadastrar usuário:", error);
@@ -258,7 +269,7 @@
         });
       };
 
-      // Função para listar turmas do professor
+      // Funções de gerenciamento adicionais
       window.listarTurmas = function(uid) {
         db.ref(`usuarios/${uid}/turmas`).once('value').then(snapshot => {
           let turmasHTML = '<h4>Turmas:</h4><ul>';
@@ -275,7 +286,6 @@
         });
       };
 
-      // Funções de edição e exclusão de turma
       window.editarTurma = function(uid, turmaId) {
         const nome = prompt("Nome da turma:");
         const alunos = prompt("Número de alunos:");
@@ -299,7 +309,6 @@
         }
       };
 
-      // Funções relacionadas ao progresso do aluno
       window.verProgresso = function(uid) {
         db.ref(`usuarios/${uid}/progresso`).once('value', snapshot => {
           const progresso = snapshot.val();
@@ -321,17 +330,15 @@
         });
       };
 
-      // Função para excluir um usuário
       window.confirmarExclusaoUsuario = function(uid) {
         if (confirm("Tem certeza de que deseja excluir este usuário?")) {
           db.ref('usuarios/' + uid).remove().then(() => {
             alert("Usuário excluído com sucesso.");
-            buscarUsuarios(); // Atualiza a lista após a exclusão
+            buscarUsuarios();
           });
         }
       };
 
-      // Função para editar um usuário
       window.editarUsuario = function(uid) {
         db.ref('usuarios/' + uid).once('value').then(snapshot => {
           const usuario = snapshot.val();
@@ -345,12 +352,11 @@
               role: novoTipo
             }).then(() => {
               alert("Usuário atualizado com sucesso.");
-              buscarUsuarios(); // Atualiza a lista após a edição
+              buscarUsuarios();
             });
           }
         });
       };
-
     });
   </script>
 </body>
