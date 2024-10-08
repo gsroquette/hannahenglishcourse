@@ -72,45 +72,67 @@
 
     const db = configurarFirebase();
 
-    // Cadastro de Usuários
-    async function cadastrarUsuario(email, senha, nome, telefone, tipo) {
-      const feedback = document.getElementById('feedback');
-      feedback.textContent = '';
-      if (senha.length < 6) {
-        feedback.textContent = 'A senha deve ter pelo menos 6 caracteres.';
-        return;
-      }
-
-      try {
-        const userCredential = await firebase.auth().createUserWithEmailAndPassword(email, senha);
-        const userId = userCredential.user.uid;
-        const dataHora = new Date().toLocaleString();
-        const userData = {
-          email: email,
-          nome: nome,
-          telefone: telefone,
-          role: tipo,
-          progresso: tipo === 'aluno' ? {} : null,
-          dataHoraCadastro: dataHora
-        };
-        await db.ref('usuarios/' + userId).set(userData);
-        alert("Usuário cadastrado com sucesso!");
-        document.getElementById('cadastroForm').reset();
-        buscarUsuarios();
-      } catch (error) {
-        feedback.textContent = `Erro: ${error.message}`;
+    // Verificar se o usuário é "proprietário"
+    function verificarProprietario(callback) {
+      const user = firebase.auth().currentUser;
+      if (user) {
+        db.ref('usuarios/' + user.uid + '/role').once('value').then(snapshot => {
+          const role = snapshot.val();
+          if (role === 'proprietario') {
+            callback(); // Permite o acesso
+          } else {
+            alert("Acesso negado. Somente proprietários podem acessar esta área.");
+          }
+        }).catch(error => {
+          console.error("Erro ao verificar papel do usuário:", error);
+        });
+      } else {
+        alert("Usuário não autenticado.");
       }
     }
 
+    // Cadastro de Usuários
+    function cadastrarUsuario(email, senha, nome, telefone, tipo) {
+      verificarProprietario(async () => {
+        const feedback = document.getElementById('feedback');
+        feedback.textContent = '';
+        if (senha.length < 6) {
+          feedback.textContent = 'A senha deve ter pelo menos 6 caracteres.';
+          return;
+        }
+
+        try {
+          const userCredential = await firebase.auth().createUserWithEmailAndPassword(email, senha);
+          const userId = userCredential.user.uid;
+          const dataHora = new Date().toLocaleString();
+          const userData = {
+            email: email,
+            nome: nome,
+            telefone: telefone,
+            role: tipo,
+            progresso: tipo === 'aluno' ? {} : null,
+            dataHoraCadastro: dataHora
+          };
+          await db.ref('usuarios/' + userId).set(userData);
+          alert("Usuário cadastrado com sucesso!");
+          document.getElementById('cadastroForm').reset();
+          buscarUsuarios();
+        } catch (error) {
+          feedback.textContent = `Erro: ${error.message}`;
+        }
+      });
+    }
+
     // Busca e Renderização de Usuários
-    async function buscarUsuarios(filtroTipo = '') {
-      try {
-        const snapshot = await db.ref('usuarios').once('value');
-        const resultados = snapshot.val();
-        renderizarResultados(resultados, filtroTipo);
-      } catch (error) {
-        console.error("Erro ao buscar usuários:", error);
-      }
+    function buscarUsuarios(filtroTipo = '') {
+      verificarProprietario(() => {
+        db.ref('usuarios').once('value').then(snapshot => {
+          const resultados = snapshot.val();
+          renderizarResultados(resultados, filtroTipo);
+        }).catch(error => {
+          console.error("Erro ao buscar usuários:", error);
+        });
+      });
     }
 
     function renderizarResultados(resultados, filtroTipo) {
@@ -138,92 +160,104 @@
     }
 
     // Gerenciamento de Turmas
-    async function listarTurmas(uid) {
-      try {
-        const snapshot = await db.ref(`usuarios/${uid}/turmas`).once('value');
-        let turmasHTML = '<h4>Turmas:</h4><ul>';
-        snapshot.forEach(childSnapshot => {
-          const turma = childSnapshot.val();
-          const turmaId = childSnapshot.key;
-          turmasHTML += `<li>${turma.nome} - ${turma.alunos} alunos 
-                         <button onclick="editarTurma('${uid}', '${turmaId}')">Editar</button>
-                         <button onclick="excluirTurma('${uid}', '${turmaId}')">Excluir</button></li>`;
+    function listarTurmas(uid) {
+      verificarProprietario(() => {
+        db.ref(`usuarios/${uid}/turmas`).once('value').then(snapshot => {
+          let turmasHTML = '<h4>Turmas:</h4><ul>';
+          snapshot.forEach(childSnapshot => {
+            const turma = childSnapshot.val();
+            const turmaId = childSnapshot.key;
+            turmasHTML += `<li>${turma.nome} - ${turma.alunos} alunos 
+                           <button onclick="editarTurma('${uid}', '${turmaId}')">Editar</button>
+                           <button onclick="excluirTurma('${uid}', '${turmaId}')">Excluir</button></li>`;
+          });
+          turmasHTML += '</ul>';
+          document.getElementById(`turmas-${uid}`).innerHTML = turmasHTML;
+        }).catch(error => {
+          console.error("Erro ao listar turmas:", error);
         });
-        turmasHTML += '</ul>';
-        document.getElementById(`turmas-${uid}`).innerHTML = turmasHTML;
-      } catch (error) {
-        console.error("Erro ao listar turmas:", error);
-      }
+      });
     }
 
-    async function cadastrarTurma(uid) {
-      const nome = prompt("Nome da turma:");
-      const alunos = prompt("Número de alunos:");
-      if (nome && alunos) {
-        await db.ref(`usuarios/${uid}/turmas`).push({ nome: nome, alunos: parseInt(alunos) });
-        listarTurmas(uid);
-      }
+    function cadastrarTurma(uid) {
+      verificarProprietario(async () => {
+        const nome = prompt("Nome da turma:");
+        const alunos = prompt("Número de alunos:");
+        if (nome && alunos) {
+          await db.ref(`usuarios/${uid}/turmas`).push({ nome: nome, alunos: parseInt(alunos) });
+          listarTurmas(uid);
+        }
+      });
     }
 
-    async function editarTurma(uid, turmaId) {
-      const nome = prompt("Nome da turma:");
-      const alunos = prompt("Número de alunos:");
-      if (nome && alunos) {
-        await db.ref(`usuarios/${uid}/turmas/${turmaId}`).update({ nome: nome, alunos: parseInt(alunos) });
-        listarTurmas(uid);
-      }
+    function editarTurma(uid, turmaId) {
+      verificarProprietario(async () => {
+        const nome = prompt("Nome da turma:");
+        const alunos = prompt("Número de alunos:");
+        if (nome && alunos) {
+          await db.ref(`usuarios/${uid}/turmas/${turmaId}`).update({ nome: nome, alunos: parseInt(alunos) });
+          listarTurmas(uid);
+        }
+      });
     }
 
-    async function excluirTurma(uid, turmaId) {
-      if (confirm("Tem certeza de que deseja excluir esta turma?")) {
-        await db.ref(`usuarios/${uid}/turmas/${turmaId}`).remove();
-        listarTurmas(uid);
-      }
+    function excluirTurma(uid, turmaId) {
+      verificarProprietario(async () => {
+        if (confirm("Tem certeza de que deseja excluir esta turma?")) {
+          await db.ref(`usuarios/${uid}/turmas/${turmaId}`).remove();
+          listarTurmas(uid);
+        }
+      });
     }
 
     // Progresso do Aluno
-    async function verProgresso(uid) {
-      try {
-        const snapshot = await db.ref(`usuarios/${uid}/progresso`).once('value');
-        const progresso = snapshot.val();
-        let progressoHTML = `<h3>Progresso do Aluno</h3><ul>`;
-        for (let nivel in progresso) {
-          progressoHTML += `<li><strong>Nível ${nivel}</strong><ul>`;
-          for (let unidade in progresso[nivel]) {
-            progressoHTML += `<li>Unidade ${unidade}: <ul>`;
-            for (let fase in progresso[nivel][unidade]) {
-              const status = progresso[nivel][unidade][fase] ? 'Completo' : 'Incompleto';
-              progressoHTML += `<li>Fase ${fase}: ${status}</li>`;
+    function verProgresso(uid) {
+      verificarProprietario(() => {
+        db.ref(`usuarios/${uid}/progresso`).once('value').then(snapshot => {
+          const progresso = snapshot.val();
+          let progressoHTML = `<h3>Progresso do Aluno</h3><ul>`;
+          for (let nivel in progresso) {
+            progressoHTML += `<li><strong>Nível ${nivel}</strong><ul>`;
+            for (let unidade in progresso[nivel]) {
+              progressoHTML += `<li>Unidade ${unidade}: <ul>`;
+              for (let fase in progresso[nivel][unidade]) {
+                const status = progresso[nivel][unidade][fase] ? 'Completo' : 'Incompleto';
+                progressoHTML += `<li>Fase ${fase}: ${status}</li>`;
+              }
+              progressoHTML += `</ul></li>`;
             }
             progressoHTML += `</ul></li>`;
           }
-          progressoHTML += `</ul></li>`;
-        }
-        progressoHTML += `</ul>`;
-        document.getElementById('progressoAluno').innerHTML = progressoHTML;
-      } catch (error) {
-        console.error("Erro ao exibir progresso do aluno:", error);
-      }
+          progressoHTML += `</ul>`;
+          document.getElementById('progressoAluno').innerHTML = progressoHTML;
+        }).catch(error => {
+          console.error("Erro ao exibir progresso do aluno:", error);
+        });
+      });
     }
 
     // Edição e Exclusão de Usuários
-    async function editarUsuario(uid) {
-      const usuarioSnapshot = await db.ref('usuarios/' + uid).once('value');
-      const usuario = usuarioSnapshot.val();
-      const novoNome = prompt("Edite o nome:", usuario.nome);
-      const novoTelefone = prompt("Edite o telefone:", usuario.telefone);
-      const novoTipo = prompt("Edite o tipo (aluno, professor, visitante, proprietário):", usuario.role);
-      if (novoNome && novoTelefone && novoTipo) {
-        await db.ref('usuarios/' + uid).update({ nome: novoNome, telefone: novoTelefone, role: novoTipo });
-        buscarUsuarios();
-      }
+    function editarUsuario(uid) {
+      verificarProprietario(async () => {
+        const usuarioSnapshot = await db.ref('usuarios/' + uid).once('value');
+        const usuario = usuarioSnapshot.val();
+        const novoNome = prompt("Edite o nome:", usuario.nome);
+        const novoTelefone = prompt("Edite o telefone:", usuario.telefone);
+        const novoTipo = prompt("Edite o tipo (aluno, professor, visitante, proprietário):", usuario.role);
+        if (novoNome && novoTelefone && novoTipo) {
+          await db.ref('usuarios/' + uid).update({ nome: novoNome, telefone: novoTelefone, role: novoTipo });
+          buscarUsuarios();
+        }
+      });
     }
 
-    async function confirmarExclusaoUsuario(uid) {
-      if (confirm("Tem certeza de que deseja excluir este usuário?")) {
-        await db.ref('usuarios/' + uid).remove();
-        buscarUsuarios();
-      }
+    function confirmarExclusaoUsuario(uid) {
+      verificarProprietario(async () => {
+        if (confirm("Tem certeza de que deseja excluir este usuário?")) {
+          await db.ref('usuarios/' + uid).remove();
+          buscarUsuarios();
+        }
+      });
     }
 
     // Função de Inicialização
@@ -240,8 +274,14 @@
       buscarUsuarios();
     }
 
-    // Inicializar aplicação
-    inicializarAplicacao();
+    // Autenticação e verificação de papel
+    firebase.auth().onAuthStateChanged(user => {
+      if (user) {
+        verificarProprietario(inicializarAplicacao);
+      } else {
+        alert("Por favor, faça login para continuar.");
+      }
+    });
   </script>
 </body>
 </html>
