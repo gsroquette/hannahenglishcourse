@@ -253,7 +253,10 @@
 
         query.once('value', snapshot => {
           const resultados = snapshot.val();
-          if (!resultados) return;
+          if (!resultados) {
+            isFetching = false;
+            return;
+          }
 
           const keys = Object.keys(resultados);
           lastLoadedUser = keys[keys.length - 1];
@@ -269,7 +272,7 @@
               (filtroNome === '' || nome.includes(filtroNome)) &&
               (filtroEmail === '' || email.includes(filtroEmail))
             ) {
-              html += `<div class="result-container">
+              html += `<div class="result-container" id="usuario-${uid}">
                 <h3>${usuario.nome} (${usuario.role})</h3>
                 <p>Email: ${usuario.email}</p>
                 <p>Telefone: ${usuario.telefone}</p>
@@ -339,10 +342,40 @@
           });
       });
 
+      // Reassocia a função `buscarUsuarios` ao botão de pesquisa
       window.buscarUsuarios = buscarUsuarios;
       buscarUsuarios(true);
       
-      // Outras funções (toggleProgresso, cadastrarTurma, listarTurmas, editarUsuario, etc) permanecem inalteradas...
+      // Mantenha o código de funções de manipulação aqui, como toggleProgresso, cadastrarTurma, listarTurmas, editarUsuario, etc.
+
+      // Exemplo de toggleProgresso para referência:
+      window.toggleProgresso = function(uid) {
+        const progressoContainer = document.getElementById(`progresso-${uid}`);
+        if (progressoContainer.style.display === 'none' || progressoContainer.style.display === '') {
+          db.ref(`usuarios/${uid}/progresso`).once('value', snapshot => {
+            const progresso = snapshot.val();
+            let progressoHTML = `<h3>Progresso do Aluno</h3><ul>`;
+            for (let nivel in progresso) {
+              progressoHTML += `<li><strong>Nível ${nivel}</strong><ul>`;
+              for (let unidade in progresso[nivel]) {
+                progressoHTML += `<li>Unidade ${unidade}: <ul>`;
+                for (let fase in progresso[nivel][unidade]) {
+                  const status = progresso[nivel][unidade][fase] ? 'Completo' : 'Incompleto';
+                  progressoHTML += `<li>Fase ${fase}: ${status}</li>`;
+                }
+                progressoHTML += `</ul></li>`;
+              }
+              progressoHTML += `</ul></li>`;
+            }
+            progressoHTML += `</ul>`;
+            progressoContainer.innerHTML = progressoHTML;
+            progressoContainer.style.display = 'block';
+          });
+        } else {
+          progressoContainer.style.display = 'none';
+        }
+      };
+      // Coloque aqui outras funções de manipulação, como cadastrarTurma, listarTurmas, editarUsuario, etc.
     });
   </script>
 </body>
