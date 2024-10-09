@@ -27,7 +27,7 @@
       margin-top: 20px;
     }
 
-    form, .unit-container, .progresso-container {
+    form, .unit-container, .progresso-container, .turma-container {
       background-color: #ffffff;
       padding: 20px;
       margin: 20px auto;
@@ -104,7 +104,7 @@
       font-size: 1.25em;
     }
 
-    .progresso-container {
+    .progresso-container, .turma-container {
       display: none;
       margin-top: 15px;
       padding: 10px;
@@ -213,7 +213,7 @@
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       var firebaseConfig = {
-        apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+        apiKey: "API_KEY",
         authDomain: "hannahenglishcourse.firebaseapp.com",
         databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
         projectId: "hannahenglishcourse",
@@ -285,7 +285,7 @@
                 <button onclick="editarUsuario('${uid}')">Editar</button>
                 <button onclick="confirmarExclusaoUsuario('${uid}')">Excluir</button>
                 ${usuario.role === 'professor' ? `
-                  <div id="turmas-${uid}"></div>
+                  <div id="turmas-${uid}" class="turma-container"></div>
                   <button onclick="cadastrarTurma('${uid}')">Adicionar Turma</button>
                   <button onclick="listarTurmas('${uid}')">Ver Turmas</button>` : ''}
                 <div id="progresso-${uid}" class="progresso-container"></div>
@@ -339,6 +339,51 @@
           }).catch(error => {
             console.error("Erro ao cadastrar turma:", error);
             alert("Erro ao cadastrar turma: " + error.message);
+          });
+        }
+      };
+
+      window.listarTurmas = function(uid) {
+        const turmaContainer = document.getElementById(`turmas-${uid}`);
+        if (turmaContainer.style.display === 'none' || turmaContainer.style.display === '') {
+          db.ref(`usuarios/${uid}/turmas`).once('value').then(snapshot => {
+            let turmasHTML = '<h4>Turmas:</h4><ul>';
+            snapshot.forEach(childSnapshot => {
+              const turmaId = childSnapshot.key;
+              const turma = childSnapshot.val();
+              turmasHTML += `<li>${turma.nome} - ${turma.alunos} alunos 
+                             <button onclick="editarTurma('${uid}', '${turmaId}')">Editar</button>
+                             <button onclick="excluirTurma('${uid}', '${turmaId}')">Excluir</button>
+                             </li>`;
+            });
+            turmasHTML += '</ul>';
+            turmaContainer.innerHTML = turmasHTML;
+            turmaContainer.style.display = 'block';
+          });
+        } else {
+          turmaContainer.style.display = 'none';
+        }
+      };
+
+      window.editarTurma = function(uid, turmaId) {
+        const nome = prompt("Nome da turma:");
+        const alunos = prompt("Número de alunos:");
+        if (nome && alunos) {
+          db.ref(`usuarios/${uid}/turmas/${turmaId}`).update({
+            nome: nome,
+            alunos: parseInt(alunos)
+          }).then(() => {
+            alert("Turma atualizada com sucesso!");
+            listarTurmas(uid);
+          });
+        }
+      };
+
+      window.excluirTurma = function(uid, turmaId) {
+        if (confirm("Tem certeza de que deseja excluir esta turma?")) {
+          db.ref(`usuarios/${uid}/turmas/${turmaId}`).remove().then(() => {
+            alert("Turma excluída com sucesso!");
+            listarTurmas(uid);
           });
         }
       };
