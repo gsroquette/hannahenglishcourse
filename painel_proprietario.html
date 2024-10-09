@@ -24,7 +24,7 @@
       margin-top: 20px;
     }
 
-    form, .unit-container, #progressoAluno {
+    form, .unit-container, .progresso-container {
       background-color: #ffffff;
       padding: 20px;
       margin: 20px auto;
@@ -76,12 +76,6 @@
       background-color: #2F66B8;
     }
 
-    .disabled {
-      background-color: #ccc;
-      color: #777;
-      cursor: not-allowed;
-    }
-
     #feedback {
       color: red;
       font-weight: bold;
@@ -104,6 +98,13 @@
     .result-container h3 {
       color: #4CAF50;
       font-size: 20px;
+    }
+
+    .progresso-container {
+      display: none;
+      margin-top: 15px;
+      padding: 10px;
+      border-top: 1px solid #ddd;
     }
 
     hr {
@@ -162,16 +163,12 @@
   <h2>Resultados da Pesquisa</h2>
   <div id="resultados"></div>
 
-  <!-- Progresso do Aluno -->
-  <div id="progressoAluno"></div>
-
   <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-database.js"></script>
 
   <script>
     document.addEventListener('DOMContentLoaded', function() {
-      // Configuração do Firebase
       var firebaseConfig = {
         apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
         authDomain: "hannahenglishcourse.firebaseapp.com",
@@ -186,7 +183,6 @@
 
       const db = firebase.database();
 
-      // Função para cadastrar um novo usuário
       document.getElementById('cadastroForm').addEventListener('submit', function(e) {
         e.preventDefault();
         
@@ -197,7 +193,7 @@
         const tipo = document.getElementById('tipo').value;
         const dataHora = new Date().toLocaleString();
         const feedback = document.getElementById('feedback');
-        feedback.textContent = ''; // Limpa o feedback anterior
+        feedback.textContent = '';
 
         if (senha.length < 6) {
           feedback.textContent = 'A senha deve ter pelo menos 6 caracteres.';
@@ -220,7 +216,7 @@
           .then(() => {
             alert("Usuário cadastrado com sucesso!");
             document.getElementById('cadastroForm').reset();
-            buscarUsuarios(); // Atualiza a lista após salvar ou editar
+            buscarUsuarios();
           })
           .catch(error => {
             console.error("Erro ao cadastrar usuário:", error);
@@ -228,7 +224,6 @@
           });
       });
 
-      // Função para buscar usuários por tipo
       window.buscarUsuarios = function() {
         const filtroTipo = document.getElementById('filtroTipo').value;
         db.ref('usuarios').once('value', snapshot => {
@@ -243,13 +238,14 @@
                 <p>Email: ${usuario.email}</p>
                 <p>Telefone: ${usuario.telefone}</p>
                 <p>Data de Cadastro: ${usuario.dataHoraCadastro}</p>
-                ${usuario.role === 'aluno' ? `<button onclick="verProgresso('${uid}')">Ver Progresso</button>` : ''}
+                ${usuario.role === 'aluno' ? `<button onclick="toggleProgresso('${uid}')">Ver Progresso</button>` : ''}
                 <button onclick="editarUsuario('${uid}')">Editar</button>
                 <button onclick="confirmarExclusaoUsuario('${uid}')">Excluir</button>
                 ${usuario.role === 'professor' ? `
                   <div id="turmas-${uid}"></div>
                   <button onclick="cadastrarTurma('${uid}')">Adicionar Turma</button>
                   <button onclick="listarTurmas('${uid}')">Ver Turmas</button>` : ''}
+                <div id="progresso-${uid}" class="progresso-container"></div>
               </div>`;
             }
           }
@@ -258,37 +254,45 @@
         });
       };
 
-      // Função para listar turmas do professor
-      window.listarTurmas = function(uid) {
-        db.ref(`usuarios/${uid}/turmas`).once('value').then(snapshot => {
-          let turmasHTML = '<h4>Turmas:</h4><ul>';
-          snapshot.forEach(childSnapshot => {
-            const turmaId = childSnapshot.key;
-            const turma = childSnapshot.val();
-            turmasHTML += `<li>${turma.nome} - ${turma.alunos} alunos 
-                           <button onclick="editarTurma('${uid}', '${turmaId}')">Editar</button>
-                           <button onclick="excluirTurma('${uid}', '${turmaId}')">Excluir</button>
-                           </li>`;
+      window.toggleProgresso = function(uid) {
+        const progressoContainer = document.getElementById(`progresso-${uid}`);
+        if (progressoContainer.style.display === 'none' || progressoContainer.style.display === '') {
+          db.ref(`usuarios/${uid}/progresso`).once('value', snapshot => {
+            const progresso = snapshot.val();
+            let progressoHTML = `<h3>Progresso do Aluno</h3><ul>`;
+            for (let nivel in progresso) {
+              progressoHTML += `<li><strong>Nível ${nivel}</strong><ul>`;
+              for (let unidade in progresso[nivel]) {
+                progressoHTML += `<li>Unidade ${unidade}: <ul>`;
+                for (let fase in progresso[nivel][unidade]) {
+                  const status = progresso[nivel][unidade][fase] ? 'Completo' : 'Incompleto';
+                  progressoHTML += `<li>Fase ${fase}: ${status}</li>`;
+                }
+                progressoHTML += `</ul></li>`;
+              }
+              progressoHTML += `</ul></li>`;
+            }
+            progressoHTML += `</ul>`;
+            progressoContainer.innerHTML = progressoHTML;
+            progressoContainer.style.display = 'block';
           });
-          turmasHTML += '</ul>';
-          document.getElementById(`turmas-${uid}`).innerHTML = turmasHTML;
-        });
+        } else {
+          progressoContainer.style.display = 'none';
+        }
       };
 
-      // Função para cadastrar uma nova turma para o professor
       window.cadastrarTurma = function(uid) {
         const nomeTurma = prompt("Nome da turma:");
         const numeroAlunos = prompt("Número de alunos:");
         
         if (nomeTurma && numeroAlunos) {
-          // Cria um ID único para a turma
           const novaTurmaRef = db.ref(`usuarios/${uid}/turmas`).push();
           novaTurmaRef.set({
             nome: nomeTurma,
             alunos: parseInt(numeroAlunos)
           }).then(() => {
             alert("Turma cadastrada com sucesso!");
-            listarTurmas(uid); // Atualiza a lista de turmas após o cadastro
+            listarTurmas(uid);
           }).catch(error => {
             console.error("Erro ao cadastrar turma:", error);
             alert("Erro ao cadastrar turma: " + error.message);
@@ -296,63 +300,6 @@
         }
       };
 
-      // Funções de edição e exclusão de turma
-      window.editarTurma = function(uid, turmaId) {
-        const nome = prompt("Nome da turma:");
-        const alunos = prompt("Número de alunos:");
-        if (nome && alunos) {
-          db.ref(`usuarios/${uid}/turmas/${turmaId}`).update({
-            nome: nome,
-            alunos: parseInt(alunos)
-          }).then(() => {
-            alert("Turma atualizada com sucesso!");
-            listarTurmas(uid);
-          });
-        }
-      };
-
-      window.excluirTurma = function(uid, turmaId) {
-        if (confirm("Tem certeza de que deseja excluir esta turma?")) {
-          db.ref(`usuarios/${uid}/turmas/${turmaId}`).remove().then(() => {
-            alert("Turma excluída com sucesso!");
-            listarTurmas(uid);
-          });
-        }
-      };
-
-      // Funções relacionadas ao progresso do aluno
-      window.verProgresso = function(uid) {
-        db.ref(`usuarios/${uid}/progresso`).once('value', snapshot => {
-          const progresso = snapshot.val();
-          let progressoHTML = `<h3>Progresso do Aluno</h3><ul>`;
-          for (let nivel in progresso) {
-            progressoHTML += `<li><strong>Nível ${nivel}</strong><ul>`;
-            for (let unidade in progresso[nivel]) {
-              progressoHTML += `<li>Unidade ${unidade}: <ul>`;
-              for (let fase in progresso[nivel][unidade]) {
-                const status = progresso[nivel][unidade][fase] ? 'Completo' : 'Incompleto';
-                progressoHTML += `<li>Fase ${fase}: ${status}</li>`;
-              }
-              progressoHTML += `</ul></li>`;
-            }
-            progressoHTML += `</ul></li>`;
-          }
-          progressoHTML += `</ul>`;
-          document.getElementById('progressoAluno').innerHTML = progressoHTML;
-        });
-      };
-
-      // Função para excluir um usuário
-      window.confirmarExclusaoUsuario = function(uid) {
-        if (confirm("Tem certeza de que deseja excluir este usuário?")) {
-          db.ref('usuarios/' + uid).remove().then(() => {
-            alert("Usuário excluído com sucesso.");
-            buscarUsuarios(); // Atualiza a lista após a exclusão
-          });
-        }
-      };
-
-      // Função para editar um usuário
       window.editarUsuario = function(uid) {
         db.ref('usuarios/' + uid).once('value').then(snapshot => {
           const usuario = snapshot.val();
@@ -366,10 +313,19 @@
               role: novoTipo
             }).then(() => {
               alert("Usuário atualizado com sucesso.");
-              buscarUsuarios(); // Atualiza a lista após a edição
+              buscarUsuarios();
             });
           }
         });
+      };
+
+      window.confirmarExclusaoUsuario = function(uid) {
+        if (confirm("Tem certeza de que deseja excluir este usuário?")) {
+          db.ref('usuarios/' + uid).remove().then(() => {
+            alert("Usuário excluído com sucesso.");
+            buscarUsuarios();
+          });
+        }
       };
     });
   </script>
