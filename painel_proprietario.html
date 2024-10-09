@@ -11,30 +11,36 @@
       color: #333;
       text-align: center;
     }
+
     h1 {
       color: #4CAF50;
       margin-top: 20px;
       font-size: 32px;
     }
+
     h2 {
       color: #333;
       font-size: 24px;
       margin-top: 20px;
     }
-    form, .unit-container {
+
+    form, .unit-container, #progressoAluno {
       background-color: #ffffff;
       padding: 20px;
       margin: 20px auto;
       border-radius: 8px;
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
       max-width: 500px;
+      text-align: left;
     }
+
     label {
       display: block;
       margin: 10px 0 5px;
       font-weight: bold;
       color: #333;
     }
+
     input[type="email"], input[type="password"], input[type="text"], input[type="tel"], select {
       width: 100%;
       padding: 10px;
@@ -43,6 +49,7 @@
       border-radius: 5px;
       box-sizing: border-box;
     }
+
     button {
       background-color: #4CAF50;
       color: white;
@@ -55,30 +62,37 @@
       transition: background-color 0.3s ease;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
     }
+
     button:hover {
       background-color: #45A049;
     }
+
     .back-button {
       background-color: #3B82F6;
       margin-top: 15px;
     }
+
     .back-button:hover {
       background-color: #2F66B8;
     }
+
     .disabled {
       background-color: #ccc;
       color: #777;
       cursor: not-allowed;
     }
+
     #feedback {
       color: red;
       font-weight: bold;
     }
+
     #resultados {
       text-align: left;
       max-width: 600px;
       margin: auto;
     }
+
     .result-container {
       background-color: #ffffff;
       padding: 15px;
@@ -86,10 +100,12 @@
       border-radius: 8px;
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     }
+
     .result-container h3 {
       color: #4CAF50;
       font-size: 20px;
     }
+
     hr {
       border: 0;
       height: 1px;
@@ -97,158 +113,10 @@
       margin: 20px 0;
     }
   </style>
-
-  <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-database.js"></script>
-
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      // Configuração do Firebase
-      var firebaseConfig = {
-        apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
-        authDomain: "hannahenglishcourse.firebaseapp.com",
-        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
-        projectId: "hannahenglishcourse",
-        storageBucket: "hannahenglishcourse.appspot.com",
-        messagingSenderId: "449818788486",
-        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
-        measurementId: "G-07VVJG9LRS"
-      };
-      firebase.initializeApp(firebaseConfig);
-      const db = firebase.database();
-
-      // Função para cadastrar um novo usuário
-      document.getElementById('cadastroForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        const email = document.getElementById('email').value;
-        const senha = document.getElementById('senha').value;
-        const nome = document.getElementById('nome').value;
-        const telefone = document.getElementById('telefone').value;
-        const tipo = document.getElementById('tipo').value;
-        const dataHora = new Date().toLocaleString();
-        const feedback = document.getElementById('feedback');
-        feedback.textContent = ''; 
-
-        if (senha.length < 6) {
-          feedback.textContent = 'A senha deve ter pelo menos 6 caracteres.';
-          return;
-        }
-
-        firebase.auth().createUserWithEmailAndPassword(email, senha)
-          .then(userCredential => {
-            const userId = userCredential.user.uid;
-            const userData = {
-              email: email,
-              nome: nome,
-              telefone: telefone,
-              role: tipo,
-              progresso: tipo === 'aluno' ? {} : null,
-              dataHoraCadastro: dataHora
-            };
-            return db.ref('usuarios/' + userId).set(userData);
-          })
-          .then(() => {
-            alert("Usuário cadastrado com sucesso!");
-            document.getElementById('cadastroForm').reset();
-          })
-          .catch(error => {
-            console.error("Erro ao cadastrar usuário:", error);
-            feedback.textContent = `Erro: ${error.message}`;
-          });
-      });
-
-      // Função para buscar usuários por tipo
-      function buscarUsuarios() {
-        const filtroTipo = document.getElementById('filtroTipo').value;
-        db.ref('usuarios').once('value', snapshot => {
-          const resultados = snapshot.val();
-          let html = '';
-          
-          for (let uid in resultados) {
-            const usuario = resultados[uid];
-            if (filtroTipo === '' || usuario.role === filtroTipo) {
-              html += `<div class="result-container">
-                <h3>${usuario.nome} (${usuario.role})</h3>
-                <p>Email: ${usuario.email}</p>
-                <p>Telefone: ${usuario.telefone}</p>
-                <p>Data de Cadastro: ${usuario.dataHoraCadastro}</p>
-                <button onclick="editarUsuario('${uid}')">Editar</button>
-                <button onclick="confirmarExclusao('${uid}')">Excluir</button>`;
-              
-              if (usuario.role === 'professor') {
-                html += `<button onclick="adicionarTurma('${uid}')">Adicionar Turma</button>
-                         <div id="turmas_${uid}">`;
-                if (usuario.turmas) {
-                  for (let turmaId in usuario.turmas) {
-                    const turma = usuario.turmas[turmaId];
-                    html += `<div>
-                                <p>Turma: ${turma.nome_turma}</p>
-                                <p>Quantidade de Alunos: ${turma.numero_alunos}</p>
-                                <button onclick="editarTurma('${uid}', '${turmaId}')">Editar Turma</button>
-                                <button onclick="confirmarExclusaoTurma('${uid}', '${turmaId}')">Excluir Turma</button>
-                              </div>`;
-                  }
-                }
-                html += `</div>`;
-              }
-
-              if (usuario.role === 'aluno') {
-                html += `<div id="progresso_${uid}">
-                          <button onclick="adicionarNivel('${uid}')">Adicionar Nível</button>`;
-                if (usuario.progresso) {
-                  for (let nivel in usuario.progresso) {
-                    html += `<h4>Nível ${nivel}</h4><ul>`;
-                    for (let unidade in usuario.progresso[nivel]) {
-                      html += `<li>Unidade ${unidade}<ul>`;
-                      for (let fase in usuario.progresso[nivel][unidade]) {
-                        html += `<li>Fase ${fase}: ${usuario.progresso[nivel][unidade][fase] ? 'Completa' : 'Incompleta'}`;
-                        html += `<button onclick="alterarProgresso('${uid}', '${nivel}', '${unidade}', '${fase}')">
-                                  Marcar como ${usuario.progresso[nivel][unidade][fase] ? 'Incompleta' : 'Completa'}
-                                </button></li>`;
-                      }
-                      html += `</ul></li>`;
-                    }
-                    html += `</ul><button onclick="editarNivel('${uid}', '${nivel}')">Editar Nível</button>
-                            <button onclick="excluirNivel('${uid}', '${nivel}')">Excluir Nível</button>`;
-                  }
-                }
-                html += `</div>`;
-              }
-
-              html += `</div>`;
-            }
-          }
-          
-          document.getElementById('resultados').innerHTML = html;
-        });
-      }
-
-      // Funções para Adicionar/Editar/Excluir Nível, Unidade e Fase
-      function adicionarNivel(uid) {
-        const nivel = prompt("Digite o nível (N1, N2, etc):");
-        if (nivel) {
-          const nivelPath = `usuarios/${uid}/progresso/${nivel}`;
-          db.ref(nivelPath).set({})
-            .then(() => {
-              alert("Nível adicionado com sucesso!");
-              buscarUsuarios();
-            })
-            .catch(error => {
-              console.error("Erro ao adicionar nível:", error);
-            });
-        }
-      }
-
-      // Demais funções aqui...
-
-      buscarUsuarios();
-    });
-  </script>
 </head>
 
 <body>
+  <!-- Botão Back -->
   <button class="back-button" onclick="window.history.back()">Back</button>
 
   <h1>Gerenciamento de Usuários</h1>
@@ -294,5 +162,196 @@
   <h2>Resultados da Pesquisa</h2>
   <div id="resultados"></div>
 
+  <!-- Progresso do Aluno -->
+  <div id="progressoAluno"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-database.js"></script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Configuração do Firebase
+      var firebaseConfig = {
+        apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+        authDomain: "hannahenglishcourse.firebaseapp.com",
+        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "hannahenglishcourse",
+        storageBucket: "hannahenglishcourse.appspot.com",
+        messagingSenderId: "449818788486",
+        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+        measurementId: "G-07VVJG9LRS"
+      };
+      firebase.initializeApp(firebaseConfig);
+
+      const db = firebase.database();
+
+      // Função para cadastrar um novo usuário
+      document.getElementById('cadastroForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const email = document.getElementById('email').value;
+        const senha = document.getElementById('senha').value;
+        const nome = document.getElementById('nome').value;
+        const telefone = document.getElementById('telefone').value;
+        const tipo = document.getElementById('tipo').value;
+        const dataHora = new Date().toLocaleString();
+        const feedback = document.getElementById('feedback');
+        feedback.textContent = ''; // Limpa o feedback anterior
+
+        if (senha.length < 6) {
+          feedback.textContent = 'A senha deve ter pelo menos 6 caracteres.';
+          return;
+        }
+
+        firebase.auth().createUserWithEmailAndPassword(email, senha)
+          .then(userCredential => {
+            const userId = userCredential.user.uid;
+            const userData = {
+              email: email,
+              nome: nome,
+              telefone: telefone,
+              role: tipo,
+              progresso: tipo === 'aluno' ? {} : null,
+              dataHoraCadastro: dataHora
+            };
+            return db.ref('usuarios/' + userId).set(userData);
+          })
+          .then(() => {
+            alert("Usuário cadastrado com sucesso!");
+            document.getElementById('cadastroForm').reset();
+            buscarUsuarios(); // Atualiza a lista após salvar ou editar
+          })
+          .catch(error => {
+            console.error("Erro ao cadastrar usuário:", error);
+            feedback.textContent = `Erro: ${error.message}`;
+          });
+      });
+
+      // Função para buscar usuários por tipo
+      window.buscarUsuarios = function() {
+        const filtroTipo = document.getElementById('filtroTipo').value;
+        db.ref('usuarios').once('value', snapshot => {
+          const resultados = snapshot.val();
+          let html = '';
+          
+          for (let uid in resultados) {
+            const usuario = resultados[uid];
+            if (filtroTipo === '' || usuario.role === filtroTipo) {
+              html += `<div class="result-container">
+                <h3>${usuario.nome} (${usuario.role})</h3>
+                <p>Email: ${usuario.email}</p>
+                <p>Telefone: ${usuario.telefone}</p>
+                <p>Data de Cadastro: ${usuario.dataHoraCadastro}</p>
+                ${usuario.role === 'aluno' ? `<button onclick="verProgresso('${uid}')">Ver Progresso</button>` : ''}
+                <button onclick="editarUsuario('${uid}')">Editar</button>
+                <button onclick="confirmarExclusaoUsuario('${uid}')">Excluir</button>
+                ${usuario.role === 'professor' ? `
+                  <div id="turmas-${uid}"></div>
+                  <button onclick="cadastrarTurma('${uid}')">Adicionar Turma</button>
+                  <button onclick="listarTurmas('${uid}')">Ver Turmas</button>` : ''}
+              </div>`;
+            }
+          }
+          
+          document.getElementById('resultados').innerHTML = html;
+        });
+      };
+
+      // Função para listar turmas do professor
+      window.listarTurmas = function(uid) {
+        db.ref(`usuarios/${uid}/turmas`).once('value').then(snapshot => {
+          let turmasHTML = '<h4>Turmas:</h4><ul>';
+          snapshot.forEach(childSnapshot => {
+            const turmaId = childSnapshot.key;
+            const turma = childSnapshot.val();
+            turmasHTML += `<li>${turma.nome} - ${turma.alunos} alunos 
+                           <button onclick="editarTurma('${uid}', '${turmaId}')">Editar</button>
+                           <button onclick="excluirTurma('${uid}', '${turmaId}')">Excluir</button>
+                           </li>`;
+          });
+          turmasHTML += '</ul>';
+          document.getElementById(`turmas-${uid}`).innerHTML = turmasHTML;
+        });
+      };
+
+      // Funções de edição e exclusão de turma
+      window.editarTurma = function(uid, turmaId) {
+        const nome = prompt("Nome da turma:");
+        const alunos = prompt("Número de alunos:");
+        if (nome && alunos) {
+          db.ref(`usuarios/${uid}/turmas/${turmaId}`).update({
+            nome: nome,
+            alunos: parseInt(alunos)
+          }).then(() => {
+            alert("Turma atualizada com sucesso!");
+            listarTurmas(uid);
+          });
+        }
+      };
+
+      window.excluirTurma = function(uid, turmaId) {
+        if (confirm("Tem certeza de que deseja excluir esta turma?")) {
+          db.ref(`usuarios/${uid}/turmas/${turmaId}`).remove().then(() => {
+            alert("Turma excluída com sucesso!");
+            listarTurmas(uid);
+          });
+        }
+      };
+
+      // Funções relacionadas ao progresso do aluno
+      window.verProgresso = function(uid) {
+        db.ref(`usuarios/${uid}/progresso`).once('value', snapshot => {
+          const progresso = snapshot.val();
+          let progressoHTML = `<h3>Progresso do Aluno</h3><ul>`;
+          for (let nivel in progresso) {
+            progressoHTML += `<li><strong>Nível ${nivel}</strong><ul>`;
+            for (let unidade in progresso[nivel]) {
+              progressoHTML += `<li>Unidade ${unidade}: <ul>`;
+              for (let fase in progresso[nivel][unidade]) {
+                const status = progresso[nivel][unidade][fase] ? 'Completo' : 'Incompleto';
+                progressoHTML += `<li>Fase ${fase}: ${status}</li>`;
+              }
+              progressoHTML += `</ul></li>`;
+            }
+            progressoHTML += `</ul></li>`;
+          }
+          progressoHTML += `</ul>`;
+          document.getElementById('progressoAluno').innerHTML = progressoHTML;
+        });
+      };
+
+      // Função para excluir um usuário
+      window.confirmarExclusaoUsuario = function(uid) {
+        if (confirm("Tem certeza de que deseja excluir este usuário?")) {
+          db.ref('usuarios/' + uid).remove().then(() => {
+            alert("Usuário excluído com sucesso.");
+            buscarUsuarios(); // Atualiza a lista após a exclusão
+          });
+        }
+      };
+
+      // Função para editar um usuário
+      window.editarUsuario = function(uid) {
+        db.ref('usuarios/' + uid).once('value').then(snapshot => {
+          const usuario = snapshot.val();
+          const novoNome = prompt("Edite o nome:", usuario.nome);
+          const novoTelefone = prompt("Edite o telefone:", usuario.telefone);
+          const novoTipo = prompt("Edite o tipo (aluno, professor, visitante, proprietário):", usuario.role);
+          if (novoNome && novoTelefone && novoTipo) {
+            db.ref('usuarios/' + uid).update({
+              nome: novoNome,
+              telefone: novoTelefone,
+              role: novoTipo
+            }).then(() => {
+              alert("Usuário atualizado com sucesso.");
+              buscarUsuarios(); // Atualiza a lista após a edição
+            });
+          }
+        });
+      };
+
+    });
+  </script>
 </body>
 </html>
