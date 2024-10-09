@@ -193,7 +193,20 @@
               <button onclick="confirmarExclusao('${uid}')">Excluir</button>`;
             
             if (usuario.role === 'professor') {
-              html += `<button onclick="adicionarTurma('${uid}')">Adicionar Turma</button>`;
+              html += `<button onclick="adicionarTurma('${uid}')">Adicionar Turma</button>
+                       <div id="turmas_${uid}">`;
+              if (usuario.turmas) {
+                for (let turmaId in usuario.turmas) {
+                  const turma = usuario.turmas[turmaId];
+                  html += `<div>
+                              <p>Turma: ${turma.nome_turma}</p>
+                              <p>Quantidade de Alunos: ${turma.numero_alunos}</p>
+                              <button onclick="editarTurma('${uid}', '${turmaId}')">Editar Turma</button>
+                              <button onclick="confirmarExclusaoTurma('${uid}', '${turmaId}')">Excluir Turma</button>
+                            </div>`;
+                }
+              }
+              html += `</div>`;
             }
 
             if (usuario.role === 'aluno') {
@@ -206,6 +219,63 @@
         
         document.getElementById('resultados').innerHTML = html;
       });
+    }
+
+    // Função para adicionar turma a um professor
+    function adicionarTurma(uid) {
+      const turmaNome = prompt("Digite o nome da turma:");
+      const turmaNumero = prompt("Digite o número de alunos:");
+      
+      if (turmaNome && turmaNumero) {
+        const turmaId = db.ref().child('usuarios/' + uid + '/turmas').push().key;
+        const novaTurma = {
+          nome_turma: turmaNome,
+          numero_alunos: turmaNumero
+        };
+        
+        db.ref('usuarios/' + uid + '/turmas/' + turmaId).set(novaTurma)
+          .then(() => {
+            alert("Turma adicionada com sucesso!");
+            buscarUsuarios(); // Atualiza a lista de usuários
+          })
+          .catch(error => {
+            console.error("Erro ao adicionar turma:", error);
+          });
+      }
+    }
+
+    // Função para editar uma turma
+    function editarTurma(uid, turmaId) {
+      const novoNome = prompt("Edite o nome da turma:");
+      const novoNumeroAlunos = prompt("Edite o número de alunos:");
+      
+      if (novoNome && novoNumeroAlunos) {
+        db.ref('usuarios/' + uid + '/turmas/' + turmaId).update({
+          nome_turma: novoNome,
+          numero_alunos: novoNumeroAlunos
+        })
+        .then(() => {
+          alert("Turma atualizada com sucesso!");
+          buscarUsuarios(); // Atualiza a lista de usuários
+        })
+        .catch(error => {
+          console.error("Erro ao atualizar a turma:", error);
+        });
+      }
+    }
+
+    // Função para confirmar e excluir uma turma
+    function confirmarExclusaoTurma(uid, turmaId) {
+      if (confirm("Tem certeza de que deseja excluir esta turma?")) {
+        db.ref('usuarios/' + uid + '/turmas/' + turmaId).remove()
+          .then(() => {
+            alert("Turma excluída com sucesso.");
+            buscarUsuarios(); // Atualiza a lista de usuários
+          })
+          .catch(error => {
+            console.error("Erro ao excluir turma:", error);
+          });
+      }
     }
 
     // Função para mostrar progresso do aluno
@@ -231,7 +301,7 @@
         }
 
         html += `<button onclick="adicionarNivel('${uid}')">Adicionar Nível</button>`;
-        document.getElementById('resultados').innerHTML += html;
+        document.getElementById('progressoAluno').innerHTML = html;
       });
     }
 
@@ -250,36 +320,6 @@
       }
     }
 
-    // Função para adicionar uma unidade
-    function adicionarUnidade(uid, nivel) {
-      const unidade = prompt("Digite a unidade (U1, U2, etc):");
-      if (unidade) {
-        db.ref('usuarios/' + uid + '/progresso/' + nivel + '/' + unidade).set({})
-          .then(() => {
-            alert("Unidade adicionada com sucesso!");
-            mostrarProgresso(uid);
-          })
-          .catch(error => {
-            console.error("Erro ao adicionar unidade:", error);
-          });
-      }
-    }
-
-    // Função para adicionar uma fase
-    function adicionarFase(uid, nivel, unidade) {
-      const fase = prompt("Digite a fase (F1, F2, etc):");
-      if (fase) {
-        db.ref('usuarios/' + uid + '/progresso/' + nivel + '/' + unidade + '/' + fase).set(false)
-          .then(() => {
-            alert("Fase adicionada com sucesso!");
-            mostrarProgresso(uid);
-          })
-          .catch(error => {
-            console.error("Erro ao adicionar fase:", error);
-          });
-      }
-    }
-
     // Função para alterar o progresso de uma fase
     function alterarProgresso(uid, nivel, unidade, fase) {
       db.ref('usuarios/' + uid + '/progresso/' + nivel + '/' + unidade + '/' + fase).once('value', snapshot => {
@@ -294,8 +334,6 @@
           });
       });
     }
-
-    // Funções de edição, exclusão e cadastro de usuários permanecem as mesmas
 
   </script>
 </head>
@@ -345,6 +383,7 @@
   <!-- Resultados da Pesquisa -->
   <h2>Resultados da Pesquisa</h2>
   <div id="resultados"></div>
+  <div id="progressoAluno"></div>
 
 </body>
 </html>
