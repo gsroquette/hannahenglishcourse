@@ -11,19 +11,16 @@
       color: #333;
       text-align: center;
     }
-
     h1 {
       color: #4CAF50;
       margin-top: 20px;
       font-size: 32px;
     }
-
     h2 {
       color: #333;
       font-size: 24px;
       margin-top: 20px;
     }
-
     form, .unit-container {
       background-color: #ffffff;
       padding: 20px;
@@ -32,14 +29,12 @@
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
       max-width: 500px;
     }
-
     label {
       display: block;
       margin: 10px 0 5px;
       font-weight: bold;
       color: #333;
     }
-
     input[type="email"], input[type="password"], input[type="text"], input[type="tel"], select {
       width: 100%;
       padding: 10px;
@@ -48,7 +43,6 @@
       border-radius: 5px;
       box-sizing: border-box;
     }
-
     button {
       background-color: #4CAF50;
       color: white;
@@ -61,37 +55,30 @@
       transition: background-color 0.3s ease;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
     }
-
     button:hover {
       background-color: #45A049;
     }
-
     .back-button {
       background-color: #3B82F6;
       margin-top: 15px;
     }
-
     .back-button:hover {
       background-color: #2F66B8;
     }
-
     .disabled {
       background-color: #ccc;
       color: #777;
       cursor: not-allowed;
     }
-
     #feedback {
       color: red;
       font-weight: bold;
     }
-
     #resultados, #progressoAluno {
       text-align: left;
       max-width: 600px;
       margin: auto;
     }
-
     .result-container {
       background-color: #ffffff;
       padding: 15px;
@@ -99,12 +86,10 @@
       border-radius: 8px;
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     }
-
     .result-container h3 {
       color: #4CAF50;
       font-size: 20px;
     }
-
     hr {
       border: 0;
       height: 1px;
@@ -112,7 +97,7 @@
       margin: 20px 0;
     }
   </style>
-  
+
   <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-database.js"></script>
@@ -120,7 +105,7 @@
   <script>
     // Configuração do Firebase
     var firebaseConfig = {
-      apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+      apiKey: "API_KEY",
       authDomain: "hannahenglishcourse.firebaseapp.com",
       databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
       projectId: "hannahenglishcourse",
@@ -130,7 +115,6 @@
       measurementId: "G-07VVJG9LRS"
     };
     firebase.initializeApp(firebaseConfig);
-
     const db = firebase.database();
 
     // Função para cadastrar um novo usuário
@@ -210,8 +194,26 @@
             }
 
             if (usuario.role === 'aluno') {
-              html += `<button onclick="mostrarProgresso('${uid}')">Progresso</button>`;
-              html += `<button onclick="adicionarNivel('${uid}')">Adicionar Nível</button>`;
+              html += `<div id="progresso_${uid}">
+                        <button onclick="adicionarNivel('${uid}')">Adicionar Nível</button>`;
+              if (usuario.progresso) {
+                for (let nivel in usuario.progresso) {
+                  html += `<h4>Nível ${nivel}</h4><ul>`;
+                  for (let unidade in usuario.progresso[nivel]) {
+                    html += `<li>Unidade ${unidade}<ul>`;
+                    for (let fase in usuario.progresso[nivel][unidade]) {
+                      html += `<li>Fase ${fase}: ${usuario.progresso[nivel][unidade][fase] ? 'Completa' : 'Incompleta'}`;
+                      html += `<button onclick="alterarProgresso('${uid}', '${nivel}', '${unidade}', '${fase}')">
+                                Marcar como ${usuario.progresso[nivel][unidade][fase] ? 'Incompleta' : 'Completa'}
+                              </button></li>`;
+                    }
+                    html += `</ul></li>`;
+                  }
+                  html += `</ul><button onclick="editarNivel('${uid}', '${nivel}')">Editar Nível</button>
+                          <button onclick="excluirNivel('${uid}', '${nivel}')">Excluir Nível</button>`;
+                }
+              }
+              html += `</div>`;
             }
 
             html += `</div>`;
@@ -222,97 +224,14 @@
       });
     }
 
-    // Função para adicionar turma a um professor
-    function adicionarTurma(uid) {
-      const turmaNome = prompt("Digite o nome da turma:");
-      const turmaNumero = prompt("Digite o número de alunos:");
-      
-      if (turmaNome && turmaNumero) {
-        const turmaId = db.ref().child('usuarios/' + uid + '/turmas').push().key;
-        const novaTurma = {
-          nome_turma: turmaNome,
-          numero_alunos: turmaNumero
-        };
-        
-        db.ref('usuarios/' + uid + '/turmas/' + turmaId).set(novaTurma)
-          .then(() => {
-            alert("Turma adicionada com sucesso!");
-            buscarUsuarios(); // Atualiza a lista de usuários
-          })
-          .catch(error => {
-            console.error("Erro ao adicionar turma:", error);
-          });
-      }
-    }
-
-    // Função para editar uma turma
-    function editarTurma(uid, turmaId) {
-      const novoNome = prompt("Edite o nome da turma:");
-      const novoNumeroAlunos = prompt("Edite o número de alunos:");
-      
-      if (novoNome && novoNumeroAlunos) {
-        db.ref('usuarios/' + uid + '/turmas/' + turmaId).update({
-          nome_turma: novoNome,
-          numero_alunos: novoNumeroAlunos
-        })
-        .then(() => {
-          alert("Turma atualizada com sucesso!");
-          buscarUsuarios(); // Atualiza a lista de usuários
-        })
-        .catch(error => {
-          console.error("Erro ao atualizar a turma:", error);
-        });
-      }
-    }
-
-    // Função para confirmar e excluir uma turma
-    function confirmarExclusaoTurma(uid, turmaId) {
-      if (confirm("Tem certeza de que deseja excluir esta turma?")) {
-        db.ref('usuarios/' + uid + '/turmas/' + turmaId).remove()
-          .then(() => {
-            alert("Turma excluída com sucesso.");
-            buscarUsuarios(); // Atualiza a lista de usuários
-          })
-          .catch(error => {
-            console.error("Erro ao excluir turma:", error);
-          });
-      }
-    }
-
-    // Função para mostrar progresso do aluno
-    function mostrarProgresso(uid) {
-      db.ref('usuarios/' + uid + '/progresso').once('value', snapshot => {
-        const progresso = snapshot.val();
-        let html = `<h3>Progresso do Aluno</h3>`;
-        
-        for (let nivel in progresso) {
-          html += `<h4>Nível ${nivel}</h4><ul>`;
-          for (let unidade in progresso[nivel]) {
-            html += `<li>Unidade ${unidade}<ul>`;
-            for (let fase in progresso[nivel][unidade]) {
-              html += `<li>Fase ${fase}: ${progresso[nivel][unidade][fase] ? 'Completa' : 'Incompleta'}`;
-              html += `<button onclick="alterarProgresso('${uid}', '${nivel}', '${unidade}', '${fase}')">
-                          Marcar como ${progresso[nivel][unidade][fase] ? 'Incompleta' : 'Completa'}
-                       </button>`;
-              html += `</li>`;
-            }
-            html += `</ul></li>`;
-          }
-          html += `</ul>`;
-        }
-
-        document.getElementById('progressoAluno').innerHTML = html;
-      });
-    }
-
-    // Função para adicionar um nível
+    // Funções para Adicionar/Editar/Excluir Nível, Unidade e Fase
     function adicionarNivel(uid) {
       const nivel = prompt("Digite o nível (N1, N2, etc):");
       if (nivel) {
         db.ref('usuarios/' + uid + '/progresso/' + nivel).set({})
           .then(() => {
             alert("Nível adicionado com sucesso!");
-            mostrarProgresso(uid);
+            buscarUsuarios();
           })
           .catch(error => {
             console.error("Erro ao adicionar nível:", error);
@@ -320,21 +239,49 @@
       }
     }
 
-    // Função para alterar o progresso de uma fase
+    function editarNivel(uid, nivel) {
+      const novoNivel = prompt("Edite o nome do nível:", nivel);
+      if (novoNivel) {
+        db.ref('usuarios/' + uid + '/progresso/' + novoNivel).set({})
+          .then(() => {
+            if (novoNivel !== nivel) {
+              db.ref('usuarios/' + uid + '/progresso/' + nivel).remove();
+            }
+            alert("Nível atualizado com sucesso!");
+            buscarUsuarios();
+          })
+          .catch(error => {
+            console.error("Erro ao editar nível:", error);
+          });
+      }
+    }
+
+    function excluirNivel(uid, nivel) {
+      if (confirm("Tem certeza de que deseja excluir este nível?")) {
+        db.ref('usuarios/' + uid + '/progresso/' + nivel).remove()
+          .then(() => {
+            alert("Nível excluído com sucesso.");
+            buscarUsuarios();
+          })
+          .catch(error => {
+            console.error("Erro ao excluir nível:", error);
+          });
+      }
+    }
+
     function alterarProgresso(uid, nivel, unidade, fase) {
       db.ref('usuarios/' + uid + '/progresso/' + nivel + '/' + unidade + '/' + fase).once('value', snapshot => {
         const completado = snapshot.val();
         db.ref('usuarios/' + uid + '/progresso/' + nivel + '/' + unidade + '/' + fase).set(!completado)
           .then(() => {
             alert("Progresso atualizado com sucesso!");
-            mostrarProgresso(uid);
+            buscarUsuarios();
           })
           .catch(error => {
             console.error("Erro ao atualizar progresso:", error);
           });
       });
     }
-
   </script>
 </head>
 
@@ -383,7 +330,6 @@
   <!-- Resultados da Pesquisa -->
   <h2>Resultados da Pesquisa</h2>
   <div id="resultados"></div>
-  <div id="progressoAluno"></div>
 
 </body>
 </html>
