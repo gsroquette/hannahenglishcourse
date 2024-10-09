@@ -342,13 +342,10 @@
           });
       });
 
-      // Reassocia a função `buscarUsuarios` ao botão de pesquisa
       window.buscarUsuarios = buscarUsuarios;
       buscarUsuarios(true);
-      
-      // Mantenha o código de funções de manipulação aqui, como toggleProgresso, cadastrarTurma, listarTurmas, editarUsuario, etc.
 
-      // Exemplo de toggleProgresso para referência:
+      // Funções globais para manipulação de progresso, edição, exclusão, etc.
       window.toggleProgresso = function(uid) {
         const progressoContainer = document.getElementById(`progresso-${uid}`);
         if (progressoContainer.style.display === 'none' || progressoContainer.style.display === '') {
@@ -375,7 +372,98 @@
           progressoContainer.style.display = 'none';
         }
       };
-      // Coloque aqui outras funções de manipulação, como cadastrarTurma, listarTurmas, editarUsuario, etc.
+
+      window.cadastrarTurma = function(uid) {
+        const nomeTurma = prompt("Nome da turma:");
+        const numeroAlunos = prompt("Número de alunos:");
+        
+        if (nomeTurma && numeroAlunos) {
+          const novaTurmaRef = db.ref(`usuarios/${uid}/turmas`).push();
+          novaTurmaRef.set({
+            nome: nomeTurma,
+            alunos: parseInt(numeroAlunos)
+          }).then(() => {
+            alert("Turma cadastrada com sucesso!");
+            listarTurmas(uid);
+          }).catch(error => {
+            console.error("Erro ao cadastrar turma:", error);
+            alert("Erro ao cadastrar turma: " + error.message);
+          });
+        }
+      };
+
+      window.listarTurmas = function(uid) {
+        const turmaContainer = document.getElementById(`turmas-${uid}`);
+        if (turmaContainer.style.display === 'none' || turmaContainer.style.display === '') {
+          db.ref(`usuarios/${uid}/turmas`).once('value').then(snapshot => {
+            let turmasHTML = '<h4>Turmas:</h4><ul>';
+            snapshot.forEach(childSnapshot => {
+              const turmaId = childSnapshot.key;
+              const turma = childSnapshot.val();
+              turmasHTML += `<li>${turma.nome} - ${turma.alunos} alunos 
+                             <button onclick="editarTurma('${uid}', '${turmaId}')">Editar</button>
+                             <button onclick="excluirTurma('${uid}', '${turmaId}')">Excluir</button>
+                             </li>`;
+            });
+            turmasHTML += '</ul>';
+            turmaContainer.innerHTML = turmasHTML;
+            turmaContainer.style.display = 'block';
+          });
+        } else {
+          turmaContainer.style.display = 'none';
+        }
+      };
+
+      window.editarTurma = function(uid, turmaId) {
+        const nome = prompt("Nome da turma:");
+        const alunos = prompt("Número de alunos:");
+        if (nome && alunos) {
+          db.ref(`usuarios/${uid}/turmas/${turmaId}`).update({
+            nome: nome,
+            alunos: parseInt(alunos)
+          }).then(() => {
+            alert("Turma atualizada com sucesso!");
+            listarTurmas(uid);
+          });
+        }
+      };
+
+      window.excluirTurma = function(uid, turmaId) {
+        if (confirm("Tem certeza de que deseja excluir esta turma?")) {
+          db.ref(`usuarios/${uid}/turmas/${turmaId}`).remove().then(() => {
+            alert("Turma excluída com sucesso!");
+            listarTurmas(uid);
+          });
+        }
+      };
+
+      window.editarUsuario = function(uid) {
+        db.ref('usuarios/' + uid).once('value').then(snapshot => {
+          const usuario = snapshot.val();
+          const novoNome = prompt("Edite o nome:", usuario.nome);
+          const novoTelefone = prompt("Edite o telefone:", usuario.telefone);
+          const novoTipo = prompt("Edite o tipo (aluno, professor, visitante, proprietário):", usuario.role);
+          if (novoNome && novoTelefone && novoTipo) {
+            db.ref('usuarios/' + uid).update({
+              nome: novoNome,
+              telefone: novoTelefone,
+              role: novoTipo
+            }).then(() => {
+              alert("Usuário atualizado com sucesso.");
+              buscarUsuarios(true);
+            });
+          }
+        });
+      };
+
+      window.confirmarExclusaoUsuario = function(uid) {
+        if (confirm("Tem certeza de que deseja excluir este usuário?")) {
+          db.ref('usuarios/' + uid).remove().then(() => {
+            alert("Usuário excluído com sucesso.");
+            buscarUsuarios(true);
+          });
+        }
+      };
     });
   </script>
 </body>
