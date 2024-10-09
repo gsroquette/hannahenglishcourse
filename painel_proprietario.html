@@ -201,7 +201,7 @@
         <option value="visitante">Visitante</option>
       </select>
     </label>
-    <button onclick="buscarUsuarios()">Pesquisar</button>
+    <button onclick="buscarUsuarios(true)">Pesquisar</button>
   </div>
 
   <!-- Resultados da Pesquisa -->
@@ -214,7 +214,7 @@
 
   <script>
     document.addEventListener('DOMContentLoaded', function() {
-      var firebaseConfig = {
+      const firebaseConfig = {
         apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
         authDomain: "hannahenglishcourse.firebaseapp.com",
         databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
@@ -227,6 +227,76 @@
       firebase.initializeApp(firebaseConfig);
 
       const db = firebase.database();
+      let lastLoadedUser = null;
+      const limit = 10;
+      let isFetching = false;
+
+      // Função para buscar usuários com scroll infinito
+      function buscarUsuarios(reset = false) {
+        if (isFetching) return;
+        isFetching = true;
+
+        const filtroTipo = document.getElementById('filtroTipo').value;
+        const filtroNome = document.getElementById('filtroNome').value.toLowerCase();
+        const filtroEmail = document.getElementById('filtroEmail').value.toLowerCase();
+
+        let query = db.ref('usuarios').orderByKey().limitToFirst(limit);
+
+        if (reset) {
+          lastLoadedUser = null;
+          document.getElementById('resultados').innerHTML = '';
+        }
+
+        if (lastLoadedUser) {
+          query = query.startAfter(lastLoadedUser);
+        }
+
+        query.once('value', snapshot => {
+          const resultados = snapshot.val();
+          if (!resultados) return;
+
+          const keys = Object.keys(resultados);
+          lastLoadedUser = keys[keys.length - 1];
+          let html = '';
+
+          keys.forEach(uid => {
+            const usuario = resultados[uid];
+            const nome = usuario.nome.toLowerCase();
+            const email = usuario.email.toLowerCase();
+
+            if (
+              (filtroTipo === '' || usuario.role === filtroTipo) &&
+              (filtroNome === '' || nome.includes(filtroNome)) &&
+              (filtroEmail === '' || email.includes(filtroEmail))
+            ) {
+              html += `<div class="result-container">
+                <h3>${usuario.nome} (${usuario.role})</h3>
+                <p>Email: ${usuario.email}</p>
+                <p>Telefone: ${usuario.telefone}</p>
+                <p>Data de Cadastro: ${usuario.dataHoraCadastro}</p>
+                ${usuario.role === 'aluno' ? `<button onclick="toggleProgresso('${uid}')">Ver Progresso</button>` : ''}
+                <button onclick="editarUsuario('${uid}')">Editar</button>
+                <button onclick="confirmarExclusaoUsuario('${uid}')">Excluir</button>
+                ${usuario.role === 'professor' ? `
+                  <div id="turmas-${uid}" class="turma-container"></div>
+                  <button onclick="cadastrarTurma('${uid}')">Adicionar Turma</button>
+                  <button onclick="listarTurmas('${uid}')">Ver Turmas</button>` : ''}
+                <div id="progresso-${uid}" class="progresso-container"></div>
+              </div>`;
+            }
+          });
+
+          document.getElementById('resultados').insertAdjacentHTML('beforeend', html);
+          isFetching = false;
+        });
+      }
+
+      // Detecta quando o usuário rola até o final da página e carrega mais dados
+      window.addEventListener('scroll', () => {
+        if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500 && !isFetching) {
+          buscarUsuarios();
+        }
+      });
 
       document.getElementById('cadastroForm').addEventListener('submit', function(e) {
         e.preventDefault();
@@ -261,7 +331,7 @@
           .then(() => {
             alert("Usuário cadastrado com sucesso!");
             document.getElementById('cadastroForm').reset();
-            buscarUsuarios();
+            buscarUsuarios(true);
           })
           .catch(error => {
             console.error("Erro ao cadastrar usuário:", error);
@@ -269,48 +339,10 @@
           });
       });
 
-      window.buscarUsuarios = function() {
-        const filtroTipo = document.getElementById('filtroTipo').value;
-        const filtroNome = document.getElementById('filtroNome').value.toLowerCase();
-        const filtroEmail = document.getElementById('filtroEmail').value.toLowerCase();
-        
-        db.ref('usuarios').once('value', snapshot => {
-          const resultados = snapshot.val();
-          let html = '';
-          
-          for (let uid in resultados) {
-            const usuario = resultados[uid];
-            const nome = usuario.nome.toLowerCase();
-            const email = usuario.email.toLowerCase();
-            
-            if (
-              (filtroTipo === '' || usuario.role === filtroTipo) &&
-              (filtroNome === '' || nome.includes(filtroNome)) &&
-              (filtroEmail === '' || email.includes(filtroEmail))
-            ) {
-              html += `<div class="result-container">
-                <h3>${usuario.nome} (${usuario.role})</h3>
-                <p>Email: ${usuario.email}</p>
-                <p>Telefone: ${usuario.telefone}</p>
-                <p>Data de Cadastro: ${usuario.dataHoraCadastro}</p>
-                ${usuario.role === 'aluno' ? `<button onclick="toggleProgresso('${uid}')">Ver Progresso</button>` : ''}
-                <button onclick="editarUsuario('${uid}')">Editar</button>
-                <button onclick="confirmarExclusaoUsuario('${uid}')">Excluir</button>
-                ${usuario.role === 'professor' ? `
-                  <div id="turmas-${uid}" class="turma-container"></div>
-                  <button onclick="cadastrarTurma('${uid}')">Adicionar Turma</button>
-                  <button onclick="listarTurmas('${uid}')">Ver Turmas</button>` : ''}
-                <div id="progresso-${uid}" class="progresso-container"></div>
-              </div>`;
-            }
-          }
-          
-          document.getElementById('resultados').innerHTML = html;
-        });
-      };
+      window.buscarUsuarios = buscarUsuarios;
+      buscarUsuarios(true);
       
-      // O restante das funções permanece inalterado...
-
+      // Outras funções (toggleProgresso, cadastrarTurma, listarTurmas, editarUsuario, etc) permanecem inalteradas...
     });
   </script>
 </body>
