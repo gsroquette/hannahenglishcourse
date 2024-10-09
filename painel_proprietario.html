@@ -228,7 +228,8 @@
     function adicionarNivel(uid) {
       const nivel = prompt("Digite o nível (N1, N2, etc):");
       if (nivel) {
-        db.ref('usuarios/' + uid + '/progresso/' + nivel).set({})
+        const nivelPath = `usuarios/${uid}/progresso/${nivel}`;
+        db.ref(nivelPath).set({})
           .then(() => {
             alert("Nível adicionado com sucesso!");
             buscarUsuarios();
@@ -242,10 +243,17 @@
     function editarNivel(uid, nivel) {
       const novoNivel = prompt("Edite o nome do nível:", nivel);
       if (novoNivel) {
-        db.ref('usuarios/' + uid + '/progresso/' + novoNivel).set({})
+        const nivelPath = `usuarios/${uid}/progresso/${nivel}`;
+        const novoNivelPath = `usuarios/${uid}/progresso/${novoNivel}`;
+        
+        db.ref(nivelPath).once('value')
+          .then(snapshot => {
+            const nivelData = snapshot.val();
+            return db.ref(novoNivelPath).set(nivelData);
+          })
           .then(() => {
             if (novoNivel !== nivel) {
-              db.ref('usuarios/' + uid + '/progresso/' + nivel).remove();
+              db.ref(nivelPath).remove();
             }
             alert("Nível atualizado com sucesso!");
             buscarUsuarios();
@@ -258,7 +266,8 @@
 
     function excluirNivel(uid, nivel) {
       if (confirm("Tem certeza de que deseja excluir este nível?")) {
-        db.ref('usuarios/' + uid + '/progresso/' + nivel).remove()
+        const nivelPath = `usuarios/${uid}/progresso/${nivel}`;
+        db.ref(nivelPath).remove()
           .then(() => {
             alert("Nível excluído com sucesso.");
             buscarUsuarios();
@@ -270,17 +279,19 @@
     }
 
     function alterarProgresso(uid, nivel, unidade, fase) {
-      db.ref('usuarios/' + uid + '/progresso/' + nivel + '/' + unidade + '/' + fase).once('value', snapshot => {
-        const completado = snapshot.val();
-        db.ref('usuarios/' + uid + '/progresso/' + nivel + '/' + unidade + '/' + fase).set(!completado)
-          .then(() => {
-            alert("Progresso atualizado com sucesso!");
-            buscarUsuarios();
-          })
-          .catch(error => {
-            console.error("Erro ao atualizar progresso:", error);
-          });
-      });
+      const fasePath = `usuarios/${uid}/progresso/${nivel}/${unidade}/${fase}`;
+      db.ref(fasePath).once('value')
+        .then(snapshot => {
+          const completado = snapshot.val();
+          return db.ref(fasePath).set(!completado);
+        })
+        .then(() => {
+          alert("Progresso atualizado com sucesso!");
+          buscarUsuarios();
+        })
+        .catch(error => {
+          console.error("Erro ao atualizar progresso:", error);
+        });
     }
   </script>
 </head>
