@@ -102,7 +102,8 @@
 
     .student-details {
       display: none;
-      margin-top: 10px;
+      padding: 10px;
+      border-top: 1px solid #ddd;
     }
 
     .progress-container {
@@ -119,35 +120,10 @@
 <body>
   <h1>Teacher Dashboard</h1>
 
-  <!-- Teacher Data Panel -->
-  <div class="panel" id="teacher-data">
-    <h2>Teacher's Information</h2>
-    <label for="teacher-name">Name</label>
-    <input type="text" id="teacher-name" placeholder="Your name">
-    
-    <label for="teacher-phone">Phone</label>
-    <input type="tel" id="teacher-phone" placeholder="Your phone number">
-    
-    <label>Email</label>
-    <input type="text" id="teacher-email" placeholder="Your email" readonly>
-    
-    <label for="teacher-avatar">Choose Avatar</label>
-    <select id="teacher-avatar">
-      <option value="avatar_professor1.png">Avatar 1</option>
-      <option value="avatar_professor2.png">Avatar 2</option>
-      <option value="avatar_professor3.png">Avatar 3</option>
-      <option value="avatar_professor4.png">Avatar 4</option>
-    </select>
-    <img id="avatar-preview" src="imagens/avatar_professor1.png" alt="Avatar Preview" style="width: 100px; height: 100px; margin-top: 10px;">
-    
-    <button onclick="saveTeacherData()">Save Changes</button>
-  </div>
-
-  <!-- Classes Panel -->
   <div class="panel" id="classes">
     <h2>Classes</h2>
     <div id="class-list">
-      <!-- Each class block will be generated dynamically here -->
+      <!-- Classes carregadas dinamicamente -->
     </div>
   </div>
 
@@ -168,57 +144,15 @@
     };
 
     firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
     const db = firebase.database();
 
-    auth.onAuthStateChanged(user => {
-      if (user) {
-        const teacherId = user.uid;
-        loadTeacherData(teacherId);
-      } else {
-        window.location.href = 'login.html';
-      }
-    });
-
-    function loadTeacherData(teacherId) {
-      const teacherRef = db.ref('usuarios/' + teacherId);
-
-      teacherRef.once('value', snapshot => {
-        const data = snapshot.val();
-        document.getElementById('teacher-name').value = data.nome || '';
-        document.getElementById('teacher-phone').value = data.telefone || '';
-        document.getElementById('teacher-email').value = data.email || '';
-        const avatar = data.avatar || 'avatar_professor1.png';
-        document.getElementById('teacher-avatar').value = avatar;
-        document.getElementById('avatar-preview').src = 'imagens/' + avatar;
-
-        loadClasses(teacherId);
-      });
-    }
-
-    function saveTeacherData() {
-      const teacherId = auth.currentUser.uid;
-      const teacherRef = db.ref('usuarios/' + teacherId);
-
-      const updatedData = {
-        nome: document.getElementById('teacher-name').value,
-        telefone: document.getElementById('teacher-phone').value,
-        avatar: document.getElementById('teacher-avatar').value
-      };
-
-      teacherRef.update(updatedData).then(() => {
-        alert("Teacher data saved successfully!");
-      }).catch(error => {
-        console.error("Error updating data:", error);
-      });
-    }
-
+    // Função para carregar turmas
     function loadClasses(teacherId) {
       const classesRef = db.ref('usuarios/' + teacherId + '/turmas');
-      classesRef.once('value', snapshot => {
-        const classList = document.getElementById('class-list');
-        classList.innerHTML = ''; 
+      const classList = document.getElementById('class-list');
+      classList.innerHTML = ''; 
 
+      classesRef.once('value', snapshot => {
         snapshot.forEach(childSnapshot => {
           const classData = childSnapshot.val();
           const classId = childSnapshot.key;
@@ -241,41 +175,7 @@
       });
     }
 
-    function addStudentToClass(teacherId, classId) {
-      const emailInput = document.getElementById(`student-email-${classId}`);
-      const email = emailInput.value.trim();
-      if (!email) {
-        alert("Please enter a student's email.");
-        return;
-      }
-
-      db.ref('usuarios').orderByChild('email').equalTo(email).once('value', snapshot => {
-        if (snapshot.exists()) {
-          snapshot.forEach(childSnapshot => {
-            const studentId = childSnapshot.key;
-            const studentRef = db.ref(`usuarios/${studentId}`);
-            studentRef.update({ atrelado_professor: true });
-
-            const classStudentRef = db.ref(`usuarios/${teacherId}/turmas/${classId}/students/${studentId}`);
-            classStudentRef.set({
-              nome: childSnapshot.val().nome,
-              nivel_em_curso: "level1"
-            }).then(() => {
-              alert("Student added successfully!");
-              loadStudents(teacherId, classId);
-            }).catch(error => {
-              console.error("Error adding student:", error);
-              alert("Error adding student. Please try again.");
-            });
-          });
-        } else {
-          alert("Student not found in the database.");
-        }
-      });
-
-      emailInput.value = ''; 
-    }
-
+    // Função para carregar alunos da turma
     function loadStudents(teacherId, classId) {
       const studentList = document.getElementById(`student-list-${classId}`);
       studentList.innerHTML = '';
@@ -293,43 +193,43 @@
         students.forEach(student => {
           const studentItem = document.createElement('li');
           studentItem.className = 'student-item';
-          studentItem.textContent = student.nome;
-
-          studentItem.onclick = () => {
-            showStudentDetails(studentItem, teacherId, classId, student.id, student.nivel_em_curso);
-          };
+          studentItem.innerHTML = `
+            ${student.nome}
+            <button class="expand-button" onclick="toggleStudentDetails('${teacherId}', '${classId}', '${student.id}')">Expand</button>
+            <div id="student-details-${student.id}" class="student-details"></div>
+          `;
 
           studentList.appendChild(studentItem);
         });
       });
     }
 
-    function showStudentDetails(studentItem, teacherId, classId, studentId, currentLevel) {
-      let detailsDiv = studentItem.querySelector('.student-details');
-      if (!detailsDiv) {
-        detailsDiv = document.createElement('div');
-        detailsDiv.className = 'student-details';
+    // Função para mostrar/ocultar detalhes do aluno
+    function toggleStudentDetails(teacherId, classId, studentId) {
+      const detailsDiv = document.getElementById(`student-details-${studentId}`);
+      if (detailsDiv.innerHTML === '') {
         detailsDiv.innerHTML = `
           <select onchange="updateStudentLevel('${teacherId}', '${classId}', '${studentId}', this.value)">
-            <option value="level1" ${currentLevel === 'level1' ? 'selected' : ''}>Level 1</option>
-            <option value="level2" ${currentLevel === 'level2' ? 'selected' : ''}>Level 2</option>
-            <option value="level3" ${currentLevel === 'level3' ? 'selected' : ''}>Level 3</option>
-            <option value="level4" ${currentLevel === 'level4' ? 'selected' : ''}>Level 4</option>
+            <option value="level1">Level 1</option>
+            <option value="level2">Level 2</option>
+            <option value="level3">Level 3</option>
+            <option value="level4">Level 4</option>
           </select>
-          <button onclick="loadProgress('${studentId}', '${studentItem.id}')">View Progress</button>
+          <button onclick="loadProgress('${studentId}')">View Progress</button>
           <button onclick="removeStudentFromClass('${teacherId}', '${classId}', '${studentId}')">Remove</button>
           <div id="progress-container-${studentId}" class="progress-container"></div>
         `;
-        studentItem.appendChild(detailsDiv);
-      } 
+      }
+
       detailsDiv.style.display = detailsDiv.style.display === 'none' ? 'block' : 'none';
     }
 
-    function loadProgress(studentId, itemId) {
+    // Função para carregar progresso do aluno
+    function loadProgress(studentId) {
       const progressContainer = document.getElementById(`progress-container-${studentId}`);
       progressContainer.style.display = progressContainer.style.display === 'none' ? 'block' : 'none';
 
-      if (progressContainer.style.display === 'block') {
+      if (progressContainer.innerHTML === '') {
         db.ref(`usuarios/${studentId}/progresso`).once('value', snapshot => {
           let progressHTML = '<h3>Progress</h3>';
           snapshot.forEach(levelSnap => {
@@ -353,19 +253,15 @@
       }
     }
 
-    function updateProgress(studentId, level, unit, phase, isComplete) {
-      const progressRef = db.ref(`usuarios/${studentId}/progresso/${level}/${unit}/${phase}`);
-      progressRef.set(isComplete).then(() => {
-        alert("Progress updated successfully!");
-      }).catch(error => {
-        console.error("Error updating progress:", error);
-      });
+    // Função para atualizar nível do aluno
+    function updateStudentLevel(teacherId, classId, studentId, level) {
+      db.ref(`usuarios/${teacherId}/turmas/${classId}/students/${studentId}`).update({ nivel_em_curso: level });
     }
 
+    // Função para remover aluno da turma
     function removeStudentFromClass(teacherId, classId, studentId) {
       if (confirm("Are you sure you want to remove this student?")) {
-        const studentRef = db.ref(`usuarios/${teacherId}/turmas/${classId}/students/${studentId}`);
-        studentRef.remove().then(() => {
+        db.ref(`usuarios/${teacherId}/turmas/${classId}/students/${studentId}`).remove().then(() => {
           alert("Student removed successfully!");
           loadStudents(teacherId, classId);
         }).catch(error => {
@@ -373,6 +269,15 @@
         });
       }
     }
+
+    // Inicialização do carregamento de turmas
+    firebase.auth().onAuthStateChanged(user => {
+      if (user) {
+        loadClasses(user.uid);
+      } else {
+        window.location.href = 'login.html';
+      }
+    });
   </script>
 </body>
 </html>
