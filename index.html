@@ -52,21 +52,10 @@
             display: inline-block;
         }
 
-        .levelA {
-            background-image: url('imagens/levelA.png');
-        }
-
-        .levelB {
-            background-image: url('imagens/levelB.png');
-        }
-
-        .levelC {
-            background-image: url('imagens/levelC.png');
-        }
-
-        .levelD {
-            background-image: url('imagens/levelD.png');
-        }
+        .levelA { background-image: url('imagens/levelA.png'); }
+        .levelB { background-image: url('imagens/levelB.png'); }
+        .levelC { background-image: url('imagens/levelC.png'); }
+        .levelD { background-image: url('imagens/levelD.png'); }
 
         /* Estilo do botão de login e dropdown */
         .login-container {
@@ -74,7 +63,7 @@
             top: 20px;
             right: 60px;
             z-index: 10;
-            background-color: white; /* Garante fundo branco no contêiner */
+            background-color: white;
             padding: 10px;
             border-radius: 8px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
@@ -90,6 +79,13 @@
             width: 40px;
             height: 40px;
             cursor: pointer;
+        }
+
+        .user-name {
+            font-size: 14px;
+            color: #333;
+            margin-top: 5px;
+            text-align: center;
         }
 
         .dropdown {
@@ -142,7 +138,6 @@
                 <a href="Formulario/login.html" class="login-button" id="loginLink">Login</a>
                 <div class="dropdown" id="userDropdown">
                     <a href="#" id="logout">LEAVE</a>
-                    <a href="painel_proprietario.html">OWNER DASHBOARD</a>
                 </div>
             </div>
 
@@ -174,7 +169,8 @@
             storageBucket: "hannahenglishcourse.appspot.com",
             messagingSenderId: "449818788486",
             appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
-            measurementId: "G-07VVJG9LRS"
+            measurementId: "G-07VVJG9LRS",
+            databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
         };
 
         // Inicializando Firebase
@@ -186,8 +182,40 @@
             const dropdown = document.getElementById("userDropdown");
             if (user) {
                 console.log("Usuário logado:", user.uid);
-                // Substitui o link de login pelo ícone de usuário
-                loginLink.innerHTML = `<img src="imagens/bonecologin1.png" alt="User Icon" class="user-icon">`;
+
+                // Acessa o banco de dados para buscar os dados do usuário
+                const userRef = firebase.database().ref('usuarios/' + user.uid);
+                userRef.once('value').then((snapshot) => {
+                    const userData = snapshot.val();
+                    const userName = userData.nome || user.email;
+                    const userAvatar = userData.avatar ? `imagens/${userData.avatar}` : 'imagens/bonecologin1.png';
+                    const userRole = userData.role || 'aluno';
+
+                    // Exibe o avatar e o nome do usuário
+                    loginLink.innerHTML = `
+                        <img src="${userAvatar}" alt="User Icon" class="user-icon">
+                        <p class="user-name">${userName}</p>
+                    `;
+
+                    // Define o link do dashboard com base no papel do usuário
+                    let dashboardLink = '';
+                    if (userRole === 'proprietario') {
+                        dashboardLink = `<a href="painel_proprietario.html">OWNER DASHBOARD</a>`;
+                    } else if (userRole === 'professor') {
+                        dashboardLink = `<a href="painel_professor.html">TEACHER DASHBOARD</a>`;
+                    } else if (userRole === 'aluno') {
+                        dashboardLink = `<a href="painel_aluno.html">STUDENT DASHBOARD</a>`;
+                    }
+
+                    // Insere o link apropriado no dropdown
+                    dropdown.innerHTML = `
+                        <a href="#" id="logout">LEAVE</a>
+                        ${dashboardLink}
+                    `;
+                }).catch((error) => {
+                    console.error("Erro ao buscar dados do usuário:", error);
+                });
+
                 loginLink.removeAttribute("href"); // Remove o href para evitar recarga
                 loginLink.onclick = function(event) {
                     event.preventDefault(); // Previne recarregamento da página
@@ -202,13 +230,15 @@
         });
 
         // Função de logout
-        document.getElementById("logout").addEventListener("click", function() {
-            firebase.auth().signOut().then(() => {
-                console.log("Usuário deslogado");
-                location.reload();
-            }).catch((error) => {
-                console.error("Erro ao deslogar:", error);
-            });
+        document.getElementById("userDropdown").addEventListener("click", function(event) {
+            if (event.target.id === "logout") {
+                firebase.auth().signOut().then(() => {
+                    console.log("Usuário deslogado");
+                    location.reload();
+                }).catch((error) => {
+                    console.error("Erro ao deslogar:", error);
+                });
+            }
         });
 
         // Fecha o dropdown ao clicar fora dele
