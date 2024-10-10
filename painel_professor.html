@@ -32,45 +32,6 @@
       text-align: left;
     }
 
-    .panel h2 {
-      font-size: 1.5em;
-      color: #333;
-      margin-bottom: 15px;
-    }
-
-    label {
-      display: block;
-      margin: 10px 0 5px;
-      font-weight: bold;
-      color: #333;
-    }
-
-    input[type="text"], input[type="tel"], select {
-      width: 100%;
-      padding: 10px;
-      margin: 8px 0;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      box-sizing: border-box;
-    }
-
-    button {
-      background-color: #4CAF50;
-      color: white;
-      padding: 12px 20px;
-      margin: 10px 0;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 1em;
-      transition: background-color 0.3s ease;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-    }
-
-    button:hover {
-      background-color: #45A049;
-    }
-
     .class-container {
       margin-top: 15px;
       padding: 15px;
@@ -224,42 +185,6 @@
       });
     }
 
-    // Add a student to a class
-    function addStudentToClass(teacherId, classId) {
-      const emailInput = document.getElementById(`student-email-${classId}`);
-      const email = emailInput.value.trim();
-      if (!email) {
-        alert("Please enter a student's email.");
-        return;
-      }
-
-      db.ref('usuarios').orderByChild('email').equalTo(email).once('value', snapshot => {
-        if (snapshot.exists()) {
-          snapshot.forEach(childSnapshot => {
-            const studentId = childSnapshot.key;
-            const studentRef = db.ref(`usuarios/${studentId}`);
-            studentRef.update({ atrelado_professor: true });
-
-            const classStudentRef = db.ref(`usuarios/${teacherId}/turmas/${classId}/students/${studentId}`);
-            classStudentRef.set({
-              nome: childSnapshot.val().nome,
-              nivel_em_curso: "level1"
-            }).then(() => {
-              alert("Student added successfully!");
-              loadStudents(teacherId, classId);
-            }).catch(error => {
-              console.error("Error adding student:", error);
-              alert("Error adding student. Please try again.");
-            });
-          });
-        } else {
-          alert("Student not found in the database.");
-        }
-      });
-
-      emailInput.value = ''; // Clear the input field
-    }
-
     // Load students for each class
     function loadStudents(teacherId, classId) {
       const studentList = document.getElementById(`student-list-${classId}`);
@@ -271,26 +196,55 @@
           const studentData = childSnapshot.val();
           const studentId = childSnapshot.key;
 
-          db.ref(`usuarios/${studentId}/atrelado_professor`).once('value', snap => {
-            const isAttached = snap.val() !== false;
-
-            const studentItem = document.createElement('li');
-            studentItem.className = isAttached ? '' : 'inactive';
-            studentItem.innerHTML = `
-              <p>${studentData.nome} ${!isAttached ? '<span class="inactive-msg">The student left the class</span>' : ''}</p>
-              <select ${!isAttached ? 'disabled' : ''} onchange="updateStudentLevel('${teacherId}', '${classId}', '${studentId}', this.value)">
-                <option value="level1" ${studentData.nivel_em_curso === 'level1' ? 'selected' : ''}>Level 1</option>
-                <option value="level2" ${studentData.nivel_em_curso === 'level2' ? 'selected' : ''}>Level 2</option>
-                <option value="level3" ${studentData.nivel_em_curso === 'level3' ? 'selected' : ''}>Level 3</option>
-                <option value="level4" ${studentData.nivel_em_curso === 'level4' ? 'selected' : ''}>Level 4</option>
-              </select>
-              <button ${!isAttached ? 'disabled' : ''} onclick="toggleProgress('${teacherId}', '${classId}', '${studentId}')">View Progress</button>
-              <button onclick="removeStudentFromClass('${teacherId}', '${classId}', '${studentId}')">Remove</button>
-              <div id="progress-container-${studentId}" class="progress-container"></div>
-            `;
-            studentList.appendChild(studentItem);
-          });
+          const studentItem = document.createElement('li');
+          studentItem.className = 'student-item';
+          studentItem.innerHTML = `
+            <p>${studentData.nome}</p>
+            <button onclick="toggleProgress('${studentId}')">View Progress</button>
+            <button onclick="removeStudentFromClass('${teacherId}', '${classId}', '${studentId}')">Remove</button>
+            <div id="progress-container-${studentId}" class="progress-container"></div>
+          `;
+          studentList.appendChild(studentItem);
         });
+      });
+    }
+
+    // Toggle student's progress visibility
+    function toggleProgress(studentId) {
+      const progressContainer = document.getElementById(`progress-container-${studentId}`);
+      progressContainer.style.display = progressContainer.style.display === 'none' ? 'block' : 'none';
+
+      if (progressContainer.innerHTML === '') {
+        db.ref(`usuarios/${studentId}/progresso`).once('value', snapshot => {
+          let progressHTML = '<h3>Progress</h3>';
+          snapshot.forEach(levelSnap => {
+            const level = levelSnap.key;
+            progressHTML += `<p><strong>Level ${level}</strong></p>`;
+            levelSnap.forEach(unitSnap => {
+              const unit = unitSnap.key;
+              progressHTML += `<p>Unit ${unit}</p>`;
+              unitSnap.forEach(phaseSnap => {
+                const phase = phaseSnap.key;
+                const completed = phaseSnap.val() ? 'checked' : '';
+                progressHTML += `
+                  <label>Phase ${phase} Complete</label>
+                  <input type="checkbox" ${completed} onchange="updateProgress('${studentId}', '${level}', '${unit}', '${phase}', this.checked)">
+                `;
+              });
+            });
+          });
+          progressContainer.innerHTML = progressHTML;
+        });
+      }
+    }
+
+    // Update student's progress
+    function updateProgress(studentId, level, unit, phase, isComplete) {
+      const progressRef = db.ref(`usuarios/${studentId}/progresso/${level}/${unit}/${phase}`);
+      progressRef.set(isComplete).then(() => {
+        alert("Progress updated successfully!");
+      }).catch(error => {
+        console.error("Error updating progress:", error);
       });
     }
 
