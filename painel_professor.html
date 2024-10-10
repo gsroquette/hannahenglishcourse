@@ -80,38 +80,37 @@
     }
 
     .student-list {
-      margin-top: 10px;
-      padding-left: 15px;
       list-style-type: none;
+      padding: 0;
     }
 
-    .student-list li {
+    .student-item {
       margin-bottom: 10px;
+      border: 1px solid #ddd;
+      padding: 10px;
+      border-radius: 5px;
+      background-color: #f1f1f1;
+      cursor: pointer;
+      text-align: center;
+      font-weight: bold;
+      transition: background-color 0.3s ease;
     }
 
-    .progress-container {
+    .student-item:hover {
+      background-color: #e0e0e0;
+    }
+
+    .student-details {
       display: none;
       margin-top: 10px;
-      padding: 10px;
-      border: 1px solid #ddd;
-      border-radius: 5px;
-      background-color: #f9f9f9;
     }
-
-    .inactive {
-      color: grey;
-    }
-
-    .inactive select, .inactive button {
-      pointer-events: none;
-      opacity: 0.5;
-    }
-
+    
     .inactive-msg {
       color: red;
       font-weight: bold;
       margin-left: 10px;
     }
+
   </style>
 </head>
 <body>
@@ -154,9 +153,8 @@
   <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-database.js"></script>
 
   <script>
-    // Firebase configuration
     const firebaseConfig = {
-      apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+       apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
       authDomain: "hannahenglishcourse.firebaseapp.com",
       databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
       projectId: "hannahenglishcourse",
@@ -166,12 +164,10 @@
       measurementId: "G-07VVJG9LRS"
     };
 
-    // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.database();
 
-    // Authenticate and load teacher data
     auth.onAuthStateChanged(user => {
       if (user) {
         const teacherId = user.uid;
@@ -181,7 +177,6 @@
       }
     });
 
-    // Load teacher data
     function loadTeacherData(teacherId) {
       const teacherRef = db.ref('usuarios/' + teacherId);
 
@@ -198,7 +193,6 @@
       });
     }
 
-    // Save teacher data
     function saveTeacherData() {
       const teacherId = auth.currentUser.uid;
       const teacherRef = db.ref('usuarios/' + teacherId);
@@ -216,18 +210,16 @@
       });
     }
 
-    // Load classes for the teacher
     function loadClasses(teacherId) {
       const classesRef = db.ref('usuarios/' + teacherId + '/turmas');
       classesRef.once('value', snapshot => {
         const classList = document.getElementById('class-list');
-        classList.innerHTML = ''; // Clear any previous content
+        classList.innerHTML = ''; 
 
         snapshot.forEach(childSnapshot => {
           const classData = childSnapshot.val();
           const classId = childSnapshot.key;
 
-          // Create a container for each class
           const classContainer = document.createElement('div');
           classContainer.classList.add('class-container');
           classContainer.innerHTML = `
@@ -246,7 +238,6 @@
       });
     }
 
-    // Add a student to a class
     function addStudentToClass(teacherId, classId) {
       const emailInput = document.getElementById(`student-email-${classId}`);
       const email = emailInput.value.trim();
@@ -255,7 +246,6 @@
         return;
       }
 
-      // Query to find the student by email
       db.ref('usuarios').orderByChild('email').equalTo(email).once('value', snapshot => {
         if (snapshot.exists()) {
           snapshot.forEach(childSnapshot => {
@@ -263,14 +253,13 @@
             const studentRef = db.ref(`usuarios/${studentId}`);
             studentRef.update({ atrelado_professor: true });
 
-            // Add the student to the class
             const classStudentRef = db.ref(`usuarios/${teacherId}/turmas/${classId}/students/${studentId}`);
             classStudentRef.set({
               nome: childSnapshot.val().nome,
               nivel_em_curso: "level1"
             }).then(() => {
               alert("Student added successfully!");
-              loadStudents(teacherId, classId); // Refresh the student list
+              loadStudents(teacherId, classId);
             }).catch(error => {
               console.error("Error adding student:", error);
               alert("Error adding student. Please try again.");
@@ -281,44 +270,59 @@
         }
       });
 
-      emailInput.value = ''; // Clear the input field
+      emailInput.value = ''; 
     }
 
-    // Load students for each class
     function loadStudents(teacherId, classId) {
       const studentList = document.getElementById(`student-list-${classId}`);
-      studentList.innerHTML = ''; // Clear the list
+      studentList.innerHTML = '';
 
       const studentsRef = db.ref(`usuarios/${teacherId}/turmas/${classId}/students`);
       studentsRef.once('value', snapshot => {
+        const students = [];
         snapshot.forEach(childSnapshot => {
           const studentData = childSnapshot.val();
           const studentId = childSnapshot.key;
+          students.push({ id: studentId, ...studentData });
+        });
 
-          db.ref(`usuarios/${studentId}/atrelado_professor`).once('value', snap => {
-            const isAttached = snap.val() !== false;
+        students.sort((a, b) => a.nome.localeCompare(b.nome));
+        students.forEach(student => {
+          const studentItem = document.createElement('li');
+          studentItem.className = 'student-item';
+          studentItem.textContent = student.nome;
 
-            const studentItem = document.createElement('li');
-            studentItem.className = isAttached ? '' : 'inactive';
-            studentItem.innerHTML = `
-              <p>${studentData.nome} ${!isAttached ? '<span class="inactive-msg">The student left the class</span>' : ''}</p>
-              <select ${!isAttached ? 'disabled' : ''} onchange="updateStudentLevel('${teacherId}', '${classId}', '${studentId}', this.value)">
-                <option value="level1" ${studentData.nivel_em_curso === 'level1' ? 'selected' : ''}>Level 1</option>
-                <option value="level2" ${studentData.nivel_em_curso === 'level2' ? 'selected' : ''}>Level 2</option>
-                <option value="level3" ${studentData.nivel_em_curso === 'level3' ? 'selected' : ''}>Level 3</option>
-                <option value="level4" ${studentData.nivel_em_curso === 'level4' ? 'selected' : ''}>Level 4</option>
-              </select>
-              <button ${!isAttached ? 'disabled' : ''} onclick="toggleProgress('${teacherId}', '${classId}', '${studentId}')">View Progress</button>
-              <button onclick="removeStudentFromClass('${teacherId}', '${classId}', '${studentId}')">Remove</button>
-              <div id="progress-container-${studentId}" class="progress-container"></div>
-            `;
-            studentList.appendChild(studentItem);
-          });
+          studentItem.onclick = () => {
+            toggleStudentDetails(studentItem, teacherId, classId, student.id, student.nivel_em_curso);
+          };
+
+          studentList.appendChild(studentItem);
         });
       });
     }
 
-    // Update the student's level
+    function toggleStudentDetails(studentItem, teacherId, classId, studentId, currentLevel) {
+      let detailsDiv = studentItem.querySelector('.student-details');
+      if (!detailsDiv) {
+        detailsDiv = document.createElement('div');
+        detailsDiv.className = 'student-details';
+        detailsDiv.innerHTML = `
+          <select onchange="updateStudentLevel('${teacherId}', '${classId}', '${studentId}', this.value)">
+            <option value="level1" ${currentLevel === 'level1' ? 'selected' : ''}>Level 1</option>
+            <option value="level2" ${currentLevel === 'level2' ? 'selected' : ''}>Level 2</option>
+            <option value="level3" ${currentLevel === 'level3' ? 'selected' : ''}>Level 3</option>
+            <option value="level4" ${currentLevel === 'level4' ? 'selected' : ''}>Level 4</option>
+          </select>
+          <button onclick="toggleProgress('${teacherId}', '${classId}', '${studentId}')">View Progress</button>
+          <button onclick="removeStudentFromClass('${teacherId}', '${classId}', '${studentId}')">Remove</button>
+          <div id="progress-container-${studentId}" class="progress-container"></div>
+        `;
+        studentItem.appendChild(detailsDiv);
+      } else {
+        detailsDiv.style.display = detailsDiv.style.display === 'none' ? 'block' : 'none';
+      }
+    }
+
     function updateStudentLevel(teacherId, classId, studentId, level) {
       const studentRef = db.ref(`usuarios/${teacherId}/turmas/${classId}/students/${studentId}`);
       studentRef.update({ nivel_em_curso: level }).then(() => {
@@ -328,7 +332,6 @@
       });
     }
 
-    // Toggle and update student's progress
     function toggleProgress(teacherId, classId, studentId) {
       const progressContainer = document.getElementById(`progress-container-${studentId}`);
       progressContainer.style.display = progressContainer.style.display === 'none' ? 'block' : 'none';
@@ -357,7 +360,6 @@
       }
     }
 
-    // Update student's progress
     function updateProgress(studentId, level, unit, phase, isComplete) {
       const progressRef = db.ref(`usuarios/${studentId}/progresso/${level}/${unit}/${phase}`);
       progressRef.set(isComplete).then(() => {
@@ -367,7 +369,6 @@
       });
     }
 
-    // Remove a student from a class
     function removeStudentFromClass(teacherId, classId, studentId) {
       if (confirm("Are you sure you want to remove this student?")) {
         const studentRef = db.ref(`usuarios/${teacherId}/turmas/${classId}/students/${studentId}`);
