@@ -71,40 +71,22 @@
       background-color: #45A049;
     }
 
-    .class-container, .student-list {
+    .class-container {
       margin-top: 15px;
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
 
-    /* Responsive Styles */
-    @media (max-width: 768px) {
-      h1 {
-        font-size: 1.75em;
-      }
-      button {
-        padding: 10px 16px;
-        font-size: 0.95em;
-      }
-      .panel {
-        max-width: 90%;
-        padding: 15px;
-      }
+    .student-list {
+      margin-top: 10px;
+      padding-left: 15px;
+      list-style-type: none;
     }
 
-    @media (max-width: 480px) {
-      h1 {
-        font-size: 1.5em;
-      }
-      button {
-        padding: 8px 14px;
-        font-size: 0.9em;
-      }
-      .panel {
-        max-width: 95%;
-        padding: 10px;
-      }
-      input[type="text"], input[type="tel"], select {
-        padding: 8px;
-      }
+    .student-list li {
+      margin-bottom: 10px;
     }
   </style>
 </head>
@@ -143,21 +125,134 @@
     </div>
   </div>
 
-  <script>
-    // Placeholder function for handling teacher data
-    function saveTeacherData() {
-      alert('Save Teacher Data - To be implemented');
-    }
-    
-    document.getElementById('teacher-avatar').addEventListener('change', function() {
-      const avatar = this.value;
-      document.getElementById('avatar-preview').src = `imagens/${avatar}`;
-    });
+  <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-database.js"></script>
 
-    // Placeholder function for classes
-    function loadClasses() {
-      alert('Load Classes - To be implemented');
+  <script>
+    // Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+      authDomain: "hannahenglishcourse.firebaseapp.com",
+      databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "hannahenglishcourse",
+      storageBucket: "hannahenglishcourse.appspot.com",
+      messagingSenderId: "449818788486",
+      appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+      measurementId: "G-07VVJG9LRS"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // Load teacher data
+    function loadTeacherData() {
+      const teacherId = "Fef9wrnzukUcO9nPPvKeWuc3Z12"; // Replace with actual teacher ID
+      const teacherRef = db.ref('usuarios/' + teacherId);
+
+      teacherRef.once('value', snapshot => {
+        const data = snapshot.val();
+        document.getElementById('teacher-name').value = data.nome || '';
+        document.getElementById('teacher-phone').value = data.telefone || '';
+        document.getElementById('teacher-email').value = data.email || '';
+        const avatar = data.avatar || 'avatar_professor1.png';
+        document.getElementById('teacher-avatar').value = avatar;
+        document.getElementById('avatar-preview').src = 'imagens/' + avatar;
+
+        // Load classes after loading teacher data
+        loadClasses(teacherId);
+      });
     }
+
+    // Load classes for the teacher
+    function loadClasses(teacherId) {
+      const classesRef = db.ref('usuarios/' + teacherId + '/turmas');
+      classesRef.once('value', snapshot => {
+        const classList = document.getElementById('class-list');
+        classList.innerHTML = ''; // Clear any previous content
+
+        snapshot.forEach(childSnapshot => {
+          const classData = childSnapshot.val();
+          const classId = childSnapshot.key;
+
+          // Create a container for each class
+          const classContainer = document.createElement('div');
+          classContainer.classList.add('class-container');
+          classContainer.innerHTML = `
+            <label>Class Name: <input type="text" value="${classData.nome}" onchange="updateClassName('${teacherId}', '${classId}', this.value)"></label>
+            <p>Number of Students: ${classData.alunos}</p>
+            <label for="student-email-${classId}">Add Student by Email</label>
+            <input type="text" id="student-email-${classId}" placeholder="Student's email">
+            <button onclick="addStudentToClass('${teacherId}', '${classId}')">Enroll Student</button>
+            <ul id="student-list-${classId}" class="student-list"></ul>
+          `;
+          
+          classList.appendChild(classContainer);
+
+          // Load the students in the class
+          loadStudents(teacherId, classId);
+        });
+      });
+    }
+
+    // Add a student to a class
+    function addStudentToClass(teacherId, classId) {
+      const emailInput = document.getElementById(`student-email-${classId}`);
+      const email = emailInput.value.trim();
+      if (!email) return alert("Please enter a student's email.");
+
+      // Query to find the student by email
+      db.ref('usuarios').orderByChild('email').equalTo(email).once('value', snapshot => {
+        if (snapshot.exists()) {
+          snapshot.forEach(childSnapshot => {
+            const studentId = childSnapshot.key;
+            const studentRef = db.ref(`usuarios/${teacherId}/turmas/${classId}/students/${studentId}`);
+
+            studentRef.set({
+              nivel_em_curso: null,
+              atrelado_professor: true
+            }).then(() => {
+              alert("Student added successfully!");
+              loadStudents(teacherId, classId); // Refresh the student list
+            });
+          });
+        } else {
+          alert("Student not found in the database.");
+        }
+      });
+
+      emailInput.value = ''; // Clear the input field
+    }
+
+    // Load students for each class
+    function loadStudents(teacherId, classId) {
+      const studentList = document.getElementById(`student-list-${classId}`);
+      studentList.innerHTML = ''; // Clear the list
+
+      const studentsRef = db.ref(`usuarios/${teacherId}/turmas/${classId}/students`);
+      studentsRef.once('value', snapshot => {
+        snapshot.forEach(childSnapshot => {
+          const studentData = childSnapshot.val();
+          const studentId = childSnapshot.key;
+
+          const studentItem = document.createElement('li');
+          studentItem.innerHTML = `
+            <p>${studentData.nome}</p>
+            <select onchange="updateStudentLevel('${teacherId}', '${classId}', '${studentId}', this.value)">
+              <option value="level1" ${studentData.nivel_em_curso === 'level1' ? 'selected' : ''}>Level 1</option>
+              <option value="level2" ${studentData.nivel_em_curso === 'level2' ? 'selected' : ''}>Level 2</option>
+              <option value="level3" ${studentData.nivel_em_curso === 'level3' ? 'selected' : ''}>Level 3</option>
+              <option value="level4" ${studentData.nivel_em_curso === 'level4' ? 'selected' : ''}>Level 4</option>
+            </select>
+            <button onclick="removeStudentFromClass('${teacherId}', '${classId}', '${studentId}')">Remove</button>
+          `;
+          studentList.appendChild(studentItem);
+        });
+      });
+    }
+
+    // Save teacher data and load classes on page load
+    window.onload = loadTeacherData;
   </script>
 </body>
 </html>
