@@ -1,19 +1,16 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hannah English - Learning English with the Bible</title>
     <link rel="stylesheet" href="CSS/styles.css">
-
     <!-- Manifesto para PWA -->
     <link rel="manifest" href="manifest.json">
-
     <!-- Firebase Libraries -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-
     <style>
         /* Fundo de tela com imagem repetida */
         body {
@@ -133,14 +130,12 @@
 <body>
     <div class="container">
         <header>
-            <!-- Contêiner para login ou ícone de usuário -->
             <div class="login-container">
                 <a href="Formulario/login.html" class="login-button" id="loginLink">Login</a>
                 <div class="dropdown" id="userDropdown">
                     <a href="#" id="logout">LEAVE</a>
                 </div>
             </div>
-
             <div class="logo-title">
                 <img src="imagens/hannah_logo.png" alt="Hannah English Logo" class="logo">
                 <h1>Hannah English<br>Learning English with the Bible</h1>
@@ -156,35 +151,60 @@
             </div>
         </main>
     </div>
-
-    <!-- Botão de instalação do PWA -->
+    
     <button id="install-button">Instalar Aplicativo</button>
-
-    <!-- Configuração do Firebase -->
+    
     <script>
         var firebaseConfig = {
-            apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
-            authDomain: "hannahenglishcourse.firebaseapp.com",
-            projectId: "hannahenglishcourse",
-            storageBucket: "hannahenglishcourse.appspot.com",
-            messagingSenderId: "449818788486",
-            appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
-            measurementId: "G-07VVJG9LRS",
-            databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+            apiKey: "API_KEY",
+            authDomain: "AUTH_DOMAIN",
+            projectId: "PROJECT_ID",
+            storageBucket: "STORAGE_BUCKET",
+            messagingSenderId: "MESSAGING_SENDER_ID",
+            appId: "APP_ID",
+            measurementId: "MEASUREMENT_ID",
+            databaseURL: "DATABASE_URL"
         };
 
-        // Inicializando Firebase
         firebase.initializeApp(firebaseConfig);
+
+        // Função para bloquear todos os níveis
+        function bloquearTodosNiveis() {
+            document.querySelectorAll('.level-button').forEach((button) => {
+                button.style.filter = 'grayscale(100%)';
+                button.style.pointerEvents = 'none';
+                button.onclick = null;
+            });
+        }
+
+        // Função para liberar níveis específicos
+        function liberarNiveis(niveis) {
+            document.querySelectorAll('.level-button').forEach((button, index) => {
+                const level = `level${index + 1}`;
+                if (niveis.includes(level)) {
+                    button.classList.add('liberado');
+                    button.style.filter = 'none';
+                    button.style.pointerEvents = 'auto';
+                    button.onclick = () => {
+                        window.location.href = `nivel${String.fromCharCode(65 + index)}/index.html`;
+                    };
+                } else {
+                    button.classList.remove('liberado');
+                    button.style.filter = 'grayscale(100%)';
+                    button.style.pointerEvents = 'none';
+                    button.onclick = null;
+                }
+            });
+        }
 
         // Verificando autenticação
         firebase.auth().onAuthStateChanged(function (user) {
             const loginLink = document.getElementById("loginLink");
             const dropdown = document.getElementById("userDropdown");
-            
+
             if (user) {
                 console.log("Usuário logado:", user.uid);
 
-                // Acessa o banco de dados para buscar os dados do usuário
                 const userRef = firebase.database().ref('usuarios/' + user.uid);
                 userRef.once('value').then((snapshot) => {
                     const userData = snapshot.val();
@@ -192,13 +212,11 @@
                     const userAvatar = userData.avatar ? `imagens/${userData.avatar}` : 'imagens/bonecologin1.png';
                     const userRole = userData.role || 'aluno';
 
-                    // Exibe o avatar e o nome do usuário
                     loginLink.innerHTML = `
                         <img src="${userAvatar}" alt="User Icon" class="user-icon">
                         <p class="user-name">${userName}</p>
                     `;
 
-                    // Define o link do dashboard com base no papel do usuário
                     let dashboardLink = '';
                     if (userRole === 'proprietario') {
                         dashboardLink = `<a href="painel_proprietario.html">OWNER DASHBOARD</a>`;
@@ -208,16 +226,13 @@
                         dashboardLink = `<a href="painel_aluno.html">STUDENT DASHBOARD</a>`;
                     }
 
-                    // Insere o link apropriado no dropdown
                     dropdown.innerHTML = `
                         <a href="#" id="logout">LEAVE</a>
                         ${dashboardLink}
                     `;
 
-                    // Lógica de liberação de níveis
                     if (userRole === 'aluno') {
                         if (userData.atrelado_professor) {
-                            // Se existe atrelado_professor, buscar o professor e verificar nivel_em_curso
                             const professorRef = firebase.database().ref('usuarios/' + userData.atrelado_professor);
                             professorRef.once('value').then((profSnapshot) => {
                                 const professorData = profSnapshot.val();
@@ -225,16 +240,14 @@
                                     ? professorData.students[user.uid].nivel_em_curso 
                                     : 'level1';
 
-                                liberarNiveis([nivelLiberado]); // Liberar o nível especificado pelo professor
+                                liberarNiveis([nivelLiberado]);
                             }).catch((error) => {
                                 console.error("Erro ao buscar dados do professor:", error);
                             });
                         } else {
-                            // Caso contrário, verificar progresso do aluno
                             if (!userData.progresso || Object.keys(userData.progresso).length === 0) {
-                                liberarNiveis(['level1']); // Se progresso é nulo ou vazio, liberar somente Level 1
+                                liberarNiveis(['level1']);
                             } else {
-                                // Liberar níveis contidos em progresso
                                 const niveisLiberados = Object.keys(userData.progresso).map(nivel => nivel.toLowerCase());
                                 liberarNiveis(niveisLiberados);
                             }
@@ -244,38 +257,18 @@
                     console.error("Erro ao buscar dados do usuário:", error);
                 });
 
-                loginLink.removeAttribute("href"); // Remove o href para evitar recarga
+                loginLink.removeAttribute("href");
                 loginLink.onclick = function(event) {
-                    event.preventDefault(); // Previne recarregamento da página
+                    event.preventDefault();
                     dropdown.style.display = dropdown.style.display === 'none' || dropdown.style.display === '' ? 'block' : 'none';
                 };
             } else {
                 console.log("Nenhum usuário logado");
-                // Mostra o link de login caso o usuário não esteja logado
                 loginLink.innerHTML = "Login";
                 loginLink.href = "Formulario/login.html";
+                bloquearTodosNiveis(); // Bloqueia todos os níveis se nenhum usuário estiver logado
             }
         });
-
-        // Função para liberar níveis específicos
-        function liberarNiveis(niveis) {
-            document.querySelectorAll('.level-button').forEach((button, index) => {
-                const level = `level${index + 1}`;
-                if (niveis.includes(level)) {
-                    button.classList.add('liberado');
-                    button.style.filter = 'none'; // Remove filtro cinza
-                    button.style.pointerEvents = 'auto'; // Ativa clique
-                    button.onclick = () => {
-                        window.location.href = `nivel${String.fromCharCode(64 + (index + 1))}/index.html`; // 'A', 'B', etc.
-                    };
-                } else {
-                    button.classList.add('bloqueado');
-                    button.style.filter = 'grayscale(100%)';
-                    button.style.pointerEvents = 'none'; // Desativa clique
-                    button.onclick = null; // Remove ação de clique
-                }
-            });
-        }
 
         // Função de logout
         document.getElementById("userDropdown").addEventListener("click", function(event) {
