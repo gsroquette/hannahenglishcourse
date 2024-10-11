@@ -243,16 +243,20 @@
             const studentId = childSnapshot.key;
             const studentRef = db.ref(`usuarios/${studentId}`);
 
-            studentRef.child('atrelado_professor').once('value', snap => {
+            studentRef.child('atrelado_professor').once('value').then(snap => {
               const linkedTeacherId = snap.val();
 
-              if (!linkedTeacherId || linkedTeacherId === teacherId) {
+              if (!linkedTeacherId) {
                 studentRef.child('atrelado_professor').set(teacherId).then(() => {
                   enrollStudentInClass(teacherId, classId, studentId, childSnapshot.val().nome);
                 });
+              } else if (linkedTeacherId === teacherId) {
+                enrollStudentInClass(teacherId, classId, studentId, childSnapshot.val().nome);
               } else {
                 alert("This student is already assigned to another teacher and cannot be added to your class.");
               }
+            }).catch(error => {
+              console.error("Error checking student record:", error);
             });
           });
         } else {
@@ -363,10 +367,11 @@
                 progressHTML += `<p>Unit ${unit}</p>`;
                 unitSnap.forEach(phaseSnap => {
                   const phase = phaseSnap.key;
-                  const completed = phaseSnap.val() ? 'checked' : '';
+                  const isComplete = phaseSnap.val();
+
                   progressHTML += `
                     <label>Phase ${phase} Complete</label>
-                    <input type="checkbox" ${completed} disabled>
+                    <input type="checkbox" ${isComplete ? 'checked' : ''} onchange="updatePhaseStatus('${studentId}', '${level}', '${unit}', '${phase}', this.checked)">
                   `;
                 });
               });
@@ -382,6 +387,15 @@
       } else {
         progressContainer.style.display = 'none';
       }
+    }
+
+    function updatePhaseStatus(studentId, level, unit, phase, isComplete) {
+      const progressRef = db.ref(`usuarios/${studentId}/progresso/${level}/${unit}/${phase}`);
+      progressRef.set(isComplete).then(() => {
+        console.log(`Phase ${phase} status updated to ${isComplete ? 'complete' : 'incomplete'}`);
+      }).catch(error => {
+        console.error("Error updating phase status:", error);
+      });
     }
 
     function removeStudentFromClass(teacherId, classId, studentId) {
