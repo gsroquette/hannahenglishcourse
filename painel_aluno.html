@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Student Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background-image: url('imagens/fundo.png');
+      background-repeat: repeat;
+      color: #333;
+      margin: 0;
+      padding: 0;
+      text-align: center;
+    }
+
+    h1 {
+      color: #4CAF50;
+      margin-top: 20px;
+      font-size: 2em;
+      padding: 10px;
+    }
+
+    .panel {
+      background-color: #ffffff;
+      padding: 20px;
+      margin: 20px auto;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      width: 90%;
+      max-width: 600px;
+      text-align: left;
+    }
+
+    .panel h2 {
+      font-size: 1.5em;
+      color: #333;
+      margin-bottom: 15px;
+    }
+
+    label {
+      display: block;
+      margin: 10px 0 5px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    input[type="text"], select {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      box-sizing: border-box;
+    }
+
+    button {
+      background-color: #4CAF50;
+      color: white;
+      padding: 12px 20px;
+      margin: 10px 0;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 1em;
+      transition: background-color 0.3s ease;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    }
+
+    button:hover {
+      background-color: #45A049;
+    }
+
+    .progress-container {
+      margin-top: 10px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      background-color: #f9f9f9;
+    }
+
+    .back-button {
+      background-color: #555;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 1em;
+      transition: background-color 0.3s ease;
+      margin-top: 15px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    }
+
+    .back-button:hover {
+      background-color: #333;
+    }
+
+    .back-container {
+      display: flex;
+      justify-content: flex-start;
+      margin-left: 20px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="back-container">
+    <button class="back-button" onclick="window.history.back();">Back</button>
+  </div>
+
+  <h1>Student Dashboard</h1>
+
+  <div class="panel" id="student-data">
+    <h2>Student's Information</h2>
+    <label for="student-name">Name</label>
+    <input type="text" id="student-name" readonly>
+    
+    <label>Email</label>
+    <input type="text" id="student-email" readonly>
+    
+    <label for="student-avatar">Choose Avatar</label>
+    <select id="student-avatar" disabled>
+      <option value="avatar_aluno1.png">Avatar 1</option>
+      <option value="avatar_aluno2.png">Avatar 2</option>
+      <option value="avatar_aluno3.png">Avatar 3</option>
+      <option value="avatar_aluno4.png">Avatar 4</option>
+    </select>
+    <img id="avatar-preview" src="imagens/avatar_professor1.png" alt="Avatar Preview" style="width: 100px; height: 100px; margin-top: 10px;">
+  </div>
+
+  <div class="panel" id="progress">
+    <h2>Your Progress</h2>
+    <div id="progress-container" class="progress-container">
+      <!-- Progress details will be loaded here -->
+      <p>Loading your progress...</p>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-database.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+      authDomain: "hannahenglishcourse.firebaseapp.com",
+      databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "hannahenglishcourse",
+      storageBucket: "hannahenglishcourse.appspot.com",
+      messagingSenderId: "449818788486",
+      appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+      measurementId: "G-07VVJG9LRS"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.database();
+
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        const studentId = user.uid;
+        loadStudentData(studentId);
+      } else {
+        window.location.href = 'login.html';
+      }
+    });
+
+    function loadStudentData(studentId) {
+      const studentRef = db.ref('usuarios/' + studentId);
+      studentRef.once('value', snapshot => {
+        const data = snapshot.val();
+        document.getElementById('student-name').value = data.nome || '';
+        document.getElementById('student-email').value = data.email || '';
+        const avatar = data.avatar || 'avatar_professor1.png';
+        document.getElementById('student-avatar').value = avatar;
+        document.getElementById('avatar-preview').src = 'imagens/' + avatar;
+        loadProgress(studentId);
+      });
+    }
+
+    function loadProgress(studentId) {
+      const progressContainer = document.getElementById('progress-container');
+      const progressRef = db.ref(`usuarios/${studentId}/progresso`);
+      
+      progressRef.once('value', snapshot => {
+        if (snapshot.exists()) {
+          let progressHTML = '<h3>Your Progress</h3>';
+          snapshot.forEach(levelSnap => {
+            const level = levelSnap.key;
+            progressHTML += `<p><strong>Level ${level}</strong></p>`;
+            levelSnap.forEach(unitSnap => {
+              const unit = unitSnap.key;
+              progressHTML += `<p>Unit ${unit}</p>`;
+              unitSnap.forEach(phaseSnap => {
+                const phase = phaseSnap.key;
+                const isComplete = phaseSnap.val();
+
+                progressHTML += `
+                  <label>Phase ${phase} Complete</label>
+                  <input type="checkbox" ${isComplete ? 'checked' : ''} disabled>
+                `;
+              });
+            });
+          });
+          progressContainer.innerHTML = progressHTML;
+        } else {
+          progressContainer.innerHTML = '<p>No progress data available.</p>';
+        }
+      }).catch(error => {
+        console.error("Error loading progress:", error);
+        progressContainer.innerHTML = '<p>Error loading progress data. Please try again later.</p>';
+      });
+    }
+  </script>
+</body>
+</html>
