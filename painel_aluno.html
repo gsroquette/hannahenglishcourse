@@ -128,13 +128,16 @@
       <option value="avatar_aluno3.png">Avatar 3</option>
       <option value="avatar_aluno4.png">Avatar 4</option>
     </select>
-    <img id="avatar-preview" src="imagens/avatar_professor1.png" alt="Avatar Preview" style="width: 100px; height: 100px; margin-top: 10px;">
+    <img id="avatar-preview" src="imagens/avatar_aluno1.png" alt="Avatar Preview" style="width: 100px; height: 100px; margin-top: 10px;">
+
+    <div id="teacher-info" style="margin-top: 20px;">
+      <!-- Teacher linking information will be loaded here -->
+    </div>
   </div>
 
   <div class="panel" id="progress">
     <h2>Your Progress</h2>
     <div id="progress-container" class="progress-container">
-      <!-- Progress details will be loaded here -->
       <p>Loading your progress...</p>
     </div>
   </div>
@@ -174,11 +177,49 @@
         const data = snapshot.val();
         document.getElementById('student-name').value = data.nome || '';
         document.getElementById('student-email').value = data.email || '';
-        const avatar = data.avatar || 'avatar_professor1.png';
+        const avatar = data.avatar || 'avatar_aluno1.png';
         document.getElementById('student-avatar').value = avatar;
         document.getElementById('avatar-preview').src = 'imagens/' + avatar;
+        
+        // Check if student is linked to a teacher
+        if (data.atrelado_professor) {
+          loadTeacherInfo(data.atrelado_professor);
+        } else {
+          document.getElementById('teacher-info').innerHTML = '<p>You are not currently linked to a teacher.</p>';
+        }
+
         loadProgress(studentId);
       });
+    }
+
+    function loadTeacherInfo(teacherId) {
+      const teacherRef = db.ref('usuarios/' + teacherId);
+      teacherRef.once('value', snapshot => {
+        const teacherData = snapshot.val();
+        const teacherName = teacherData ? teacherData.nome : 'Unknown Teacher';
+
+        document.getElementById('teacher-info').innerHTML = `
+          <p>Linked to Teacher: ${teacherName}</p>
+          <button onclick="unlinkTeacher()">Unlink from Teacher</button>
+        `;
+      });
+    }
+
+    function unlinkTeacher() {
+      if (confirm("Are you sure you want to unlink from your teacher? You will no longer have a teacher if you proceed.")) {
+        const studentId = auth.currentUser.uid;
+        const studentRef = db.ref('usuarios/' + studentId + '/atrelado_professor');
+
+        studentRef.remove()
+          .then(() => {
+            alert("You have been unlinked from your teacher.");
+            document.getElementById('teacher-info').innerHTML = '<p>You are not currently linked to a teacher.</p>';
+          })
+          .catch(error => {
+            console.error("Error unlinking from teacher:", error);
+            alert("An error occurred while trying to unlink. Please try again later.");
+          });
+      }
     }
 
     function loadProgress(studentId) {
