@@ -73,6 +73,7 @@
 
     <!-- Firebase Configuration and Initialization (Namespaced SDK) -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <script>
         const firebaseConfig = {
@@ -88,23 +89,38 @@
         firebase.initializeApp(firebaseConfig);
 
         const db = firebase.database();
-        const userId = 'zZystjhTmdgxC7USqV593vrSxx82'; // Substitua pelo ID do usuário
+        const auth = firebase.auth();
 
-        // Função para verificar o progresso do aluno
-        db.ref(`usuarios/${userId}/progresso/Level1`).once('value', snapshot => {
-            const progresso = snapshot.val();
-            console.log("Progresso do usuário:", progresso); // Log para verificar os dados recebidos
-
-            const units = document.querySelectorAll('.unit-button');
-            
-            units.forEach(unit => {
-                const unitId = unit.id.replace('unit', 'Unit');
-                // Verifica se a unidade está no progresso e tem fase1 como true
-                if (!progresso || !progresso[unitId] || progresso[unitId].fase1 !== true) {
-                    unit.classList.add('disabled');
-                }
-            });
+        // Carregar o progresso do aluno quando ele está autenticado
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                console.log("Usuário autenticado:", user.uid);
+                carregarProgresso(user.uid); 
+            } else {
+                console.error("Erro: Usuário não autenticado");
+            }
         });
+
+        function carregarProgresso(userId) {
+            db.ref(`usuarios/${userId}/progresso/Level1`).once('value')
+                .then(snapshot => {
+                    const progresso = snapshot.val();
+                    console.log("Progresso do usuário:", progresso); // Log para verificar os dados recebidos
+
+                    const units = document.querySelectorAll('.unit-button');
+                    
+                    units.forEach(unit => {
+                        const unitId = unit.id.replace('unit', 'Unit');
+                        // Verifica se a unidade está no progresso e tem fase1 como true
+                        if (!progresso || !progresso[unitId] || progresso[unitId].fase1 !== true) {
+                            unit.classList.add('disabled');
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error("Erro ao acessar o banco de dados:", error);
+                });
+        }
     </script>
 </body>
 </html>
