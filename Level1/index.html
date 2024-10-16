@@ -35,10 +35,9 @@
             padding: 20px;
             max-width: 800px;
             margin: 0 auto;
-            justify-content: center; /* Centraliza os itens em telas menores */
+            justify-content: center;
         }
 
-        /* Estilo dos botões das unidades */
         .unit-button {
             text-align: center;
             padding: 10px 0;
@@ -48,22 +47,20 @@
             background-color: white;
             text-decoration: none;
             transition: background-color 0.3s ease, color 0.3s ease;
-            width: 100%; /* Preenche o espaço disponível */
+            width: 100%;
             max-width: 200px;
             box-sizing: border-box;
         }
 
-        /* Hover dos botões das unidades */
         .unit-button:hover {
             background-color: green;
             color: white;
         }
 
-        /* Botões desabilitados */
         .unit-button.disabled {
-            background-color: rgba(128, 128, 128, 0.3); /* Cinza translúcido */
-            border-color: rgba(128, 128, 128, 0.5); /* Cinza mais escuro */
-            color: rgba(128, 128, 128, 0.5); /* Cinza claro */
+            background-color: rgba(128, 128, 128, 0.3);
+            border-color: rgba(128, 128, 128, 0.5);
+            color: rgba(128, 128, 128, 0.5);
             pointer-events: none;
         }
     </style>
@@ -114,23 +111,40 @@
         auth.onAuthStateChanged(user => {
             if (user) {
                 console.log("Usuário autenticado:", user.uid);
-                carregarProgresso(user.uid); 
+                verificarRole(user.uid); 
             } else {
                 console.error("Erro: Usuário não autenticado");
             }
         });
 
+        function verificarRole(userId) {
+            db.ref(`usuarios/${userId}/role`).once('value')
+                .then(snapshot => {
+                    const role = snapshot.val();
+                    console.log("Papel do usuário:", role);
+                    
+                    if (role === 'proprietario' || role === 'proprietario') {
+                        desbloquearTodasUnidades();
+                    } else {
+                        carregarProgresso(userId);
+                    }
+                })
+                .catch(error => {
+                    console.error("Erro ao acessar o banco de dados para verificar o papel:", error);
+                });
+        }
+
         function carregarProgresso(userId) {
             db.ref(`usuarios/${userId}/progresso/Level1`).once('value')
                 .then(snapshot => {
                     const progresso = snapshot.val();
-                    console.log("Progresso do usuário:", progresso); // Log para verificar os dados recebidos
+                    console.log("Progresso do usuário:", progresso);
 
                     const units = document.querySelectorAll('.unit-button');
                     
                     units.forEach(unit => {
                         const unitId = unit.id.replace('unit', 'Unit');
-                        // Verifica se a unidade está no progresso e tem fase1 como true
+                        
                         if (!progresso || !progresso[unitId] || progresso[unitId].fase1 !== true) {
                             unit.classList.add('disabled');
                         }
@@ -139,6 +153,13 @@
                 .catch(error => {
                     console.error("Erro ao acessar o banco de dados:", error);
                 });
+        }
+
+        function desbloquearTodasUnidades() {
+            const units = document.querySelectorAll('.unit-button');
+            units.forEach(unit => {
+                unit.classList.remove('disabled');
+            });
         }
     </script>
 </body>
