@@ -11,7 +11,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const mapContainer = document.getElementById('mapContainer');
     const svgContainer = document.getElementById('linesSvg');
-    let currentPhase = 0;
     let player;
     let positionLeft = true;
 
@@ -20,7 +19,6 @@ document.addEventListener('DOMContentLoaded', function() {
         player.src = '../../imagens/bonequinho.png'; 
         player.classList.add('player');
         mapContainer.appendChild(player);
-        moveToPhase(currentPhase);
     }
 
     function unlockPhasesFromDatabase() {
@@ -28,9 +26,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(snapshot => {
                 let lastUnlockedIndex = 0;
                 snapshot.forEach((childSnapshot, index) => {
-                    const phaseKey = childSnapshot.key;
                     const isUnlocked = childSnapshot.val();
-
                     if (isUnlocked) {
                         activities[index].unlocked = true;
                         lastUnlockedIndex = index;
@@ -50,16 +46,9 @@ document.addEventListener('DOMContentLoaded', function() {
             phaseDiv.classList.add('phase');
 
             const baseTopPosition = 200;
-            let topPosition, horizontalPosition;
             const randomVerticalGap = Math.random() * (30 - 20) + 20;
-            topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
-
-            if (positionLeft) {
-                horizontalPosition = Math.random() * (20 - 5) + 5;
-            } else {
-                horizontalPosition = Math.random() * (95 - 80) + 80;
-            }
-
+            let topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
+            let horizontalPosition = positionLeft ? Math.random() * (20 - 5) + 5 : Math.random() * (95 - 80) + 80;
             positionLeft = !positionLeft;
 
             phaseDiv.style.top = `${topPosition}px`;
@@ -80,7 +69,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             } else {
                 phaseDiv.classList.add('locked');
-
                 const lockIcon = document.createElement('img');
                 lockIcon.src = '../../imagens/lock_icon_resized.png';
                 lockIcon.classList.add('lock-icon');
@@ -92,7 +80,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             phaseDiv.addEventListener('click', () => {
                 if (activity.unlocked) {
-                    moveToPhase(index, activity.path, index);
+                    moveToPhase(index, activity.path);
                 }
             });
         });
@@ -117,16 +105,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     }
 
-    function moveToPhase(index, path = null, clickedIndex = null) {
+    function moveToPhase(index, path) {
         const phase = document.querySelectorAll('.phase')[index];
         const coords = phase.getBoundingClientRect();
-        document.querySelectorAll('.phase').forEach(phase => { phase.classList.remove('active'); });
-        phase.classList.add('active');
-
         player.style.top = `${coords.top + window.scrollY + coords.height / 2}px`;
         player.style.left = `${coords.left + window.scrollX + coords.width / 2}px`;
-        player.classList.add('moving');
-
         if (path) {
             setTimeout(() => {
                 window.location.href = path;
@@ -141,16 +124,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const phase2 = document.querySelectorAll('.phase')[i + 1];
             const coords1 = phase1.getBoundingClientRect();
             const coords2 = phase2.getBoundingClientRect();
-
             const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
             const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150;
             const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
             const controlPointY2 = coords2.top - 150;
-
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
-                       C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
-                       ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
+            const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
             path.setAttribute('d', d);
             path.setAttribute('class', `path path-blue`);
             svgContainer.appendChild(path);
