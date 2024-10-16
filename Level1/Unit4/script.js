@@ -1,6 +1,18 @@
 document.addEventListener('DOMContentLoaded', function() {
     const database = firebase.database();
-    const userId = 'SUNqNVmtcrh1YdZgjaRDAu3uAmj2'; // Substitua pelo ID do usuário específico
+    const auth = firebase.auth();
+
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            const userId = user.uid; // Obter o ID do usuário autenticado
+            console.log(`Usuário autenticado: ${userId}`);
+            unlockPhasesFromDatabase(userId); // Passar o userId para a função
+        } else {
+            console.error("Usuário não autenticado!");
+            // Redirecionar para a página de login ou exibir uma mensagem de erro, se necessário
+        }
+    });
+
     const activities = [
         { id: 1, name: "StoryCards", path: "../unidade4/StoryCards/index.html", img: "../../imagens/botoes/storycards_button.png", unlocked: false },
         { id: 2, name: "Flashcards", path: "../unidade4/Flashcards/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
@@ -21,15 +33,19 @@ document.addEventListener('DOMContentLoaded', function() {
         mapContainer.appendChild(player);
     }
 
-    function unlockPhasesFromDatabase() {
+    function unlockPhasesFromDatabase(userId) {
         database.ref(`/usuarios/${userId}/progresso/Level1/Unit1`).once('value')
             .then(snapshot => {
-                let lastUnlockedIndex = 0;
+                let lastUnlockedIndex = -1;
                 snapshot.forEach((childSnapshot, index) => {
-                    const isUnlocked = childSnapshot.val();
-                    if (isUnlocked) {
-                        activities[index].unlocked = true;
-                        lastUnlockedIndex = index;
+                    if (index < activities.length) { // Verifica se o índice está no intervalo do array
+                        const isUnlocked = childSnapshot.val();
+                        if (isUnlocked) {
+                            activities[index].unlocked = true;
+                            lastUnlockedIndex = index;
+                        }
+                    } else {
+                        console.error(`Índice ${index} fora do alcance de activities.`);
                     }
                 });
 
@@ -107,6 +123,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function moveToPhase(index, path) {
         const phase = document.querySelectorAll('.phase')[index];
+        if (!phase) return; // Verificação para garantir que 'phase' existe
+
         const coords = phase.getBoundingClientRect();
         player.style.top = `${coords.top + window.scrollY + coords.height / 2}px`;
         player.style.left = `${coords.left + window.scrollX + coords.width / 2}px`;
@@ -119,9 +137,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function drawLines() {
         svgContainer.innerHTML = '';
+        const phases = document.querySelectorAll('.phase');
         for (let i = 0; i < activities.length - 1; i++) {
-            const phase1 = document.querySelectorAll('.phase')[i];
-            const phase2 = document.querySelectorAll('.phase')[i + 1];
+            const phase1 = phases[i];
+            const phase2 = phases[i + 1];
+            if (!phase1 || !phase2) continue; // Verifica se ambos elementos existem
+
             const coords1 = phase1.getBoundingClientRect();
             const coords2 = phase2.getBoundingClientRect();
             const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
@@ -136,6 +157,5 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    unlockPhasesFromDatabase();
     window.addEventListener('resize', drawLines);
 });
