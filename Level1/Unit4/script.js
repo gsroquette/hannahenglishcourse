@@ -41,6 +41,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             currentPhase = index; // Atualiza a última fase liberada
                         }
                     });
+                } else {
+                    console.error("Nenhum progresso encontrado para este nível e unidade.");
                 }
                 initializeMap();
                 createPlayer();
