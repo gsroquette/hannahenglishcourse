@@ -23,8 +23,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function loadUserProgress() {
         const urlPathParts = window.location.pathname.split('/');
-        const level = urlPathParts[2]; // Extrai o nível da URL, por exemplo, 'Level1'
-        const unit = urlPathParts[3];  // Extrai a unidade da URL, por exemplo, 'Unit4'
+        const level = urlPathParts[urlPathParts.length - 3]; // Extrai o nível da URL (ex: 'Level1')
+        const unit = urlPathParts[urlPathParts.length - 2];  // Extrai a unidade da URL (ex: 'Unit4')
 
         const userId = "SUNqNvm"; // ID do usuário fixo para teste; adaptar conforme necessário para usuários dinâmicos
 
