@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const urlPathParts = window.location.pathname.split('/');
         const level = urlPathParts[urlPathParts.length - 3];
         const unit = urlPathParts[urlPathParts.length - 2];
-        const userId = "SUNqNVmtcrh1YdZgjaRDAu3uAmj2"; // Atualize este ID para o usuário ativo
+        const userId = "SUNqNVmtcrh1YdZgjaRDAu3uAmj2";
 
         const progressPath = `/usuarios/${userId}/progresso/${level}/${unit}`;
         const avatarPath = `/usuarios/${userId}/avatar`;
@@ -117,16 +117,27 @@ document.addEventListener('DOMContentLoaded', function() {
         const nextPhaseIndex = currentPhase + 1;
         if (nextPhaseIndex < activities.length && !activities[nextPhaseIndex].unlocked) {
             const nextPhase = document.querySelectorAll('.phase')[nextPhaseIndex];
-            const lockIcon = nextPhase.lockIcon;
 
-            if (lockIcon) {
-                lockIcon.classList.add('unlock-animation');
-                setTimeout(() => {
-                    lockIcon.remove();
-                    nextPhase.classList.remove('locked');
-                    nextPhase.classList.add('active');
-                }, 1000); // Tempo de 1 segundo para a animação
-            }
+            // Configuração do GIF de desbloqueio
+            const unlockGif = document.createElement('img');
+            unlockGif.src = '../../imagens/cadeado.gif';
+            unlockGif.classList.add('unlock-gif');
+            nextPhase.appendChild(unlockGif);
+
+            unlockGif.style.position = 'absolute';
+            unlockGif.style.top = '50%';
+            unlockGif.style.left = '50%';
+            unlockGif.style.transform = 'translate(-50%, -50%)';
+
+            // Exibição do GIF por 3 segundos e remoção
+            setTimeout(() => {
+                unlockGif.remove();
+                mapContainer.style.transform = 'scale(1)';
+
+                // Marcar a fase como desbloqueada e ativar
+                nextPhase.classList.remove('locked');
+                nextPhase.classList.add('active');
+            }, 3000);
         }
     }
 
