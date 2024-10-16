@@ -11,7 +11,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const svgContainer = document.getElementById('linesSvg');
     let currentPhase = 0;
     let player;
-    let previousPosition = null;
     let positionLeft = true;
 
     function createPlayer() {
@@ -22,29 +21,24 @@ document.addEventListener('DOMContentLoaded', function() {
         moveToPhase(currentPhase);
     }
 
-    function isTooClose(pos1, pos2) {
-        const minDistance = 100;
-        const dx = pos1.left - pos2.left;
-        const dy = pos1.top - pos2.top;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        return distance < minDistance;
-    }
-
     function loadUserProgress() {
         const urlPathParts = window.location.pathname.split('/');
-        const level = urlPathParts[2]; // Extrai o nível da URL
-        const unit = urlPathParts[3];  // Extrai a unidade da URL
+        const level = urlPathParts[2]; // Extrai o nível da URL, por exemplo, 'Level1'
+        const unit = urlPathParts[3];  // Extrai a unidade da URL, por exemplo, 'Unit4'
 
-        const userId = "SUNqNvm"; // ID de exemplo; substituir pelo ID do usuário logado, se aplicável
+        const userId = "SUNqNvm"; // ID do usuário fixo para teste; adaptar conforme necessário para usuários dinâmicos
 
-        firebase.database().ref(`/usuarios/${userId}/progresso/${level}/${unit}`).once('value')
+        // Construir o caminho correto no Firebase
+        const progressRef = firebase.database().ref(`/usuarios/${userId}/progresso/${level}/${unit}`);
+        
+        progressRef.once('value')
             .then((snapshot) => {
                 const progress = snapshot.val();
                 if (progress) {
                     activities.forEach((activity, index) => {
                         if (progress[`fase${index + 1}`]) {
                             activity.unlocked = true;
-                            currentPhase = index; // Atualiza a fase mais avançada
+                            currentPhase = index; // Atualiza a última fase liberada
                         }
                     });
                 }
