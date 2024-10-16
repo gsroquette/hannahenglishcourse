@@ -118,6 +118,28 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 
+    function drawLines() {
+        svgContainer.innerHTML = ''; // Limpa o SVG antes de redesenhar as linhas
+        for (let i = 0; i < activities.length - 1; i++) {
+            const phase1 = document.querySelectorAll('.phase')[i];
+            const phase2 = document.querySelectorAll('.phase')[i + 1];
+
+            if (phase1 && phase2) {
+                const coords1 = phase1.getBoundingClientRect();
+                const coords2 = phase2.getBoundingClientRect();
+
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                path.setAttribute('x1', coords1.left + coords1.width / 2 + window.scrollX);
+                path.setAttribute('y1', coords1.top + coords1.height / 2 + window.scrollY);
+                path.setAttribute('x2', coords2.left + coords2.width / 2 + window.scrollX);
+                path.setAttribute('y2', coords2.top + coords2.height / 2 + window.scrollY);
+                path.setAttribute('stroke', '#000');
+                path.setAttribute('stroke-width', '2');
+                svgContainer.appendChild(path);
+            }
+        }
+    }
+
     async function checkForNewUnlock() {
         await fetchUserProgress(); // Recarrega o progresso após o retorno
 
@@ -126,7 +148,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (activity.unlocked && phaseDiv.classList.contains('locked')) {
                 phaseDiv.classList.remove('locked');
                 phaseDiv.classList.add('unlocked');
-                // Animação de desbloqueio
                 const unlockGif = document.createElement('img');
                 unlockGif.src = '../../imagens/cadeado.gif';
                 unlockGif.classList.add('unlock-gif');
