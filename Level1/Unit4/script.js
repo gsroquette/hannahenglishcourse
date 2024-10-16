@@ -1,4 +1,7 @@
 document.addEventListener('DOMContentLoaded', async function() { 
+    // Garante que a rolagem da página esteja no topo
+    window.scrollTo(0, 0);
+
     const activities = [
         { id: 1, name: "StoryCards", path: "../Unit4/StoryCards/index.html", img: "../../imagens/botoes/storycards_button.png" },
         { id: 2, name: "Flashcards", path: "../Unit4/Flashcards/index.html", img: "../../imagens/botoes/flashcards_button.png" },
@@ -18,8 +21,8 @@ document.addEventListener('DOMContentLoaded', async function() {
             console.log("Usuário autenticado:", user.uid);
             await fetchUserProgress(user);
             initializePhases();
-
-            // Aguardar uma pequena pausa para garantir que tudo foi renderizado
+            
+            // Adiciona um pequeno atraso para garantir o desenho correto das linhas e a criação do boneco
             setTimeout(() => {
                 drawLines();
                 createPlayer();
@@ -47,7 +50,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 activities.forEach((activity, index) => {
                     if (progress[`fase${index + 1}`]) {
                         activities[index].unlocked = true;
-                        currentPhase = index;
+                        currentPhase = index; // Define o boneco na última fase liberada
                     } else {
                         activities[index].unlocked = false;
                     }
@@ -65,7 +68,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         player.src = '../../imagens/bonequinho.png'; 
         player.classList.add('player');
         mapContainer.appendChild(player);
-        moveToPhase(currentPhase);
+        moveToPhase(currentPhase); // Coloca o boneco na última fase liberada
     }
 
     async function initializePhases() {
@@ -149,6 +152,23 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 
+    async function checkForNewUnlock() {
+        await fetchUserProgress(firebase.auth().currentUser);
+
+        activities.forEach((activity, index) => {
+            const phaseDiv = document.querySelectorAll('.phase')[index];
+            if (activity.unlocked && phaseDiv.classList.contains('locked')) {
+                phaseDiv.classList.remove('locked');
+                phaseDiv.classList.add('unlocked');
+                const unlockGif = document.createElement('img');
+                unlockGif.src = '../../imagens/cadeado.gif';
+                unlockGif.classList.add('unlock-gif');
+                phaseDiv.appendChild(unlockGif);
+                setTimeout(() => unlockGif.remove(), 3000);
+            }
+        });
+    }
+
     window.addEventListener('focus', checkForNewUnlock);
-    window.addEventListener('resize', drawLines);
+    window.addEventListener('resize', drawLines); // Redesenha as linhas ao redimensionar a tela
 });
