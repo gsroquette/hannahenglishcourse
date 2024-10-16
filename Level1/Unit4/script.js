@@ -28,12 +28,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const userId = "SUNqNvm"; // ID do usuário fixo para teste; adaptar conforme necessário para usuários dinâmicos
 
-        // Construir o caminho correto no Firebase
-        const progressRef = firebase.database().ref(`/usuarios/${userId}/progresso/${level}/${unit}`);
+        // Construir o caminho correto no Firebase e exibir no console
+        const progressPath = `/usuarios/${userId}/progresso/${level}/${unit}`;
+        console.log("Firebase Path:", progressPath);  // Para depuração
+        const progressRef = firebase.database().ref(progressPath);
         
         progressRef.once('value')
             .then((snapshot) => {
                 const progress = snapshot.val();
+                console.log("Progresso obtido:", progress);  // Exibir o progresso para depuração
                 if (progress) {
                     activities.forEach((activity, index) => {
                         if (progress[`fase${index + 1}`] === true) {
