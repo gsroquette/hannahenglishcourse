@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', async function() {
-    window.scrollTo(0, 0); // Garante que a rolagem da página esteja no topo
+    // Garante que a rolagem da página esteja no topo
+    window.scrollTo(0, 0);
 
     const activities = [
         { id: 1, name: "StoryCards", path: "../Unit4/StoryCards/index.html", img: "../../imagens/botoes/storycards_button.png" },
@@ -21,7 +22,9 @@ document.addEventListener('DOMContentLoaded', async function() {
             await fetchUserProgress(user);
             initializePhases();
             createPlayer();
-            setTimeout(drawLines, 50); // Adiciona um pequeno atraso para garantir o desenho correto das linhas
+            
+            // Adiciona um pequeno atraso para garantir o desenho correto das linhas
+            setTimeout(drawLines, 50);
         } else {
             console.error("Usuário não autenticado.");
         }
@@ -129,20 +132,21 @@ document.addEventListener('DOMContentLoaded', async function() {
         for (let i = 0; i < activities.length - 1; i++) {
             const phase1 = document.querySelectorAll('.phase')[i];
             const phase2 = document.querySelectorAll('.phase')[i + 1];
+            const coords1 = phase1.getBoundingClientRect();
+            const coords2 = phase2.getBoundingClientRect();
 
-            if (phase1 && phase2) {
-                const coords1 = phase1.getBoundingClientRect();
-                const coords2 = phase2.getBoundingClientRect();
+            const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
+            const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150;
+            const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
+            const controlPointY2 = coords2.top - 150;
 
-                const path = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                path.setAttribute('x1', coords1.left + coords1.width / 2 + window.scrollX);
-                path.setAttribute('y1', coords1.top + coords1.height / 2 + window.scrollY);
-                path.setAttribute('x2', coords2.left + coords2.width / 2 + window.scrollX);
-                path.setAttribute('y2', coords2.top + coords2.height / 2 + window.scrollY);
-                path.setAttribute('stroke', '#000');
-                path.setAttribute('stroke-width', '2');
-                svgContainer.appendChild(path);
-            }
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
+                       C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
+                       ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
+            path.setAttribute('d', d);
+            path.setAttribute('class', `path path-blue`);
+            svgContainer.appendChild(path);
         }
     }
 
@@ -164,7 +168,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     window.addEventListener('focus', checkForNewUnlock); // Verifica o progresso ao retornar à página
-
-    drawLines();
     window.addEventListener('resize', drawLines); // Redesenha as linhas ao redimensionar a tela
+
+    // Desenha as linhas inicialmente após as fases serem renderizadas
+    setTimeout(drawLines, 50);
 });
