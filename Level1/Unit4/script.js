@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const progress = snapshot.val();
                 if (progress) {
                     activities.forEach((activity, index) => {
-                        if (progress[`fase${index + 1}`]) {
+                        if (progress[`fase${index + 1}`] === true) {
                             activity.unlocked = true;
                             currentPhase = index; // Atualiza a última fase liberada
                         }
@@ -82,7 +82,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             mapContainer.appendChild(phaseDiv);
 
-            if (index <= currentPhase) {
+            if (activity.unlocked) {
                 phaseDiv.classList.add('active');
             } else {
                 phaseDiv.classList.add('locked');
