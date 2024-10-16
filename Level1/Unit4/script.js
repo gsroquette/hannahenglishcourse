@@ -16,17 +16,18 @@ document.addEventListener('DOMContentLoaded', async function() {
     let player;
     let positionLeft = true;
 
+    // Autenticação do usuário
     firebase.auth().onAuthStateChanged(async function(user) {
         if (user) {
             console.log("Usuário autenticado:", user.uid);
             await fetchUserProgress(user);
             initializePhases();
             
-            // Adiciona um pequeno atraso para garantir o desenho correto das linhas e a criação do boneco
+            // Pequeno atraso para garantir o desenho correto das linhas e a criação do boneco
             setTimeout(() => {
                 drawLines();
                 createPlayer();
-            }, 200); // Atraso ligeiramente maior para renderização completa
+            }, 100);
         } else {
             console.error("Usuário não autenticado.");
         }
@@ -171,5 +172,4 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     window.addEventListener('focus', checkForNewUnlock); // Verifica o progresso ao retornar à página
     window.addEventListener('resize', drawLines); // Redesenha as linhas ao redimensionar a tela
-    window.addEventListener('scroll', drawLines); // Redesenha as linhas ao fazer scroll
 });
