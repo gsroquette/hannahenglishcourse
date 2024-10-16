@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             await fetchUserProgress(user);
             initializePhases();
             createPlayer();
+            drawLines();
         } else {
             console.error("Usuário não autenticado.");
         }
@@ -131,13 +132,17 @@ document.addEventListener('DOMContentLoaded', async function() {
                 const coords1 = phase1.getBoundingClientRect();
                 const coords2 = phase2.getBoundingClientRect();
 
-                const path = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                path.setAttribute('x1', coords1.left + coords1.width / 2 + window.scrollX);
-                path.setAttribute('y1', coords1.top + coords1.height / 2 + window.scrollY);
-                path.setAttribute('x2', coords2.left + coords2.width / 2 + window.scrollX);
-                path.setAttribute('y2', coords2.top + coords2.height / 2 + window.scrollY);
-                path.setAttribute('stroke', '#000');
-                path.setAttribute('stroke-width', '2');
+                const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
+                const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150;
+                const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
+                const controlPointY2 = coords2.top - 150;
+
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
+                           C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
+                           ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
+                path.setAttribute('d', d);
+                path.setAttribute('class', `path path-blue`);
                 svgContainer.appendChild(path);
             }
         }
@@ -161,7 +166,5 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     window.addEventListener('focus', checkForNewUnlock); // Verifica o progresso ao retornar à página
-
-    drawLines();
-    window.addEventListener('resize', drawLines);
+    window.addEventListener('resize', drawLines); // Redesenha as linhas ao redimensionar a tela
 });
