@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             await fetchUserProgress(user);
             initializePhases();
             createPlayer();
-            drawLines();
+            drawLines(); // Desenha as linhas após inicializar as fases e o jogador
         } else {
             console.error("Usuário não autenticado.");
         }
@@ -166,5 +166,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     window.addEventListener('focus', checkForNewUnlock); // Verifica o progresso ao retornar à página
+
+    drawLines();
     window.addEventListener('resize', drawLines); // Redesenha as linhas ao redimensionar a tela
 });
