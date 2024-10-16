@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', async function() { 
+    // Garante que a rolagem da página esteja no topo
     window.scrollTo(0, 0);
 
     const activities = [
@@ -11,7 +12,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     const mapContainer = document.getElementById('mapContainer');
     const svgContainer = document.getElementById('linesSvg');
-    svgContainer.style.position = 'fixed'; // Mantém o SVG fixo
+    svgContainer.style.position = 'absolute';
     svgContainer.style.top = '0';
     svgContainer.style.left = '0';
     let currentPhase = 0;
@@ -132,21 +133,24 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     function drawLines() {
         svgContainer.innerHTML = ''; 
+        const scrollOffsetY = window.scrollY;
+        const scrollOffsetX = window.scrollX;
+        
         for (let i = 0; i < activities.length - 1; i++) {
             const phase1 = document.querySelectorAll('.phase')[i];
             const phase2 = document.querySelectorAll('.phase')[i + 1];
             const coords1 = phase1.getBoundingClientRect();
             const coords2 = phase2.getBoundingClientRect();
 
-            const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33 + window.scrollX;
-            const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150 + window.scrollY;
-            const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66 + window.scrollX;
-            const controlPointY2 = coords2.top - 150 + window.scrollY;
+            const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33 + scrollOffsetX;
+            const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150 + scrollOffsetY;
+            const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66 + scrollOffsetX;
+            const controlPointY2 = coords2.top - 150 + scrollOffsetY;
 
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const d = `M ${coords1.left + coords1.width / 2 + window.scrollX} ${coords1.top + coords1.height / 2 + window.scrollY} 
+            const d = `M ${coords1.left + coords1.width / 2 + scrollOffsetX} ${coords1.top + coords1.height / 2 + scrollOffsetY} 
                        C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
-                       ${coords2.left + coords2.width / 2 + window.scrollX} ${coords2.top + coords2.height / 2 + window.scrollY}`;
+                       ${coords2.left + coords2.width / 2 + scrollOffsetX} ${coords2.top + coords2.height / 2 + scrollOffsetY}`;
             path.setAttribute('d', d);
             path.setAttribute('class', `path path-blue`);
             svgContainer.appendChild(path);
