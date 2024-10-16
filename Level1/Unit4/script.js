@@ -14,7 +14,13 @@ document.addEventListener('DOMContentLoaded', async function() {
     let positionLeft = true;
 
     async function fetchUserProgress() {
-        const userId = firebase.auth().currentUser.uid;
+        const user = firebase.auth().currentUser;
+        if (!user) {
+            console.error("Usuário não autenticado.");
+            return;
+        }
+        
+        const userId = user.uid;
         const currentUrl = window.location.pathname;
         const levelMatch = currentUrl.match(/Level(\d+)/);
         const unitMatch = currentUrl.match(/Unit(\d+)/);
@@ -36,6 +42,8 @@ document.addEventListener('DOMContentLoaded', async function() {
                         activities[index].unlocked = false;
                     }
                 });
+            } else {
+                console.log("Progresso não encontrado para o usuário.");
             }
         } catch (error) {
             console.error("Erro ao buscar o progresso do usuário:", error);
