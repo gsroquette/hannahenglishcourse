@@ -134,22 +134,16 @@ document.addEventListener('DOMContentLoaded', async function() {
             const phase2 = document.querySelectorAll('.phase')[i + 1];
 
             if (phase1 && phase2) {
-                const phase1Top = parseFloat(phase1.style.top);
-                const phase1Left = parseFloat(phase1.style.left) * window.innerWidth / 100;
-                const phase2Top = parseFloat(phase2.style.top);
-                const phase2Left = parseFloat(phase2.style.left) * window.innerWidth / 100;
+                const coords1 = phase1.getBoundingClientRect();
+                const coords2 = phase2.getBoundingClientRect();
 
-                const controlPointX1 = phase1Left + (phase2Left - phase1Left) * 0.33;
-                const controlPointY1 = phase1Top + (phase2Top - phase1Top) * 0.33 + 150;
-                const controlPointX2 = phase1Left + (phase2Left - phase1Left) * 0.66;
-                const controlPointY2 = phase2Top - 150;
-
-                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                const d = `M ${phase1Left} ${phase1Top} 
-                           C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
-                           ${phase2Left} ${phase2Top}`;
-                path.setAttribute('d', d);
-                path.setAttribute('class', `path path-blue`);
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                path.setAttribute('x1', coords1.left + coords1.width / 2 + window.scrollX);
+                path.setAttribute('y1', coords1.top + coords1.height / 2 + window.scrollY);
+                path.setAttribute('x2', coords2.left + coords2.width / 2 + window.scrollX);
+                path.setAttribute('y2', coords2.top + coords2.height / 2 + window.scrollY);
+                path.setAttribute('stroke', '#000');
+                path.setAttribute('stroke-width', '2');
                 svgContainer.appendChild(path);
             }
         }
