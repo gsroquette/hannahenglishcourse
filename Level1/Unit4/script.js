@@ -21,10 +21,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             console.log("Usuário autenticado:", user.uid);
             await fetchUserProgress(user);
             initializePhases();
-            createPlayer();
             
-            // Adiciona um pequeno atraso para garantir o desenho correto das linhas
-            setTimeout(drawLines, 50);
+            // Adiciona um pequeno atraso para garantir o desenho correto das linhas e a criação do boneco
+            setTimeout(() => {
+                drawLines();
+                createPlayer();
+            }, 100);
         } else {
             console.error("Usuário não autenticado.");
         }
@@ -169,7 +171,4 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     window.addEventListener('focus', checkForNewUnlock); // Verifica o progresso ao retornar à página
     window.addEventListener('resize', drawLines); // Redesenha as linhas ao redimensionar a tela
-
-    // Desenha as linhas inicialmente após as fases serem renderizadas
-    setTimeout(drawLines, 50);
 });
