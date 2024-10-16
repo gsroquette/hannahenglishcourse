@@ -134,8 +134,14 @@ document.addEventListener('DOMContentLoaded', async function() {
         for (let i = 0; i < activities.length - 1; i++) {
             const phase1 = document.querySelectorAll('.phase')[i];
             const phase2 = document.querySelectorAll('.phase')[i + 1];
-            const coords1 = phase1.getBoundingClientRect();
-            const coords2 = phase2.getBoundingClientRect();
+            const coords1 = {
+                left: phase1.offsetLeft,
+                top: phase1.offsetTop
+            };
+            const coords2 = {
+                left: phase2.offsetLeft,
+                top: phase2.offsetTop
+            };
 
             const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
             const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150;
@@ -143,9 +149,9 @@ document.addEventListener('DOMContentLoaded', async function() {
             const controlPointY2 = coords2.top - 150;
 
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
+            const d = `M ${coords1.left} ${coords1.top} 
                        C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
-                       ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
+                       ${coords2.left} ${coords2.top}`;
             path.setAttribute('d', d);
             path.setAttribute('class', `path path-blue`);
             svgContainer.appendChild(path);
