@@ -21,12 +21,19 @@ document.addEventListener('DOMContentLoaded', function() {
         moveToPhase(currentPhase);
     }
 
-    function loadUserProgress() {
+    firebase.auth().onAuthStateChanged((user) => {
+        if (user) {
+            const userId = user.uid;
+            loadUserProgress(userId);
+        } else {
+            console.error("Nenhum usuário autenticado");
+        }
+    });
+
+    function loadUserProgress(userId) {
         const urlPathParts = window.location.pathname.split('/');
         const level = urlPathParts[urlPathParts.length - 3];
         const unit = urlPathParts[urlPathParts.length - 2];
-        const userId = "SUNqNVmtcrh1YdZgjaRDAu3uAmj2";
-
         const progressPath = `/usuarios/${userId}/progresso/${level}/${unit}`;
         const avatarPath = `/usuarios/${userId}/avatar`;
 
@@ -165,20 +172,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const coords1 = phase1.getBoundingClientRect();
             const coords2 = phase2.getBoundingClientRect();
 
-            const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
-            const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150;
-            const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
-            const controlPointY2 = coords2.top - 150;
+            const controlPointX1 = coords1.left + coords1.width / 2;
+            const controlPointY1 = coords1.top + coords1.height / 2 + window.scrollY;
+            const controlPointX2 = coords2.left + coords2.width / 2;
+            const controlPointY2 = coords2.top + coords2.height / 2 + window.scrollY;
 
-            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
-                       C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
-                       ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
-            path.setAttribute('d', d);
-            path.setAttribute('class', `path path-blue`);
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            path.setAttribute("d", `M ${controlPointX1} ${controlPointY1} C ${controlPointX1} ${(controlPointY1 + controlPointY2) / 2}, ${controlPointX2} ${(controlPointY1 + controlPointY2) / 2}, ${controlPointX2} ${controlPointY2}`);
+            path.setAttribute("class", i % 2 == 0 ? "path path-blue" : "path path-purple");
             svgContainer.appendChild(path);
         }
     }
-
-    loadUserProgress();
 });
