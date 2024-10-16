@@ -30,55 +30,84 @@ document.addEventListener('DOMContentLoaded', function() {
         return distance < minDistance;
     }
 
-    activities.forEach((activity, index) => {
-        const phaseDiv = document.createElement('div');
-        phaseDiv.classList.add('phase');
+    function loadUserProgress() {
+        const url = new URL(window.location.href);
+        const level = url.pathname.split('/')[2]; // Extrai o nível da URL
+        const unit = url.pathname.split('/')[3]; // Extrai a unidade da URL
 
-        const baseTopPosition = 200;
-        let topPosition, horizontalPosition;
+        const userId = "SUNqNvm"; // ID de exemplo; substituir pelo ID do usuário logado, se aplicável
 
-        const randomVerticalGap = Math.random() * (30 - 20) + 20;
-        topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
+        firebase.database().ref(`/usuarios/${userId}/progresso/${level}/${unit}`).once('value')
+            .then((snapshot) => {
+                const progress = snapshot.val();
+                if (progress) {
+                    activities.forEach((activity, index) => {
+                        if (progress[`fase${index + 1}`]) {
+                            activity.unlocked = true;
+                            currentPhase = index; // Atualiza a fase mais avançada
+                        }
+                    });
+                }
+                initializeMap();
+                createPlayer();
+            })
+            .catch((error) => {
+                console.error("Erro ao carregar o progresso do usuário:", error);
+                initializeMap(); // Ainda inicializa o mapa, mesmo se houver erro
+                createPlayer();
+            });
+    }
 
-        if (positionLeft) {
-            horizontalPosition = Math.random() * (20 - 5) + 5;
-        } else {
-            horizontalPosition = Math.random() * (95 - 80) + 80;
-        }
+    function initializeMap() {
+        activities.forEach((activity, index) => {
+            const phaseDiv = document.createElement('div');
+            phaseDiv.classList.add('phase');
 
-        positionLeft = !positionLeft;
+            const baseTopPosition = 200;
+            let topPosition, horizontalPosition;
 
-        phaseDiv.style.top = `${topPosition}px`;
-        phaseDiv.style.left = `${horizontalPosition}%`;
+            const randomVerticalGap = Math.random() * (30 - 20) + 20;
+            topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
 
-        const phaseImage = document.createElement('img');
-        phaseImage.src = activity.img;
-        phaseImage.alt = activity.name;
-        phaseImage.classList.add('phase-img');
-        phaseDiv.appendChild(phaseImage);
-
-        mapContainer.appendChild(phaseDiv);
-
-        if (index === currentPhase) {
-            phaseDiv.classList.add('active');
-        } else if (index > currentPhase) {
-            phaseDiv.classList.add('locked');
-
-            const lockIcon = document.createElement('img');
-            lockIcon.src = '../../imagens/lock_icon_resized.png';
-            lockIcon.classList.add('lock-icon');
-            mapContainer.appendChild(lockIcon);
-
-            lockIcon.style.top = `${topPosition}px`;
-            lockIcon.style.left = `${horizontalPosition}%`;
-        }
-
-        phaseDiv.addEventListener('click', () => {
-            if (!phaseDiv.classList.contains('locked')) {
-                moveToPhase(index, activity.path, index);
+            if (positionLeft) {
+                horizontalPosition = Math.random() * (20 - 5) + 5;
+            } else {
+                horizontalPosition = Math.random() * (95 - 80) + 80;
             }
+
+            positionLeft = !positionLeft;
+
+            phaseDiv.style.top = `${topPosition}px`;
+            phaseDiv.style.left = `${horizontalPosition}%`;
+
+            const phaseImage = document.createElement('img');
+            phaseImage.src = activity.img;
+            phaseImage.alt = activity.name;
+            phaseImage.classList.add('phase-img');
+            phaseDiv.appendChild(phaseImage);
+
+            mapContainer.appendChild(phaseDiv);
+
+            if (index <= currentPhase) {
+                phaseDiv.classList.add('active');
+            } else {
+                phaseDiv.classList.add('locked');
+                const lockIcon = document.createElement('img');
+                lockIcon.src = '../../imagens/lock_icon_resized.png';
+                lockIcon.classList.add('lock-icon');
+                mapContainer.appendChild(lockIcon);
+                lockIcon.style.top = `${topPosition}px`;
+                lockIcon.style.left = `${horizontalPosition}%`;
+            }
+
+            phaseDiv.addEventListener('click', () => {
+                if (!phaseDiv.classList.contains('locked')) {
+                    moveToPhase(index, activity.path, index);
+                }
+            });
         });
-    });
+        drawLines();
+    }
 
     function moveToPhase(index, path = null, clickedIndex = null) {
         const phase = document.querySelectorAll('.phase')[index];
@@ -111,79 +140,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function unlockNextPhase(index, path) {
-        if (index < activities.length - 1) {
-            const nextPhase = document.querySelectorAll('.phase')[index + 1];
-            const nextActivity = activities[index + 1];
-
-            if (!nextActivity.unlocked) {
-                nextActivity.unlocked = true; // Marcar a fase como desbloqueada
-
-                nextPhase.classList.remove('locked');
-                nextPhase.classList.add('unlocked');
-
-                const lockIcon = mapContainer.querySelector('.lock-icon');
-                if (lockIcon) {
-                    lockIcon.remove();
-                }
-
-                const nextPhaseCoords = nextPhase.getBoundingClientRect();
-
-                window.scrollTo({
-                    top: nextPhaseCoords.top + window.scrollY - window.innerHeight / 2,
-                    left: nextPhaseCoords.left + window.scrollX - window.innerWidth / 2,
-                    behavior: 'smooth'
-                });
-
-                setTimeout(() => {
-                    const zoomFactor = 1.5;
-                    const zoomX = nextPhaseCoords.left + window.scrollX + nextPhaseCoords.width / 2;
-                    const zoomY = nextPhaseCoords.top + window.scrollY + nextPhaseCoords.height / 2;
-
-                    mapContainer.style.transformOrigin = `${zoomX}px ${zoomY}px`;
-                    mapContainer.style.transform = `scale(${zoomFactor})`;
-                    mapContainer.style.transition = 'transform 1s ease';
-
-                    setTimeout(() => {
-                        const unlockGif = document.createElement('img');
-                        unlockGif.src = '../../imagens/cadeado.gif'; 
-                        unlockGif.classList.add('unlock-gif');
-                        nextPhase.appendChild(unlockGif);
-
-                        unlockGif.style.position = 'absolute';
-                        unlockGif.style.top = '50%';
-                        unlockGif.style.left = '50%';
-                        unlockGif.style.transform = 'translate(-50%, -50%)';
-
-                        setTimeout(() => {
-                            unlockGif.remove();
-                            mapContainer.style.transform = 'scale(1)';
-
-                            setTimeout(() => {
-                                const clickedPhase = document.querySelectorAll('.phase')[index];
-                                const clickedCoords = clickedPhase.getBoundingClientRect();
-                                window.scrollTo({
-                                    top: clickedCoords.top + window.scrollY - window.innerHeight / 2,
-                                    behavior: 'smooth'
-                                });
-
-                                setTimeout(() => {
-                                    window.location.href = path;
-                                }, 600);
-                            }, 1000);
-                        }, 3000);
-                    }, 1000);
-                }, 600);
-            } else {
-                // Se a fase já estiver desbloqueada, apenas abrir a fase atual
-                window.location.href = path;
-            }
-        } else {
-            // Se não houver próxima fase, apenas abrir a fase atual
-            window.location.href = path;
-        }
-    }
-
     function drawLines() {
         svgContainer.innerHTML = '';
         for (let i = 0; i < activities.length - 1; i++) {
@@ -207,15 +163,5 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function updateLineColor(index) {
-        const paths = document.querySelectorAll('.path');
-        if (paths[index]) {
-            paths[index].classList.remove('path-blue');
-            paths[index].classList.add('path-purple');
-        }
-    }
-
-    drawLines();
-    createPlayer();
-    window.addEventListener('resize', drawLines);
+    loadUserProgress(); // Carrega o progresso do usuário ao iniciar a página
 });
