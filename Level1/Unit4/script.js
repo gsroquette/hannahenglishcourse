@@ -21,19 +21,12 @@ document.addEventListener('DOMContentLoaded', function() {
         moveToPhase(currentPhase);
     }
 
-    firebase.auth().onAuthStateChanged((user) => {
-        if (user) {
-            const userId = user.uid;
-            loadUserProgress(userId);
-        } else {
-            console.error("Nenhum usuário autenticado");
-        }
-    });
-
-    function loadUserProgress(userId) {
+    function loadUserProgress() {
         const urlPathParts = window.location.pathname.split('/');
         const level = urlPathParts[urlPathParts.length - 3];
         const unit = urlPathParts[urlPathParts.length - 2];
+        const userId = "SUNqNVmtcrh1YdZgjaRDAu3uAmj2"; // Atualize este ID para o usuário ativo
+
         const progressPath = `/usuarios/${userId}/progresso/${level}/${unit}`;
         const avatarPath = `/usuarios/${userId}/avatar`;
 
@@ -42,21 +35,17 @@ document.addEventListener('DOMContentLoaded', function() {
             .then((snapshot) => {
                 const progress = snapshot.val();
                 if (progress) {
-                    let lastUnlockedIndex = -1;
                     activities.forEach((activity, index) => {
                         if (progress[`fase${index + 1}`] === true) {
                             activity.unlocked = true;
-                            lastUnlockedIndex = index;
+                            currentPhase = index;
                         }
                     });
-                    if (lastUnlockedIndex !== -1) {
-                        currentPhase = lastUnlockedIndex;
-                    }
                 } else {
                     console.error("Nenhum progresso encontrado para este nível e unidade.");
                 }
                 initializeMap();
-                unlockLastPhaseWithAnimation();
+                unlockNextPhaseWithAnimation();
 
                 const avatarRef = firebase.database().ref(avatarPath);
                 avatarRef.once('value').then((avatarSnapshot) => {
@@ -124,17 +113,19 @@ document.addEventListener('DOMContentLoaded', function() {
         drawLines();
     }
 
-    function unlockLastPhaseWithAnimation() {
-        const lastUnlockedPhase = document.querySelectorAll('.phase')[currentPhase];
-        if (lastUnlockedPhase) {
-            const lockIcon = lastUnlockedPhase.lockIcon;
+    function unlockNextPhaseWithAnimation() {
+        const nextPhaseIndex = currentPhase + 1;
+        if (nextPhaseIndex < activities.length && !activities[nextPhaseIndex].unlocked) {
+            const nextPhase = document.querySelectorAll('.phase')[nextPhaseIndex];
+            const lockIcon = nextPhase.lockIcon;
+
             if (lockIcon) {
                 lockIcon.classList.add('unlock-animation');
                 setTimeout(() => {
                     lockIcon.remove();
-                    lastUnlockedPhase.classList.remove('locked');
-                    lastUnlockedPhase.classList.add('active');
-                }, 1000); // 1 segundo para animação
+                    nextPhase.classList.remove('locked');
+                    nextPhase.classList.add('active');
+                }, 1000); // Tempo de 1 segundo para a animação
             }
         }
     }
@@ -172,15 +163,20 @@ document.addEventListener('DOMContentLoaded', function() {
             const coords1 = phase1.getBoundingClientRect();
             const coords2 = phase2.getBoundingClientRect();
 
-            const controlPointX1 = coords1.left + coords1.width / 2;
-            const controlPointY1 = coords1.top + coords1.height / 2 + window.scrollY;
-            const controlPointX2 = coords2.left + coords2.width / 2;
-            const controlPointY2 = coords2.top + coords2.height / 2 + window.scrollY;
+            const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
+            const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150;
+            const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
+            const controlPointY2 = coords2.top - 150;
 
-            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            path.setAttribute("d", `M ${controlPointX1} ${controlPointY1} C ${controlPointX1} ${(controlPointY1 + controlPointY2) / 2}, ${controlPointX2} ${(controlPointY1 + controlPointY2) / 2}, ${controlPointX2} ${controlPointY2}`);
-            path.setAttribute("class", i % 2 == 0 ? "path path-blue" : "path path-purple");
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
+                       C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
+                       ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
+            path.setAttribute('d', d);
+            path.setAttribute('class', `path path-blue`);
             svgContainer.appendChild(path);
         }
     }
+
+    loadUserProgress();
 });
