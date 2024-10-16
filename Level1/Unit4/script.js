@@ -1,4 +1,7 @@
 document.addEventListener('DOMContentLoaded', async function() {
+    // Garante que a rolagem da página esteja no topo
+    window.scrollTo(0, 0);
+
     const activities = [
         { id: 1, name: "StoryCards", path: "../Unit4/StoryCards/index.html", img: "../../imagens/botoes/storycards_button.png" },
         { id: 2, name: "Flashcards", path: "../Unit4/Flashcards/index.html", img: "../../imagens/botoes/flashcards_button.png" },
@@ -19,7 +22,9 @@ document.addEventListener('DOMContentLoaded', async function() {
             await fetchUserProgress(user);
             initializePhases();
             createPlayer();
-            drawLines(); // Desenha as linhas após inicializar as fases e o jogador
+            
+            // Adiciona um pequeno atraso para garantir o desenho correto das linhas
+            setTimeout(drawLines, 50);
         } else {
             console.error("Usuário não autenticado.");
         }
@@ -123,32 +128,32 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     function drawLines() {
-    svgContainer.innerHTML = ''; // Limpa o SVG antes de redesenhar as linhas
-    for (let i = 0; i < activities.length - 1; i++) {
-        const phase1 = document.querySelectorAll('.phase')[i];
-        const phase2 = document.querySelectorAll('.phase')[i + 1];
+        svgContainer.innerHTML = ''; // Limpa o SVG antes de redesenhar as linhas
+        for (let i = 0; i < activities.length - 1; i++) {
+            const phase1 = document.querySelectorAll('.phase')[i];
+            const phase2 = document.querySelectorAll('.phase')[i + 1];
 
-        if (phase1 && phase2) {
-            const phase1Top = parseFloat(phase1.style.top);
-            const phase1Left = parseFloat(phase1.style.left) * window.innerWidth / 100;
-            const phase2Top = parseFloat(phase2.style.top);
-            const phase2Left = parseFloat(phase2.style.left) * window.innerWidth / 100;
+            if (phase1 && phase2) {
+                const phase1Top = parseFloat(phase1.style.top);
+                const phase1Left = parseFloat(phase1.style.left) * window.innerWidth / 100;
+                const phase2Top = parseFloat(phase2.style.top);
+                const phase2Left = parseFloat(phase2.style.left) * window.innerWidth / 100;
 
-            const controlPointX1 = phase1Left + (phase2Left - phase1Left) * 0.33;
-            const controlPointY1 = phase1Top + (phase2Top - phase1Top) * 0.33 + 150;
-            const controlPointX2 = phase1Left + (phase2Left - phase1Left) * 0.66;
-            const controlPointY2 = phase2Top - 150;
+                const controlPointX1 = phase1Left + (phase2Left - phase1Left) * 0.33;
+                const controlPointY1 = phase1Top + (phase2Top - phase1Top) * 0.33 + 150;
+                const controlPointX2 = phase1Left + (phase2Left - phase1Left) * 0.66;
+                const controlPointY2 = phase2Top - 150;
 
-            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const d = `M ${phase1Left} ${phase1Top} 
-                       C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
-                       ${phase2Left} ${phase2Top}`;
-            path.setAttribute('d', d);
-            path.setAttribute('class', `path path-blue`);
-            svgContainer.appendChild(path);
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                const d = `M ${phase1Left} ${phase1Top} 
+                           C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
+                           ${phase2Left} ${phase2Top}`;
+                path.setAttribute('d', d);
+                path.setAttribute('class', `path path-blue`);
+                svgContainer.appendChild(path);
+            }
         }
     }
-}
 
     async function checkForNewUnlock() {
         await fetchUserProgress(firebase.auth().currentUser); // Recarrega o progresso após o retorno
@@ -169,6 +174,8 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     window.addEventListener('focus', checkForNewUnlock); // Verifica o progresso ao retornar à página
 
-    drawLines();
-    window.addEventListener('resize', drawLines); // Redesenha as linhas ao redimensionar a tela
+    window.addEventListener('resize', () => {
+        window.scrollTo(0, 0);
+        drawLines(); // Redesenha as linhas ao redimensionar a tela
+    });
 });
