@@ -5,16 +5,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const activities = [
         { id: 1, name: "StoryCards", path: "../Unit4/StoryCards/index.html", img: "../../imagens/botoes/storycards_button.png", unlocked: false },
         { id: 2, name: "Flashcards", path: "../Unit4/Flashcards/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-        { id: 3, name: "Flashcards2", path: "../Unit4/Flashcards2/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+        { id: 3, name: "Flashcards2", path: "../Unit4/Flashcards2/index.html", img: "../../imagens/botoes/storycards_button.png", unlocked: false },
         { id: 4, name: "Flashcards3", path: "../Unit4/Flashcards3/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
         { id: 5, name: "QUIZ", path: "../Unit4/QUIZ/index.html", img: "../../imagens/botoes/quiz_button.png", unlocked: false },
     ];
 
     const mapContainer = document.getElementById('mapContainer');
     const svgContainer = document.getElementById('linesSvg');
-    let currentPhase = 0;
     let player;
-    let positionLeft = true;
 
     auth.onAuthStateChanged(user => {
         if (user) {
@@ -34,28 +32,25 @@ document.addEventListener('DOMContentLoaded', function() {
         const progressPath = `/usuarios/${userId}/progresso/${level}/${unit}`;
         const avatarPath = `/usuarios/${userId}/avatar`;
 
-        const progressRef = database.ref(progressPath);
-        progressRef.once('value')
+        database.ref(progressPath).once('value')
             .then((snapshot) => {
                 const progress = snapshot.val();
                 if (progress) {
                     activities.forEach((activity, index) => {
-                        if (progress[`fase${index + 1}`] === true) {
-                            activity.unlocked = true;
-                            currentPhase = index;
-                        }
+                        activity.unlocked = progress[`fase${index + 1}`] === true;
                     });
                 } else {
                     console.error("Nenhum progresso encontrado para este nível e unidade.");
                 }
-                initializeMap();
-                unlockNextPhaseWithAnimation();
 
-                const avatarRef = database.ref(avatarPath);
-                avatarRef.once('value').then((avatarSnapshot) => {
+                initializeMap();
+
+                database.ref(avatarPath).once('value').then((avatarSnapshot) => {
                     const avatarFileName = avatarSnapshot.val();
                     const avatarImgPath = `../../imagens/${avatarFileName}`;
                     createPlayer(avatarImgPath);
+                }).catch(() => {
+                    createPlayer(); // Se erro, usar avatar padrão
                 });
             })
             .catch((error) => {
@@ -70,7 +65,7 @@ document.addEventListener('DOMContentLoaded', function() {
         player.src = avatarPath;
         player.classList.add('player');
         mapContainer.appendChild(player);
-        moveToPhase(currentPhase);
+        moveToPhase(0);  // Iniciar na primeira fase
     }
 
     function initializeMap() {
@@ -79,18 +74,8 @@ document.addEventListener('DOMContentLoaded', function() {
             phaseDiv.classList.add('phase');
 
             const baseTopPosition = 200;
-            let topPosition, horizontalPosition;
-
-            const randomVerticalGap = Math.random() * (30 - 20) + 20;
-            topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
-
-            if (positionLeft) {
-                horizontalPosition = Math.random() * (20 - 5) + 5;
-            } else {
-                horizontalPosition = Math.random() * (95 - 80) + 80;
-            }
-
-            positionLeft = !positionLeft;
+            let topPosition = baseTopPosition + index * 20 * window.innerHeight / 100;
+            let horizontalPosition = index % 2 === 0 ? 10 : 85;
 
             phaseDiv.style.top = `${topPosition}px`;
             phaseDiv.style.left = `${horizontalPosition}%`;
@@ -110,60 +95,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 const lockIcon = document.createElement('img');
                 lockIcon.src = '../../imagens/lock_icon_resized.png';
                 lockIcon.classList.add('lock-icon');
-                mapContainer.appendChild(lockIcon);
-                lockIcon.style.top = `${topPosition}px`;
-                lockIcon.style.left = `${horizontalPosition}%`;
+                phaseDiv.appendChild(lockIcon);
             }
 
             phaseDiv.addEventListener('click', () => {
-                if (!phaseDiv.classList.contains('locked')) {
+                if (activity.unlocked) {
                     moveToPhase(index, activity.path);
                 }
             });
         });
+
         drawLines();
-    }
-
-    function unlockNextPhaseWithAnimation() {
-        const nextPhaseIndex = currentPhase + 1;
-        if (nextPhaseIndex < activities.length && !activities[nextPhaseIndex].unlocked) {
-            const nextPhase = document.querySelectorAll('.phase')[nextPhaseIndex];
-
-            const unlockGif = document.createElement('img');
-            unlockGif.src = '../../imagens/cadeado.gif';
-            unlockGif.classList.add('unlock-gif');
-            nextPhase.appendChild(unlockGif);
-
-            unlockGif.style.position = 'absolute';
-            unlockGif.style.top = '50%';
-            unlockGif.style.left = '50%';
-            unlockGif.style.transform = 'translate(-50%, -50%)';
-
-            setTimeout(() => {
-                unlockGif.remove();
-                nextPhase.classList.remove('locked');
-                nextPhase.classList.add('active');
-            }, 3000);
-        }
     }
 
     function moveToPhase(index, path = null) {
         const phase = document.querySelectorAll('.phase')[index];
         const coords = phase.getBoundingClientRect();
-        document.querySelectorAll('.phase').forEach(phase => { phase.classList.remove('active'); });
-        phase.classList.add('active');
 
         player.style.top = `${coords.top + window.scrollY + coords.height / 2}px`;
         player.style.left = `${coords.left + window.scrollX + coords.width / 2}px`;
         player.classList.add('moving');
-
-        const phaseInView = phase.getBoundingClientRect().top >= 0 && phase.getBoundingClientRect().bottom <= window.innerHeight;
-        if (!phaseInView) {
-            window.scrollTo({
-                top: coords.top + window.scrollY - window.innerHeight / 2,
-                behavior: 'smooth'
-            });
-        }
 
         if (path) {
             setTimeout(() => {
@@ -174,12 +125,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function drawLines() {
         svgContainer.innerHTML = '';
+        const phases = document.querySelectorAll('.phase');
         for (let i = 0; i < activities.length - 1; i++) {
-            const phase1 = document.querySelectorAll('.phase')[i];
-            const phase2 = document.querySelectorAll('.phase')[i + 1];
+            const phase1 = phases[i];
+            const phase2 = phases[i + 1];
+            if (!phase1 || !phase2) continue;
+
             const coords1 = phase1.getBoundingClientRect();
             const coords2 = phase2.getBoundingClientRect();
-
             const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
             const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150;
             const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
