@@ -13,13 +13,18 @@ document.addEventListener('DOMContentLoaded', async function() {
     let player;
     let positionLeft = true;
 
-    async function fetchUserProgress() {
-        const user = firebase.auth().currentUser;
-        if (!user) {
+    firebase.auth().onAuthStateChanged(async function(user) {
+        if (user) {
+            console.log("Usuário autenticado:", user.uid);
+            await fetchUserProgress(user);
+            initializePhases();
+            createPlayer();
+        } else {
             console.error("Usuário não autenticado.");
-            return;
         }
-        
+    });
+
+    async function fetchUserProgress(user) {
         const userId = user.uid;
         const currentUrl = window.location.pathname;
         const levelMatch = currentUrl.match(/Level(\d+)/);
@@ -59,8 +64,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     async function initializePhases() {
-        await fetchUserProgress();
-
         activities.forEach((activity, index) => {
             const phaseDiv = document.createElement('div');
             phaseDiv.classList.add('phase');
@@ -141,7 +144,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     async function checkForNewUnlock() {
-        await fetchUserProgress(); // Recarrega o progresso após o retorno
+        await fetchUserProgress(firebase.auth().currentUser); // Recarrega o progresso após o retorno
 
         activities.forEach((activity, index) => {
             const phaseDiv = document.querySelectorAll('.phase')[index];
@@ -160,7 +163,5 @@ document.addEventListener('DOMContentLoaded', async function() {
     window.addEventListener('focus', checkForNewUnlock); // Verifica o progresso ao retornar à página
 
     drawLines();
-    await initializePhases();
-    createPlayer();
     window.addEventListener('resize', drawLines);
 });
