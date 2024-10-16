@@ -116,7 +116,6 @@ document.addEventListener('DOMContentLoaded', function() {
     function unlockNextPhaseWithAnimation() {
         const nextPhaseIndex = currentPhase + 1;
         if (nextPhaseIndex < activities.length && !activities[nextPhaseIndex].unlocked) {
-            activities[nextPhaseIndex].unlocked = true;
             const nextPhase = document.querySelectorAll('.phase')[nextPhaseIndex];
             const lockIcon = nextPhase.lockIcon;
 
