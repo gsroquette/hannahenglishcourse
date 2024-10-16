@@ -1,6 +1,5 @@
 document.addEventListener('DOMContentLoaded', async function() {
-    // Garante que a rolagem da página esteja no topo
-    window.scrollTo(0, 0);
+    window.scrollTo(0, 0); // Garante que a rolagem da página esteja no topo
 
     const activities = [
         { id: 1, name: "StoryCards", path: "../Unit4/StoryCards/index.html", img: "../../imagens/botoes/storycards_button.png" },
@@ -22,9 +21,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             await fetchUserProgress(user);
             initializePhases();
             createPlayer();
-            
-            // Adiciona um pequeno atraso para garantir o desenho correto das linhas
-            setTimeout(drawLines, 50);
+            setTimeout(drawLines, 50); // Adiciona um pequeno atraso para garantir o desenho correto das linhas
         } else {
             console.error("Usuário não autenticado.");
         }
@@ -168,8 +165,6 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     window.addEventListener('focus', checkForNewUnlock); // Verifica o progresso ao retornar à página
 
-    window.addEventListener('resize', () => {
-        window.scrollTo(0, 0);
-        drawLines(); // Redesenha as linhas ao redimensionar a tela
-    });
+    drawLines();
+    window.addEventListener('resize', drawLines); // Redesenha as linhas ao redimensionar a tela
 });
