@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const avatarRef = firebase.database().ref(avatarPath);
                 avatarRef.once('value').then((avatarSnapshot) => {
                     const avatarFileName = avatarSnapshot.val();
-                    const avatarImgPath = `../../imagens/${avatarFileName}.png`; // Certifique-se de que o caminho está correto
+                    const avatarImgPath = `../../imagens/${avatarFileName}`; // Remove a duplicação de .png
                     createPlayer(avatarImgPath); // Passa o caminho do avatar
                 });
             })
