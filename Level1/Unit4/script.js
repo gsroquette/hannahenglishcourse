@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const activities = [
         { id: 1, name: "StoryCards", path: "../Unit4/StoryCards/index.html", img: "../../imagens/botoes/storycards_button.png", unlocked: false },
         { id: 2, name: "Flashcards", path: "../Unit4/Flashcards/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-        { id: 3, name: "Flashcards2", path: "../Unit4/Flashcards2/index.html", img: "../../imagens/botoes/storycards_button.png", unlocked: false },
+        { id: 3, name: "Flashcards2", path: "../Unit4/Flashcards2/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
         { id: 4, name: "Flashcards3", path: "../Unit4/Flashcards3/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
         { id: 5, name: "QUIZ", path: "../Unit4/QUIZ/index.html", img: "../../imagens/botoes/quiz_button.png", unlocked: false },
     ];
@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const mapContainer = document.getElementById('mapContainer');
     const svgContainer = document.getElementById('linesSvg');
     let player;
+    let lastUnlockedIndex = -1;
 
     auth.onAuthStateChanged(user => {
         if (user) {
@@ -37,7 +38,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 const progress = snapshot.val();
                 if (progress) {
                     activities.forEach((activity, index) => {
-                        activity.unlocked = progress[`fase${index + 1}`] === true;
+                        if (progress[`fase${index + 1}`] === true) {
+                            activity.unlocked = true;
+                            lastUnlockedIndex = index;  // Atualiza com o índice da última fase desbloqueada
+                        }
                     });
                 } else {
                     console.error("Nenhum progresso encontrado para este nível e unidade.");
@@ -106,6 +110,26 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         drawLines();
+
+        // Aplica a animação de desbloqueio na última fase desbloqueada
+        if (lastUnlockedIndex >= 0) {
+            const lastUnlockedPhase = document.querySelectorAll('.phase')[lastUnlockedIndex];
+            animateUnlock(lastUnlockedPhase);
+        }
+    }
+
+    function animateUnlock(phaseDiv) {
+        const unlockGif = document.createElement('img');
+        unlockGif.src = '../../imagens/cadeado.gif';
+        unlockGif.classList.add('unlock-gif');
+        phaseDiv.appendChild(unlockGif);
+
+        unlockGif.style.filter = 'none'; // Remove qualquer filtro aplicado
+        unlockGif.style.opacity = '1'; // Garante que o gif esteja visível
+
+        setTimeout(() => {
+            unlockGif.remove();
+        }, 3000);
     }
 
     function moveToPhase(index, path = null) {
