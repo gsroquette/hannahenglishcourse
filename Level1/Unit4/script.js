@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const level = urlPathParts[urlPathParts.length - 3]; // Extrai o nível da URL (ex: 'Level1')
         const unit = urlPathParts[urlPathParts.length - 2];  // Extrai a unidade da URL (ex: 'Unit4')
 
-        const userId = "SUNqNvm"; // ID do usuário fixo para teste; adaptar conforme necessário para usuários dinâmicos
+        const userId = "SUNqNVmtcrh1YdZgjaRDAu3uAmj2"; // ID do usuário atualizado
 
         // Construir o caminho correto no Firebase e exibir no console
         const progressPath = `/usuarios/${userId}/progresso/${level}/${unit}`;
