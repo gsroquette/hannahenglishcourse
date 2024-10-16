@@ -31,9 +31,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function loadUserProgress() {
-        const url = new URL(window.location.href);
-        const level = url.pathname.split('/')[2]; // Extrai o nível da URL
-        const unit = url.pathname.split('/')[3]; // Extrai a unidade da URL
+        const urlPathParts = window.location.pathname.split('/');
+        const level = urlPathParts[2]; // Extrai o nível da URL
+        const unit = urlPathParts[3];  // Extrai a unidade da URL
 
         const userId = "SUNqNvm"; // ID de exemplo; substituir pelo ID do usuário logado, se aplicável
 
