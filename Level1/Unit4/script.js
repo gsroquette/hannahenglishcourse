@@ -2,11 +2,11 @@ document.addEventListener('DOMContentLoaded', async function() {
     window.scrollTo(0, 0); // Garantir que a página comece no topo
 
     const activities = [
-        { id: 1, name: "StoryCards", path: "../unidade4/StoryCards/index.html", img: "../../imagens/botoes/storycards_button.png", unlocked: false },
-        { id: 2, name: "Flashcards", path: "../unidade4/Flashcards/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-        { id: 3, name: "Flashcards2", path: "../unidade4/Flashcards2/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-        { id: 4, name: "Flashcards3", path: "../unidade4/Flashcards3/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-        { id: 5, name: "QUIZ", path: "../unidade4/QUIZ/index.html", img: "../../imagens/botoes/quiz_button.png", unlocked: false }
+        { id: 1, name: "StoryCards", path: "../Unit4/StoryCards/index.html", img: "../../imagens/botoes/storycards_button.png", unlocked: false },
+        { id: 2, name: "Flashcards", path: "../Unit4/Flashcards/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+        { id: 3, name: "Flashcards2", path: "../Unit4/Flashcards2/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+        { id: 4, name: "Flashcards3", path: "../Unit4/Flashcards3/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+        { id: 5, name: "QUIZ", path: "../Unit4/QUIZ/index.html", img: "../../imagens/botoes/quiz_button.png", unlocked: false }
     ];
 
     const mapContainer = document.getElementById('mapContainer');
