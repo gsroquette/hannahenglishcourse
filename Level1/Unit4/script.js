@@ -171,4 +171,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     window.addEventListener('focus', checkForNewUnlock);
     window.addEventListener('resize', drawLines); // Redesenha as linhas ao redimensionar a tela
+
+    // Monitora o scroll para redesenhar as linhas quando novas fases entram na tela
+    window.addEventListener('scroll', () => {
+        drawLines();
+    });
 });
