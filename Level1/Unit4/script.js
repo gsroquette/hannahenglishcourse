@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const urlPathParts = window.location.pathname.split('/');
         const level = urlPathParts[urlPathParts.length - 3];
         const unit = urlPathParts[urlPathParts.length - 2];
-        const userId = "SUNqNVmtcrh1YdZgjaRDAu3uAmj2"; // Atualize este ID para o usuário ativo
+        const userId = "SUNqNVmtcrh1YdZgjaRDAu3uAmj2";
 
         const progressPath = `/usuarios/${userId}/progresso/${level}/${unit}`;
         const avatarPath = `/usuarios/${userId}/avatar`;
@@ -35,17 +35,21 @@ document.addEventListener('DOMContentLoaded', function() {
             .then((snapshot) => {
                 const progress = snapshot.val();
                 if (progress) {
+                    let lastUnlockedIndex = -1;
                     activities.forEach((activity, index) => {
                         if (progress[`fase${index + 1}`] === true) {
                             activity.unlocked = true;
-                            currentPhase = index;
+                            lastUnlockedIndex = index;
                         }
                     });
+                    if (lastUnlockedIndex !== -1) {
+                        currentPhase = lastUnlockedIndex;
+                    }
                 } else {
                     console.error("Nenhum progresso encontrado para este nível e unidade.");
                 }
                 initializeMap();
-                unlockNextPhaseWithAnimation();
+                unlockLastPhaseWithAnimation();
 
                 const avatarRef = firebase.database().ref(avatarPath);
                 avatarRef.once('value').then((avatarSnapshot) => {
@@ -113,19 +117,17 @@ document.addEventListener('DOMContentLoaded', function() {
         drawLines();
     }
 
-    function unlockNextPhaseWithAnimation() {
-        const nextPhaseIndex = currentPhase + 1;
-        if (nextPhaseIndex < activities.length && !activities[nextPhaseIndex].unlocked) {
-            const nextPhase = document.querySelectorAll('.phase')[nextPhaseIndex];
-            const lockIcon = nextPhase.lockIcon;
-
+    function unlockLastPhaseWithAnimation() {
+        const lastUnlockedPhase = document.querySelectorAll('.phase')[currentPhase];
+        if (lastUnlockedPhase) {
+            const lockIcon = lastUnlockedPhase.lockIcon;
             if (lockIcon) {
                 lockIcon.classList.add('unlock-animation');
                 setTimeout(() => {
                     lockIcon.remove();
-                    nextPhase.classList.remove('locked');
-                    nextPhase.classList.add('active');
-                }, 1000); // Tempo de 1 segundo para a animação
+                    lastUnlockedPhase.classList.remove('locked');
+                    lastUnlockedPhase.classList.add('active');
+                }, 1000); // 1 segundo para animação
             }
         }
     }
