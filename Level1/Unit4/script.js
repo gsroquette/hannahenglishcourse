@@ -1,12 +1,13 @@
-document.addEventListener('DOMContentLoaded', async function() {
-    window.scrollTo(0, 0); // Garantir que a página comece no topo
+document.addEventListener('DOMContentLoaded', async function() { 
+    // Garante que a rolagem da página esteja no topo
+    window.scrollTo(0, 0);
 
     const activities = [
-        { id: 1, name: "StoryCards", path: "../Unit4/StoryCards/index.html", img: "../../imagens/botoes/storycards_button.png", unlocked: false },
-        { id: 2, name: "Flashcards", path: "../Unit4/Flashcards/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-        { id: 3, name: "Flashcards2", path: "../Unit4/Flashcards2/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-        { id: 4, name: "Flashcards3", path: "../Unit4/Flashcards3/index.html", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-        { id: 5, name: "QUIZ", path: "../Unit4/QUIZ/index.html", img: "../../imagens/botoes/quiz_button.png", unlocked: false }
+        { id: 1, name: "StoryCards", path: "../Unit4/StoryCards/index.html", img: "../../imagens/botoes/storycards_button.png" },
+        { id: 2, name: "Flashcards", path: "../Unit4/Flashcards/index.html", img: "../../imagens/botoes/flashcards_button.png" },
+        { id: 3, name: "Flashcards2", path: "../Unit4/Flashcards2/index.html", img: "../../imagens/botoes/flashcards_button.png" },
+        { id: 4, name: "Flashcards3", path: "../Unit4/Flashcards3/index.html", img: "../../imagens/botoes/flashcards_button.png" },
+        { id: 5, name: "QUIZ", path: "../Unit4/QUIZ/index.html", img: "../../imagens/botoes/quiz_button.png" }
     ];
 
     const mapContainer = document.getElementById('mapContainer');
@@ -15,72 +16,104 @@ document.addEventListener('DOMContentLoaded', async function() {
     let player;
     let positionLeft = true;
 
+    firebase.auth().onAuthStateChanged(async function(user) {
+        if (user) {
+            console.log("Usuário autenticado:", user.uid);
+            await fetchUserProgress(user);
+            initializePhases();
+            
+            // Adiciona um pequeno atraso para garantir o desenho correto das linhas e a criação do boneco
+            setTimeout(() => {
+                drawLines();
+                createPlayer();
+            }, 200); // Atraso ligeiramente maior para renderização completa
+        } else {
+            console.error("Usuário não autenticado.");
+        }
+    });
+
+    async function fetchUserProgress(user) {
+        const userId = user.uid;
+        const currentUrl = window.location.pathname;
+        const levelMatch = currentUrl.match(/Level(\d+)/);
+        const unitMatch = currentUrl.match(/Unit(\d+)/);
+        
+        if (!levelMatch || !unitMatch) return;
+        
+        const level = `Level${levelMatch[1]}`;
+        const unit = `Unit${unitMatch[1]}`;
+
+        try {
+            const snapshot = await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`).get();
+            if (snapshot.exists()) {
+                const progress = snapshot.val();
+                activities.forEach((activity, index) => {
+                    if (progress[`fase${index + 1}`]) {
+                        activities[index].unlocked = true;
+                        currentPhase = index; // Define o boneco na última fase liberada
+                    } else {
+                        activities[index].unlocked = false;
+                    }
+                });
+            } else {
+                console.log("Progresso não encontrado para o usuário.");
+            }
+        } catch (error) {
+            console.error("Erro ao buscar o progresso do usuário:", error);
+        }
+    }
+
     function createPlayer() {
         player = document.createElement('img');
         player.src = '../../imagens/bonequinho.png'; 
         player.classList.add('player');
         mapContainer.appendChild(player);
-        moveToPhase(currentPhase);
+        moveToPhase(currentPhase); // Coloca o boneco na última fase liberada
     }
 
-    function isTooClose(pos1, pos2) {
-        const minDistance = 100;
-        const dx = pos1.left - pos2.left;
-        const dy = pos1.top - pos2.top;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        return distance < minDistance;
-    }
+    async function initializePhases() {
+        activities.forEach((activity, index) => {
+            const phaseDiv = document.createElement('div');
+            phaseDiv.classList.add('phase');
+            
+            const baseTopPosition = 200;
+            const randomVerticalGap = Math.random() * (30 - 20) + 20;
+            const topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
+            const horizontalPosition = positionLeft ? Math.random() * (20 - 5) + 5 : Math.random() * (95 - 80) + 80;
+            positionLeft = !positionLeft;
 
-    activities.forEach((activity, index) => {
-        const phaseDiv = document.createElement('div');
-        phaseDiv.classList.add('phase');
+            phaseDiv.style.top = `${topPosition}px`;
+            phaseDiv.style.left = `${horizontalPosition}%`;
 
-        const baseTopPosition = 200;
-        let topPosition, horizontalPosition;
+            const phaseImage = document.createElement('img');
+            phaseImage.src = activity.img;
+            phaseImage.alt = activity.name;
+            phaseImage.classList.add('phase-img');
+            phaseDiv.appendChild(phaseImage);
+            mapContainer.appendChild(phaseDiv);
 
-        const randomVerticalGap = Math.random() * (30 - 20) + 20;
-        topPosition = baseTopPosition + index * randomVerticalGap * window.innerHeight / 100;
-
-        if (positionLeft) {
-            horizontalPosition = Math.random() * (20 - 5) + 5;
-        } else {
-            horizontalPosition = Math.random() * (95 - 80) + 80;
-        }
-
-        positionLeft = !positionLeft;
-
-        phaseDiv.style.top = `${topPosition}px`;
-        phaseDiv.style.left = `${horizontalPosition}%`;
-
-        const phaseImage = document.createElement('img');
-        phaseImage.src = activity.img;
-        phaseImage.alt = activity.name;
-        phaseImage.classList.add('phase-img');
-        phaseDiv.appendChild(phaseImage);
-        mapContainer.appendChild(phaseDiv);
-
-        if (index === currentPhase) {
-            phaseDiv.classList.add('active');
-        } else if (index > currentPhase) {
-            phaseDiv.classList.add('locked');
-
-            const lockIcon = document.createElement('img');
-            lockIcon.src = '../../imagens/lock_icon_resized.png';
-            lockIcon.classList.add('lock-icon');
-            mapContainer.appendChild(lockIcon);
-
-            lockIcon.style.top = `${topPosition}px`;
-            lockIcon.style.left = `${horizontalPosition}%`;
-        }
-
-        phaseDiv.addEventListener('click', () => {
-            if (!phaseDiv.classList.contains('locked')) {
-                moveToPhase(index, activity.path, index);
+            if (activity.unlocked) {
+                phaseDiv.classList.add('unlocked');
+                phaseDiv.classList.remove('locked');
+            } else {
+                phaseDiv.classList.add('locked');
+                const lockIcon = document.createElement('img');
+                lockIcon.src = '../../imagens/lock_icon_resized.png';
+                lockIcon.classList.add('lock-icon');
+                mapContainer.appendChild(lockIcon);
+                lockIcon.style.top = `${topPosition}px`;
+                lockIcon.style.left = `${horizontalPosition}%`;
             }
-        });
-    });
 
-    function moveToPhase(index, path = null, clickedIndex = null) {
+            phaseDiv.addEventListener('click', () => {
+                if (activity.unlocked) {
+                    moveToPhase(index, activity.path);
+                }
+            });
+        });
+    }
+
+    function moveToPhase(index, path = null) {
         const phase = document.querySelectorAll('.phase')[index];
         const coords = phase.getBoundingClientRect();
         document.querySelectorAll('.phase').forEach(phase => { phase.classList.remove('active'); });
@@ -88,22 +121,8 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         player.style.top = `${coords.top + window.scrollY + coords.height / 2}px`;
         player.style.left = `${coords.left + window.scrollX + coords.width / 2}px`;
-        player.classList.add('moving');
-
-        const phaseInView = phase.getBoundingClientRect().top >= 0 && phase.getBoundingClientRect().bottom <= window.innerHeight;
-        if (!phaseInView) {
-            window.scrollTo({
-                top: coords.top + window.scrollY - window.innerHeight / 2,
-                behavior: 'smooth'
-            });
-        }
-
-        if (clickedIndex !== null && clickedIndex < activities.length - 1) {
-            setTimeout(() => {
-                unlockNextPhase(clickedIndex, path);
-                updateLineColor(clickedIndex);
-            }, 600);
-        } else if (path) {
+        
+        if (path) {
             setTimeout(() => {
                 window.location.href = path;
             }, 600);
@@ -111,7 +130,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     function drawLines() {
-        svgContainer.innerHTML = '';
+        svgContainer.innerHTML = ''; // Limpa o SVG antes de redesenhar as linhas
         for (let i = 0; i < activities.length - 1; i++) {
             const phase1 = document.querySelectorAll('.phase')[i];
             const phase2 = document.querySelectorAll('.phase')[i + 1];
@@ -133,7 +152,24 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 
-    drawLines();
-    createPlayer();
-    window.addEventListener('resize', drawLines);
+    async function checkForNewUnlock() {
+        await fetchUserProgress(firebase.auth().currentUser); // Recarrega o progresso após o retorno
+
+        activities.forEach((activity, index) => {
+            const phaseDiv = document.querySelectorAll('.phase')[index];
+            if (activity.unlocked && phaseDiv.classList.contains('locked')) {
+                phaseDiv.classList.remove('locked');
+                phaseDiv.classList.add('unlocked');
+                const unlockGif = document.createElement('img');
+                unlockGif.src = '../../imagens/cadeado.gif';
+                unlockGif.classList.add('unlock-gif');
+                phaseDiv.appendChild(unlockGif);
+                setTimeout(() => unlockGif.remove(), 3000);
+            }
+        });
+    }
+
+    window.addEventListener('focus', checkForNewUnlock); // Verifica o progresso ao retornar à página
+    window.addEventListener('resize', drawLines); // Redesenha as linhas ao redimensionar a tela
+    window.addEventListener('scroll', drawLines); // Redesenha as linhas ao fazer scroll
 });
