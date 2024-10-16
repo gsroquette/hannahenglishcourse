@@ -28,7 +28,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const userId = "SUNqNVmtcrh1YdZgjaRDAu3uAmj2"; // ID do usuário atualizado
 
-        // Construir o caminho correto no Firebase e exibir no console
         const progressPath = `/usuarios/${userId}/progresso/${level}/${unit}`;
         console.log("Firebase Path:", progressPath);  // Para depuração
         const progressRef = firebase.database().ref(progressPath);
@@ -108,7 +107,7 @@ document.addEventListener('DOMContentLoaded', function() {
         drawLines();
     }
 
-    function moveToPhase(index, path = null, clickedIndex = null) {
+    function moveToPhase(index, path = null) {
         const phase = document.querySelectorAll('.phase')[index];
         const coords = phase.getBoundingClientRect();
         document.querySelectorAll('.phase').forEach(phase => { phase.classList.remove('active'); });
@@ -126,13 +125,8 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
 
-        if (clickedIndex !== null && clickedIndex < activities.length - 1) {
-            setTimeout(() => {
-                unlockNextPhase(clickedIndex, path);
-                updateLineColor(clickedIndex);
-            }, 600);
-        } else if (path) {
-            // Abrir a fase se não houver próxima fase para desbloquear
+        if (path) {
+            // Abrir a fase após o movimento do personagem
             setTimeout(() => {
                 window.location.href = path;
             }, 600);
