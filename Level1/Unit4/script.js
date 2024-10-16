@@ -23,11 +23,13 @@ document.addEventListener('DOMContentLoaded', async function() {
             await fetchUserProgress(user);
             initializePhases();
             
-            // Pequeno atraso para garantir o desenho correto das linhas e a criação do boneco
+            // Adiciona um pequeno atraso e rola para o fim e volta para o topo para garantir o desenho correto
+            window.scrollTo(0, document.body.scrollHeight);
             setTimeout(() => {
+                window.scrollTo(0, 0);
                 drawLines();
                 createPlayer();
-            }, 100);
+            }, 300);
         } else {
             console.error("Usuário não autenticado.");
         }
