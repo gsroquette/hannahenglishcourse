@@ -152,9 +152,10 @@ document.addEventListener('DOMContentLoaded', async function() {
             const controlPointY2 = coords2.top - 150 + window.scrollY;
 
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const d = `M ${coords1.left + coords1.width / 2 + window.scrollX} ${coords1.top + coords1.height / 2 + window.scrollY} 
-                       C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
-                       ${coords2.left + coords2.width / 2 + window.scrollX} ${coords2.top + coords2.height / 2 + window.scrollY}`;
+            const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
+           C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
+           ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
+
             path.setAttribute('d', d);
             path.setAttribute('class', `path path-blue`);
             svgContainer.appendChild(path);
