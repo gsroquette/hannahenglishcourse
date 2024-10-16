@@ -1,5 +1,4 @@
 document.addEventListener('DOMContentLoaded', async function() { 
-    // Garante que a rolagem da página esteja no topo
     window.scrollTo(0, 0);
 
     const activities = [
@@ -12,6 +11,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     const mapContainer = document.getElementById('mapContainer');
     const svgContainer = document.getElementById('linesSvg');
+    svgContainer.style.position = 'fixed'; // Mantém o SVG fixo
+    svgContainer.style.top = '0';
+    svgContainer.style.left = '0';
     let currentPhase = 0;
     let player;
     let positionLeft = true;
@@ -22,11 +24,10 @@ document.addEventListener('DOMContentLoaded', async function() {
             await fetchUserProgress(user);
             initializePhases();
             
-            // Adiciona um pequeno atraso para garantir o desenho correto das linhas e a criação do boneco
             setTimeout(() => {
                 drawLines();
                 createPlayer();
-            }, 500); // Tempo suficiente para a renderização completa
+            }, 100);
         } else {
             console.error("Usuário não autenticado.");
         }
@@ -50,7 +51,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 activities.forEach((activity, index) => {
                     if (progress[`fase${index + 1}`]) {
                         activities[index].unlocked = true;
-                        currentPhase = index; // Define o boneco na última fase liberada
+                        currentPhase = index; 
                     } else {
                         activities[index].unlocked = false;
                     }
@@ -68,7 +69,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         player.src = '../../imagens/bonequinho.png'; 
         player.classList.add('player');
         mapContainer.appendChild(player);
-        moveToPhase(currentPhase); // Coloca o boneco na última fase liberada
+        moveToPhase(currentPhase); 
     }
 
     async function initializePhases() {
@@ -137,43 +138,21 @@ document.addEventListener('DOMContentLoaded', async function() {
             const coords1 = phase1.getBoundingClientRect();
             const coords2 = phase2.getBoundingClientRect();
 
-            const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
-            const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150;
-            const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
-            const controlPointY2 = coords2.top - 150;
+            const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33 + window.scrollX;
+            const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150 + window.scrollY;
+            const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66 + window.scrollX;
+            const controlPointY2 = coords2.top - 150 + window.scrollY;
 
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
+            const d = `M ${coords1.left + coords1.width / 2 + window.scrollX} ${coords1.top + coords1.height / 2 + window.scrollY} 
                        C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
-                       ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
+                       ${coords2.left + coords2.width / 2 + window.scrollX} ${coords2.top + coords2.height / 2 + window.scrollY}`;
             path.setAttribute('d', d);
             path.setAttribute('class', `path path-blue`);
             svgContainer.appendChild(path);
         }
     }
 
-    async function checkForNewUnlock() {
-        await fetchUserProgress(firebase.auth().currentUser);
-
-        activities.forEach((activity, index) => {
-            const phaseDiv = document.querySelectorAll('.phase')[index];
-            if (activity.unlocked && phaseDiv.classList.contains('locked')) {
-                phaseDiv.classList.remove('locked');
-                phaseDiv.classList.add('unlocked');
-                const unlockGif = document.createElement('img');
-                unlockGif.src = '../../imagens/cadeado.gif';
-                unlockGif.classList.add('unlock-gif');
-                phaseDiv.appendChild(unlockGif);
-                setTimeout(() => unlockGif.remove(), 3000);
-            }
-        });
-    }
-
-    window.addEventListener('focus', checkForNewUnlock);
-    window.addEventListener('resize', drawLines); // Redesenha as linhas ao redimensionar a tela
-
-    // Monitora o scroll para redesenhar as linhas quando novas fases entram na tela
-    window.addEventListener('scroll', () => {
-        drawLines();
-    });
+    window.addEventListener('scroll', drawLines);
+    window.addEventListener('resize', drawLines);
 });
