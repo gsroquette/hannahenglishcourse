@@ -27,11 +27,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const unit = urlPathParts[urlPathParts.length - 2];
         const userId = "SUNqNVmtcrh1YdZgjaRDAu3uAmj2"; // Atualize este ID para o usuário ativo
 
-        // Definir o caminho para o progresso
         const progressPath = `/usuarios/${userId}/progresso/${level}/${unit}`;
         const avatarPath = `/usuarios/${userId}/avatar`;
 
-        // Obter o progresso
         const progressRef = firebase.database().ref(progressPath);
         progressRef.once('value')
             .then((snapshot) => {
@@ -47,13 +45,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.error("Nenhum progresso encontrado para este nível e unidade.");
                 }
                 initializeMap();
+                unlockNextPhaseWithAnimation();
 
-                // Obter o avatar do usuário
                 const avatarRef = firebase.database().ref(avatarPath);
                 avatarRef.once('value').then((avatarSnapshot) => {
                     const avatarFileName = avatarSnapshot.val();
-                    const avatarImgPath = `../../imagens/${avatarFileName}`; // Remove a duplicação de .png
-                    createPlayer(avatarImgPath); // Passa o caminho do avatar
+                    const avatarImgPath = `../../imagens/${avatarFileName}`;
+                    createPlayer(avatarImgPath);
                 });
             })
             .catch((error) => {
@@ -103,6 +101,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 mapContainer.appendChild(lockIcon);
                 lockIcon.style.top = `${topPosition}px`;
                 lockIcon.style.left = `${horizontalPosition}%`;
+                phaseDiv.lockIcon = lockIcon;
             }
 
             phaseDiv.addEventListener('click', () => {
@@ -112,6 +111,24 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
         drawLines();
+    }
+
+    function unlockNextPhaseWithAnimation() {
+        const nextPhaseIndex = currentPhase + 1;
+        if (nextPhaseIndex < activities.length && !activities[nextPhaseIndex].unlocked) {
+            activities[nextPhaseIndex].unlocked = true;
+            const nextPhase = document.querySelectorAll('.phase')[nextPhaseIndex];
+            const lockIcon = nextPhase.lockIcon;
+
+            if (lockIcon) {
+                lockIcon.classList.add('unlock-animation');
+                setTimeout(() => {
+                    lockIcon.remove();
+                    nextPhase.classList.remove('locked');
+                    nextPhase.classList.add('active');
+                }, 1000); // Tempo de 1 segundo para a animação
+            }
+        }
     }
 
     function moveToPhase(index, path = null) {
@@ -162,5 +179,5 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    loadUserProgress(); // Carrega o progresso do usuário ao iniciar a página
+    loadUserProgress();
 });
