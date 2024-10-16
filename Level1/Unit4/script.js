@@ -123,30 +123,32 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     function drawLines() {
-        svgContainer.innerHTML = ''; // Limpa o SVG antes de redesenhar as linhas
-        for (let i = 0; i < activities.length - 1; i++) {
-            const phase1 = document.querySelectorAll('.phase')[i];
-            const phase2 = document.querySelectorAll('.phase')[i + 1];
+    svgContainer.innerHTML = ''; // Limpa o SVG antes de redesenhar as linhas
+    for (let i = 0; i < activities.length - 1; i++) {
+        const phase1 = document.querySelectorAll('.phase')[i];
+        const phase2 = document.querySelectorAll('.phase')[i + 1];
 
-            if (phase1 && phase2) {
-                const coords1 = phase1.getBoundingClientRect();
-                const coords2 = phase2.getBoundingClientRect();
+        if (phase1 && phase2) {
+            const phase1Top = parseFloat(phase1.style.top);
+            const phase1Left = parseFloat(phase1.style.left) * window.innerWidth / 100;
+            const phase2Top = parseFloat(phase2.style.top);
+            const phase2Left = parseFloat(phase2.style.left) * window.innerWidth / 100;
 
-                const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
-                const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150;
-                const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
-                const controlPointY2 = coords2.top - 150;
+            const controlPointX1 = phase1Left + (phase2Left - phase1Left) * 0.33;
+            const controlPointY1 = phase1Top + (phase2Top - phase1Top) * 0.33 + 150;
+            const controlPointX2 = phase1Left + (phase2Left - phase1Left) * 0.66;
+            const controlPointY2 = phase2Top - 150;
 
-                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
-                           C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
-                           ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
-                path.setAttribute('d', d);
-                path.setAttribute('class', `path path-blue`);
-                svgContainer.appendChild(path);
-            }
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const d = `M ${phase1Left} ${phase1Top} 
+                       C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
+                       ${phase2Left} ${phase2Top}`;
+            path.setAttribute('d', d);
+            path.setAttribute('class', `path path-blue`);
+            svgContainer.appendChild(path);
         }
     }
+}
 
     async function checkForNewUnlock() {
         await fetchUserProgress(firebase.auth().currentUser); // Recarrega o progresso após o retorno
