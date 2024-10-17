@@ -119,18 +119,22 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function animateUnlock(phaseDiv) {
-        const unlockGif = document.createElement('img');
-        unlockGif.src = '../../imagens/cadeado.gif';
-        unlockGif.classList.add('unlock-gif');
-        phaseDiv.appendChild(unlockGif);
+    // Cria o elemento de imagem para o gif de desbloqueio
+       const unlockGif = document.createElement('img');
+       unlockGif.src = '../../imagens/cadeado.gif';
+       unlockGif.classList.add('unlock-gif');
+       phaseDiv.appendChild(unlockGif);
 
-        unlockGif.style.filter = 'none'; // Remove qualquer filtro aplicado
-        unlockGif.style.opacity = '1'; // Garante que o gif esteja visível
+    // Cria o elemento de áudio para o som de desbloqueio
+       const unlockSound = new Audio('../../imagens/unlock-padlock.mp3');
+       unlockSound.play(); // Toca o som de desbloqueio
 
-        setTimeout(() => {
-            unlockGif.remove();
-        }, 3000);
-    }
+    // Remove o gif após 3 segundos
+       setTimeout(() => {
+           unlockGif.remove();
+       }, 3000);
+}
+
 
     function moveToPhase(index, path = null) {
         const phase = document.querySelectorAll('.phase')[index];
