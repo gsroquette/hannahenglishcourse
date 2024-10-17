@@ -5,10 +5,12 @@ const path = require('path');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Configurar o Express para servir arquivos estáticos diretamente da raiz do projeto
+// Configurar o Express para servir arquivos estáticos
+app.use('/CSS', express.static(path.join(__dirname, 'CSS')));
+app.use('/imagens', express.static(path.join(__dirname, 'imagens')));
 app.use(express.static(__dirname));
 
-// Rota para servir o index.html
+// Rota para servir o index.html na raiz
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
