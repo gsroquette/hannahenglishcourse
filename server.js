@@ -8,6 +8,11 @@ const port = process.env.PORT || 3000;
 // Configurar o Express para servir arquivos estáticos diretamente da raiz do projeto
 app.use(express.static(__dirname));
 
+// Rota para servir o index.html
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
 // Endpoint para servir a configuração do Firebase
 app.get('/firebase-config', (req, res) => {
     res.json({
