@@ -6,144 +6,246 @@
     <title>Hannah English - Learning English with the Bible</title>
     <link rel="stylesheet" href="CSS/styles.css">
     <link rel="manifest" href="manifest.json">
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    
     <style>
-        /* Seu CSS aqui */
+        /* Fundo de tela com imagem repetida */
+        body {
+            background-image: url('../imagens/fundo.png');
+            background-repeat: repeat;
+            background-size: 200%;
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+        /* Estilos adicionais para centralizar o conteúdo */
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+        }
+        .levels {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 20px;
+            max-width: 500px;
+            margin: 0 auto;
+            justify-content: center;
+        }
+        .level-button {
+            width: 200px;
+            height: 200px;
+            background-size: cover;
+            background-repeat: no-repeat;
+            display: inline-block;
+        }
+        .levelA { background-image: url('imagens/levelA.png'); }
+        .levelB { background-image: url('imagens/levelB.png'); }
+        .levelC { background-image: url('imagens/levelC.png'); }
+        .levelD { background-image: url('imagens/levelD.png'); }
+        /* Estilo do botão de login e dropdown */
+        .login-container {
+            position: absolute;
+            top: 20px;
+            right: 60px;
+            z-index: 10;
+            background-color: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .login-button {
+            text-decoration: none;
+            font-size: 18px;
+            color: #333;
+        }
+        .user-icon {
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+        }
+        .user-name {
+            font-size: 14px;
+            color: #333;
+            margin-top: 5px;
+            text-align: center;
+        }
+        .dropdown {
+            display: none;
+            position: absolute;
+            top: 60px;
+            right: 0;
+            background-color: white;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            z-index: 1;
+            border-radius: 4px;
+            min-width: 150px;
+        }
+        .dropdown a {
+            display: block;
+            padding: 10px;
+            text-decoration: none;
+            color: #333;
+            font-size: 16px;
+            text-align: left;
+        }
+        .dropdown a:hover {
+            background-color: #f2f2f2;
+        }
+        /* Botão de instalação do PWA */
+        #install-button {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        /* Contêiner da imagem do convite */
+        .invitation-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        /* Estilo da imagem do convite como botão */
+        .invitation-button {
+            width: 250px;
+            height: auto;
+            cursor: pointer;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+        }
+        .invitation-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+        }
+        /* Esconder o botão convite por padrão */
+        .invitation-container {
+            display: none;
+        }
     </style>
 </head>
 
 <body>
     <div class="container">
-        <!-- Conteúdo do HTML -->
+        <header>
+            <div class="login-container">
+                <a href="Formulario/login.html" class="login-button" id="loginLink">Login</a>
+                <div class="dropdown" id="userDropdown">
+                    <a href="#" id="logout">LEAVE</a>
+                </div>
+            </div>
+
+            <div class="logo-title">
+                <img src="imagens/hannah_logo.png" alt="Hannah English Logo" class="logo">
+                <h1>Hannah English<br>Learning English with the Bible</h1>
+            </div>
+        </header>
+        <main>
+            <h2>Escolha seu nível</h2>
+            <div class="invitation-container" id="invitationContainer">
+                <img src="imagens/convite.png" alt="Convite" class="invitation-button" id="invitationButton">
+            </div>
+            <div class="levels">
+                <a href="Level1/index.html" class="level-button levelA" id="Level1"></a>
+                <a href="Level2/index.html" class="level-button levelB" id="Level2"></a>
+                <a href="Level3/index.html" class="level-button levelC" id="Level3"></a>
+                <a href="Level4/index.html" class="level-button levelD" id="Level4"></a>
+            </div>
+        </main>
     </div>
 
-    <!-- Configuração do Firebase -->
+    <button id="install-button">Instalar Aplicativo</button>
+
     <script>
+        // Requisitar configurações do Firebase do backend
         fetch('/firebase-config')
             .then(response => response.json())
-            .then(config => {
-                firebase.initializeApp(config);
+            .then(firebaseConfig => {
+                firebase.initializeApp(firebaseConfig);
+
+                // Agora, o restante do código que utiliza o Firebase será executado após a inicialização.
+                firebase.auth().onAuthStateChanged(function (user) {
+                    const loginLink = document.getElementById("loginLink");
+                    const dropdown = document.getElementById("userDropdown");
+                    const invitationContainer = document.getElementById("invitationContainer");
+                    
+                    if (user) {
+                        console.log("Usuário logado:", user.uid);
+                        invitationContainer.style.display = "none"; // Oculta a imagem convite quando logado
+
+                        const userRef = firebase.database().ref('usuarios/' + user.uid);
+                        userRef.once('value').then((snapshot) => {
+                            const userData = snapshot.val();
+                            const userName = userData.nome || user.email;
+                            const userAvatar = userData.avatar ? `imagens/${userData.avatar}` : 'imagens/bonecologin1.png';
+                            const userRole = userData.role || 'aluno';
+
+                            loginLink.innerHTML = `            
+                                <img src="${userAvatar}" alt="User Icon" class="user-icon">
+                                <p class="user-name">${userName}</p>
+                            `;
+
+                            let dashboardLink = '';
+                            if (userRole === 'proprietario') {
+                                dashboardLink = `<a href="painel_proprietario.html">OWNER DASHBOARD</a>`;
+                            } else if (userRole === 'professor') {
+                                dashboardLink = `<a href="painel_professor.html">TEACHER DASHBOARD</a>`;
+                            } else if (userRole === 'aluno') {
+                                dashboardLink = `<a href="painel_aluno.html">STUDENT DASHBOARD</a>`;
+                            }
+
+                            dropdown.innerHTML = `
+                                <a href="#" id="logout">LEAVE</a>
+                                ${dashboardLink}
+                            `;
+
+                            // Verificar progresso e liberar níveis
+                            if (userRole === 'aluno') {
+                                // ...resto do código
+                            }
+                        }).catch((error) => {
+                            console.error("Erro ao buscar dados do usuário:", error);
+                        });
+
+                        loginLink.removeAttribute("href");
+                        loginLink.onclick = function(event) {
+                            event.preventDefault();
+                            dropdown.style.display = dropdown.style.display === 'none' || dropdown.style.display === '' ? 'block' : 'none';
+                        };
+                    } else {
+                        console.log("Nenhum usuário logado");
+                        loginLink.innerHTML = "Login";
+                        loginLink.href = "Formulario/login.html";
+                        bloquearTodosNiveis();
+                        invitationContainer.style.display = "flex"; // Exibe a imagem convite quando não logado
+                    }
+                });
             })
             .catch(error => {
-                console.error('Erro ao carregar configuração do Firebase:', error);
+                console.error("Erro ao carregar configuração do Firebase:", error);
             });
-
-        function bloquearTodosNiveis() {
-            document.querySelectorAll('.level-button').forEach((button) => {
-                button.style.filter = 'grayscale(100%)';
-                button.style.pointerEvents = 'none';
-                button.onclick = null;
-            });
-        }
-
-        function liberarNiveis(niveis) {
-            document.querySelectorAll('.level-button').forEach((button) => {
-                const level = button.id;
-                if (niveis.includes(level)) {
-                    button.classList.add('liberado');
-                    button.style.filter = 'none';
-                    button.style.pointerEvents = 'auto';
-                    button.onclick = () => {
-                        const levelIndex = level.replace('Level', '');
-                        window.location.href = `nivel${String.fromCharCode(64 + parseInt(levelIndex))}/index.html`;
-                    };
-                } else {
-                    button.classList.remove('liberado');
-                    button.style.filter = 'grayscale(100%)';
-                    button.style.pointerEvents = 'none';
-                    button.onclick = null;
-                }
-            });
-        }
-
-        firebase.auth().onAuthStateChanged(function (user) {
-            const loginLink = document.getElementById("loginLink");
-            const dropdown = document.getElementById("userDropdown");
-            const invitationContainer = document.getElementById("invitationContainer");
-            
-            if (user) {
-                console.log("Usuário logado:", user.uid);
-                invitationContainer.style.display = "none";
-
-                const userRef = firebase.database().ref('usuarios/' + user.uid);
-                userRef.once('value').then((snapshot) => {
-                    const userData = snapshot.val();
-                    const userName = userData.nome || user.email;
-                    const userAvatar = userData.avatar ? `imagens/${userData.avatar}` : 'imagens/bonecologin1.png';
-                    const userRole = userData.role || 'aluno';
-
-                    loginLink.innerHTML = `
-                        <img src="${userAvatar}" alt="User Icon" class="user-icon">
-                        <p class="user-name">${userName}</p>
-                    `;
-
-                    let dashboardLink = '';
-                    if (userRole === 'proprietario') {
-                        dashboardLink = `<a href="painel_proprietario.html">OWNER DASHBOARD</a>`;
-                    } else if (userRole === 'professor') {
-                        dashboardLink = `<a href="painel_professor.html">TEACHER DASHBOARD</a>`;
-                    } else if (userRole === 'aluno') {
-                        dashboardLink = `<a href="painel_aluno.html">STUDENT DASHBOARD</a>`;
-                    }
-
-                    dropdown.innerHTML = `
-                        <a href="#" id="logout">LEAVE</a>
-                        ${dashboardLink}
-                    `;
-
-                    if (userRole === 'aluno') {
-                        if (userData.atrelado_professor) {
-                            const professorRef = firebase.database().ref('usuarios/' + userData.atrelado_professor);
-                            professorRef.once('value').then((profSnapshot) => {
-                                const professorData = profSnapshot.val();
-                                const turmaId = '-O8mdLgStvNqNf6x-O5l'; 
-                                const alunoId = user.uid;
-
-                                const nivelLiberado = professorData.turmas &&
-                                    professorData.turmas[turmaId] &&
-                                    professorData.turmas[turmaId].students &&
-                                    professorData.turmas[turmaId].students[alunoId] &&
-                                    professorData.turmas[turmaId].students[alunoId].nivel_em_curso
-                                    ? professorData.turmas[turmaId].students[alunoId].nivel_em_curso
-                                    : null;
-
-                                if (nivelLiberado) {
-                                    liberarNiveis([nivelLiberado]);
-                                } else {
-                                    console.error("Nenhum nível foi definido pelo professor.");
-                                }
-                            }).catch((error) => {
-                                console.error("Erro ao buscar dados do professor:", error);
-                            });
-                        } else {
-                            if (!userData.progresso || Object.keys(userData.progresso).length === 0) {
-                                liberarNiveis(['Level1']);
-                            } else {
-                                const niveisLiberados = Object.keys(userData.progresso).map(nivel => nivel);
-                                liberarNiveis(niveisLiberados);
-                            }
-                        }
-                    }
-                }).catch((error) => {
-                    console.error("Erro ao buscar dados do usuário:", error);
-                });
-
-                loginLink.removeAttribute("href");
-                loginLink.onclick = function(event) {
-                    event.preventDefault();
-                    dropdown.style.display = dropdown.style.display === 'none' || dropdown.style.display === '' ? 'block' : 'none';
-                };
-            } else {
-                loginLink.innerHTML = "Login";
-                loginLink.href = "Formulario/login.html";
-                bloquearTodosNiveis();
-                invitationContainer.style.display = "flex";
-            }
-        });
     </script>
 
-    <!-- Outros scripts como Service Worker e botões adicionais -->
+    <!-- Registro do service worker -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/service-worker.js')
+              .then(registration => {
+                console.log('Service Worker registrado com sucesso:', registration.scope);
+              })
+              .catch(error => {
+                console.log('Falha ao registrar o Service Worker:', error);
+              });
+        }
+    </script>
 </body>
 </html>
