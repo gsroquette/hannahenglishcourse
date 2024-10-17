@@ -5,8 +5,14 @@ const path = require('path');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Configurar o Express para servir arquivos estáticos do diretório raiz e todas as subpastas
-app.use(express.static(path.join(__dirname)));
+// Configurar o Express para servir arquivos estáticos
+app.use('/CSS', express.static(path.join(__dirname, 'CSS')));
+app.use('/imagens', express.static(path.join(__dirname, 'imagens')));
+app.use('/Formulario', express.static(path.join(__dirname, 'Formulario')));
+app.use('/Level1', express.static(path.join(__dirname, 'Level1')));
+app.use('/Level2', express.static(path.join(__dirname, 'Level2')));
+app.use('/Level3', express.static(path.join(__dirname, 'Level3')));
+app.use('/Level4', express.static(path.join(__dirname, 'Level4')));
 
 // Rota para servir o index.html na raiz
 app.get('/', (req, res) => {
