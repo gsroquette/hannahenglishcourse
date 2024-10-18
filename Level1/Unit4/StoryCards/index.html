@@ -25,6 +25,40 @@
       
       // Inicializa o Firebase
       firebase.initializeApp(firebaseConfig);
+
+      // Função para identificar Level, Unit e Fase pelo URL
+      function getParamsFromURL() {
+          const urlParams = new URLSearchParams(window.location.search);
+          const fase = urlParams.get('fase');
+          const pathParts = window.location.pathname.split('/');
+          const level = pathParts.find(part => part.startsWith('Level'));
+          const unit = pathParts.find(part => part.startsWith('Unit'));
+          return { level, unit, fase };
+      }
+
+      // Função para salvar progresso no Firebase
+      function salvarProgressoAluno(uid, fase) {
+          const { level, unit } = getParamsFromURL();
+
+          if (fase === '1' && level === 'Level1' && unit === 'Unit1') {
+              // Se for fase 1 da Unit1 do Level1, cria level1 e level2 como true
+              const firebasePath = `usuarios/${uid}/progresso/Level1/Unit1`;
+              firebase.database().ref(firebasePath).set({
+                  level1: true,
+                  level2: true
+              });
+          } else if (fase === 'last') {
+              // Se for a última fase (fase=last), criar Level e Unit subsequentes
+              const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+              const firebasePath = `usuarios/${uid}/progresso/${nextLevel}/Unit1/fase1`;
+              firebase.database().ref(firebasePath).set(true);
+          } else {
+              // Para qualquer outra fase, criar a próxima fase subsequente
+              const nextFase = `fase${parseInt(fase) + 1}`;
+              const firebasePath = `usuarios/${uid}/progresso/${level}/${unit}/${nextFase}`;
+              firebase.database().ref(firebasePath).set(true);
+          }
+      }
     </script>
 
     <style>
@@ -291,34 +325,6 @@
             displayCard(currentCardIndex);
         }
 
-        // Função para salvar o progresso no Firebase
-        function salvarProgressoAluno(uid, fase) {
-            // Extrai o caminho atual da URL
-            const pathParts = window.location.pathname.split('/');
-            
-            // Obtém 'Level' e 'Unit' dinamicamente
-            const level = pathParts.find(part => part.startsWith('Level'));
-            const unit = pathParts.find(part => part.startsWith('Unit'));
-
-            // Constrói o caminho no Firebase com as novas informações
-            const firebasePath = `usuarios/${uid}/progresso/${level}/${unit}/${fase}`;
-            
-            // Salva o progresso como true no Firebase
-            firebase.database().ref(firebasePath).set(true)
-                .then(function() {
-                    console.log("Progresso salvo com sucesso em: " + firebasePath);
-                })
-                .catch(function(error) {
-                    console.error("Erro ao salvar o progresso:", error);
-                });
-        }
-
-        // Função para inicializar a página com o primeiro card
-        async function init() {
-            cardsData = await loadContent();
-            displayCard(0);
-        }
-
         // Função para gerar o PDF com o texto da história
         function generatePDF() {
             const { jsPDF } = window.jspdf;
@@ -344,6 +350,12 @@
             });
 
             doc.save('story.pdf');
+        }
+
+        // Função para inicializar a página com o primeiro card
+        async function init() {
+            cardsData = await loadContent();
+            displayCard(0);
         }
 
         init();
