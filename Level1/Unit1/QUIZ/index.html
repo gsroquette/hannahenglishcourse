@@ -306,9 +306,9 @@
     }
 
     function checkCompletion() {
-        // Verifica se todas as perguntas foram respondidas corretamente
         if (answeredQuestions.every((answered) => answered)) {
             showModal();
+            ensureUserIsAuthenticated(updateNextPhase); // Atualiza o Firebase
         }
     }
 
@@ -320,6 +320,52 @@
     function closeModal() {
         document.getElementById('completion-modal').style.display = 'none';
         document.getElementById('overlay').style.display = 'none';
+    }
+
+    // Função para garantir que o usuário esteja autenticado
+    function ensureUserIsAuthenticated(callback) {
+        firebase.auth().onAuthStateChanged(function(user) {
+            if (user) {
+                callback(user.uid); // Usuário autenticado
+            } else {
+                console.error("Usuário não autenticado");
+            }
+        });
+    }
+
+    // Função para atualizar a fase no Firebase
+    async function updateNextPhase(userId) {
+        const currentPhase = getPhaseFromURL(); 
+        const nextPhase = parseInt(currentPhase) + 1;
+
+        const { level, unit } = getLevelAndUnitFromURL(); 
+        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+        
+        try {
+            if (currentPhase === "last") {
+                const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+                await dbRef.set({ fase1: true });
+                console.log(`Level ${nextLevel} / Unit 1 / Fase 1 criada.`);
+            } else {
+                await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
+                console.log(`Fase ${currentPhase} marcada como concluída e fase ${nextPhase} liberada.`);
+            }
+        } catch (error) {
+            console.error("Erro ao atualizar o progresso da fase:", error);
+        }
+    }
+
+    function getPhaseFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('fase'); 
+    }
+
+    function getLevelAndUnitFromURL() {
+        const url = window.location.pathname; 
+        const parts = url.split('/');
+        const level = parts[1];
+        const unit = parts[2];
+        return { level, unit };
     }
 
     function generatePDF() {
