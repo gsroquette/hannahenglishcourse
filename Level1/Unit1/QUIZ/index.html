@@ -8,27 +8,27 @@
         body {
             font-family: Arial, sans-serif;
             margin: 20px;
-            background-image: url('../../../imagens/fundo.png'); /* Adiciona a imagem de fundo */
-            background-repeat: repeat; /* Faz com que a imagem se repita */
-            background-size: auto; /* Mantém o tamanho original da imagem */
-            background-color: white; /* Fundo branco */
+            background-image: url('../../../imagens/fundo.png');
+            background-repeat: repeat;
+            background-size: auto;
+            background-color: white;
         }
 
         h1 {
             text-align: center;
             font-size: 2.5em;
             color: #333;
-            margin-bottom: 20px; /* Diminui a margem inferior */
+            margin-bottom: 20px;
         }
 
         .gif-container {
-            display: none; /* Esconde o container inicialmente */
+            display: none;
             text-align: center;
-            margin-bottom: 20px; /* Aproxima o GIF das questões */
+            margin-bottom: 20px;
         }
 
         .gif-container img {
-            max-width: 500px; /* Aumenta o tamanho do GIF em 50% */
+            max-width: 500px;
         }
 
         .question-container {
@@ -37,11 +37,11 @@
         }
 
         .question {
-            margin-bottom: 10px; /* Aproxima ainda mais as questões dos botões */
+            margin-bottom: 10px;
             font-size: 1.2em;
             padding: 20px;
             text-align: left;
-            border: none; /* Retirando a borda branca ao redor */
+            border: none;
         }
 
         label {
@@ -54,7 +54,7 @@
             display: flex;
             justify-content: center;
             gap: 10px;
-            margin-top: 5px; /* Aproxima os botões das questões */
+            margin-top: 5px;
         }
 
         button {
@@ -99,7 +99,46 @@
         }
 
         audio {
-            display: none; /* Esconder a caixinha de execução do áudio */
+            display: none;
+        }
+
+        /* Modal de conclusão */
+        #completion-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border: 2px solid #333;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            text-align: center;
+        }
+
+        #completion-modal button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #333;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        #completion-modal button:hover {
+            background-color: #555;
+        }
+
+        #overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
         }
     </style>
 </head>
@@ -111,7 +150,7 @@
 <h1>Hannah Quiz</h1>
 
 <div class="gif-container">
-    <img id="feedback-img" src="" alt="Feedback GIF"/> <!-- O GIF aparecerá aqui, aumentado em 50% -->
+    <img id="feedback-img" src="" alt="Feedback GIF"/>
 </div>
 
 <div class="question-container">
@@ -126,12 +165,21 @@
 </div>
 
 <div id="feedback" class="feedback">
-    <audio id="feedback-audio"></audio> <!-- O áudio ainda será reproduzido, mas não aparecerá na tela -->
+    <audio id="feedback-audio"></audio>
+</div>
+
+<!-- Modal de conclusão -->
+<div id="overlay"></div>
+<div id="completion-modal">
+    <h2>Phase Completed!</h2>
+    <p>Congratulations! You have completed this phase.</p>
+    <button onclick="closeModal()">Close</button>
 </div>
 
 <script>
     let currentQuestionIndex = 0;
     let questions = [];
+    let answeredQuestions = [];
     let speechSynthesisUtterance = null;
 
     async function loadQuestions() {
@@ -158,6 +206,7 @@
             questions.push(currentQuestion);
         }
 
+        answeredQuestions = new Array(questions.length).fill(false);  // Inicializa o array de respostas
         displayQuestion();
     }
 
@@ -190,7 +239,7 @@
     }
 
     function showNextQuestion() {
-        hideGIF(); // Esconder o GIF ao mudar a pergunta
+        hideGIF();
         if (currentQuestionIndex < questions.length - 1) {
             currentQuestionIndex++;
             displayQuestion();
@@ -198,7 +247,7 @@
     }
 
     function showPreviousQuestion() {
-        hideGIF(); // Esconder o GIF ao mudar a pergunta
+        hideGIF();
         if (currentQuestionIndex > 0) {
             currentQuestionIndex--;
             displayQuestion();
@@ -213,38 +262,40 @@
         const gifContainer = document.querySelector('.gif-container');
 
         if (selectedAnswer === q.correct) {
-            feedbackImg.src = 'certo.gif';  // Certifique-se de que a imagem certa esteja correta
+            feedbackImg.src = 'certo.gif'; 
             feedbackAudio.src = 'certo.mp3';
-            feedbackAudio.play();  // O áudio será reproduzido sem aparecer na tela
+            feedbackAudio.play();
             feedbackDiv.style.display = 'block';
-            gifContainer.style.display = 'block';  // Exibir o GIF
+            gifContainer.style.display = 'block';
+            answeredQuestions[currentQuestionIndex] = true;  // Marca a questão como respondida corretamente
             setTimeout(() => {
                 hideGIF();
                 showNextQuestion();
-            }, 5000);
+                checkCompletion();  // Verifica se todas as questões foram respondidas
+            }, 2000);
         } else {
-            feedbackImg.src = 'errado.gif';  // Certifique-se de que a imagem errada esteja correta
+            feedbackImg.src = 'errado.gif'; 
             feedbackAudio.src = 'errado.mp3';
-            feedbackAudio.play();  // O áudio será reproduzido sem aparecer na tela
+            feedbackAudio.play();
             feedbackDiv.style.display = 'block';
-            gifContainer.style.display = 'block';  // Exibir o GIF
+            gifContainer.style.display = 'block';
             setTimeout(() => {
                 hideGIF();
                 radioElement.checked = false;
-            }, 5000);
+            }, 2000);
         }
     }
 
     function hideGIF() {
         const gifContainer = document.querySelector('.gif-container');
-        gifContainer.style.display = 'none';  // Esconder o GIF ao mudar a pergunta
+        gifContainer.style.display = 'none';
     }
 
     function readQuestion() {
         stopReading();
         const questionText = document.getElementById('question-text').innerText;
         speechSynthesisUtterance = new SpeechSynthesisUtterance(questionText);
-        speechSynthesisUtterance.lang = 'en-US'; // Configura o idioma para inglês
+        speechSynthesisUtterance.lang = 'en-US';
         speechSynthesis.speak(speechSynthesisUtterance);
     }
 
@@ -252,6 +303,23 @@
         if (speechSynthesisUtterance) {
             speechSynthesis.cancel();
         }
+    }
+
+    function checkCompletion() {
+        // Verifica se todas as perguntas foram respondidas corretamente
+        if (answeredQuestions.every((answered) => answered)) {
+            showModal();
+        }
+    }
+
+    function showModal() {
+        document.getElementById('completion-modal').style.display = 'block';
+        document.getElementById('overlay').style.display = 'block';
+    }
+
+    function closeModal() {
+        document.getElementById('completion-modal').style.display = 'none';
+        document.getElementById('overlay').style.display = 'none';
     }
 
     function generatePDF() {
@@ -310,7 +378,6 @@
     window.onload = loadQuestions;
 </script>
 
-<!-- Including jsPDF library to handle PDF generation -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 </body>
