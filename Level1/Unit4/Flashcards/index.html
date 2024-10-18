@@ -278,33 +278,33 @@
 
         // Função para atualizar a fase no Firebase
         async function updateNextPhase(userId) {
-            const { level, unit } = getLevelAndUnitFromURL(); // Pega Level e Unit da URL
+            const currentPhase = getPhaseFromURL(); // Pega a fase atual da URL
 
+            const { level, unit } = getLevelAndUnitFromURL(); // Pega Level e Unit da URL
             const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
             
             try {
-                // Busca todas as fases concluídas dentro do Level e Unit
-                const snapshot = await dbRef.once('value');
-                const fases = snapshot.val();
+                // Verifica se a fase atual já foi concluída
+                const snapshot = await dbRef.child(`fase${currentPhase}`).once('value');
+                const isCompleted = snapshot.val();
                 
-                if (fases) {
-                    const faseKeys = Object.keys(fases);
-                    const lastFase = faseKeys[faseKeys.length - 1]; // Obtém a última fase concluída (ex: fase2)
-                    const lastFaseNumber = parseInt(lastFase.replace('fase', ''), 10); // Extrai o número (2)
-                    const nextFaseNumber = lastFaseNumber + 1; // Próxima fase (3)
-                    const nextFaseKey = `fase${nextFaseNumber}`; // Cria a chave da próxima fase (fase3)
-
-                    // Atualiza o banco de dados criando a nova fase como true
-                    await dbRef.update({ [nextFaseKey]: true });
-                    console.log(`Fase ${nextFaseKey} marcada como concluída.`);
+                if (!isCompleted) {
+                    // Se a fase atual não foi concluída, marca como concluída e libera a próxima fase
+                    const nextPhase = parseInt(currentPhase) + 1; // Próxima fase
+                    await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
+                    console.log(`Fase ${currentPhase} marcada como concluída e fase ${nextPhase} liberada.`);
                 } else {
-                    // Se não houver fases, começa com a fase1
-                    await dbRef.update({ fase1: true });
-                    console.log('Fase 1 marcada como concluída.');
+                    console.log(`Fase ${currentPhase} já foi concluída.`);
                 }
             } catch (error) {
                 console.error("Erro ao atualizar o progresso da fase:", error);
             }
+        }
+
+        // Função para obter a fase atual da URL
+        function getPhaseFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('fase'); // Retorna o valor do parâmetro "fase"
         }
 
         // Função para obter o Level e Unit da URL
