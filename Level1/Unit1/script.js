@@ -76,6 +76,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function initializeMap() {
+        // Rola para o topo antes de desenhar as linhas
+        window.scrollTo(0, 0);
+
         activities.forEach((activity, index) => {
             const phaseDiv = document.createElement('div');
             phaseDiv.classList.add('phase');
@@ -118,6 +121,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (lastUnlockedIndex >= 0) {
             const lastUnlockedPhase = document.querySelectorAll('.phase')[lastUnlockedIndex];
             animateUnlock(lastUnlockedPhase);
+
+            // Rola para a fase desbloqueada após desenhar as linhas
+            scrollToPhase(lastUnlockedIndex);
         }
     }
 
@@ -148,6 +154,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.location.href = path;
             }, 600);
         }
+    }
+
+    function scrollToPhase(index) {
+        const phase = document.querySelectorAll('.phase')[index];
+        const coords = phase.getBoundingClientRect();
+        window.scrollTo({
+            top: coords.top + window.scrollY - window.innerHeight / 2,
+            behavior: 'smooth'
+        });
     }
 
     function drawLines() {
