@@ -55,14 +55,6 @@
             font-size: 1.5em;
             margin-top: 20px;
         }
-        .feedback {
-            display: none;
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 1000;
-        }
         .button {
             margin-top: 20px;
             padding: 10px 20px;
@@ -176,6 +168,9 @@
             }
         }
     </style>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 </head>
 <body>
     <button id="backButton" class="button">Back</button>
@@ -205,11 +200,24 @@
     </div>
 
     <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+            authDomain: "hannahenglishcourse.firebaseapp.com",
+            projectId: "hannahenglishcourse",
+            storageBucket: "hannahenglishcourse.appspot.com",
+            messagingSenderId: "449818788486",
+            appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+            measurementId: "G-07VVJG9LRS",
+            databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+
         const wordListUrl = '../data1/words.txt';
         const imageFolderUrl = '../data1/imagens/';
         let words = [];
         let currentWordIndex = 0;
-        let wordsTried = 0; // Contador de tentativas de palavras
+        let wordsTried = 0;
         let recognitionTimeout;
         let tryAgainInProgress = false;
 
@@ -245,8 +253,6 @@
         const backButton = document.getElementById("backButton");
         const resultDiv = document.getElementById("result");
         const wordDiv = document.getElementById("word");
-        const imageElement = document.getElementById("image");
-        const iconElement = document.getElementById("icon");
         const finalFeedbackDiv = document.getElementById("finalFeedback");
         const restartButton = document.getElementById("restartButton");
 
@@ -257,7 +263,7 @@
 
         startButton.addEventListener('click', () => {
             wordsTried++;
-            checkCompletion(); // Verifica se todas as palavras foram tentadas
+            checkCompletion();
             disableStartButton();
             startRecognition();
         });
@@ -347,6 +353,8 @@
         }
 
         function markActivityAsCompleted() {
+            console.log("Atividade concluída!");
+            ensureUserIsAuthenticated(updateNextPhase);
             document.getElementById('overlay').style.display = 'block';
             document.getElementById('completion-modal').style.display = 'block';
         }
@@ -354,6 +362,48 @@
         function closeModal() {
             document.getElementById('overlay').style.display = 'none';
             document.getElementById('completion-modal').style.display = 'none';
+        }
+
+        function ensureUserIsAuthenticated(callback) {
+            firebase.auth().onAuthStateChanged(function(user) {
+                if (user) {
+                    callback(user.uid);
+                } else {
+                    console.error("Usuário não autenticado");
+                }
+            });
+        }
+
+        async function updateNextPhase(userId) {
+            const currentPhase = getPhaseFromURL();
+            const nextPhase = parseInt(currentPhase) + 1;
+            const { level, unit } = getLevelAndUnitFromURL();
+            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+            try {
+                if (currentPhase === "last") {
+                    const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+                    await dbRef.set({ fase1: true });
+                    console.log(`Level ${nextLevel} / Unit 1 / Fase 1 criada.`);
+                } else {
+                    await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
+                    console.log(`Fase ${currentPhase} marcada como concluída e fase ${nextPhase} liberada.`);
+                }
+            } catch (error) {
+                console.error("Erro ao atualizar o progresso da fase:", error);
+            }
+        }
+
+        function getPhaseFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('fase');
+        }
+
+        function getLevelAndUnitFromURL() {
+            const url = window.location.pathname.split('/');
+            const level = url[1];
+            const unit = url[2];
+            return { level, unit };
         }
 
         function readWordWithHighlight(word, callback) {
@@ -387,7 +437,7 @@
             currentWordIndex = 0;
             finalFeedbackDiv.style.display = "none";
             restartButton.style.display = "none";
-            wordsTried = 0; // Reinicia o contador de tentativas de palavras
+            wordsTried = 0;
             loadWord(0);
         }
 
