@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -54,6 +54,14 @@
         .result {
             font-size: 1.5em;
             margin-top: 20px;
+        }
+        .feedback {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
         }
         .button {
             margin-top: 20px;
@@ -112,6 +120,44 @@
             margin-top: 20px;
             animation: fadeIn 2s ease-in-out;
         }
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            z-index: 999;
+        }
+        #completion-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            display: none;
+            z-index: 1000;
+            text-align: center;
+        }
+        #completion-modal h2 {
+            margin: 0 0 10px;
+        }
+        #completion-modal button {
+            padding: 10px 20px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        #completion-modal button:hover {
+            background: #2980b9;
+        }
         @keyframes fadeIn {
             0% { opacity: 0; }
             100% { opacity: 1; }
@@ -130,9 +176,6 @@
             }
         }
     </style>
-    <!-- Adicione o SDK do Firebase -->
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js"></script>
 </head>
 <body>
     <button id="backButton" class="button">Back</button>
@@ -162,21 +205,6 @@
     </div>
 
     <script>
-        // Configuração do Firebase
-        const firebaseConfig = {
-            apiKey: "SUA_API_KEY",
-            authDomain: "SEU_AUTH_DOMAIN",
-            projectId: "SEU_PROJECT_ID",
-            storageBucket: "SEU_STORAGE_BUCKET",
-            messagingSenderId: "SEU_MESSAGING_SENDER_ID",
-            appId: "SEU_APP_ID",
-            databaseURL: "SEU_DATABASE_URL"
-        };
-
-        // Inicializar Firebase
-        const app = firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
-
         const wordListUrl = '../data1/words.txt';
         const imageFolderUrl = '../data1/imagens/';
         let words = [];
@@ -217,7 +245,15 @@
         const backButton = document.getElementById("backButton");
         const resultDiv = document.getElementById("result");
         const wordDiv = document.getElementById("word");
+        const imageElement = document.getElementById("image");
+        const iconElement = document.getElementById("icon");
         const finalFeedbackDiv = document.getElementById("finalFeedback");
+        const restartButton = document.getElementById("restartButton");
+
+        const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
 
         startButton.addEventListener('click', () => {
             wordsTried++;
@@ -226,34 +262,87 @@
             startRecognition();
         });
 
+        prevButton.addEventListener('click', () => {
+            disableStartButton();
+            loadWord(currentWordIndex - 1);
+        });
+
+        nextButton.addEventListener('click', () => {
+            disableStartButton();
+            loadWord(currentWordIndex + 1);
+        });
+
+        backButton.addEventListener('click', () => {
+            window.history.back();
+        });
+
+        restartButton.addEventListener('click', () => {
+            restartGame();
+        });
+
+        recognition.onresult = (event) => {
+            clearTimeout(recognitionTimeout);
+            const speechResult = event.results[0][0].transcript.toLowerCase();
+            const expectedWord = words[currentWordIndex].toLowerCase();
+
+            if (speechResult.includes(expectedWord)) {
+                handleCorrectAnswer();
+            } else {
+                if (!tryAgainInProgress) {
+                    handleIncorrectAttempt();
+                }
+            }
+        };
+
+        recognition.onerror = (event) => {
+            resultDiv.textContent = "Error occurred in recognition: " + event.error;
+            resultDiv.style.color = "red";
+            clearTimeout(recognitionTimeout);
+            enableStartButton();
+        };
+
+        recognition.onend = () => {
+            if (!resultDiv.textContent.includes("Correct!") && !tryAgainInProgress) {
+                handleIncorrectAttempt();
+            }
+        };
+
+        function startRecognition() {
+            recognition.start();
+            recognitionTimeout = setTimeout(() => {
+                recognition.stop();
+            }, 5000);
+        }
+
+        function handleCorrectAnswer() {
+            resultDiv.textContent = "Correct!";
+            resultDiv.style.color = "green";
+            setTimeout(() => {
+                if (currentWordIndex + 1 < words.length) {
+                    loadWord(currentWordIndex + 1);
+                } else {
+                    showFinalFeedback();
+                }
+            }, 3000);
+        }
+
+        function handleIncorrectAttempt() {
+            tryAgainInProgress = true;
+            resultDiv.textContent = "Try again.";
+            resultDiv.style.color = "red";
+            readWordWithHighlight(words[currentWordIndex], () => {
+                enableStartButton();
+                tryAgainInProgress = false;
+            });
+        }
+
+        function resetFeedback() {
+            resultDiv.textContent = "";
+        }
+
         function checkCompletion() {
             if (wordsTried === words.length) {
                 markActivityAsCompleted();
-                updateNextPhase();
-            }
-        }
-
-        function updateNextPhase() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const faseAtual = urlParams.get('fase');
-            const nextPhase = faseAtual === 'last' ? 'fase1' : `fase${parseInt(faseAtual) + 1}`;
-
-            const userId = "USUARIO_ID"; // Substituir pelo ID do usuário autenticado
-            const level = "Level1"; // Ajustar conforme o nível atual
-            const unit = "Unit1"; // Ajustar conforme a unidade atual
-
-            if (faseAtual === 'last') {
-                // Cria nova unidade e libera a primeira fase
-                const novaUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-                firebase.database().ref(`/usuarios/${userId}/progresso/${level}/${novaUnit}`).set({
-                    fase1: true
-                });
-            } else {
-                // Marca a fase atual como concluída e libera a próxima fase
-                firebase.database().ref(`/usuarios/${userId}/progresso/${level}/${unit}`).update({
-                    [faseAtual]: true,
-                    [nextPhase]: true
-                });
             }
         }
 
@@ -267,9 +356,48 @@
             document.getElementById('completion-modal').style.display = 'none';
         }
 
-        backButton.addEventListener('click', () => {
-            window.history.back();
+        function readWordWithHighlight(word, callback) {
+            wordDiv.classList.add("enlarged");
+            const utterance = new SpeechSynthesisUtterance(word);
+            utterance.lang = 'en-US';
+            utterance.rate = 0.7;
+            utterance.onend = () => {
+                wordDiv.classList.remove("enlarged");
+                if (callback) callback();
+            };
+            speechSynthesis.speak(utterance);
+        }
+
+        imageElement.addEventListener('click', () => {
+            readWordWithHighlight(words[currentWordIndex]);
         });
+
+        iconElement.addEventListener('click', () => {
+            readWordWithHighlight(words[currentWordIndex]);
+        });
+
+        function showFinalFeedback() {
+            finalFeedbackDiv.textContent = "You've completed all words!";
+            finalFeedbackDiv.style.display = "block";
+            restartButton.style.display = "inline-block";
+            enableStartButton();
+        }
+
+        function restartGame() {
+            currentWordIndex = 0;
+            finalFeedbackDiv.style.display = "none";
+            restartButton.style.display = "none";
+            wordsTried = 0; // Reinicia o contador de tentativas de palavras
+            loadWord(0);
+        }
+
+        function disableStartButton() {
+            startButton.disabled = true;
+        }
+
+        function enableStartButton() {
+            startButton.disabled = false;
+        }
     </script>
 </body>
 </html>
