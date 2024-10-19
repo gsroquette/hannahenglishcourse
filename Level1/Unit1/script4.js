@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 2, name: "Flashcards", path: "../Unit1/Flashcards/index.html?fase=2", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
         { id: 3, name: "Flashcards2", path: "../Unit1/Flashcards2/index.html?fase=3", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
         { id: 4, name: "Flashcards3", path: "../Unit1/Flashcards3/index.html?fase=4", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-        { id: 5, name: "QUIZ", path: "../Unit1/QUIZ/index.html?fase=last", img: "../../imagens/botoes/quiz_button.png", unlocked: false }
+        { id: 5, name: "QUIZ", path: "../Unit1/QUIZ/index.html?fase=5", img: "../../imagens/botoes/quiz_button.png", unlocked: false }
     ];
 
     const mapContainer = document.getElementById('mapContainer');
@@ -38,9 +38,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 const progress = snapshot.val();
                 if (progress) {
                     activities.forEach((activity, index) => {
-                        if (progress[`fase${index + 1}`] === true) {
+                        // Atualiza a fase com base no ID da atividade
+                        if (progress[`fase${activity.id}`] === true) {
                             activity.unlocked = true;
                             lastUnlockedIndex = index;  // Atualiza com o índice da última fase desbloqueada
+                        } else {
+                            activity.unlocked = false;  // Garante que a fase permaneça bloqueada se não estiver no progresso
                         }
                     });
                 } else {

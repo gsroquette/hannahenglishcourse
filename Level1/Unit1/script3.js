@@ -36,9 +36,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 const progress = snapshot.val();
                 if (progress) {
                     activities.forEach((activity, index) => {
-                        if (progress[`fase${index + 1}`] === true) {
+                        // Atualiza a fase com base no ID da atividade
+                        if (progress[`fase${activity.id}`] === true) {
                             activity.unlocked = true;
                             lastUnlockedIndex = index;  // Atualiza com o índice da última fase desbloqueada
+                        } else {
+                            activity.unlocked = false;  // Garante que a fase permaneça bloqueada se não estiver no progresso
                         }
                     });
                 } else {
