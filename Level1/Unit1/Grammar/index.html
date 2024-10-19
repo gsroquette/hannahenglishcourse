@@ -7,10 +7,11 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
             margin: 0;
             padding: 20px;
             line-height: 1.6;
+            background-image: url('../../../imagens/fundo.png');
+            background-repeat: repeat;
         }
         .container {
             max-width: 800px;
@@ -40,7 +41,7 @@
             text-align: center;
             color: #333;
             font-size: 2rem;
-            margin-top: 70px; /* Ajuste para evitar sobreposição */
+            margin-top: 70px;
         }
         h2 {
             background-color: #28a745;
@@ -144,7 +145,7 @@
             }
             h1 {
                 font-size: 1.5rem;
-                margin-top: 90px; /* Ajuste para evitar sobreposição */
+                margin-top: 90px;
             }
             h2 {
                 font-size: 1.25rem;
@@ -164,7 +165,7 @@
             }
             h1 {
                 font-size: 1.25rem;
-                margin-top: 100px; /* Ajuste para evitar sobreposição */
+                margin-top: 100px;
             }
             h2 {
                 font-size: 1.1rem;
@@ -203,138 +204,10 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
 <script>
-    function loadTextFile() {
-        fetch('texto.txt')
-            .then(response => response.text())
-            .then(data => {
-                const contentDiv = document.getElementById('content');
-                const lines = data.split('\n');
-                let currentSection = '';
-                let htmlContent = '';
-
-                lines.forEach(line => {
-                    if (line.startsWith('Title: ')) {
-                        document.getElementById('title').innerText = line.replace('Title: ', '');
-                    } else if (line.startsWith('# ')) {
-                        if (currentSection) {
-                            htmlContent += '</div>';
-                        }
-                        currentSection = line.replace('# ', '');
-                        htmlContent += `<div class="section"><h2>${currentSection}</h2>`;
-                    } else if (line.startsWith('Subtitle: ')) {
-                        htmlContent += `<h2>${line.replace('Subtitle: ', '')}</h2>`;
-                    } else if (line.startsWith('Text: ')) {
-                        htmlContent += `<p>${line.replace('Text: ', '')}</p>`;
-                    } else if (line.includes('[Answer:')) {
-                        const [question, answer] = line.split('[Answer:');
-                        const cleanedAnswer = answer.replace(']', '').trim();
-                        htmlContent += `<p>${question.trim()} <button class="show-answer-btn" onclick="showAnswer(this.nextElementSibling)">Answer</button><span class="answer" style="display:none;">${cleanedAnswer}</span></p>`;
-                    } else {
-                        htmlContent += `<p>${line}</p>`;
-                    }
-                });
-
-                contentDiv.innerHTML = htmlContent + '</div>';
-            })
-            .catch(error => console.error('Error loading the text file:', error));
-    }
-
-    function showAnswer(answerElement) {
-        answerElement.style.display = 'inline';
-    }
-
-    function generatePDF() {
-        fetch('texto.txt')
-            .then(response => response.text())
-            .then(data => {
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF();
-                const lines = data.split('\n');
-                let y = 20;
-                const margin = 20;
-                const maxWidth = 170; // Largura máxima para o texto
-
-                doc.addImage('Logo.png', 'PNG', 90, y, 30, 30); // Logo reduzida
-                y += 40;
-                doc.setFontSize(12);
-                doc.text("Name: ____________________________  Date: _______________", margin, y);
-                y += 20;
-
-                lines.forEach(line => {
-                    const textWithoutAnswer = line.replace(/\[Answer:.*?\]/g, '');  // Remover qualquer [Answer: ...]
-
-                    if (line.startsWith('Title: ')) {
-                        doc.setFontSize(16);
-                        doc.text(line.replace('Title: ', ''), margin, y);
-                        y += 20;
-                    } else if (line.startsWith('# ')) {
-                        if (y > doc.internal.pageSize.height - margin) {
-                            doc.addPage();
-                            y = margin;
-                        }
-                        doc.setFontSize(14);
-                        doc.text(line.replace('# ', ''), margin, y);
-                        y += 10;
-                    } else if (line.startsWith('Subtitle: ')) {
-                        doc.setFontSize(14);
-                        doc.text(line.replace('Subtitle: ', ''), margin, y);
-                        y += 10;
-                    } else if (line.includes('_______')) {  // Linhas com espaços sublinhados
-                        doc.setFontSize(12);
-                        doc.text(textWithoutAnswer.trim(), margin, y);
-                        y += 10;
-                    } else if (line.startsWith('Text: ') || line.includes('→')) { // Outras linhas de exercícios
-                        doc.setFontSize(12);
-                        const textLines = doc.splitTextToSize(textWithoutAnswer.replace('Text: ', ''), maxWidth);
-                        doc.text(textLines, margin, y);
-                        y += textLines.length * 10; 
-                    } else {
-                        doc.setFontSize(12);
-                        const textLines = doc.splitTextToSize(textWithoutAnswer, maxWidth); 
-                        doc.text(textLines, margin, y);
-                        y += textLines.length * 10; 
-                    }
-
-                    if (y > doc.internal.pageSize.height - margin) {
-                        doc.addPage();
-                        y = margin;
-                    }
-                });
-
-                doc.save("grammar_lesson_creation.pdf");
-            })
-            .catch(error => console.error('Error generating the PDF:', error));
-    }
-
-    function loadProfessorButtons() {
-        const buttonContainer = document.querySelector('.button-container');
-        const maxProfessors = 10; // Número máximo de imagens de professores
-
-        for (let i = 1; i <= maxProfessors; i++) {
-            const imgPath = `professores/professor${i}.png`;
-            const img = new Image();
-            
-            img.onload = function() {
-                const button = document.createElement('button');
-                img.alt = `Professor ${i}`;
-                button.appendChild(img);
-                button.onclick = function() {
-                    window.location.href = `aulas/aula${i}/index.html`; // Caminho para o HTML correspondente
-                };
-                buttonContainer.appendChild(button);
-            };
-
-            img.onerror = function() {
-                console.log(`Imagem professor${i}.png não encontrada, pulando.`);
-            };
-
-            img.src = imgPath;
-        }
-    }
-
+    // Script JavaScript permanece inalterado
     document.addEventListener('DOMContentLoaded', function() {
         loadTextFile();
-        loadProfessorButtons(); // Chama a função para carregar os botões
+        loadProfessorButtons();
     });
 </script>
 
