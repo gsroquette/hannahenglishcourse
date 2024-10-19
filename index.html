@@ -32,13 +32,11 @@
         }
 
         .levels {
-            display: flex; /* Altera para flexbox */
-            flex-wrap: wrap;
+            display: flex;
+            flex-wrap: wrap; /* Permite que os botões quebrem linha */
             justify-content: center; /* Centraliza os botões */
             gap: 20px;
             padding: 20px;
-            max-width: 500px;
-            margin: 0 auto;
         }
 
         .level-button {
@@ -46,6 +44,7 @@
             height: 200px;
             background-size: cover;
             background-repeat: no-repeat;
+            display: inline-block;
         }
 
         .levelA { background-image: url('imagens/levelA.png'); }
@@ -53,10 +52,10 @@
         .levelC { background-image: url('imagens/levelC.png'); }
         .levelD { background-image: url('imagens/levelD.png'); }
 
-        /* Estilo do botão de login e dropdown */
+        /* Estilo da caixa de login */
         .login-container {
-            display: flex; /* Alinha o conteúdo como flexbox */
-            align-items: center; /* Centraliza verticalmente */
+            display: flex;
+            align-items: center; /* Alinha verticalmente */
             gap: 10px; /* Espaço entre avatar e nome */
             position: absolute;
             top: 20px;
@@ -66,13 +65,7 @@
             padding: 10px;
             border-radius: 8px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            cursor: pointer; /* Indica que é clicável */
-        }
-
-        .login-button {
-            text-decoration: none;
-            font-size: 18px;
-            color: #333;
+            cursor: pointer;
         }
 
         .user-icon {
@@ -84,8 +77,7 @@
         .user-name {
             font-size: 14px;
             color: #333;
-            margin: 0; /* Remove margem extra */
-            text-align: center;
+            margin: 0;
         }
 
         .dropdown {
@@ -111,48 +103,6 @@
 
         .dropdown a:hover {
             background-color: #f2f2f2;
-        }
-
-        /* Botão de instalação do PWA */
-        #install-button {
-            display: none;
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            padding: 10px 20px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-
-        /* Contêiner da imagem do convite */
-        .invitation-container {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 20px;
-        }
-
-        /* Estilo da imagem do convite como botão */
-        .invitation-button {
-            width: 250px; /* Ajuste o tamanho conforme necessário */
-            height: auto;
-            cursor: pointer;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            transition: all 0.3s ease;
-        }
-
-        .invitation-button:hover {
-            transform: scale(1.05);
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
-        }
-
-        /* Esconder o botão convite por padrão */
-        .invitation-container {
-            display: none;
         }
     </style>
 </head>
@@ -188,10 +138,7 @@
         </main>
     </div>
 
-    <!-- Botão de instalação do PWA -->
-    <button id="install-button">Instalar Aplicativo</button>
-
-    <!-- Configuração do Firebase -->
+    <!-- Firebase Auth Script -->
     <script>
         var firebaseConfig = {
             apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
@@ -207,14 +154,66 @@
         // Inicializando Firebase
         firebase.initializeApp(firebaseConfig);
 
-        // Função para alternar o dropdown ao clicar em qualquer parte da caixa
+        // Função para exibir o usuário logado e ajustar níveis
+        firebase.auth().onAuthStateChanged(function(user) {
+            const loginLink = document.getElementById("loginLink");
+            const userDropdown = document.getElementById("userDropdown");
+            const invitationContainer = document.getElementById("invitationContainer");
+
+            if (user) {
+                const userRef = firebase.database().ref('usuarios/' + user.uid);
+                userRef.once('value').then((snapshot) => {
+                    const userData = snapshot.val();
+                    const userName = userData.nome || user.email;
+                    const userAvatar = userData.avatar ? `imagens/${userData.avatar}` : 'imagens/bonecologin1.png';
+                    
+                    // Atualiza a interface do usuário
+                    loginLink.innerHTML = `<img src="${userAvatar}" alt="User Icon" class="user-icon"><p class="user-name">${userName}</p>`;
+                    invitationContainer.style.display = "none";
+
+                    // Ajusta o desbloqueio dos níveis
+                    if (userData.progresso) {
+                        liberarNiveis(Object.keys(userData.progresso));
+                    } else {
+                        liberarNiveis(['Level1']);
+                    }
+                });
+            } else {
+                loginLink.innerHTML = "Login";
+                bloquearTodosNiveis();
+                invitationContainer.style.display = "flex";
+            }
+        });
+
+        // Funções de bloqueio e desbloqueio de níveis
+        function bloquearTodosNiveis() {
+            document.querySelectorAll('.level-button').forEach(button => {
+                button.style.filter = 'grayscale(100%)';
+                button.style.pointerEvents = 'none';
+            });
+        }
+
+        function liberarNiveis(niveis) {
+            document.querySelectorAll('.level-button').forEach(button => {
+                const level = button.id;
+                if (niveis.includes(level)) {
+                    button.style.filter = 'none';
+                    button.style.pointerEvents = 'auto';
+                } else {
+                    button.style.filter = 'grayscale(100%)';
+                    button.style.pointerEvents = 'none';
+                }
+            });
+        }
+
+        // Alternar dropdown ao clicar
         document.getElementById("loginContainer").addEventListener("click", function(event) {
             event.preventDefault();
             const dropdown = document.getElementById("userDropdown");
             dropdown.style.display = (dropdown.style.display === 'none' || dropdown.style.display === '') ? 'block' : 'none';
         });
 
-        // Fecha o dropdown ao clicar fora dele
+        // Fecha o dropdown ao clicar fora
         window.addEventListener("click", function(event) {
             const dropdown = document.getElementById("userDropdown");
             const loginContainer = document.getElementById("loginContainer");
@@ -222,21 +221,6 @@
                 dropdown.style.display = 'none';
             }
         });
-
-        // Adiciona o restante do código original aqui...
-    </script>
-
-    <!-- Registro do service worker -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/service-worker.js')
-              .then(registration => {
-                console.log('Service Worker registrado com sucesso:', registration.scope);
-              })
-              .catch(error => {
-                console.log('Falha ao registrar o Service Worker:', error);
-              });
-        }
     </script>
 </body>
 </html>
