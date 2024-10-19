@@ -3,11 +3,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const auth = firebase.auth();
 
     const activities = [
-        { id: 1, name: "StoryCards", path: "../Unit1/StoryCards/index.html?fase=1", img: "../../imagens/botoes/storycards_button.png", unlocked: false },
-        { id: 2, name: "Flashcards", path: "../Unit1/Flashcards/index.html?fase=2", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-        { id: 3, name: "Flashcards2", path: "../Unit1/Flashcards2/index.html?fase=3", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-        { id: 4, name: "Flashcards3", path: "../Unit1/Flashcards3/index.html?fase=4", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-        { id: 5, name: "QUIZ", path: "../Unit1/QUIZ/index.html?fase=last", img: "../../imagens/botoes/quiz_button.png", unlocked: false }
+        { id: 1, name: "Grammar", path: "../Unit1/Grammar/index.html?fase=1", img: "../../imagens/botoes/grammar_button.png", unlocked: false },
+        { id: 2, name: "Grammar2", path: "../Unit1/Grammar2/index.html?fase=2", img: "../../imagens/botoes/grammar_button.png", unlocked: false },
+        { id: 3, name: "Grammar3", path: "../Unit1/Grammar3/index.html?fase=3", img: "../../imagens/botoes/grammar_button.png", unlocked: false },
+        { id: 4, name: "Fill in the Blanks", path: "../Unit1/Fill in the Blanks/index.html?fase=last", img: "../../imagens/botoes/fillintheblanks_button.png", unlocked: false }     
     ];
 
     const mapContainer = document.getElementById('mapContainer');
