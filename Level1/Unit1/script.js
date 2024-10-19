@@ -3,12 +3,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const auth = firebase.auth();
 
     const activities = [
-    { id: 1, name: "StoryCards", path: "../Unit1/StoryCards/index.html?fase=1", img: "../../imagens/botoes/storycards_button.png", unlocked: false },
-    { id: 2, name: "Flashcards", path: "../Unit1/Flashcards/index.html?fase=2", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-    { id: 3, name: "Flashcards2", path: "../Unit1/Flashcards2/index.html?fase=3", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-    { id: 4, name: "Flashcards3", path: "../Unit1/Flashcards3/index.html?fase=4", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-    { id: 5, name: "QUIZ", path: "../Unit1/QUIZ/index.html?fase=last", img: "../../imagens/botoes/quiz_button.png", unlocked: false }
-];
+        { id: 1, name: "StoryCards", path: "../Unit1/StoryCards/index.html?fase=1", img: "../../imagens/botoes/storycards_button.png", unlocked: false },
+        { id: 2, name: "Flashcards", path: "../Unit1/Flashcards/index.html?fase=2", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+        { id: 3, name: "Flashcards2", path: "../Unit1/Flashcards2/index.html?fase=3", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+        { id: 4, name: "Flashcards3", path: "../Unit1/Flashcards3/index.html?fase=4", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+        { id: 5, name: "QUIZ", path: "../Unit1/QUIZ/index.html?fase=last", img: "../../imagens/botoes/quiz_button.png", unlocked: false }
+    ];
 
     const mapContainer = document.getElementById('mapContainer');
     const svgContainer = document.getElementById('linesSvg');
@@ -69,7 +69,10 @@ document.addEventListener('DOMContentLoaded', function() {
         player.src = avatarPath;
         player.classList.add('player');
         mapContainer.appendChild(player);
-        moveToPhase(0);  // Iniciar na primeira fase
+
+        // Determina a fase para posicionar o bonequinho
+        const initialPhaseIndex = lastUnlockedIndex > 0 ? lastUnlockedIndex - 1 : 0;
+        moveToPhase(initialPhaseIndex);  // Move para a fase uma antes da última desbloqueada, ou a primeira fase
     }
 
     function initializeMap() {
@@ -119,22 +122,18 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function animateUnlock(phaseDiv) {
-    // Cria o elemento de imagem para o gif de desbloqueio
-       const unlockGif = document.createElement('img');
-       unlockGif.src = '../../imagens/cadeado.gif';
-       unlockGif.classList.add('unlock-gif');
-       phaseDiv.appendChild(unlockGif);
+        const unlockGif = document.createElement('img');
+        unlockGif.src = '../../imagens/cadeado.gif';
+        unlockGif.classList.add('unlock-gif');
+        phaseDiv.appendChild(unlockGif);
 
-    // Cria o elemento de áudio para o som de desbloqueio
-       const unlockSound = new Audio('../../imagens/unlock-padlock.mp3');
-       unlockSound.play(); // Toca o som de desbloqueio
+        const unlockSound = new Audio('../../imagens/unlock-padlock.mp3');
+        unlockSound.play(); // Toca o som de desbloqueio
 
-    // Remove o gif após 3 segundos
-       setTimeout(() => {
-           unlockGif.remove();
-       }, 3000);
-}
-
+        setTimeout(() => {
+            unlockGif.remove();
+        }, 3000);
+    }
 
     function moveToPhase(index, path = null) {
         const phase = document.querySelectorAll('.phase')[index];
