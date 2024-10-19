@@ -179,11 +179,44 @@
                         liberarNiveis(['Level1', 'Level2', 'Level3', 'Level4']); // Desbloqueia todos os níveis
                     } else if (userData.role === 'aluno') {
                         dashboardLink = '<a href="painel_aluno.html" class="dashboard-link">STUDENT DASHBOARD</a>';
-                        // Libera apenas os níveis de acordo com o progresso do aluno
-                        if (userData.progresso) {
-                            liberarNiveis(Object.keys(userData.progresso));
+
+                        // Verifica se o aluno está atrelado a um professor
+                        if (userData.atrelado_professor) {
+                            const professorRef = firebase.database().ref('usuarios/' + userData.atrelado_professor);
+
+                            professorRef.once('value').then((profSnapshot) => {
+                                const professorData = profSnapshot.val();
+
+                                // Verifica o nível definido pelo professor para o aluno
+                                const turmaId = '-O8mdLgStvNqNf6x-O5l'; // Substitua pelo ID real da turma
+                                const alunoId = user.uid;
+
+                                const nivelLiberado = professorData.turmas &&
+                                                      professorData.turmas[turmaId] &&
+                                                      professorData.turmas[turmaId].students &&
+                                                      professorData.turmas[turmaId].students[alunoId] &&
+                                                      professorData.turmas[turmaId].students[alunoId].nivel_em_curso
+                                                      ? professorData.turmas[turmaId].students[alunoId].nivel_em_curso
+                                                      : null;
+
+                                // Libera o nível determinado pelo professor
+                                if (nivelLiberado) {
+                                    liberarNiveis([nivelLiberado]);
+                                } else {
+                                    console.error("Nenhum nível foi definido pelo professor.");
+                                    liberarNiveis(['Level1']); // Libera o nível 1 por padrão
+                                }
+                            }).catch((error) => {
+                                console.error("Erro ao buscar dados do professor:", error);
+                                liberarNiveis(['Level1']); // Libera o nível 1 por padrão
+                            });
                         } else {
-                            liberarNiveis(['Level1']);
+                            // Se o aluno não estiver atrelado a um professor, usa o progresso próprio
+                            if (userData.progresso) {
+                                liberarNiveis(Object.keys(userData.progresso));
+                            } else {
+                                liberarNiveis(['Level1']);
+                            }
                         }
                     }
 
