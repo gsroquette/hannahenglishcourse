@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -120,6 +120,44 @@
             margin-top: 20px;
             animation: fadeIn 2s ease-in-out;
         }
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            z-index: 999;
+        }
+        #completion-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            display: none;
+            z-index: 1000;
+            text-align: center;
+        }
+        #completion-modal h2 {
+            margin: 0 0 10px;
+        }
+        #completion-modal button {
+            padding: 10px 20px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        #completion-modal button:hover {
+            background: #2980b9;
+        }
         @keyframes fadeIn {
             0% { opacity: 0; }
             100% { opacity: 1; }
@@ -157,9 +195,13 @@
     </div>
     <div id="finalFeedback"></div>
     <button id="restartButton" class="button" style="display: none;">Restart</button>
-    <div class="feedback" id="feedback">
-        <img id="correctGif" src="certo.gif" alt="Correct">
-        <audio id="correctAudio" src="certo.mp3"></audio>
+
+    <!-- Modal de conclusão -->
+    <div id="overlay"></div>
+    <div id="completion-modal">
+        <h2>Phase Completed!</h2>
+        <p>Congratulations! You have completed this phase.</p>
+        <button onclick="closeModal()">Close</button>
     </div>
 
     <script>
@@ -167,6 +209,7 @@
         const imageFolderUrl = '../data1/imagens/';
         let words = [];
         let currentWordIndex = 0;
+        let wordsPlayed = 0; // Contador de palavras reproduzidas
         let recognitionTimeout;
         let tryAgainInProgress = false;
 
@@ -205,8 +248,6 @@
         const imageElement = document.getElementById("image");
         const iconElement = document.getElementById("icon");
         const feedbackDiv = document.getElementById("feedback");
-        const correctGif = document.getElementById("correctGif");
-        const correctAudio = document.getElementById("correctAudio");
         const finalFeedbackDiv = document.getElementById("finalFeedback");
         const restartButton = document.getElementById("restartButton");
 
@@ -218,6 +259,8 @@
         startButton.addEventListener('click', () => {
             disableStartButton();
             startRecognition();
+            wordsPlayed++;
+            checkCompletion();
         });
 
         prevButton.addEventListener('click', () => {
@@ -275,9 +318,7 @@
         function handleCorrectAnswer() {
             resultDiv.textContent = "Correct!";
             resultDiv.style.color = "green";
-            playCorrectFeedback();
             setTimeout(() => {
-                stopCorrectFeedback();
                 if (currentWordIndex + 1 < words.length) {
                     loadWord(currentWordIndex + 1);
                 } else {
@@ -288,43 +329,33 @@
 
         function handleIncorrectAttempt() {
             tryAgainInProgress = true;
-            const tryAgainMessage = "Try again. Listen to the correct pronunciation of this word.";
-            resultDiv.textContent = tryAgainMessage;
+            resultDiv.textContent = "Try again.";
             resultDiv.style.color = "red";
-            readMessage(tryAgainMessage, () => {
-                readWordWithHighlight(words[currentWordIndex], () => {
-                    enableStartButton();
-                    tryAgainInProgress = false;
-                });
+            readWordWithHighlight(words[currentWordIndex], () => {
+                enableStartButton();
+                tryAgainInProgress = false;
             });
         }
 
         function resetFeedback() {
             resultDiv.textContent = "";
             feedbackDiv.style.display = "none";
-            correctGif.style.display = "none";
-            correctAudio.pause();
-            correctAudio.currentTime = 0;
         }
 
-        function playCorrectFeedback() {
-            feedbackDiv.style.display = "block";
-            correctGif.style.display = "block";
-            correctAudio.play();
+        function checkCompletion() {
+            if (wordsPlayed === words.length) {
+                markActivityAsCompleted();
+            }
         }
 
-        function stopCorrectFeedback() {
-            feedbackDiv.style.display = "none";
-            correctGif.style.display = "none";
-            correctAudio.pause();
-            correctAudio.currentTime = 0;
+        function markActivityAsCompleted() {
+            document.getElementById('overlay').style.display = 'block';
+            document.getElementById('completion-modal').style.display = 'block';
         }
 
-        function readMessage(message, callback) {
-            const utterance = new SpeechSynthesisUtterance(message);
-            utterance.lang = 'en-US';
-            utterance.onend = callback;
-            speechSynthesis.speak(utterance);
+        function closeModal() {
+            document.getElementById('overlay').style.display = 'none';
+            document.getElementById('completion-modal').style.display = 'none';
         }
 
         function readWordWithHighlight(word, callback) {
@@ -339,14 +370,6 @@
             speechSynthesis.speak(utterance);
         }
 
-        imageElement.addEventListener('click', () => {
-            readWordWithHighlight(words[currentWordIndex]);
-        });
-
-        iconElement.addEventListener('click', () => {
-            readWordWithHighlight(words[currentWordIndex]);
-        });
-
         function showFinalFeedback() {
             finalFeedbackDiv.textContent = "You've completed all words!";
             finalFeedbackDiv.style.display = "block";
@@ -358,8 +381,8 @@
             currentWordIndex = 0;
             finalFeedbackDiv.style.display = "none";
             restartButton.style.display = "none";
+            wordsPlayed = 0; // Reinicia o contador de palavras reproduzidas
             loadWord(0);
-            enableStartButton();
         }
 
         function disableStartButton() {
@@ -369,6 +392,18 @@
         function enableStartButton() {
             startButton.disabled = false;
         }
+
+        imageElement.addEventListener('click', () => {
+            readWordWithHighlight(words[currentWordIndex]);
+            wordsPlayed++;
+            checkCompletion();
+        });
+
+        iconElement.addEventListener('click', () => {
+            readWordWithHighlight(words[currentWordIndex]);
+            wordsPlayed++;
+            checkCompletion();
+        });
     </script>
 </body>
 </html>
