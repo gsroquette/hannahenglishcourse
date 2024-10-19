@@ -355,21 +355,30 @@
     async function updateNextPhase(userId) {
         const currentPhase = getPhaseFromURL(); 
         const { level, unit } = getLevelAndUnitFromURL(); 
-        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}`);
+        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso`);
 
         try {
-            if (currentPhase === "last") {
+            if (currentPhase === "end") {
+                // Criar nova Level
+                const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+                await dbRef.child(nextLevel).set({});
+                console.log(`Level ${nextLevel} criada.`);
+
+                // Criar Unit1/fase1 como true dentro da nova Level
+                await dbRef.child(`${nextLevel}/Unit1/fase1`).set(true);
+                console.log(`Unit1/fase1 criada como true dentro de ${nextLevel}.`);
+            } else if (currentPhase === "last") {
                 const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
                 // Primeiro, cria a nova Unit
-                await dbRef.child(nextUnit).set({});
+                await dbRef.child(`${level}/${nextUnit}`).set({});
                 console.log(`Unit ${nextUnit} criada dentro de ${level}.`);
 
                 // Em seguida, adiciona a fase1 como true dentro da nova Unit
-                await dbRef.child(`${nextUnit}/fase1`).set(true);
+                await dbRef.child(`${level}/${nextUnit}/fase1`).set(true);
                 console.log(`Fase1 marcada como true dentro de ${nextUnit}.`);
             } else {
                 const nextPhase = parseInt(currentPhase) + 1;
-                await dbRef.child(unit).update({ 
+                await dbRef.child(`${level}/${unit}`).update({ 
                     [`fase${currentPhase}`]: true, 
                     [`fase${nextPhase}`]: true 
                 });

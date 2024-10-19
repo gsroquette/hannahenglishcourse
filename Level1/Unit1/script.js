@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', function() {
     { id: 2, name: "Flashcards", path: "../Unit1/Flashcards/index.html?fase=2", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
     { id: 3, name: "Flashcards2", path: "../Unit1/Flashcards2/index.html?fase=3", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
     { id: 4, name: "Flashcards3", path: "../Unit1/Flashcards3/index.html?fase=4", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-    { id: 5, name: "QUIZ", path: "../Unit1/QUIZ/index.html?fase=last", img: "../../imagens/botoes/quiz_button.png", unlocked: false }
+    { id: 5, name: "QUIZ", path: "../Unit1/QUIZ/index.html?fase=end", img: "../../imagens/botoes/quiz_button.png", unlocked: false }
 ];
 
     const mapContainer = document.getElementById('mapContainer');
