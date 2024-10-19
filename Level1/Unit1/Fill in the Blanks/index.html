@@ -6,7 +6,7 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            background-color: #ffffff; /* Fundo branco */
+            background-color: #ffffff;
             background-image: url('../../../imagens/fundo.png');
             background-repeat: repeat;
             background-size: auto;
@@ -18,7 +18,7 @@
             margin-top: 30px;
             font-size: 36px;
             text-align: center;
-            padding-top: 50px; /* Espaço para o botão Back */
+            padding-top: 50px;
         }
         .question-text {
             margin: 20px auto;
@@ -97,7 +97,7 @@
             text-align: center;
         }
         .success-container img {
-            width: 250px; /* Tamanho maior do GIF */
+            width: 250px;
             height: auto;
         }
         @media (max-width: 768px) {
@@ -105,7 +105,7 @@
                 flex-direction: column;
             }
             .question-text {
-                font-size: 36px; /* Aumenta o texto da atividade em 50% */
+                font-size: 36px;
             }
         }
         #backBtn {
@@ -119,9 +119,8 @@
             border-radius: 5px;
             font-size: 18px;
             cursor: pointer;
-            z-index: 1000; /* Garante que o botão fique sobre outros elementos */
+            z-index: 1000;
         }
-        /* Estilos para o modal de conclusão */
         #overlay {
             position: fixed;
             top: 0;
@@ -162,25 +161,24 @@
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 </head>
 <body>
 <button id="backBtn" onclick="window.location.href='../index.html'">Back</button>
 
     <h1>Hannah Fill in the Blanks</h1>
 
-    <!-- Contêiner para o GIF e o som -->
     <div class="success-container" id="successContainer" style="display:none;">
         <img id="successGif" src="success.gif" alt="Success">
         <audio id="successSound" src="success.mp3"></audio>
     </div>
 
-    <!-- Contêiner para as questões -->
     <div class="question-text" id="questionsContainer"></div>
 
-    <!-- Contêiner para as dicas -->
     <div id="tipsContainer" class="tips"></div>
 
-    <!-- Botões de navegação -->
     <div class="buttons">
         <button id="previousBtn" onclick="previousQuestion()">⏪ Previous</button>
         <button id="nextBtn" onclick="nextQuestion()">Next ⏩</button>
@@ -190,7 +188,6 @@
         <button id="pdfBtn" onclick="generatePDF()">Generate PDF</button>
     </div>
 
-    <!-- Modal de conclusão -->
     <div id="overlay"></div>
     <div id="completion-modal">
         <h2>Phase Completed!</h2>
@@ -199,14 +196,26 @@
     </div>
 
     <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+            authDomain: "hannahenglishcourse.firebaseapp.com",
+            projectId: "hannahenglishcourse",
+            storageBucket: "hannahenglishcourse.appspot.com",
+            messagingSenderId: "449818788486",
+            appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+            measurementId: "G-07VVJG9LRS",
+            databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+
         let currentQuestion = 1;
         let questionsData = [];
         let correctAnswers = [];
         let totalQuestions = 0;
-        let answeredQuestions = 0; // Contador de questões respondidas corretamente
+        let answeredQuestions = 0;
         let synth = window.speechSynthesis;
 
-        // Função para buscar e carregar o arquivo .txt
         async function loadQuestions() {
             try {
                 const response = await fetch('questions.txt');
@@ -217,7 +226,6 @@
             }
         }
 
-        // Processar o conteúdo do arquivo .txt
         function processFile(content) {
             const lines = content.split('\n');
             questionsData = [];
@@ -252,32 +260,28 @@
             showQuestion(1);
         }
 
-        // Função para exibir a questão atual
         function showQuestion(questionNumber) {
             const questionsContainer = document.getElementById('questionsContainer');
             questionsContainer.innerHTML = formatQuestion(questionsData[questionNumber - 1].text);
 
             document.getElementById('previousBtn').disabled = questionNumber === 1;
             document.getElementById('nextBtn').disabled = questionNumber === totalQuestions;
-            document.getElementById('tipsContainer').style.display = 'none'; // Ocultar dicas ao mudar de questão
-            synth.cancel(); // Interromper a leitura ao mudar de página
+            document.getElementById('tipsContainer').style.display = 'none';
+            synth.cancel();
         }
 
-        // Função para formatar a questão com espaços editáveis
         function formatQuestion(text) {
             return text.replace(/___/g, '<span class="blank" contenteditable="true"></span>');
         }
 
-        // Função para exibir dicas com respostas embaralhadas
         function showTips() {
             const tipsContainer = document.getElementById('tipsContainer');
             let tips = correctAnswers[currentQuestion - 1].slice();
-            tips.sort(() => Math.random() - 0.5); // Embaralhar as respostas
+            tips.sort(() => Math.random() - 0.5);
             tipsContainer.innerHTML = 'Tips: ' + tips.join(', ');
             tipsContainer.style.display = 'block';
         }
 
-        // Função para verificar as respostas e aplicar as cores
         function checkAnswers() {
             const blanks = document.querySelectorAll('.blank');
             let allCorrect = true;
@@ -310,33 +314,69 @@
             }
         }
 
-        // Função para verificar a conclusão da atividade
         function checkCompletion() {
             if (answeredQuestions === totalQuestions) {
                 markActivityAsCompleted();
             }
         }
 
-        // Função para marcar a atividade como concluída
         function markActivityAsCompleted() {
             console.log("Atividade concluída!");
-            // Exibir o modal de conclusão
+            ensureUserIsAuthenticated(updateNextPhase);
             document.getElementById('overlay').style.display = 'block';
             document.getElementById('completion-modal').style.display = 'block';
         }
 
-        // Função para fechar o modal de conclusão
         function closeModal() {
             document.getElementById('overlay').style.display = 'none';
             document.getElementById('completion-modal').style.display = 'none';
         }
 
-        // Função para ler o texto completo da questão
-        function readText() {
-            synth.cancel(); // Interrompe qualquer leitura anterior
-            let textToRead = questionsData[currentQuestion - 1].text;
+        function ensureUserIsAuthenticated(callback) {
+            firebase.auth().onAuthStateChanged(function(user) {
+                if (user) {
+                    callback(user.uid);
+                } else {
+                    console.error("Usuário não autenticado");
+                }
+            });
+        }
 
-            // Adicionar as respostas corretas ao texto
+        async function updateNextPhase(userId) {
+            const currentPhase = getPhaseFromURL();
+            const nextPhase = parseInt(currentPhase) + 1;
+            const { level, unit } = getLevelAndUnitFromURL();
+            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+            try {
+                if (currentPhase === "last") {
+                    const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+                    await dbRef.set({ fase1: true });
+                    console.log(`Level ${nextLevel} / Unit 1 / Fase 1 criada.`);
+                } else {
+                    await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
+                    console.log(`Fase ${currentPhase} marcada como concluída e fase ${nextPhase} liberada.`);
+                }
+            } catch (error) {
+                console.error("Erro ao atualizar o progresso da fase:", error);
+            }
+        }
+
+        function getPhaseFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('fase');
+        }
+
+        function getLevelAndUnitFromURL() {
+            const url = window.location.pathname.split('/');
+            const level = url[1];
+            const unit = url[2];
+            return { level, unit };
+        }
+
+        function readText() {
+            synth.cancel();
+            let textToRead = questionsData[currentQuestion - 1].text;
             correctAnswers[currentQuestion - 1].forEach(answer => {
                 textToRead = textToRead.replace('___', answer);
             });
@@ -346,17 +386,16 @@
             synth.speak(utterance);
         }
 
-        // Função para gerar o PDF
         function generatePDF() {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
 
             const img = new Image();
-            img.src = 'Logo.png'; // Certifique-se de que o logo está na mesma pasta que o HTML
-            doc.addImage(img, 'PNG', 85, 10, 30, 30); // Logo centralizado (85) com 3x3 cm
+            img.src = 'Logo.png';
+            doc.addImage(img, 'PNG', 85, 10, 30, 30);
 
             doc.setFontSize(18);
-            doc.text('Hannah Fill in the Blanks', 105, 50, { align: 'center' }); // Centralizado
+            doc.text('Hannah Fill in the Blanks', 105, 50, { align: 'center' });
 
             doc.setFontSize(12);
             doc.text('Name: ___________________________________________  Date: ___________________', 10, 70);
@@ -383,7 +422,6 @@
             doc.save('Hannah_Fill_in_the_Blanks.pdf');
         }
 
-        // Funções de navegação
         function nextQuestion() {
             if (currentQuestion < totalQuestions) {
                 currentQuestion++;
@@ -398,7 +436,6 @@
             }
         }
 
-        // Inicializa o carregamento das perguntas
         loadQuestions();
     </script>
 </body>
