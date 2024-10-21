@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hannah Missing Word</title>
+    <style>
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            margin: 0;
+            padding: 20px;
+            background-image: url('../../../imagens/fundo.png');
+            background-repeat: repeat;
+            background-size: contain;
+            background-position: center;
+        }
+        h1 {
+            text-align: center;
+            color: #ff4500;
+            font-size: 3rem;
+            margin-bottom: 20px;
+        }
+        .activity-container {
+            margin-top: 20px;
+        }
+        .activity {
+            display: flex;
+            align-items: center;
+            position: relative;
+            padding: 20px;
+            background-color: #ffdab9;
+            border-radius: 15px;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+        .activity img {
+            max-width: 150px;
+            max-height: 150px;
+            border-radius: 12px;
+            margin-right: 20px;
+        }
+        .missing-word {
+            font-size: 36px;
+            font-weight: bold;
+            color: #ff4500;
+        }
+        .full-word {
+            font-size: 24px;
+            margin-top: 10px;
+            color: #8b4513;
+        }
+        .missing-letter-input {
+            width: 40px;
+            font-size: 36px;
+            text-align: center;
+            border-bottom: 2px solid black;
+            margin-right: 10px;
+            border: 2px solid black;
+        }
+        .correct {
+            border-color: blue;
+        }
+        .incorrect {
+            border-color: red;
+        }
+        .word-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .letter-animation {
+            font-size: 80px;
+            color: #32CD32;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation: grow-shrink 1s ease-in-out;
+            display: none;
+        }
+        @keyframes grow-shrink {
+            0% {
+                transform: translate(-50%, -50%) scale(0);
+            }
+            50% {
+                transform: translate(-50%, -50%) scale(1.5);
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+
+        /* Estilos do modal de conclusão */
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            z-index: 1000;
+        }
+        #completion-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            display: none;
+            z-index: 1001;
+        }
+        #completion-modal h2 {
+            margin-top: 0;
+            font-size: 2rem;
+            color: #32CD32;
+        }
+        #completion-modal p {
+            font-size: 1.2rem;
+            margin: 10px 0;
+        }
+        #completion-modal button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 1rem;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #32CD32;
+            color: white;
+            transition: background-color 0.3s ease;
+        }
+        #completion-modal button:hover {
+            background-color: #28a428;
+        }
+    </style>
+</head>
+<body>
+<button onclick="history.back()" style="padding: 15px 25px; background-color: black; color: white; border: none; border-radius: 10px; font-size: 1.5rem; cursor: pointer; transition: background-color 0.3s ease;">
+    Back
+</button>
+
+<h1>Hannah Missing Word</h1>
+
+<div id="activity-container" class="activity-container"></div>
+
+<!-- Modal de conclusão -->
+<div id="overlay"></div>
+<div id="completion-modal">
+    <h2>Phase Completed!</h2>
+    <p>Congratulations! You have completed this phase.</p>
+    <button onclick="closeModal()">Close</button>
+</div>
+
+<script>
+    let activities = [];
+    let completedWords = 0; // Contador de palavras concluídas
+
+    function speakText(text) {
+        const synth = window.speechSynthesis;
+        const utterThis = new SpeechSynthesisUtterance(text);
+        utterThis.lang = 'en-US';
+        synth.speak(utterThis);
+    }
+
+    async function loadActivities() {
+        try {
+            const response = await fetch('../data1/words.txt');
+            const text = await response.text();
+            const words = text.trim().split('\n');
+
+            words.forEach((word, index) => {
+                const imageName = `imagem${index + 1}.jpeg`;
+                const imageUrl = `../data1/imagens/${imageName}`;
+                
+                createActivity(imageUrl, word);
+            });
+        } catch (error) {
+            console.error('Erro ao carregar palavras:', error);
+        }
+    }
+
+    function createActivity(imageUrl, word) {
+        const activityContainer = document.getElementById('activity-container');
+        const activityDiv = document.createElement('div');
+        activityDiv.classList.add('activity');
+
+        const imgElement = document.createElement('img');
+        imgElement.src = imageUrl;
+        imgElement.onerror = function() {
+            console.error(`Erro ao carregar a imagem: ${imageUrl}`);
+        };
+        activityDiv.appendChild(imgElement);
+
+        const wordContainer = document.createElement('div');
+        wordContainer.classList.add('word-container');
+
+        const missingWordElement = document.createElement('div');
+        missingWordElement.classList.add('missing-word');
+
+        const letterInputs = [];
+        word.split('').forEach((letter, index) => {
+            const letterInput = document.createElement('input');
+            letterInput.classList.add('missing-letter-input');
+            letterInput.maxLength = 1;
+
+            letterInput.addEventListener('input', function() {
+                if (letterInput.value.toUpperCase() === letter.toUpperCase()) {
+                    letterInput.classList.add('correct');
+                    letterInput.classList.remove('incorrect');
+
+                    if (index < word.length - 1) {
+                        letterInputs[index + 1].focus(); 
+                    }
+
+                    const animationElement = document.createElement('div');
+                    animationElement.classList.add('letter-animation');
+                    animationElement.innerText = letter.toUpperCase();
+                    activityDiv.appendChild(animationElement);
+                    animationElement.style.display = 'block';
+
+                    setTimeout(() => {
+                        animationElement.style.display = 'none';
+                        animationElement.remove();
+                    }, 1000);
+
+                    const userWord = letterInputs.map(input => input.value.toUpperCase()).join('');
+                    if (userWord === word.toUpperCase()) {
+                        speakText(word);
+                        completedWords++;
+
+                        if (completedWords === activities.length) {
+                            showCompletionModal();
+                        }
+                    } else {
+                        speakText(letter);
+                    }
+                } else {
+                    letterInput.classList.add('incorrect');
+                    letterInput.classList.remove('correct');
+                }
+            });
+
+            letterInputs.push(letterInput);
+            missingWordElement.appendChild(letterInput);
+        });
+
+        wordContainer.appendChild(missingWordElement);
+        activityDiv.appendChild(wordContainer);
+        activityContainer.appendChild(activityDiv);
+        activities.push(word);
+    }
+
+    function showCompletionModal() {
+        document.getElementById('overlay').style.display = 'block';
+        document.getElementById('completion-modal').style.display = 'block';
+    }
+
+    function closeModal() {
+        document.getElementById('overlay').style.display = 'none';
+        document.getElementById('completion-modal').style.display = 'none';
+    }
+
+    document.addEventListener('DOMContentLoaded', loadActivities);
+</script>
+
+</body>
+</html>
