@@ -3,28 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hannah Missing Word</title>
+    <title>Hannah Mixed Letters</title>
     <style>
         body {
             font-family: 'Times New Roman', Times, serif;
             margin: 0;
             padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             background-image: url('../../../imagens/fundo.png');
             background-repeat: repeat;
-            background-size: contain;
-            background-position: center;
+            background-size: auto;
         }
+
         h1 {
             text-align: center;
             color: #ff4500;
             font-size: 3rem;
             margin-bottom: 20px;
         }
+
         .activity-container {
             margin-top: 20px;
+            width: 100%;
         }
+
         .activity {
             display: flex;
+            flex-direction: column;
             align-items: center;
             position: relative;
             padding: 20px;
@@ -33,62 +40,61 @@
             box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
             margin-bottom: 30px;
             overflow: hidden;
+            font-family: 'Times New Roman', Times, serif;
         }
+
         .activity img {
             max-width: 150px;
             max-height: 150px;
             border-radius: 12px;
-            margin-right: 20px;
+            margin-bottom: 10px;
         }
-        .missing-word {
+
+        .mixed-letters {
             font-size: 36px;
             font-weight: bold;
             color: #ff4500;
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 15px;
         }
-        .full-word {
-            font-size: 24px;
-            margin-top: 10px;
-            color: #8b4513;
-        }
-        .missing-letter-input {
+
+        .letter-input {
             width: 40px;
             font-size: 36px;
             text-align: center;
             border-bottom: 2px solid black;
-            margin-right: 10px;
-            border: 2px solid black;
+            margin-right: 5px;
         }
+
         .correct {
             border-color: blue;
         }
+
         .incorrect {
             border-color: red;
         }
+
         .word-container {
             display: flex;
             flex-direction: column;
             align-items: center;
+            font-family: 'Times New Roman', Times, serif;
         }
-        .letter-animation {
-            font-size: 80px;
-            color: #32CD32;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            animation: grow-shrink 1s ease-in-out;
-            display: none;
+
+        .check-answer-btn {
+            background-color: #32CD32;
+            color: white;
+            margin-top: 10px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.2rem;
+            cursor: pointer;
         }
-        @keyframes grow-shrink {
-            0% {
-                transform: translate(-50%, -50%) scale(0);
-            }
-            50% {
-                transform: translate(-50%, -50%) scale(1.5);
-            }
-            100% {
-                transform: translate(-50%, -50%) scale(1);
-            }
+
+        .check-answer-btn:hover {
+            background-color: #28a428;
         }
 
         /* Estilos do modal de conclusão */
@@ -145,7 +151,7 @@
     Back
 </button>
 
-<h1>Hannah Missing Word</h1>
+<h1>Hannah Mixed Letters</h1>
 
 <div id="activity-container" class="activity-container"></div>
 
@@ -159,8 +165,15 @@
 
 <script>
     let activities = [];
-    let completedWords = 0; // Contador de palavras concluídas
+    let completedWords = 0;
 
+    // Função para embaralhar a palavra
+    function shuffleWord(word) {
+        const shuffled = word.split('').sort(() => 0.5 - Math.random()).join('');
+        return shuffled !== word ? shuffled : shuffleWord(word);
+    }
+
+    // Função para ler o texto
     function speakText(text) {
         const synth = window.speechSynthesis;
         const utterThis = new SpeechSynthesisUtterance(text);
@@ -168,6 +181,7 @@
         synth.speak(utterThis);
     }
 
+    // Função para carregar as atividades
     async function loadActivities() {
         try {
             const response = await fetch('../data1/words.txt');
@@ -185,6 +199,7 @@
         }
     }
 
+    // Função para criar uma atividade
     function createActivity(imageUrl, word) {
         const activityContainer = document.getElementById('activity-container');
         const activityDiv = document.createElement('div');
@@ -200,67 +215,79 @@
         const wordContainer = document.createElement('div');
         wordContainer.classList.add('word-container');
 
-        const missingWordElement = document.createElement('div');
-        missingWordElement.classList.add('missing-word');
+        const shuffledWord = shuffleWord(word);
 
-        const letterInputs = [];
-        word.split('').forEach((letter, index) => {
+        const mixedLettersElement = document.createElement('div');
+        mixedLettersElement.classList.add('mixed-letters');
+        shuffledWord.split('').forEach(letter => {
+            const letterElement = document.createElement('span');
+            letterElement.innerText = letter;
+            mixedLettersElement.appendChild(letterElement);
+        });
+        wordContainer.appendChild(mixedLettersElement);
+
+        const inputContainer = document.createElement('div');
+        shuffledWord.split('').forEach((_, index, array) => {
             const letterInput = document.createElement('input');
-            letterInput.classList.add('missing-letter-input');
+            letterInput.classList.add('letter-input');
             letterInput.maxLength = 1;
 
             letterInput.addEventListener('input', function() {
-                if (letterInput.value.toUpperCase() === letter.toUpperCase()) {
-                    letterInput.classList.add('correct');
-                    letterInput.classList.remove('incorrect');
-
-                    if (index < word.length - 1) {
-                        letterInputs[index + 1].focus(); 
-                    }
-
-                    const animationElement = document.createElement('div');
-                    animationElement.classList.add('letter-animation');
-                    animationElement.innerText = letter.toUpperCase();
-                    activityDiv.appendChild(animationElement);
-                    animationElement.style.display = 'block';
-
-                    setTimeout(() => {
-                        animationElement.style.display = 'none';
-                        animationElement.remove();
-                    }, 1000);
-
-                    const userWord = letterInputs.map(input => input.value.toUpperCase()).join('');
-                    if (userWord === word.toUpperCase()) {
-                        speakText(word);
-                        completedWords++;
-
-                        if (completedWords === activities.length) {
-                            showCompletionModal();
-                        }
-                    } else {
-                        speakText(letter);
-                    }
-                } else {
-                    letterInput.classList.add('incorrect');
-                    letterInput.classList.remove('correct');
+                if (letterInput.value.length === 1 && index < array.length - 1) {
+                    inputContainer.children[index + 1].focus();
                 }
             });
 
-            letterInputs.push(letterInput);
-            missingWordElement.appendChild(letterInput);
+            inputContainer.appendChild(letterInput);
         });
 
-        wordContainer.appendChild(missingWordElement);
+        wordContainer.appendChild(inputContainer);
+
+        const checkAnswerBtn = document.createElement('button');
+        checkAnswerBtn.classList.add('check-answer-btn');
+        checkAnswerBtn.innerText = 'Check Answer';
+
+        checkAnswerBtn.onclick = function() {
+            const userAnswer = Array.from(inputContainer.querySelectorAll('.letter-input'))
+                .map(input => input.value.toUpperCase())
+                .join('');
+
+            const letterInputs = inputContainer.querySelectorAll('.letter-input');
+            if (userAnswer === word.toUpperCase()) {
+                letterInputs.forEach(input => {
+                    input.classList.add('correct');
+                    input.classList.remove('incorrect');
+                });
+                speakText(word);
+                completedWords++; // Incrementa as palavras concluídas
+
+                // Verifica se todas as palavras foram completadas
+                if (completedWords === activities.length) {
+                    showCompletionModal(); // Exibe o modal de conclusão
+                }
+            } else {
+                letterInputs.forEach(input => {
+                    input.classList.add('incorrect');
+                    input.classList.remove('correct');
+                });
+            }
+        };
+
+        wordContainer.appendChild(checkAnswerBtn);
+
         activityDiv.appendChild(wordContainer);
         activityContainer.appendChild(activityDiv);
-        activities.push(word);
+
+        activities.push(word); // Adiciona a palavra à lista de atividades
     }
 
+    // Função para exibir o modal de conclusão
     function showCompletionModal() {
         document.getElementById('overlay').style.display = 'block';
         document.getElementById('completion-modal').style.display = 'block';
     }
 
+    // Função para fechar o modal de conclusão
     function closeModal() {
         document.getElementById('overlay').style.display = 'none';
         document.getElementById('completion-modal').style.display = 'none';

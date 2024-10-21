@@ -16,19 +16,16 @@
             background-repeat: repeat;
             background-size: auto;
         }
-
         h1 {
             text-align: center;
             color: #ff4500;
             font-size: 3rem;
             margin-bottom: 20px;
         }
-
         .activity-container {
             margin-top: 20px;
             width: 100%;
         }
-
         .activity {
             display: flex;
             flex-direction: column;
@@ -42,14 +39,12 @@
             overflow: hidden;
             font-family: 'Times New Roman', Times, serif;
         }
-
         .activity img {
             max-width: 150px;
             max-height: 150px;
             border-radius: 12px;
             margin-bottom: 10px;
         }
-
         .mixed-letters {
             font-size: 36px;
             font-weight: bold;
@@ -58,7 +53,6 @@
             justify-content: space-around;
             margin-bottom: 15px;
         }
-
         .letter-input {
             width: 40px;
             font-size: 36px;
@@ -66,22 +60,18 @@
             border-bottom: 2px solid black;
             margin-right: 5px;
         }
-
         .correct {
             border-color: blue;
         }
-
         .incorrect {
             border-color: red;
         }
-
         .word-container {
             display: flex;
             flex-direction: column;
             align-items: center;
             font-family: 'Times New Roman', Times, serif;
         }
-
         .check-answer-btn {
             background-color: #32CD32;
             color: white;
@@ -92,11 +82,9 @@
             font-size: 1.2rem;
             cursor: pointer;
         }
-
         .check-answer-btn:hover {
             background-color: #28a428;
         }
-
         /* Estilos do modal de conclusão */
         #overlay {
             position: fixed;
@@ -163,17 +151,26 @@
     <button onclick="closeModal()">Close</button>
 </div>
 
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
 <script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+        authDomain: "hannahenglishcourse.firebaseapp.com",
+        projectId: "hannahenglishcourse",
+        storageBucket: "hannahenglishcourse.appspot.com",
+        messagingSenderId: "449818788486",
+        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+    };
+    firebase.initializeApp(firebaseConfig);
+
     let activities = [];
     let completedWords = 0;
 
-    // Função para embaralhar a palavra
-    function shuffleWord(word) {
-        const shuffled = word.split('').sort(() => 0.5 - Math.random()).join('');
-        return shuffled !== word ? shuffled : shuffleWord(word);
-    }
-
-    // Função para ler o texto
     function speakText(text) {
         const synth = window.speechSynthesis;
         const utterThis = new SpeechSynthesisUtterance(text);
@@ -181,7 +178,6 @@
         synth.speak(utterThis);
     }
 
-    // Função para carregar as atividades
     async function loadActivities() {
         try {
             const response = await fetch('../data1/words.txt');
@@ -199,7 +195,6 @@
         }
     }
 
-    // Função para criar uma atividade
     function createActivity(imageUrl, word) {
         const activityContainer = document.getElementById('activity-container');
         const activityDiv = document.createElement('div');
@@ -215,11 +210,9 @@
         const wordContainer = document.createElement('div');
         wordContainer.classList.add('word-container');
 
-        const shuffledWord = shuffleWord(word);
-
         const mixedLettersElement = document.createElement('div');
         mixedLettersElement.classList.add('mixed-letters');
-        shuffledWord.split('').forEach(letter => {
+        word.split('').forEach(letter => {
             const letterElement = document.createElement('span');
             letterElement.innerText = letter;
             mixedLettersElement.appendChild(letterElement);
@@ -227,7 +220,7 @@
         wordContainer.appendChild(mixedLettersElement);
 
         const inputContainer = document.createElement('div');
-        shuffledWord.split('').forEach((_, index, array) => {
+        word.split('').forEach((_, index, array) => {
             const letterInput = document.createElement('input');
             letterInput.classList.add('letter-input');
             letterInput.maxLength = 1;
@@ -259,11 +252,12 @@
                     input.classList.remove('incorrect');
                 });
                 speakText(word);
-                completedWords++; // Incrementa as palavras concluídas
+                completedWords++;
 
                 // Verifica se todas as palavras foram completadas
                 if (completedWords === activities.length) {
                     showCompletionModal(); // Exibe o modal de conclusão
+                    updateProgressInDatabase(); // Atualiza o progresso no banco de dados
                 }
             } else {
                 letterInputs.forEach(input => {
@@ -278,19 +272,54 @@
         activityDiv.appendChild(wordContainer);
         activityContainer.appendChild(activityDiv);
 
-        activities.push(word); // Adiciona a palavra à lista de atividades
+        activities.push(word);
     }
 
-    // Função para exibir o modal de conclusão
     function showCompletionModal() {
         document.getElementById('overlay').style.display = 'block';
         document.getElementById('completion-modal').style.display = 'block';
     }
 
-    // Função para fechar o modal de conclusão
     function closeModal() {
         document.getElementById('overlay').style.display = 'none';
         document.getElementById('completion-modal').style.display = 'none';
+    }
+
+    function updateProgressInDatabase() {
+        const currentPhase = getPhaseFromURL();
+        const { level, unit } = getLevelAndUnitFromURL();
+        const userId = getCurrentUserId();
+
+        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+        if (currentPhase === "last") {
+            const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+            dbRef.child(nextUnit).set({ fase1: true });
+        } else if (currentPhase === "end") {
+            const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+            firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+        } else {
+            dbRef.update({ [`fase${currentPhase}`]: true });
+            const nextPhase = parseInt(currentPhase) + 1;
+            dbRef.update({ [`fase${nextPhase}`]: true });
+        }
+    }
+
+    function getPhaseFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('fase');
+    }
+
+    function getLevelAndUnitFromURL() {
+        const url = window.location.pathname;
+        const parts = url.split('/');
+        const level = parts[1];
+        const unit = parts[2];
+        return { level, unit };
+    }
+
+    function getCurrentUserId() {
+        return "exampleUserId"; // Implementar lógica real de autenticação do Firebase
     }
 
     document.addEventListener('DOMContentLoaded', loadActivities);
