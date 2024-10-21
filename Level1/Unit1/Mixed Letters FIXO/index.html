@@ -96,6 +96,54 @@
         .check-answer-btn:hover {
             background-color: #28a428;
         }
+
+        /* Estilos do modal de conclusão */
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            z-index: 1000;
+        }
+        #completion-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            display: none;
+            z-index: 1001;
+        }
+        #completion-modal h2 {
+            margin-top: 0;
+            font-size: 2rem;
+            color: #32CD32;
+        }
+        #completion-modal p {
+            font-size: 1.2rem;
+            margin: 10px 0;
+        }
+        #completion-modal button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 1rem;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #32CD32;
+            color: white;
+            transition: background-color 0.3s ease;
+        }
+        #completion-modal button:hover {
+            background-color: #28a428;
+        }
     </style>
 </head>
 <body>
@@ -107,14 +155,25 @@
 
 <div id="activity-container" class="activity-container"></div>
 
+<!-- Modal de conclusão -->
+<div id="overlay"></div>
+<div id="completion-modal">
+    <h2>Phase Completed!</h2>
+    <p>Congratulations! You have completed this phase.</p>
+    <button onclick="closeModal()">Close</button>
+</div>
+
 <script>
     let activities = [];
+    let completedWords = 0;
 
+    // Função para embaralhar a palavra
     function shuffleWord(word) {
         const shuffled = word.split('').sort(() => 0.5 - Math.random()).join('');
         return shuffled !== word ? shuffled : shuffleWord(word);
     }
 
+    // Função para ler o texto
     function speakText(text) {
         const synth = window.speechSynthesis;
         const utterThis = new SpeechSynthesisUtterance(text);
@@ -122,15 +181,16 @@
         synth.speak(utterThis);
     }
 
+    // Função para carregar as atividades
     async function loadActivities() {
         try {
-            const response = await fetch('../data1/words.txt'); 
+            const response = await fetch('../data1/words.txt');
             const text = await response.text();
             const words = text.trim().split('\n');
 
             words.forEach((word, index) => {
-                const imageName = `imagem${index + 1}.jpeg`; 
-                const imageUrl = `../data1/imagens/${imageName}`; 
+                const imageName = `imagem${index + 1}.jpeg`;
+                const imageUrl = `../data1/imagens/${imageName}`;
                 
                 createActivity(imageUrl, word);
             });
@@ -139,6 +199,7 @@
         }
     }
 
+    // Função para criar uma atividade
     function createActivity(imageUrl, word) {
         const activityContainer = document.getElementById('activity-container');
         const activityDiv = document.createElement('div');
@@ -198,6 +259,12 @@
                     input.classList.remove('incorrect');
                 });
                 speakText(word);
+                completedWords++; // Incrementa as palavras concluídas
+
+                // Verifica se todas as palavras foram completadas
+                if (completedWords === activities.length) {
+                    showCompletionModal(); // Exibe o modal de conclusão
+                }
             } else {
                 letterInputs.forEach(input => {
                     input.classList.add('incorrect');
@@ -211,11 +278,22 @@
         activityDiv.appendChild(wordContainer);
         activityContainer.appendChild(activityDiv);
 
-        activityDiv.scrollIntoView({ behavior: 'smooth' });
+        activities.push(word); // Adiciona a palavra à lista de atividades
+    }
+
+    // Função para exibir o modal de conclusão
+    function showCompletionModal() {
+        document.getElementById('overlay').style.display = 'block';
+        document.getElementById('completion-modal').style.display = 'block';
+    }
+
+    // Função para fechar o modal de conclusão
+    function closeModal() {
+        document.getElementById('overlay').style.display = 'none';
+        document.getElementById('completion-modal').style.display = 'none';
     }
 
     document.addEventListener('DOMContentLoaded', loadActivities);
-
 </script>
 
 </body>
