@@ -90,6 +90,54 @@
                 transform: translate(-50%, -50%) scale(1);
             }
         }
+
+        /* Estilos do modal de conclusão */
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            z-index: 1000;
+        }
+        #completion-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            display: none;
+            z-index: 1001;
+        }
+        #completion-modal h2 {
+            margin-top: 0;
+            font-size: 2rem;
+            color: #32CD32;
+        }
+        #completion-modal p {
+            font-size: 1.2rem;
+            margin: 10px 0;
+        }
+        #completion-modal button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 1rem;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #32CD32;
+            color: white;
+            transition: background-color 0.3s ease;
+        }
+        #completion-modal button:hover {
+            background-color: #28a428;
+        }
     </style>
 </head>
 <body>
@@ -101,8 +149,17 @@
 
 <div id="activity-container" class="activity-container"></div>
 
+<!-- Modal de conclusão -->
+<div id="overlay"></div>
+<div id="completion-modal">
+    <h2>Phase Completed!</h2>
+    <p>Congratulations! You have completed this phase.</p>
+    <button onclick="closeModal()">Close</button>
+</div>
+
 <script>
-    let activities = []; // Lista para armazenar as atividades criadas
+    let activities = [];
+    let completedWords = 0; // Contador de palavras concluídas
 
     function speakText(text) {
         const synth = window.speechSynthesis;
@@ -111,16 +168,15 @@
         synth.speak(utterThis);
     }
 
-    // Função para carregar palavras e imagens dinamicamente
     async function loadActivities() {
         try {
-            const response = await fetch('../data1/words.txt'); // Subindo um nível e acessando a pasta data1
+            const response = await fetch('../data1/words.txt');
             const text = await response.text();
             const words = text.trim().split('\n');
 
             words.forEach((word, index) => {
-                const imageName = `imagem${index + 1}.jpeg`; // Gera os nomes das imagens sequencialmente
-                const imageUrl = `../data1/imagens/${imageName}`; // Subindo um nível para acessar as imagens
+                const imageName = `imagem${index + 1}.jpeg`;
+                const imageUrl = `../data1/imagens/${imageName}`;
                 
                 createActivity(imageUrl, word);
             });
@@ -129,13 +185,11 @@
         }
     }
 
-    // Função para criar uma nova atividade
     function createActivity(imageUrl, word) {
         const activityContainer = document.getElementById('activity-container');
         const activityDiv = document.createElement('div');
         activityDiv.classList.add('activity');
 
-        // Adicionar a imagem
         const imgElement = document.createElement('img');
         imgElement.src = imageUrl;
         imgElement.onerror = function() {
@@ -149,7 +203,6 @@
         const missingWordElement = document.createElement('div');
         missingWordElement.classList.add('missing-word');
 
-        // Criar campos de entrada para o aluno
         const letterInputs = [];
         word.split('').forEach((letter, index) => {
             const letterInput = document.createElement('input');
@@ -162,7 +215,7 @@
                     letterInput.classList.remove('incorrect');
 
                     if (index < word.length - 1) {
-                        letterInputs[index + 1].focus(); // Mover para o próximo campo
+                        letterInputs[index + 1].focus(); 
                     }
 
                     const animationElement = document.createElement('div');
@@ -176,10 +229,14 @@
                         animationElement.remove();
                     }, 1000);
 
-                    // Verificar se a palavra está completa
                     const userWord = letterInputs.map(input => input.value.toUpperCase()).join('');
                     if (userWord === word.toUpperCase()) {
-                        speakText(word);  // Ler a palavra completa se o aluno acertar
+                        speakText(word);
+                        completedWords++;
+
+                        if (completedWords === activities.length) {
+                            showCompletionModal();
+                        }
                     } else {
                         speakText(letter);
                     }
@@ -194,14 +251,22 @@
         });
 
         wordContainer.appendChild(missingWordElement);
-
         activityDiv.appendChild(wordContainer);
         activityContainer.appendChild(activityDiv);
+        activities.push(word);
     }
 
-    // Carregar atividades automaticamente ao carregar a página
-    document.addEventListener('DOMContentLoaded', loadActivities);
+    function showCompletionModal() {
+        document.getElementById('overlay').style.display = 'block';
+        document.getElementById('completion-modal').style.display = 'block';
+    }
 
+    function closeModal() {
+        document.getElementById('overlay').style.display = 'none';
+        document.getElementById('completion-modal').style.display = 'none';
+    }
+
+    document.addEventListener('DOMContentLoaded', loadActivities);
 </script>
 
 </body>
