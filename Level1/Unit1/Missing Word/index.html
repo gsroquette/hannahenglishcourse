@@ -45,18 +45,12 @@
             font-weight: bold;
             color: #ff4500;
         }
-        .full-word {
-            font-size: 24px;
-            margin-top: 10px;
-            color: #8b4513;
-        }
         .missing-letter-input {
             width: 40px;
             font-size: 36px;
             text-align: center;
-            border-bottom: 2px solid black;
-            margin-right: 10px;
             border: 2px solid black;
+            margin-right: 10px;
         }
         .correct {
             border-color: blue;
@@ -64,33 +58,7 @@
         .incorrect {
             border-color: red;
         }
-        .word-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        .letter-animation {
-            font-size: 80px;
-            color: #32CD32;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            animation: grow-shrink 1s ease-in-out;
-            display: none;
-        }
-        @keyframes grow-shrink {
-            0% {
-                transform: translate(-50%, -50%) scale(0);
-            }
-            50% {
-                transform: translate(-50%, -50%) scale(1.5);
-            }
-            100% {
-                transform: translate(-50%, -50%) scale(1);
-            }
-        }
-
+        
         /* Estilos do modal de conclusão */
         #overlay {
             position: fixed;
@@ -197,9 +165,6 @@
         };
         activityDiv.appendChild(imgElement);
 
-        const wordContainer = document.createElement('div');
-        wordContainer.classList.add('word-container');
-
         const missingWordElement = document.createElement('div');
         missingWordElement.classList.add('missing-word');
 
@@ -218,17 +183,6 @@
                         letterInputs[index + 1].focus(); 
                     }
 
-                    const animationElement = document.createElement('div');
-                    animationElement.classList.add('letter-animation');
-                    animationElement.innerText = letter.toUpperCase();
-                    activityDiv.appendChild(animationElement);
-                    animationElement.style.display = 'block';
-
-                    setTimeout(() => {
-                        animationElement.style.display = 'none';
-                        animationElement.remove();
-                    }, 1000);
-
                     const userWord = letterInputs.map(input => input.value.toUpperCase()).join('');
                     if (userWord === word.toUpperCase()) {
                         speakText(word);
@@ -237,8 +191,6 @@
                         if (completedWords === activities.length) {
                             showCompletionModal();
                         }
-                    } else {
-                        speakText(letter);
                     }
                 } else {
                     letterInput.classList.add('incorrect');
@@ -250,14 +202,12 @@
             missingWordElement.appendChild(letterInput);
         });
 
-        wordContainer.appendChild(missingWordElement);
-        activityDiv.appendChild(wordContainer);
+        activityDiv.appendChild(missingWordElement);
         activityContainer.appendChild(activityDiv);
         activities.push(word);
     }
 
     function showCompletionModal() {
-        updateProgressInDatabase();
         document.getElementById('overlay').style.display = 'block';
         document.getElementById('completion-modal').style.display = 'block';
     }
@@ -265,44 +215,6 @@
     function closeModal() {
         document.getElementById('overlay').style.display = 'none';
         document.getElementById('completion-modal').style.display = 'none';
-    }
-
-    function updateProgressInDatabase() {
-        const currentPhase = getPhaseFromURL();
-        const { level, unit } = getLevelAndUnitFromURL();
-        const userId = getCurrentUserId(); // Função para obter o ID do usuário logado
-
-        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-
-        if (currentPhase === "last") {
-            const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-            // Criar a nova unidade na mesma level
-            firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
-        } else if (currentPhase === "end") {
-            const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
-            // Criar um novo level e adicionar Unit1
-            firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
-        } else {
-            dbRef.update({ [`fase${currentPhase}`]: true });
-            const nextPhase = parseInt(currentPhase) + 1;
-            dbRef.update({ [`fase${nextPhase}`]: true });
-        }
-    }
-
-    function getPhaseFromURL() {
-        const params = new URLSearchParams(window.location.search);
-        return params.get('fase');
-    }
-
-    function getLevelAndUnitFromURL() {
-        const url = window.location.pathname;
-        const parts = url.split('/');
-        return { level: parts[1], unit: parts[2] };
-    }
-
-    function getCurrentUserId() {
-        // Lógica para obter o ID do usuário logado
-        return "exampleUserId"; // Substituir pela lógica real
     }
 
     document.addEventListener('DOMContentLoaded', loadActivities);
