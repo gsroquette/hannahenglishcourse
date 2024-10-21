@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hannah Memory Game</title>
     <style>
+        /* Estilos para o jogo de memória */
         body {
             font-family: "Times New Roman", Times, serif;
             display: flex;
@@ -233,37 +234,21 @@
         firebase.initializeApp(firebaseConfig);
 
         const gameContainer = document.getElementById('memory-game');
-        const moveCounterElement = document.getElementById('move-counter');
-        const overlay = document.getElementById('overlay');
-        const completionModal = document.getElementById('completion-modal');
         let moves = 0;
-        let firstCard = null;
-        let secondCard = null;
-        let lockBoard = false;
         let matchedPairs = 0;
         let totalPairs = 0;
+        let firstCard = null;
+        let secondCard = null;
 
         function loadCardsData(callback) {
             fetch('../data2/words.txt')
                 .then(response => response.text())
                 .then(text => {
                     const words = text.trim().split('\n');
-                    const cardsArray = [];
-
-                    words.forEach((word, index) => {
-                        const imageName = `image${index + 1}`;
-                        cardsArray.push({
-                            type: 'image',
-                            src: `../data2/imagens/imagem${index + 1}.jpeg`,
-                            pair: imageName
-                        });
-                        cardsArray.push({
-                            type: 'word',
-                            text: word.trim(),
-                            pair: imageName
-                        });
-                    });
-
+                    const cardsArray = words.flatMap((word, index) => [
+                        { type: 'image', src: `../data2/imagens/imagem${index + 1}.jpeg`, pair: index },
+                        { type: 'word', text: word.trim(), pair: index }
+                    ]);
                     totalPairs = words.length;
                     callback(cardsArray);
                 })
@@ -272,12 +257,15 @@
                 });
         }
 
-        function shuffle(array) {
-            for (let i = array.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [array[i], array[j]] = [array[j], array[i]];
-            }
-            return array;
+        function initGame(cardsArray) {
+            gameContainer.innerHTML = ''; // Limpar o container antes de adicionar novos cartões
+            cardsArray.sort(() => 0.5 - Math.random()).forEach(cardData => {
+                const cardElement = createCard(cardData);
+                gameContainer.appendChild(cardElement);
+            });
+            moves = 0;
+            matchedPairs = 0;
+            document.getElementById('move-counter').textContent = 'Moves: 0';
         }
 
         function createCard(cardData) {
@@ -290,35 +278,27 @@
 
             const cardFront = document.createElement('div');
             cardFront.classList.add('card-front');
-            const logo = document.createElement('img');
-            logo.src = 'logo.png';
-            cardFront.appendChild(logo);
-
-            const cardBack = document.createElement('div');
-            cardBack.classList.add('card-back');
 
             if (cardData.type === 'image') {
                 const img = document.createElement('img');
                 img.src = cardData.src;
-                cardBack.appendChild(img);
+                cardFront.appendChild(img);
             } else if (cardData.type === 'word') {
                 const word = document.createElement('div');
                 word.classList.add('word');
                 word.textContent = cardData.text;
-                cardBack.appendChild(word);
+                cardFront.appendChild(word);
             }
 
             cardInner.appendChild(cardFront);
-            cardInner.appendChild(cardBack);
             card.appendChild(cardInner);
-
             card.addEventListener('click', flipCard);
+
             return card;
         }
 
         function flipCard() {
-            if (lockBoard) return;
-            if (this.classList.contains('flipped')) return;
+            if (this.classList.contains('flipped') || secondCard) return;
 
             this.classList.add('flipped');
 
@@ -328,7 +308,9 @@
             }
 
             secondCard = this;
-            updateMoveCounter();
+            moves++;
+            document.getElementById('move-counter').textContent = `Moves: ${moves}`;
+
             checkForMatch();
         }
 
@@ -336,134 +318,81 @@
             const isMatch = firstCard.dataset.pair === secondCard.dataset.pair;
 
             if (isMatch) {
-                disableCards();
                 matchedPairs++;
+                firstCard = null;
+                secondCard = null;
 
                 if (matchedPairs === totalPairs) {
-                    markPhaseCompleted();
                     showCompletionModal();
+                    ensureUserIsAuthenticated(updateNextPhase);
                 }
             } else {
-                unflipCards();
+                setTimeout(() => {
+                    firstCard.classList.remove('flipped');
+                    secondCard.classList.remove('flipped');
+                    firstCard = null;
+                    secondCard = null;
+                }, 1000);
             }
         }
 
-        function disableCards() {
-            firstCard.removeEventListener('click', flipCard);
-            secondCard.removeEventListener('click', flipCard);
-            resetBoard();
+        function showCompletionModal() {
+            document.getElementById('completion-modal').style.display = 'block';
+            document.getElementById('overlay').style.display = 'block';
         }
 
-        function unflipCards() {
-            lockBoard = true;
-            setTimeout(() => {
-                firstCard.classList.remove('flipped');
-                secondCard.classList.remove('flipped');
-                resetBoard();
-            }, 1500);
+        function closeModal() {
+            document.getElementById('completion-modal').style.display = 'none';
+            document.getElementById('overlay').style.display = 'none';
         }
 
-        function resetBoard() {
-            [firstCard, secondCard] = [null, null];
-            lockBoard = false;
-        }
-
-        function updateMoveCounter() {
-            moves++;
-            moveCounterElement.textContent = `Moves: ${moves}`;
-        }
-
-        function initGame(cardsArray) {
-            gameContainer.innerHTML = ''; // Limpar o container antes de adicionar novos cartões
-            shuffle(cardsArray).forEach(cardData => {
-                const cardElement = createCard(cardData);
-                gameContainer.appendChild(cardElement);
-            });
-            adjustFontSize();
-            moves = 0;
-            matchedPairs = 0;
-            moveCounterElement.textContent = 'Moves: 0';
-        }
-
-        function restartGame() {
-            loadCardsData(initGame);
-        }
-
-        function goBack() {
-            window.history.back();
-        }
-
-        function adjustFontSize() {
-            const cards = document.querySelectorAll('.card .word');
-            cards.forEach(card => {
-                let fontSize = parseInt(window.getComputedStyle(card).fontSize);
-                while (card.scrollWidth > card.clientWidth || card.scrollHeight > card.clientHeight) {
-                    fontSize -= 1;
-                    card.style.fontSize = `${fontSize}px`;
+        function ensureUserIsAuthenticated(callback) {
+            firebase.auth().onAuthStateChanged(user => {
+                if (user) {
+                    callback(user.uid);
+                } else {
+                    console.error("Usuário não autenticado");
                 }
             });
         }
 
-        function markPhaseCompleted() {
-            const { level, unit, fase } = getProgressInfoFromURL();
-            console.log(`Concluindo fase atual: ${fase} no nível ${level}, unidade ${unit}`);
-            updateNextPhase(firebase.auth().currentUser.uid, level, unit, fase);
-        }
-
-        function showCompletionModal() {
-            overlay.style.display = 'block';
-            completionModal.style.display = 'block';
-        }
-
-        function closeModal() {
-            overlay.style.display = 'none';
-            completionModal.style.display = 'none';
-        }
-
-        function getProgressInfoFromURL() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const level = window.location.pathname.split('/')[2];
-            const unit = window.location.pathname.split('/')[3];
-            const fase = urlParams.get('fase');
-            return { level, unit, fase };
-        }
-
-        async function updateNextPhase(userId, level, unit, fase) {
+        async function updateNextPhase(userId) {
+            const currentPhase = getPhaseFromURL();
+            const { level, unit } = getLevelAndUnitFromURL();
             const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-            
+
             try {
-                if (fase === "last") {
-                    // Desbloqueia a próxima unidade
+                if (currentPhase === "last") {
                     const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
                     await dbRef.child(nextUnit).set({ fase1: true });
-                    console.log(`Nova unidade ${nextUnit} criada com fase1 liberada.`);
-                } else if (fase === "end") {
-                    // Desbloqueia o próximo nível
+                } else if (currentPhase === "end") {
                     const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
                     await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
-                    console.log(`Novo nível ${nextLevel} criado com Unit1/fase1 liberada.`);
                 } else {
-                    // Desbloqueia a próxima fase
-                    const nextPhase = parseInt(fase) + 1;
-                    await dbRef.update({ [`fase${fase}`]: true, [`fase${nextPhase}`]: true });
-                    console.log(`Fase ${nextPhase} criada e liberada.`);
+                    const nextPhase = parseInt(currentPhase) + 1;
+                    await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
                 }
             } catch (error) {
                 console.error("Erro ao atualizar o progresso da fase:", error);
             }
         }
 
-        // Autenticação e carregamento do jogo
-        firebase.auth().onAuthStateChanged(user => {
-            if (user) {
-                loadCardsData(initGame);
-            } else {
-                console.error("Redirecionando para login, usuário não autenticado!");
-                window.location.href = "/login";
-            }
-        });
+        function getPhaseFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('fase');
+        }
 
-        window.addEventListener('resize', adjustFontSize);
+        function getLevelAndUnitFromURL() {
+            const url = window.location.pathname;
+            const parts = url.split('/');
+            return { level: parts[2], unit: parts[3] };
+        }
+
+        function goBack() {
+            window.history.back();
+        }
+
+        loadCardsData(initGame);
     </script>
 </body>
 </html>
