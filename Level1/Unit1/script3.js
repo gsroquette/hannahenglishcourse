@@ -6,9 +6,9 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 8, name: "Speak", path: "../Unit1/Speak/index.html?fase=8", img: "../../imagens/botoes/speak_button.png", unlocked: false },
         { id: 9, name: "Speak2", path: "../Unit1/Speak2/index.html?fase=9", img: "../../imagens/botoes/speak_button.png", unlocked: false },
         { id: 10, name: "Speak3", path: "../Unit1/Speak3/index.html?fase=10", img: "../../imagens/botoes/speak_button.png", unlocked: false },
-        { id: 11, name: "MemoryGame", path: "../Unit1/MemoryGame/index.html?fase=8", img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
-        { id: 12, name: "MemoryGame2", path: "../Unit1/MemoryGame2/index.html?fase=9", img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
-        { id: 13, name: "MemoryGame3", path: "../Unit1/MemoryGame3/index.html?fase=10", img: "../../imagens/botoes/memorygame_button.png", unlocked: false }
+        { id: 11, name: "MemoryGame", path: "../Unit1/MemoryGame/index.html?fase=11", img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
+        { id: 12, name: "MemoryGame2", path: "../Unit1/MemoryGame2/index.html?fase=12", img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
+        { id: 13, name: "MemoryGame3", path: "../Unit1/MemoryGame3/index.html?fase=13", img: "../../imagens/botoes/memorygame_button.png", unlocked: false }
     ];
 
     const mapContainer = document.getElementById('mapContainer');
