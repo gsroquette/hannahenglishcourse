@@ -216,11 +216,24 @@
         <button onclick="closeModal()">Close</button>
     </div>
 
+    <!-- Firebase Config -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <script>
-        const gameContainer = document.getElementById('memory-game');
-        const moveCounterElement = document.getElementById('move-counter');
-        const overlay = document.getElementById('overlay');
-        const completionModal = document.getElementById('completion-modal');
+        // Configuração do Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+            authDomain: "hannahenglishcourse.firebaseapp.com",
+            projectId: "hannahenglishcourse",
+            storageBucket: "hannahenglishcourse.appspot.com",
+            messagingSenderId: "449818788486",
+            appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+            measurementId: "G-07VVJG9LRS",
+            databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+        };
+        firebase.initializeApp(firebaseConfig);
+
         let moves = 0;
         let firstCard = null;
         let secondCard = null;
@@ -254,48 +267,40 @@
                 });
         }
 
-        function shuffle(array) {
-            for (let i = array.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [array[i], array[j]] = [array[j], array[i]];
-            }
-            return array;
+        function getProgressInfoFromURL() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const level = window.location.pathname.split('/')[2];
+            const unit = window.location.pathname.split('/')[3];
+            const fase = urlParams.get('fase');
+            return { level, unit, fase };
         }
 
-        function createCard(cardData) {
-            const card = document.createElement('div');
-            card.classList.add('card');
-            card.dataset.pair = cardData.pair;
+        function updateFirebaseProgress(level, unit, fase) {
+            const user = firebase.auth().currentUser;
+            if (!user) return;
 
-            const cardInner = document.createElement('div');
-            cardInner.classList.add('card-inner');
+            const userId = user.uid;
+            const dbRef = firebase.database().ref(`/usuarios/${userId}/progresso/${level}/${unit}`);
 
-            const cardFront = document.createElement('div');
-            cardFront.classList.add('card-front');
-            const cardBack = document.createElement('div');
-            cardBack.classList.add('card-back');
-
-            const logo = document.createElement('img');
-            logo.src = 'logo.png';
-            cardFront.appendChild(logo);
-
-            if (cardData.type === 'image') {
-                const img = document.createElement('img');
-                img.src = cardData.src;
-                cardBack.appendChild(img);
-            } else if (cardData.type === 'word') {
-                const word = document.createElement('div');
-                word.classList.add('word');
-                word.textContent = cardData.text;
-                cardBack.appendChild(word);
+            // Definir lógica de fases
+            if (fase === 'last') {
+                const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+                dbRef.child(`${nextUnit}/fase1`).set(true);
+            } else if (fase === 'end') {
+                const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+                firebase.database().ref(`/usuarios/${userId}/progresso/${nextLevel}/Unit1/fase1`).set(true);
+            } else {
+                const currentFase = `fase${fase}`;
+                const nextFase = `fase${parseInt(fase) + 1}`;
+                dbRef.child(currentFase).set(true);
+                dbRef.child(nextFase).set(true);
             }
+        }
 
-            cardInner.appendChild(cardFront);
-            cardInner.appendChild(cardBack);
-            card.appendChild(cardInner);
-
-            card.addEventListener('click', flipCard);
-            return card;
+        function markPhaseCompleted() {
+            const { level, unit, fase } = getProgressInfoFromURL();
+            updateFirebaseProgress(level, unit, fase);
+            console.log("Fase concluída!");
         }
 
         function flipCard() {
@@ -386,11 +391,6 @@
             });
         }
 
-        function markPhaseCompleted() {
-            // Implementar lógica para marcar a fase como concluída (e.g., salvar no banco de dados)
-            console.log("Fase concluída!");
-        }
-
         function showCompletionModal() {
             overlay.style.display = 'block';
             completionModal.style.display = 'block';
@@ -401,7 +401,16 @@
             completionModal.style.display = 'none';
         }
 
-        loadCardsData(initGame);
+        // Autenticação e carregamento do jogo
+        firebase.auth().onAuthStateChanged(user => {
+            if (user) {
+                loadCardsData(initGame);
+            } else {
+                // Redirecionar para a página de login se não autenticado
+                window.location.href = "/login";
+            }
+        });
+
         window.addEventListener('resize', adjustFontSize);
     </script>
 </body>
