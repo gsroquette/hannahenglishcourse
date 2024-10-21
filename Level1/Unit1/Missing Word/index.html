@@ -129,6 +129,18 @@
     let activities = [];
     let completedWords = 0; // Contador de palavras concluídas
 
+    // Inicialização do Firebase
+    const firebaseConfig = {
+        apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+        authDomain: "hannahenglishcourse.firebaseapp.com",
+        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "hannahenglishcourse",
+        storageBucket: "hannahenglishcourse.appspot.com",
+        messagingSenderId: "449818788486",
+        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707"
+    };
+    firebase.initializeApp(firebaseConfig);
+
     function speakText(text) {
         const synth = window.speechSynthesis;
         const utterThis = new SpeechSynthesisUtterance(text);
@@ -175,26 +187,36 @@
             letterInput.maxLength = 1;
 
             letterInput.addEventListener('input', function() {
-                if (letterInput.value.toUpperCase() === letter.toUpperCase()) {
+                const currentLetter = letter.toUpperCase(); // Get the correct letter
+                const userInput = letterInput.value.toUpperCase(); // Get the user input
+                
+                // Check if input is correct
+                if (userInput === currentLetter) {
                     letterInput.classList.add('correct');
                     letterInput.classList.remove('incorrect');
 
+                    // Focus on next input
                     if (index < word.length - 1) {
                         letterInputs[index + 1].focus(); 
                     }
 
-                    const userWord = letterInputs.map(input => input.value.toUpperCase()).join('');
-                    if (userWord === word.toUpperCase()) {
-                        speakText(word);
-                        completedWords++;
-
-                        if (completedWords === activities.length) {
-                            showCompletionModal();
-                        }
-                    }
+                    speakText(currentLetter); // Speak the letter
                 } else {
                     letterInput.classList.add('incorrect');
                     letterInput.classList.remove('correct');
+                }
+
+                // Check if the whole word is completed
+                const userWord = letterInputs.map(input => input.value.toUpperCase()).join('');
+                if (userWord === word.toUpperCase()) {
+                    speakText(word);
+                    completedWords++;
+
+                    // Show modal and update database
+                    if (completedWords === activities.length) {
+                        showCompletionModal();
+                        updateProgressInDatabase(); // Atualiza o progresso no banco de dados
+                    }
                 }
             });
 
@@ -215,6 +237,44 @@
     function closeModal() {
         document.getElementById('overlay').style.display = 'none';
         document.getElementById('completion-modal').style.display = 'none';
+    }
+
+    function updateProgressInDatabase() {
+        const currentPhase = getPhaseFromURL();
+        const { level, unit } = getLevelAndUnitFromURL();
+        const userId = getCurrentUserId(); // Função para obter o ID do usuário logado
+
+        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+        if (currentPhase === "last") {
+            const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+            // Criar a nova unidade na mesma level
+            firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
+        } else if (currentPhase === "end") {
+            const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+            // Criar um novo level e adicionar Unit1
+            firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+        } else {
+            dbRef.update({ [`fase${currentPhase}`]: true });
+            const nextPhase = parseInt(currentPhase) + 1;
+            dbRef.update({ [`fase${nextPhase}`]: true });
+        }
+    }
+
+    function getPhaseFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('fase');
+    }
+
+    function getLevelAndUnitFromURL() {
+        const url = window.location.pathname;
+        const parts = url.split('/');
+        return { level: parts[1], unit: parts[2] };
+    }
+
+    function getCurrentUserId() {
+        // Lógica para obter o ID do usuário logado
+        return "exampleUserId"; // Substituir pela lógica real
     }
 
     document.addEventListener('DOMContentLoaded', loadActivities);
