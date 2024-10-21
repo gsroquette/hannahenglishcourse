@@ -64,15 +64,15 @@
             align-items: center;
         }
         .letter-animation {
-            font-size: 80px; /* Tamanho da letra da animação */
-            color: #32CD32; /* Cor da letra da animação */
+            font-size: 80px;
+            color: #32CD32;
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
             animation: grow-shrink 1s ease-in-out;
             display: none;
-            font-family: 'Times New Roman', Times, serif; /* Fonte da animação */
+            font-family: 'Times New Roman', Times, serif;
         }
         @keyframes grow-shrink {
             0% {
@@ -168,6 +168,7 @@
         messagingSenderId: "449818788486",
         appId: "1:449818788486:web:8a49d3f68591e6fb3f0707"
     };
+
     // Inicialização do Firebase
     firebase.initializeApp(firebaseConfig);
 
@@ -270,7 +271,7 @@
     }
 
     function showCompletionModal() {
-        updateProgressInDatabase(); // Chama a atualização do banco de dados
+        updateProgressInDatabase();
         document.getElementById('overlay').style.display = 'block';
         document.getElementById('completion-modal').style.display = 'block';
     }
@@ -283,23 +284,28 @@
     function updateProgressInDatabase() {
         const currentPhase = getPhaseFromURL();
         const { level, unit } = getLevelAndUnitFromURL();
-        const userId = getCurrentUserId(); // Função para obter o ID do usuário logado
+        
+        // Verifica se o usuário está autenticado
+        firebase.auth().onAuthStateChanged(function(user) {
+            if (user) {
+                const userId = user.uid;
+                const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
 
-        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-
-        if (currentPhase === "last") {
-            const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-            // Criar a nova unidade na mesma level
-            firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
-        } else if (currentPhase === "end") {
-            const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
-            // Criar um novo level e adicionar Unit1
-            firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
-        } else {
-            dbRef.update({ [`fase${currentPhase}`]: true });
-            const nextPhase = parseInt(currentPhase) + 1;
-            dbRef.update({ [`fase${nextPhase}`]: true });
-        }
+                if (currentPhase === "last") {
+                    const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+                    dbRef.child(nextUnit).set({ fase1: true });
+                } else if (currentPhase === "end") {
+                    const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+                    firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+                } else {
+                    dbRef.update({ [`fase${currentPhase}`]: true });
+                    const nextPhase = parseInt(currentPhase) + 1;
+                    dbRef.update({ [`fase${nextPhase}`]: true });
+                }
+            } else {
+                console.error("Usuário não autenticado");
+            }
+        });
     }
 
     function getPhaseFromURL() {
@@ -311,11 +317,6 @@
         const url = window.location.pathname;
         const parts = url.split('/');
         return { level: parts[1], unit: parts[2] };
-    }
-
-    function getCurrentUserId() {
-        // Lógica para obter o ID do usuário logado
-        return "exampleUserId"; // Substituir pela lógica real
     }
 
     document.addEventListener('DOMContentLoaded', loadActivities);
