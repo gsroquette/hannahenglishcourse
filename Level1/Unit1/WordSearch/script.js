@@ -13,15 +13,14 @@ let foundCells = [];
 const wordsList = document.getElementById('words');
 let wordsToFind = [];
 
+// Função para carregar as palavras da fase
 async function loadWords() {
     try {
-        // Caminho atualizado para buscar o arquivo words.txt na pasta data1
         const response = await fetch('../data1/words.txt');
         if (!response.ok) {
             throw new Error('Network response was not ok');
         }
         const text = await response.text();
-        console.log('Loaded words:', text);
         wordsToFind = text.split(/\r?\n/).filter(word => word.trim() !== '');
         init();
     } catch (error) {
@@ -29,6 +28,7 @@ async function loadWords() {
     }
 }
 
+// Função para criar a grade do caça-palavras
 function createWordSearchGrid() {
     grid = Array.from({ length: gridSize }, () => Array(gridSize).fill(''));
 
@@ -43,12 +43,20 @@ function createWordSearchGrid() {
     }
 }
 
+// Função para verificar se a fase está completa
+function checkCompletion() {
+    if (foundCells.length === wordsToFind.length) {
+        showCompletionModal();
+    }
+}
+
+// Função para colocar uma palavra na grade
 function placeWordInGrid(word) {
     const directions = [
         { row: 0, col: 1 }, // Horizontal
         { row: 1, col: 0 }, // Vertical
-        { row: 1, col: 1 }, // Diagonal (principal)
-        { row: 1, col: -1 } // Diagonal (secundária)
+        { row: 1, col: 1 }, // Diagonal principal
+        { row: 1, col: -1 } // Diagonal secundária
     ];
 
     const direction = directions[Math.floor(Math.random() * directions.length)];
@@ -65,6 +73,7 @@ function placeWordInGrid(word) {
     }
 }
 
+// Função para verificar se a palavra pode ser colocada na grade
 function canPlaceWord(grid, word, row, col, direction) {
     for (let i = 0; i < word.length; i++) {
         const newRow = row + i * direction.row;
@@ -77,11 +86,12 @@ function canPlaceWord(grid, word, row, col, direction) {
     return true;
 }
 
+// Função para desenhar a grade do caça-palavras
 function drawWordSearchGrid() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     ctx.font = `${cellSize * 0.6}px Arial`;
-    ctx.fillStyle = '#000'; // Cor preta para as letras
+    ctx.fillStyle = '#000';
 
     for (let row = 0; row < gridSize; row++) {
         for (let col = 0; col < gridSize; col++) {
@@ -96,6 +106,7 @@ function drawWordSearchGrid() {
     });
 }
 
+// Função para destacar as células selecionadas
 function drawSelectedCells() {
     ctx.fillStyle = 'rgba(0, 0, 255, 0.3)';
     selectedCells.forEach(({ row, col }) => {
@@ -103,6 +114,7 @@ function drawSelectedCells() {
     });
 }
 
+// Função para exibir a lista de palavras a serem encontradas
 function displayWordsList() {
     wordsList.innerHTML = '';
     wordsToFind.forEach(word => {
@@ -113,6 +125,7 @@ function displayWordsList() {
     });
 }
 
+// Função para marcar a palavra encontrada na lista
 function markWordInList(word) {
     const listItems = wordsList.getElementsByTagName('li');
     for (let item of listItems) {
@@ -123,6 +136,7 @@ function markWordInList(word) {
     }
 }
 
+// Função para lidar com o clique no canvas
 function handleCanvasClick(event) {
     const rect = canvas.getBoundingClientRect();
     const x = (event.clientX - rect.left) * (canvas.width / rect.width);
@@ -156,25 +170,29 @@ function handleCanvasClick(event) {
     }
 }
 
+// Função para verificar se uma palavra foi encontrada
 function checkWord() {
     const selectedCellsSorted = [...selectedCells].sort((a, b) => a.row - b.row || a.col - b.col);
     const selectedWord = selectedCellsSorted.map(cell => grid[cell.row][cell.col]).join('');
 
     if (wordsToFind.includes(selectedWord)) {
         markWordInList(selectedWord);
-        foundCells = foundCells.concat(selectedCells);
+        foundCells.push(...selectedCells);
         selectedCells = [];
         drawWordSearchGrid();
         drawSelectedCells();
+        checkCompletion(); // Verifica se a fase está completa
     }
 }
 
+// Função para reiniciar o jogo
 function resetGame() {
     selectedCells = [];
     foundCells = [];
     init();
 }
 
+// Função para inicializar o jogo
 function init() {
     createWordSearchGrid();
     drawWordSearchGrid();
@@ -182,6 +200,6 @@ function init() {
     canvas.addEventListener('click', handleCanvasClick);
 }
 
+// Inicializa o jogo e carrega as palavras
 document.getElementById('reset-button').addEventListener('click', resetGame);
-
 loadWords();
