@@ -125,11 +125,13 @@
     <button onclick="closeModal()">Close</button>
 </div>
 
-<script>
-    let activities = [];
-    let completedWords = 0; // Contador de palavras concluídas
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
-    // Inicialização do Firebase
+<script>
+    // Configuração do Firebase
     const firebaseConfig = {
         apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
         authDomain: "hannahenglishcourse.firebaseapp.com",
@@ -139,7 +141,11 @@
         messagingSenderId: "449818788486",
         appId: "1:449818788486:web:8a49d3f68591e6fb3f0707"
     };
+    // Inicialização do Firebase
     firebase.initializeApp(firebaseConfig);
+
+    let activities = [];
+    let completedWords = 0; // Contador de palavras concluídas
 
     function speakText(text) {
         const synth = window.speechSynthesis;
@@ -177,6 +183,9 @@
         };
         activityDiv.appendChild(imgElement);
 
+        const wordContainer = document.createElement('div');
+        wordContainer.classList.add('word-container');
+
         const missingWordElement = document.createElement('div');
         missingWordElement.classList.add('missing-word');
 
@@ -187,36 +196,40 @@
             letterInput.maxLength = 1;
 
             letterInput.addEventListener('input', function() {
-                const currentLetter = letter.toUpperCase(); // Get the correct letter
-                const userInput = letterInput.value.toUpperCase(); // Get the user input
-                
-                // Check if input is correct
-                if (userInput === currentLetter) {
+                if (letterInput.value.toUpperCase() === letter.toUpperCase()) {
                     letterInput.classList.add('correct');
                     letterInput.classList.remove('incorrect');
 
-                    // Focus on next input
                     if (index < word.length - 1) {
                         letterInputs[index + 1].focus(); 
                     }
 
-                    speakText(currentLetter); // Speak the letter
+                    const animationElement = document.createElement('div');
+                    animationElement.classList.add('letter-animation');
+                    animationElement.innerText = letter.toUpperCase();
+                    activityDiv.appendChild(animationElement);
+                    animationElement.style.display = 'block';
+
+                    setTimeout(() => {
+                        animationElement.style.display = 'none';
+                        animationElement.remove();
+                    }, 1000);
+
+                    const userWord = letterInputs.map(input => input.value.toUpperCase()).join('');
+                    if (userWord === word.toUpperCase()) {
+                        speakText(word);
+                        completedWords++;
+
+                        if (completedWords === activities.length) {
+                            updateProgressInDatabase();
+                            showCompletionModal();
+                        }
+                    } else {
+                        speakText(letter);
+                    }
                 } else {
                     letterInput.classList.add('incorrect');
                     letterInput.classList.remove('correct');
-                }
-
-                // Check if the whole word is completed
-                const userWord = letterInputs.map(input => input.value.toUpperCase()).join('');
-                if (userWord === word.toUpperCase()) {
-                    speakText(word);
-                    completedWords++;
-
-                    // Show modal and update database
-                    if (completedWords === activities.length) {
-                        showCompletionModal();
-                        updateProgressInDatabase(); // Update database when all words are completed
-                    }
                 }
             });
 
@@ -224,7 +237,8 @@
             missingWordElement.appendChild(letterInput);
         });
 
-        activityDiv.appendChild(missingWordElement);
+        wordContainer.appendChild(missingWordElement);
+        activityDiv.appendChild(wordContainer);
         activityContainer.appendChild(activityDiv);
         activities.push(word);
     }
@@ -242,14 +256,16 @@
     function updateProgressInDatabase() {
         const currentPhase = getPhaseFromURL();
         const { level, unit } = getLevelAndUnitFromURL();
-        const userId = getCurrentUserId(); // Assume this function gets the current user ID
+        const userId = getCurrentUserId(); // Função para obter o ID do usuário logado
         const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
 
         if (currentPhase === "last") {
             const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+            // Criar a nova unidade na mesma level
             dbRef.child(nextUnit).set({ fase1: true });
         } else if (currentPhase === "end") {
             const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+            // Criar um novo level e adicionar Unit1
             firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
         } else {
             dbRef.update({ [`fase${currentPhase}`]: true });
