@@ -45,9 +45,23 @@ function createWordSearchGrid() {
 
 // Função para verificar se a fase está completa
 function checkCompletion() {
-    if (foundCells.length === wordsToFind.length) {
+    // Verifica se todas as palavras foram encontradas
+    const foundWords = [...new Set(foundCells.map(cell => cell.word))];
+    if (foundWords.length === wordsToFind.length) {
         showCompletionModal();
     }
+}
+
+// Função para exibir o modal de conclusão
+function showCompletionModal() {
+    document.getElementById('overlay').style.display = 'block';
+    document.getElementById('completion-modal').style.display = 'block';
+}
+
+// Função para fechar o modal de conclusão
+function closeModal() {
+    document.getElementById('overlay').style.display = 'none';
+    document.getElementById('completion-modal').style.display = 'none';
 }
 
 // Função para colocar uma palavra na grade
@@ -177,7 +191,7 @@ function checkWord() {
 
     if (wordsToFind.includes(selectedWord)) {
         markWordInList(selectedWord);
-        foundCells.push(...selectedCells);
+        foundCells.push(...selectedCells.map(cell => ({ ...cell, word: selectedWord })));
         selectedCells = [];
         drawWordSearchGrid();
         drawSelectedCells();
