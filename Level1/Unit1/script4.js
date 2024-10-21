@@ -6,8 +6,8 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 14, name: "WordSearch", path: "../Unit1/WordSearch/index.html?fase=14", img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
         { id: 15, name: "WordSearch2", path: "../Unit1/WordSearch2/index.html?fase=15", img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
         { id: 16, name: "WordSearch3", path: "../Unit1/WordSearch3/index.html?fase=16", img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
-        { id: 17, name: "Missing Word", path: "../Unit1/Missing Word/index.html?fase=1", img: "../../imagens/botoes/missingword_button.png", unlocked: false },
-        { id: 18, name: "Missing Word", path: "../Unit1/Missing Word/index.html?fase=18", img: "../../imagens/botoes/missingword_button.png", unlocked: false }
+        { id: 17, name: "Missing Word", path: "../Unit1/Missing Word/index.html?fase=17", img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
+        { id: 18, name: "Mixed Letters FIXO", path: "../Unit1/Mixed Letters FIXO/index.html?fase=18", img: "../../imagens/botoes/mixed_letters FIXO_button.png", unlocked: false }
     ];
 
     const mapContainer = document.getElementById('mapContainer');
