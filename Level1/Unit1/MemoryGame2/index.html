@@ -408,6 +408,7 @@
 
         function markPhaseCompleted() {
             const { level, unit, fase } = getProgressInfoFromURL();
+            console.log(`Concluindo fase atual: ${fase} no nível ${level}, unidade ${unit}`);
             updateFirebaseProgress(level, unit, fase);
             console.log("Fase concluída!");
         }
@@ -440,15 +441,35 @@
             if (!isNaN(fase)) {
                 const currentFase = `fase${fase}`;
                 const nextFase = `fase${parseInt(fase) + 1}`;
-                dbRef.child(currentFase).set(true).then(() => {
-                    dbRef.child(nextFase).set(true); // Cria e libera a fase seguinte
-                });
+                dbRef.child(currentFase).set(true)
+                    .then(() => {
+                        console.log(`Fase ${fase} marcada como concluída.`);
+                        return dbRef.child(nextFase).set(true); // Cria e libera a próxima fase
+                    })
+                    .then(() => {
+                        console.log(`Fase ${nextFase} criada e liberada.`);
+                    })
+                    .catch(error => {
+                        console.error("Erro ao atualizar o progresso:", error);
+                    });
             } else if (fase === 'last') {
                 const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-                dbRef.child(`${nextUnit}/fase1`).set(true);
+                dbRef.child(`${nextUnit}/fase1`).set(true)
+                    .then(() => {
+                        console.log(`Nova unidade ${nextUnit} criada com fase1 liberada.`);
+                    })
+                    .catch(error => {
+                        console.error("Erro ao criar nova unidade:", error);
+                    });
             } else if (fase === 'end') {
                 const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
-                firebase.database().ref(`/usuarios/${userId}/progresso/${nextLevel}/Unit1/fase1`).set(true);
+                firebase.database().ref(`/usuarios/${userId}/progresso/${nextLevel}/Unit1/fase1`).set(true)
+                    .then(() => {
+                        console.log(`Novo nível ${nextLevel} criado com Unit1/fase1 liberada.`);
+                    })
+                    .catch(error => {
+                        console.error("Erro ao criar novo nível:", error);
+                    });
             }
         }
 
