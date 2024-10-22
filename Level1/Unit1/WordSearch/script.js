@@ -4,8 +4,6 @@ const ctx = canvas.getContext('2d');
 
 // Variáveis globais
 let grid = [];
-let selectedCells = [];
-let foundCells = [];
 let wordsToFind = [];
 
 // Configurações do canvas
@@ -30,10 +28,13 @@ async function loadWords() {
 
 // Função para criar a grade do caça-palavras
 function createWordSearchGrid() {
+    // Inicializa a grade vazia
     grid = Array.from({ length: gridSize }, () => Array(gridSize).fill(''));
 
+    // Coloca cada palavra na grade
     wordsToFind.forEach(word => placeWordInGrid(word));
 
+    // Preenche as células vazias com letras aleatórias
     for (let row = 0; row < gridSize; row++) {
         for (let col = 0; col < gridSize; col++) {
             if (grid[row][col] === '') {
@@ -46,10 +47,10 @@ function createWordSearchGrid() {
 // Função para colocar uma palavra na grade
 function placeWordInGrid(word) {
     const directions = [
-        { row: 0, col: 1 }, // Horizontal
-        { row: 1, col: 0 }, // Vertical
-        { row: 1, col: 1 }, // Diagonal principal
-        { row: 1, col: -1 } // Diagonal secundária
+        { row: 0, col: 1 },  // Horizontal
+        { row: 1, col: 0 },  // Vertical
+        { row: 1, col: 1 },  // Diagonal principal
+        { row: 1, col: -1 }  // Diagonal secundária
     ];
 
     let placed = false;
@@ -104,9 +105,20 @@ function init() {
     createWordSearchGrid();
     drawWordSearchGrid();
     displayWordsList();
-    canvas.addEventListener('click', handleCanvasClick);
+}
+
+// Função para exibir a lista de palavras na tela
+function displayWordsList() {
+    const wordsListElement = document.getElementById('words');
+    wordsListElement.innerHTML = ''; // Limpa a lista antes de adicionar novas palavras
+
+    wordsToFind.forEach(word => {
+        const li = document.createElement('li');
+        li.textContent = word;
+        wordsListElement.appendChild(li);
+    });
 }
 
 // Inicializa o jogo e carrega as palavras
-document.getElementById('reset-button').addEventListener('click', resetGame);
+document.getElementById('reset-button').addEventListener('click', init);
 document.addEventListener('DOMContentLoaded', loadWords);
