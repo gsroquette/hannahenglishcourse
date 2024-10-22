@@ -2,11 +2,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const database = firebase.database();
     const auth = firebase.auth();
 
-    // Configurar persistência
-    auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
-        .then(() => console.log("Persistência de autenticação definida para LOCAL."))
-        .catch(error => console.error("Erro ao definir a persistência:", error.message));
-
     const activities = [
         { id: 1, name: "StoryCards", path: "../Unit1/StoryCards/index.html?fase=1", img: "../../imagens/botoes/storycards_button.png", unlocked: false },
         { id: 2, name: "Flashcards", path: "../Unit1/Flashcards/index.html?fase=2", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
@@ -20,105 +15,47 @@ document.addEventListener('DOMContentLoaded', function() {
     let player;
     let lastUnlockedIndex = -1;
 
-    // Verificar autenticação
-    auth.onAuthStateChanged(function(user) {
+    auth.onAuthStateChanged(user => {
         if (user) {
-            console.log("Usuário autenticado:", user.uid);
-            atualizarQuadroBranco(user);
-            loadUserProgress(user.uid); // Carregar progresso do usuário
+            const userId = user.uid;
+            console.log(`Usuário autenticado: ${userId}`);
+            database.ref(`/usuarios/${userId}/role`).once('value').then((snapshot) => {
+                const role = snapshot.val();
+                if (role === 'professor' || role === 'proprietario') {
+                    // Libera todas as fases para professor ou proprietário
+                    activities.forEach(activity => activity.unlocked = true);
+                    lastUnlockedIndex = activities.length - 1;  // Marca todas as fases como desbloqueadas
+                    initializeMap();
+
+                    // Busca o avatar no banco de dados
+                    const avatarPath = `/usuarios/${userId}/avatar`;
+                    database.ref(avatarPath).once('value').then((avatarSnapshot) => {
+                        const avatarFileName = avatarSnapshot.val();
+                        const avatarImgPath = avatarFileName ? `../../imagens/${avatarFileName}` : '../../imagens/bonequinho.png';
+                        createPlayer(avatarImgPath, true); // Define para começar na primeira fase
+                    }).catch(() => {
+                        createPlayer('../../imagens/bonequinho.png', true); // Usa bonequinho se houver erro
+                    });
+                } else if (role === 'aluno') {
+                    // Carrega progresso para aluno
+                    loadUserProgress(userId);
+                } else {
+                    console.error("Role não reconhecido!");
+                }
+            });
         } else {
-            console.log("Usuário não autenticado.");
-            exibirLinkDeLogin();
+            console.error("Usuário não autenticado!");
         }
     });
 
-    // Atualiza o quadro branco
-    function atualizarQuadroBranco(user) {
-        const userRef = database.ref('usuarios/' + user.uid);
-        userRef.once('value')
-            .then((snapshot) => {
-                const userData = snapshot.val();
-                if (!userData) {
-                    exibirLinkDeLogin();
-                    return;
-                }
-
-                const userName = userData.nome || user.email;
-                const userAvatar = userData.avatar ? `imagens/${userData.avatar}` : 'imagens/bonecologin1.png';
-
-                // Atualiza o quadro branco
-                loginLink.innerHTML = `<img src="${userAvatar}" alt="User Icon" class="user-icon"><p class="user-name">${userName}</p>`;
-                loginLink.removeAttribute('href'); 
-                userDropdown.style.display = 'block';
-
-                // Define o dashboard
-                let dashboardLink = '';
-                if (userData.role === 'proprietario') {
-                    dashboardLink = '<a href="painel_proprietario.html" class="dashboard-link">OWNER DASHBOARD</a>';
-                } else if (userData.role === 'professor') {
-                    dashboardLink = '<a href="painel_professor.html" class="dashboard-link">TEACHER DASHBOARD</a>';
-                } else if (userData.role === 'aluno') {
-                    dashboardLink = '<a href="painel_aluno.html" class="dashboard-link">STUDENT DASHBOARD</a>';
-                }
-
-                userDropdown.innerHTML = `${dashboardLink}<a href="#" id="logout">LEAVE</a>`;
-                console.log("Quadro branco atualizado com o usuário:", userName);
-            })
-            .catch((error) => {
-                console.error("Erro ao acessar os dados do usuário:", error.message);
-                exibirLinkDeLogin();
-            });
-    }
-
-    // Exibir link de login
-    function exibirLinkDeLogin() {
-        loginLink.innerHTML = 'Login';
-        loginLink.setAttribute('href', 'Formulario/login.html');
-        userDropdown.style.display = 'none';
-    }
-
-    // Alternar dropdown ao clicar
-    document.getElementById("loginContainer").addEventListener("click", function(event) {
-        const user = auth.currentUser;
-        if (!user) return;
-
-        event.preventDefault();
-        const dropdown = document.getElementById("userDropdown");
-        dropdown.style.display = (dropdown.style.display === 'none' || dropdown.style.display === '') ? 'block' : 'none';
-        console.log("Dropdown exibido:", dropdown.style.display);
-    });
-
-    // Fecha o dropdown ao clicar fora dele
-    window.addEventListener("click", function(event) {
-        const dropdown = document.getElementById("userDropdown");
-        const loginContainer = document.getElementById("loginContainer");
-        if (!loginContainer.contains(event.target)) {
-            dropdown.style.display = 'none';
-            console.log("Dropdown oculto.");
-        }
-    });
-
-    // Logout
-    document.addEventListener("click", function(event) {
-        if (event.target.id === "logout") {
-            auth.signOut().then(() => {
-                console.log("Usuário deslogado");
-                location.reload();
-            }).catch((error) => {
-                console.error("Erro ao deslogar:", error.message);
-            });
-        }
-    });
-
-    // Carregar progresso do usuário
     function loadUserProgress(userId) {
-        console.log("Carregando progresso do usuário:", userId);
-
         const urlPathParts = window.location.pathname.split('/');
         const level = urlPathParts[urlPathParts.length - 3];
         const unit = urlPathParts[urlPathParts.length - 2];
 
         const progressPath = `/usuarios/${userId}/progresso/${level}/${unit}`;
+        const avatarPath = `/usuarios/${userId}/avatar`;
+
         database.ref(progressPath).once('value')
             .then((snapshot) => {
                 const progress = snapshot.val();
@@ -126,9 +63,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     activities.forEach((activity, index) => {
                         if (progress[`fase${activity.id}`] === true) {
                             activity.unlocked = true;
-                            lastUnlockedIndex = index;
+                            lastUnlockedIndex = index;  // Atualiza com o índice da última fase desbloqueada
                         } else {
-                            activity.unlocked = false;
+                            activity.unlocked = false;  // Garante que a fase permaneça bloqueada se não estiver no progresso
                         }
                     });
                 } else {
@@ -136,27 +73,35 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 initializeMap();
+
+                database.ref(avatarPath).once('value').then((avatarSnapshot) => {
+                    const avatarFileName = avatarSnapshot.val();
+                    const avatarImgPath = avatarFileName ? `../../imagens/${avatarFileName}` : '../../imagens/bonequinho.png';
+                    createPlayer(avatarImgPath); // Para aluno, posiciona o bonequinho na fase desbloqueada
+                }).catch(() => {
+                    createPlayer(); // Se erro, usar avatar padrão
+                });
             })
             .catch((error) => {
                 console.error("Erro ao carregar o progresso do usuário:", error);
                 initializeMap();
+                createPlayer();
             });
     }
 
-    // Criar jogador no mapa
     function createPlayer(avatarPath = '../../imagens/bonequinho.png', startAtFirstPhase = false) {
         player = document.createElement('img');
         player.src = avatarPath;
         player.classList.add('player');
         mapContainer.appendChild(player);
 
+        // Determina a fase para posicionar o bonequinho
         const initialPhaseIndex = startAtFirstPhase ? 0 : (lastUnlockedIndex > 0 ? lastUnlockedIndex - 1 : 0);
-        moveToPhase(initialPhaseIndex);
+        moveToPhase(initialPhaseIndex);  // Move para a primeira fase ou uma antes da última desbloqueada
     }
 
-    // Inicializar mapa
     function initializeMap() {
-        console.log("Inicializando mapa...");
+        // Rola para o topo antes de desenhar as linhas
         window.scrollTo(0, 0);
 
         activities.forEach((activity, index) => {
@@ -184,6 +129,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 phaseDiv.classList.add('locked');
                 const lockIcon = document.createElement('img');
                 lockIcon.src = '../../imagens/lock_icon_resized.png';
+                lockIcon.classList.add('lock-icon');
                 phaseDiv.appendChild(lockIcon);
             }
 
@@ -196,14 +142,30 @@ document.addEventListener('DOMContentLoaded', function() {
 
         drawLines();
 
+        // Aplica a animação de desbloqueio na última fase desbloqueada
         if (lastUnlockedIndex >= 0) {
             const lastUnlockedPhase = document.querySelectorAll('.phase')[lastUnlockedIndex];
             animateUnlock(lastUnlockedPhase);
+
+            // Rola para a fase desbloqueada após desenhar as linhas
             scrollToPhase(lastUnlockedIndex);
         }
     }
 
-    // Rolar jogador para a fase
+    function animateUnlock(phaseDiv) {
+        const unlockGif = document.createElement('img');
+        unlockGif.src = '../../imagens/cadeado.gif';
+        unlockGif.classList.add('unlock-gif');
+        phaseDiv.appendChild(unlockGif);
+
+        const unlockSound = new Audio('../../imagens/unlock-padlock.mp3');
+        unlockSound.play(); // Toca o som de desbloqueio
+
+        setTimeout(() => {
+            unlockGif.remove();
+        }, 3000);
+    }
+
     function moveToPhase(index, path = null) {
         const phase = document.querySelectorAll('.phase')[index];
         const coords = phase.getBoundingClientRect();
@@ -219,9 +181,16 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Desenhar linhas entre fases
+    function scrollToPhase(index) {
+        const phase = document.querySelectorAll('.phase')[index];
+        const coords = phase.getBoundingClientRect();
+        window.scrollTo({
+            top: coords.top + window.scrollY - window.innerHeight / 2,
+            behavior: 'smooth'
+        });
+    }
+
     function drawLines() {
-        console.log("Desenhando linhas entre fases...");
         svgContainer.innerHTML = '';
         const phases = document.querySelectorAll('.phase');
         for (let i = 0; i < activities.length - 1; i++) {
@@ -244,30 +213,5 @@ document.addEventListener('DOMContentLoaded', function() {
             path.setAttribute('class', `path path-blue`);
             svgContainer.appendChild(path);
         }
-    }
-
-    // Animar desbloqueio
-    function animateUnlock(phaseDiv) {
-        const unlockGif = document.createElement('img');
-        unlockGif.src = '../../imagens/cadeado.gif';
-        unlockGif.classList.add('unlock-gif');
-        phaseDiv.appendChild(unlockGif);
-
-        const unlockSound = new Audio('../../imagens/unlock-padlock.mp3');
-        unlockSound.play();
-
-        setTimeout(() => {
-            unlockGif.remove();
-        }, 3000);
-    }
-
-    // Rolar para a fase
-    function scrollToPhase(index) {
-        const phase = document.querySelectorAll('.phase')[index];
-        const coords = phase.getBoundingClientRect();
-        window.scrollTo({
-            top: coords.top + window.scrollY - window.innerHeight / 2,
-            behavior: 'smooth'
-        });
     }
 });
