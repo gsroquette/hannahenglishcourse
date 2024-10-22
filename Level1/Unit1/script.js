@@ -20,15 +20,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const userId = user.uid;
             console.log(`Usuário autenticado: ${userId}`);
 
-            // Obtendo o token do usuário para verificar o role
+            // Obtendo o token para verificar o role do usuário
             user.getIdTokenResult().then((idTokenResult) => {
                 const userRole = idTokenResult.claims.role || '';
-                console.log(`Role do usuário: ${userRole}`); // Log para verificar o role
+                console.log(`Role do usuário: ${userRole}`);
 
                 // Verifica se o usuário é "proprietário" ou "professor"
                 if (userRole.toLowerCase() === 'proprietario' || userRole.toLowerCase() === 'professor') {
                     console.log("Usuário é proprietário ou professor. Liberando todas as fases.");
-                    
+
                     // Libera todas as fases
                     activities.forEach(activity => {
                         activity.unlocked = true;
@@ -73,25 +73,34 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.error("Nenhum progresso encontrado para este nível e unidade.");
                 }
 
-                initializeMap(); // Inicializa o mapa
+                initializeMap();
 
                 database.ref(avatarPath).once('value').then((avatarSnapshot) => {
                     const avatarFileName = avatarSnapshot.val();
                     const avatarImgPath = `../../imagens/${avatarFileName}`;
-                    createPlayer(avatarImgPath); // Cria o jogador com o avatar
+                    createPlayer(avatarImgPath);
                 }).catch(() => {
-                    createPlayer(); // Cria o jogador com avatar padrão
+                    createPlayer(); // Se erro, usar avatar padrão
                 });
             })
             .catch((error) => {
                 console.error("Erro ao carregar o progresso do usuário:", error);
-                initializeMap(); // Inicializa o mapa em caso de erro
-                createPlayer(); // Cria o jogador
+                initializeMap();
+                createPlayer();
             });
     }
 
+    function createPlayer(avatarPath = '../../imagens/bonequinho.png') {
+        player = document.createElement('img');
+        player.src = avatarPath;
+        player.classList.add('player');
+        mapContainer.appendChild(player);
+
+        const initialPhaseIndex = lastUnlockedIndex > 0 ? lastUnlockedIndex - 1 : 0;
+        moveToPhase(initialPhaseIndex);
+    }
+
     function initializeMap() {
-        console.log("Inicializando o mapa..."); // Log para depuração
         window.scrollTo(0, 0);
 
         activities.forEach((activity, index) => {
@@ -139,5 +148,5 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Outras funções como createPlayer, moveToPhase, e drawLines continuam inalteradas
+    // Outras funções (animateUnlock, moveToPhase, scrollToPhase, drawLines) permanecem inalteradas
 });
