@@ -4,7 +4,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const activities = [
         { id: 6, name: "Grammar", path: "../Unit1/Grammar/index.html?fase=6", img: "../../imagens/botoes/grammar_button.png", unlocked: false },
-        { id: 7, name: "Fill in the Blanks", path: "../Unit1/Fill in the Blanks/index.html?fase=7", img: "../../imagens/botoes/fillintheblanks_button.png", unlocked: false }     
+        { id: 7, name: "Fill in the Blanks", path: "../Unit1/Fill in the Blanks/index.html?fase=7", img: "../../imagens/botoes/fillintheblanks_button.png", unlocked: false },
+        { id: 8, name: "WordSearch", path: "../Unit1/WordSearch/index.html?fase=8", img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },     
     ];
 
     const mapContainer = document.getElementById('mapContainer');
