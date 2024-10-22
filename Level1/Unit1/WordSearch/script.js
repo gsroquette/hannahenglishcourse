@@ -130,7 +130,8 @@ function continueSelection(event) {
 function endSelection() {
     if (isSelecting) {
         isSelecting = false;
-        checkSelectedWord(); // Verifica a palavra selecionada
+        const selectedWord = selectedCells.map(cell => grid[cell.row][cell.col]).join('');
+        checkSelectedWord(selectedWord); // Verifica a palavra selecionada
         selectedCells = [];  // Limpa a seleção
     }
 }
@@ -163,15 +164,25 @@ function highlightCell(cell, color) {
 }
 
 // Função para verificar se a palavra selecionada está correta
-function checkSelectedWord() {
-    const selectedWord = selectedCells.map(cell => grid[cell.row][cell.col]).join('');
+function checkSelectedWord(selectedWord) {
+    // Ignora a seleção se não houver células selecionadas
+    if (!selectedWord || selectedWord.length === 0) return;
+
+    // Verifica se a palavra está na lista de palavras
     if (wordsToFind.includes(selectedWord)) {
         // Destaque final para palavra encontrada
         selectedCells.forEach(cell => highlightCell(cell, 'rgba(0, 255, 0, 0.3)')); // Destaque em verde
+        removeFoundWord(selectedWord); // Remove a palavra encontrada da lista
     } else {
         // Limpa a seleção se a palavra estiver incorreta
         selectedCells.forEach(cell => highlightCell(cell, 'rgba(255, 0, 0, 0.3)')); // Destaque em vermelho
     }
+}
+
+// Função para remover a palavra encontrada da lista
+function removeFoundWord(word) {
+    wordsToFind = wordsToFind.filter(w => w !== word);
+    displayWordsList();
 }
 
 // Função para inicializar o jogo
