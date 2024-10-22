@@ -1,61 +1,85 @@
-const gridSize = 15;
-const canvas = document.getElementById('word-search-canvas');
-const ctx = canvas.getContext('2d');
+// Variáveis globais
+let wordSearchCanvas, ctx, grid, wordsToFind, foundCells = [];
 
-// Calcula o tamanho das células dinamicamente com base no tamanho do canvas
-const cellSize = Math.min(canvas.clientWidth / gridSize, 30);
-canvas.width = cellSize * gridSize;
-canvas.height = cellSize * gridSize;
+// Inicializa o jogo
+function initializeGame() {
+    wordSearchCanvas = document.getElementById('word-search-canvas');
+    ctx = wordSearchCanvas.getContext('2d');
+    loadWords();
+}
 
-let grid = [];
-let selectedCells = [];
-let foundCells = [];
-const wordsList = document.getElementById('words');
-let wordsToFind = [];
+// Carrega as palavras do jogo
+function loadWords() {
+    wordsToFind = ["JESUS", "BIBLE", "LOVE", "FAITH", "HOPE", "GRACE"]; // Exemplo de palavras
+    renderGrid();
+    renderWordList();
+}
 
-// Função para carregar as palavras da fase
-async function loadWords() {
-    try {
-        const response = await fetch('../data1/words.txt');
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
+// Renderiza a grade do caça-palavras
+function renderGrid() {
+    grid = createGrid(10, 10); // Exemplo de grade 10x10
+    drawGrid();
+}
+
+// Cria a grade do caça-palavras
+function createGrid(rows, cols) {
+    const grid = [];
+    for (let i = 0; i < rows; i++) {
+        grid[i] = [];
+        for (let j = 0; j < cols; j++) {
+            grid[i][j] = ''; // Preenche a grade inicialmente vazia
         }
-        const text = await response.text();
-        wordsToFind = text.split(/\r?\n/).filter(word => word.trim() !== '');
-        init();
-    } catch (error) {
-        console.error('Error loading words:', error);
+    }
+    return grid;
+}
+
+// Desenha a grade do caça-palavras
+function drawGrid() {
+    const cellSize = wordSearchCanvas.width / grid.length;
+    for (let i = 0; i < grid.length; i++) {
+        for (let j = 0; j < grid[i].length; j++) {
+            ctx.strokeStyle = "#4a90e2";
+            ctx.strokeRect(j * cellSize, i * cellSize, cellSize, cellSize);
+            ctx.fillStyle = "#000";
+            ctx.font = `${cellSize / 2}px Arial`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(grid[i][j], j * cellSize + cellSize / 2, i * cellSize + cellSize / 2);
+        }
     }
 }
 
-// Função para criar a grade do caça-palavras
-function createWordSearchGrid() {
-    grid = Array.from({ length: gridSize }, () => Array(gridSize).fill(''));
-
-    wordsToFind.forEach(word => placeWordInGrid(word));
-
-    for (let row = 0; row < gridSize; row++) {
-        for (let col = 0; col < gridSize; col++) {
-            if (grid[row][col] === '') {
-                grid[row][col] = String.fromCharCode(65 + Math.floor(Math.random() * 26));
-            }
-        }
-    }
+// Renderiza a lista de palavras a serem encontradas
+function renderWordList() {
+    const wordsList = document.getElementById('words');
+    wordsList.innerHTML = '';
+    wordsToFind.forEach(word => {
+        const listItem = document.createElement('li');
+        listItem.textContent = word;
+        wordsList.appendChild(listItem);
+    });
 }
 
 // Função para verificar se a fase está completa
 function checkCompletion() {
-    // Verifica se todas as palavras foram encontradas
     const foundWords = [...new Set(foundCells.map(cell => cell.word))];
     if (foundWords.length === wordsToFind.length) {
         showCompletionModal();
     }
 }
 
+// Função para resetar o jogo
+function resetGame() {
+    foundCells = [];
+    renderGrid();
+    renderWordList();
+}
+
 // Função para exibir o modal de conclusão
 function showCompletionModal() {
     document.getElementById('overlay').style.display = 'block';
     document.getElementById('completion-modal').style.display = 'block';
+    ensureUserIsAuthenticated(updateNextPhase); // Atualiza o progresso ao concluir a fase
 }
 
 // Função para fechar o modal de conclusão
@@ -64,156 +88,53 @@ function closeModal() {
     document.getElementById('completion-modal').style.display = 'none';
 }
 
-// Função para colocar uma palavra na grade
-function placeWordInGrid(word) {
-    const directions = [
-        { row: 0, col: 1 }, // Horizontal
-        { row: 1, col: 0 }, // Vertical
-        { row: 1, col: 1 }, // Diagonal principal
-        { row: 1, col: -1 } // Diagonal secundária
-    ];
-
-    const direction = directions[Math.floor(Math.random() * directions.length)];
-
-    let row, col;
-
-    do {
-        row = Math.floor(Math.random() * gridSize);
-        col = Math.floor(Math.random() * gridSize);
-    } while (!canPlaceWord(grid, word, row, col, direction));
-
-    for (let i = 0; i < word.length; i++) {
-        grid[row + i * direction.row][col + i * direction.col] = word[i];
-    }
+// Função para capturar fase, level e unit do URL
+function getPhaseFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('fase');
 }
 
-// Função para verificar se a palavra pode ser colocada na grade
-function canPlaceWord(grid, word, row, col, direction) {
-    for (let i = 0; i < word.length; i++) {
-        const newRow = row + i * direction.row;
-        const newCol = col + i * direction.col;
-        if (newRow < 0 || newRow >= gridSize || newCol < 0 || newCol >= gridSize ||
-            (grid[newRow][newCol] !== '' && grid[newRow][newCol] !== word[i])) {
-            return false;
-        }
-    }
-    return true;
+function getLevelAndUnitFromURL() {
+    const url = window.location.pathname;
+    const parts = url.split('/');
+    const level = parts[1];
+    const unit = parts[2];
+    return { level, unit };
 }
 
-// Função para desenhar a grade do caça-palavras
-function drawWordSearchGrid() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    ctx.font = `${cellSize * 0.6}px Arial`;
-    ctx.fillStyle = '#000';
-
-    for (let row = 0; row < gridSize; row++) {
-        for (let col = 0; col < gridSize; col++) {
-            ctx.strokeRect(col * cellSize, row * cellSize, cellSize, cellSize);
-            ctx.fillText(grid[row][col], col * cellSize + cellSize / 4, row * cellSize + cellSize / 1.5);
-        }
-    }
-
-    ctx.fillStyle = 'rgba(0, 255, 0, 0.3)';
-    foundCells.forEach(({ row, col }) => {
-        ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
-    });
-}
-
-// Função para destacar as células selecionadas
-function drawSelectedCells() {
-    ctx.fillStyle = 'rgba(0, 0, 255, 0.3)';
-    selectedCells.forEach(({ row, col }) => {
-        ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
-    });
-}
-
-// Função para exibir a lista de palavras a serem encontradas
-function displayWordsList() {
-    wordsList.innerHTML = '';
-    wordsToFind.forEach(word => {
-        const li = document.createElement('li');
-        li.textContent = word;
-        li.onclick = () => markWordInList(word);
-        wordsList.appendChild(li);
-    });
-}
-
-// Função para marcar a palavra encontrada na lista
-function markWordInList(word) {
-    const listItems = wordsList.getElementsByTagName('li');
-    for (let item of listItems) {
-        if (item.textContent === word) {
-            item.style.textDecoration = 'line-through';
-            break;
-        }
-    }
-}
-
-// Função para lidar com o clique no canvas
-function handleCanvasClick(event) {
-    const rect = canvas.getBoundingClientRect();
-    const x = (event.clientX - rect.left) * (canvas.width / rect.width);
-    const y = (event.clientY - rect.top) * (canvas.height / rect.height);
-
-    const col = Math.floor(x / cellSize);
-    const row = Math.floor(y / cellSize);
-
-    if (selectedCells.length > 0) {
-        const lastCell = selectedCells[selectedCells.length - 1];
-
-        const isHorizontal = row === lastCell.row;
-        const isVertical = col === lastCell.col;
-        const isDiagonal1 = row - lastCell.row === col - lastCell.col;
-        const isDiagonal2 = row - lastCell.row === lastCell.col - col;
-
-        if (isHorizontal || isVertical || isDiagonal1 || isDiagonal2) {
-            selectedCells.push({ row, col });
-            drawWordSearchGrid();
-            drawSelectedCells();
-            checkWord();
+// Função para verificar autenticação do usuário
+function ensureUserIsAuthenticated(callback) {
+    firebase.auth().onAuthStateChanged(function(user) {
+        if (user) {
+            callback(user.uid);
         } else {
-            selectedCells = [{ row, col }];
-            drawWordSearchGrid();
-            drawSelectedCells();
+            console.error("Usuário não autenticado");
         }
-    } else {
-        selectedCells.push({ row, col });
-        drawWordSearchGrid();
-        drawSelectedCells();
+    });
+}
+
+// Função para atualizar o progresso no banco de dados
+async function updateNextPhase(userId) {
+    const currentPhase = getPhaseFromURL();
+    const { level, unit } = getLevelAndUnitFromURL();
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+    try {
+        if (currentPhase === "last") {
+            const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+            await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
+        } else if (currentPhase === "end") {
+            const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+            await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+        } else {
+            const nextPhase = parseInt(currentPhase) + 1;
+            await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
+        }
+    } catch (error) {
+        console.error("Erro ao atualizar o progresso da fase:", error);
     }
 }
 
-// Função para verificar se uma palavra foi encontrada
-function checkWord() {
-    const selectedCellsSorted = [...selectedCells].sort((a, b) => a.row - b.row || a.col - b.col);
-    const selectedWord = selectedCellsSorted.map(cell => grid[cell.row][cell.col]).join('');
-
-    if (wordsToFind.includes(selectedWord)) {
-        markWordInList(selectedWord);
-        foundCells.push(...selectedCells.map(cell => ({ ...cell, word: selectedWord })));
-        selectedCells = [];
-        drawWordSearchGrid();
-        drawSelectedCells();
-        checkCompletion(); // Verifica se a fase está completa
-    }
-}
-
-// Função para reiniciar o jogo
-function resetGame() {
-    selectedCells = [];
-    foundCells = [];
-    init();
-}
-
-// Função para inicializar o jogo
-function init() {
-    createWordSearchGrid();
-    drawWordSearchGrid();
-    displayWordsList();
-    canvas.addEventListener('click', handleCanvasClick);
-}
-
-// Inicializa o jogo e carrega as palavras
+// Inicializa o jogo ao carregar a página
+document.addEventListener('DOMContentLoaded', initializeGame);
 document.getElementById('reset-button').addEventListener('click', resetGame);
-loadWords();
