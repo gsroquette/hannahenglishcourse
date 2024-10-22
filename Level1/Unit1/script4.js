@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const auth = firebase.auth();
 
     const activities = [
-        { id: 14, name: "WordSearch", path: "../Unit1/WordSearch/index.html?fase=14", img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
+        { id: 14, name: "WordSearch", path: "../Unit1/WordSearch/index.html?fase=last", img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
         { id: 15, name: "WordSearch2", path: "../Unit1/WordSearch2/index.html?fase=15", img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
         { id: 16, name: "WordSearch3", path: "../Unit1/WordSearch3/index.html?fase=16", img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
         { id: 17, name: "Missing Word", path: "../Unit1/Missing Word/index.html?fase=end", img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
