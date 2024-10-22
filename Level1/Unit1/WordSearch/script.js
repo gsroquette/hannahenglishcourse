@@ -6,7 +6,7 @@ const ctx = canvas.getContext('2d');
 let grid = [];
 let wordsToFind = [];
 let selectedCells = [];
-let foundWords = [];
+let isSelecting = false;
 
 // Configurações do canvas
 const cellSize = Math.min(canvas.clientWidth / gridSize, 30);
@@ -99,62 +99,70 @@ function drawWordSearchGrid() {
     }
 }
 
-// Função para lidar com cliques no canvas
-canvas.addEventListener('mousedown', handleMouseDown);
-canvas.addEventListener('mouseup', handleMouseUp);
-
-let isSelecting = false;
+// Função para lidar com eventos de clique no canvas
+canvas.addEventListener('mousedown', startSelection);
+canvas.addEventListener('mousemove', continueSelection);
+canvas.addEventListener('mouseup', endSelection);
 
 // Função para iniciar a seleção
-function handleMouseDown(event) {
+function startSelection(event) {
     isSelecting = true;
-    const { row, col } = getCellFromCoordinates(event.offsetX, event.offsetY);
-    selectedCells = [{ row, col }];
+    selectedCells = [];
+    const cell = getCellFromMouse(event);
+    if (cell) selectedCells.push(cell);
+}
+
+// Função para continuar a seleção
+function continueSelection(event) {
+    if (!isSelecting) return;
+    const cell = getCellFromMouse(event);
+    if (cell && !isCellSelected(cell)) {
+        selectedCells.push(cell);
+        highlightCell(cell);
+    }
 }
 
 // Função para finalizar a seleção
-function handleMouseUp(event) {
-    if (!isSelecting) return;
-
-    isSelecting = false;
-    const { row, col } = getCellFromCoordinates(event.offsetX, event.offsetY);
-    selectedCells.push({ row, col });
-    
-    checkSelectedWord();
+function endSelection() {
+    if (isSelecting) {
+        isSelecting = false;
+        checkSelectedWord();
+    }
 }
 
 // Função para obter a célula a partir das coordenadas do mouse
-function getCellFromCoordinates(x, y) {
-    return {
-        row: Math.floor(y / cellSize),
-        col: Math.floor(x / cellSize)
-    };
+function getCellFromMouse(event) {
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const row = Math.floor(y / cellSize);
+    const col = Math.floor(x / cellSize);
+
+    if (row >= 0 && row < gridSize && col >= 0 && col < gridSize) {
+        return { row, col };
+    }
+    return null;
+}
+
+// Função para verificar se a célula já foi selecionada
+function isCellSelected(cell) {
+    return selectedCells.some(selectedCell => selectedCell.row === cell.row && selectedCell.col === cell.col);
+}
+
+// Função para destacar a célula selecionada
+function highlightCell(cell) {
+    ctx.fillStyle = 'rgba(0, 0, 255, 0.3)'; // Cor de destaque
+    ctx.fillRect(cell.col * cellSize, cell.row * cellSize, cellSize, cellSize);
+    ctx.fillStyle = '#000'; // Restaura a cor da letra
+    ctx.fillText(grid[cell.row][cell.col], cell.col * cellSize + cellSize / 4, cell.row * cellSize + cellSize / 1.5);
 }
 
 // Função para verificar se a palavra selecionada está correta
 function checkSelectedWord() {
     const selectedWord = selectedCells.map(cell => grid[cell.row][cell.col]).join('');
-    
     if (wordsToFind.includes(selectedWord)) {
-        foundWords.push(selectedWord);
-        highlightSelectedWord();
-        checkCompletion();
-    }
-}
-
-// Função para destacar a palavra encontrada
-function highlightSelectedWord() {
-    ctx.fillStyle = 'rgba(0, 255, 0, 0.3)';  // Cor verde com opacidade
-
-    selectedCells.forEach(cell => {
-        ctx.fillRect(cell.col * cellSize, cell.row * cellSize, cellSize, cellSize);
-    });
-}
-
-// Função para verificar se todas as palavras foram encontradas
-function checkCompletion() {
-    if (foundWords.length === wordsToFind.length) {
-        showCompletionModal();
+        // Destaque final para palavra encontrada
+        selectedCells.forEach(cell => highlightCell(cell, true));
     }
 }
 
@@ -165,5 +173,18 @@ function init() {
     displayWordsList();
 }
 
+// Função para exibir a lista de palavras na tela
+function displayWordsList() {
+    const wordsListElement = document.getElementById('words');
+    wordsListElement.innerHTML = ''; // Limpa a lista antes de adicionar novas palavras
+
+    wordsToFind.forEach(word => {
+        const li = document.createElement('li');
+        li.textContent = word;
+        wordsListElement.appendChild(li);
+    });
+}
+
 // Inicializa o jogo e carrega as palavras
+document.getElementById('reset-button').addEventListener('click', init);
 document.addEventListener('DOMContentLoaded', loadWords);
