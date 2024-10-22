@@ -26,7 +26,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     activities.forEach(activity => activity.unlocked = true);
                     lastUnlockedIndex = activities.length - 1;  // Marca todas as fases como desbloqueadas
                     initializeMap();
-                    createPlayer();
+
+                    // Busca o avatar no banco de dados
+                    const avatarPath = `/usuarios/${userId}/avatar`;
+                    database.ref(avatarPath).once('value').then((avatarSnapshot) => {
+                        const avatarFileName = avatarSnapshot.val();
+                        const avatarImgPath = avatarFileName ? `../../imagens/${avatarFileName}` : '../../imagens/bonequinho.png';
+                        createPlayer(avatarImgPath, true); // Define para começar na primeira fase
+                    }).catch(() => {
+                        createPlayer('../../imagens/bonequinho.png', true); // Usa bonequinho se houver erro
+                    });
                 } else if (role === 'aluno') {
                     // Carrega progresso para aluno
                     loadUserProgress(userId);
@@ -52,7 +61,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 const progress = snapshot.val();
                 if (progress) {
                     activities.forEach((activity, index) => {
-                        // Atualiza a fase com base no ID da atividade
                         if (progress[`fase${activity.id}`] === true) {
                             activity.unlocked = true;
                             lastUnlockedIndex = index;  // Atualiza com o índice da última fase desbloqueada
@@ -68,8 +76,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 database.ref(avatarPath).once('value').then((avatarSnapshot) => {
                     const avatarFileName = avatarSnapshot.val();
-                    const avatarImgPath = `../../imagens/${avatarFileName}`;
-                    createPlayer(avatarImgPath);
+                    const avatarImgPath = avatarFileName ? `../../imagens/${avatarFileName}` : '../../imagens/bonequinho.png';
+                    createPlayer(avatarImgPath); // Para aluno, posiciona o bonequinho na fase desbloqueada
                 }).catch(() => {
                     createPlayer(); // Se erro, usar avatar padrão
                 });
@@ -81,15 +89,15 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
-    function createPlayer(avatarPath = '../../imagens/bonequinho.png') {
+    function createPlayer(avatarPath = '../../imagens/bonequinho.png', startAtFirstPhase = false) {
         player = document.createElement('img');
         player.src = avatarPath;
         player.classList.add('player');
         mapContainer.appendChild(player);
 
         // Determina a fase para posicionar o bonequinho
-        const initialPhaseIndex = lastUnlockedIndex > 0 ? lastUnlockedIndex - 1 : 0;
-        moveToPhase(initialPhaseIndex);  // Move para a fase uma antes da última desbloqueada, ou a primeira fase
+        const initialPhaseIndex = startAtFirstPhase ? 0 : (lastUnlockedIndex > 0 ? lastUnlockedIndex - 1 : 0);
+        moveToPhase(initialPhaseIndex);  // Move para a primeira fase ou uma antes da última desbloqueada
     }
 
     function initializeMap() {
