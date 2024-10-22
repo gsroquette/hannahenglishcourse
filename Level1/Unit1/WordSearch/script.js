@@ -2,28 +2,29 @@ const gridSize = 15;
 const canvas = document.getElementById('word-search-canvas');
 const ctx = canvas.getContext('2d');
 
-// Configurações do canvas
+// Calcula o tamanho das células dinamicamente com base no tamanho do canvas
 const cellSize = Math.min(canvas.clientWidth / gridSize, 30);
 canvas.width = cellSize * gridSize;
 canvas.height = cellSize * gridSize;
 
-// Variáveis globais
 let grid = [];
-let wordsToFind = [];
 let selectedCells = [];
 let foundCells = [];
+const wordsList = document.getElementById('words');
+let wordsToFind = [];
 
 // Função para carregar as palavras da fase
 async function loadWords() {
     try {
         const response = await fetch('../data1/words.txt');
-        if (!response.ok) throw new Error('Não foi possível carregar as palavras.');
-
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
         const text = await response.text();
         wordsToFind = text.split(/\r?\n/).filter(word => word.trim() !== '');
-        init(); // Inicializa o jogo após carregar as palavras
+        init();
     } catch (error) {
-        console.error('Erro ao carregar as palavras:', error);
+        console.error('Error loading words:', error);
     }
 }
 
@@ -42,18 +43,40 @@ function createWordSearchGrid() {
     }
 }
 
+// Função para verificar se a fase está completa
+function checkCompletion() {
+    // Verifica se todas as palavras foram encontradas
+    const foundWords = [...new Set(foundCells.map(cell => cell.word))];
+    if (foundWords.length === wordsToFind.length) {
+        showCompletionModal();
+    }
+}
+
+// Função para exibir o modal de conclusão
+function showCompletionModal() {
+    document.getElementById('overlay').style.display = 'block';
+    document.getElementById('completion-modal').style.display = 'block';
+}
+
+// Função para fechar o modal de conclusão
+function closeModal() {
+    document.getElementById('overlay').style.display = 'none';
+    document.getElementById('completion-modal').style.display = 'none';
+}
+
 // Função para colocar uma palavra na grade
 function placeWordInGrid(word) {
     const directions = [
         { row: 0, col: 1 }, // Horizontal
         { row: 1, col: 0 }, // Vertical
-        { row: 1, col: 1 }, // Diagonal (principal)
-        { row: 1, col: -1 } // Diagonal (secundária)
+        { row: 1, col: 1 }, // Diagonal principal
+        { row: 1, col: -1 } // Diagonal secundária
     ];
 
     const direction = directions[Math.floor(Math.random() * directions.length)];
 
     let row, col;
+
     do {
         row = Math.floor(Math.random() * gridSize);
         col = Math.floor(Math.random() * gridSize);
@@ -91,14 +114,43 @@ function drawWordSearchGrid() {
         }
     }
 
-    // Destaca as células encontradas
     ctx.fillStyle = 'rgba(0, 255, 0, 0.3)';
     foundCells.forEach(({ row, col }) => {
         ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
     });
 }
 
-// Função para lidar com cliques no canvas
+// Função para destacar as células selecionadas
+function drawSelectedCells() {
+    ctx.fillStyle = 'rgba(0, 0, 255, 0.3)';
+    selectedCells.forEach(({ row, col }) => {
+        ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+    });
+}
+
+// Função para exibir a lista de palavras a serem encontradas
+function displayWordsList() {
+    wordsList.innerHTML = '';
+    wordsToFind.forEach(word => {
+        const li = document.createElement('li');
+        li.textContent = word;
+        li.onclick = () => markWordInList(word);
+        wordsList.appendChild(li);
+    });
+}
+
+// Função para marcar a palavra encontrada na lista
+function markWordInList(word) {
+    const listItems = wordsList.getElementsByTagName('li');
+    for (let item of listItems) {
+        if (item.textContent === word) {
+            item.style.textDecoration = 'line-through';
+            break;
+        }
+    }
+}
+
+// Função para lidar com o clique no canvas
 function handleCanvasClick(event) {
     const rect = canvas.getBoundingClientRect();
     const x = (event.clientX - rect.left) * (canvas.width / rect.width);
@@ -132,42 +184,26 @@ function handleCanvasClick(event) {
     }
 }
 
-// Função para destacar células selecionadas
-function drawSelectedCells() {
-    ctx.fillStyle = 'rgba(0, 0, 255, 0.3)'; // Cor azul para seleção
-    selectedCells.forEach(({ row, col }) => {
-        ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
-        ctx.fillStyle = '#000'; // Restaura a cor do texto
-        ctx.fillText(grid[row][col], col * cellSize + cellSize / 4, row * cellSize + cellSize / 1.5);
-    });
-}
-
-// Função para verificar se a palavra selecionada está correta
+// Função para verificar se uma palavra foi encontrada
 function checkWord() {
-    const selectedWord = selectedCells.map(cell => grid[cell.row][cell.col]).join('');
+    const selectedCellsSorted = [...selectedCells].sort((a, b) => a.row - b.row || a.col - b.col);
+    const selectedWord = selectedCellsSorted.map(cell => grid[cell.row][cell.col]).join('');
+
     if (wordsToFind.includes(selectedWord)) {
-        foundCells = [...foundCells, ...selectedCells];
-        removeFoundWord(selectedWord);
+        markWordInList(selectedWord);
+        foundCells.push(...selectedCells.map(cell => ({ ...cell, word: selectedWord })));
+        selectedCells = [];
+        drawWordSearchGrid();
+        drawSelectedCells();
+        checkCompletion(); // Verifica se a fase está completa
     }
 }
 
-// Função para remover a palavra encontrada da lista
-function removeFoundWord(word) {
-    wordsToFind = wordsToFind.filter(w => w !== word);
-    displayWordsList();
-    drawWordSearchGrid();
-}
-
-// Função para exibir a lista de palavras na tela
-function displayWordsList() {
-    const wordsListElement = document.getElementById('words');
-    wordsListElement.innerHTML = '';
-
-    wordsToFind.forEach(word => {
-        const li = document.createElement('li');
-        li.textContent = word;
-        wordsListElement.appendChild(li);
-    });
+// Função para reiniciar o jogo
+function resetGame() {
+    selectedCells = [];
+    foundCells = [];
+    init();
 }
 
 // Função para inicializar o jogo
@@ -179,5 +215,54 @@ function init() {
 }
 
 // Inicializa o jogo e carrega as palavras
-document.getElementById('reset-button').addEventListener('click', init);
-document.addEventListener('DOMContentLoaded', loadWords);
+document.getElementById('reset-button').addEventListener('click', resetGame);
+loadWords();
+ // Função para capturar fase, level e unit do URL
+    function getPhaseFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('fase'); // Obtém o valor de 'fase'
+    }
+
+    function getLevelAndUnitFromURL() {
+        const url = window.location.pathname;
+        const parts = url.split('/');
+        const level = parts[1];
+        const unit = parts[2];
+        return { level, unit };
+    }
+
+    // Função para verificar autenticação do usuário
+    function ensureUserIsAuthenticated(callback) {
+        firebase.auth().onAuthStateChanged(function(user) {
+            if (user) {
+                callback(user.uid); // Executa a função de callback se o usuário estiver logado
+            } else {
+                console.error("Usuário não autenticado");
+            }
+        });
+    }
+
+    // Função para atualizar o progresso no banco de dados
+    async function updateNextPhase(userId) {
+        const currentPhase = getPhaseFromURL();
+        const { level, unit } = getLevelAndUnitFromURL();
+        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+        try {
+            if (currentPhase === "last") {
+                // Cria uma nova Unit dentro do mesmo Level
+                const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+                await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
+            } else if (currentPhase === "end") {
+                // Cria um novo Level com Unit1
+                const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+                await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+            } else {
+                // Para fases normais, desbloqueia a próxima fase
+                const nextPhase = parseInt(currentPhase) + 1;
+                await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
+            }
+        } catch (error) {
+            console.error("Erro ao atualizar o progresso da fase:", error);
+        }
+    }
