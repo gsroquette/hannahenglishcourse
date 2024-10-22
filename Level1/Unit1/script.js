@@ -1,85 +1,3 @@
-<!-- HTML para o quadro branco -->
-<div class="login-container" id="loginContainer">
-    <a href="Formulario/login.html" class="login-button" id="loginLink">Login</a>
-    <div class="dropdown" id="userDropdown"></div>
-</div>
-
-<style>
-/* CSS para o quadro branco */
-/* Estilo da caixa de login */
-.login-container {
-    display: flex;
-    align-items: center; /* Alinha verticalmente */
-    gap: 10px; /* Espaço entre avatar e nome */
-    position: absolute;
-    top: 20px;
-    right: 60px;
-    z-index: 10;
-    background-color: white;
-    padding: 10px;
-    border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    cursor: pointer;
-}
-
-.user-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-}
-
-.user-name {
-    font-size: 14px;
-    color: #333;
-    margin: 0;
-}
-
-.dropdown {
-    display: none;
-    position: absolute;
-    top: 60px;
-    right: 0;
-    background-color: white;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    z-index: 1;
-    border-radius: 4px;
-    min-width: 150px;
-}
-
-.dropdown a {
-    display: block;
-    padding: 10px;
-    text-decoration: none;
-    color: #333;
-    font-size: 16px;
-    text-align: left;
-}
-
-.dropdown a:hover {
-    background-color: #f2f2f2;
-}
-</style>
-
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-
-<script>
-// Firebase Configuração
-var firebaseConfig = {
-    apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
-    authDomain: "hannahenglishcourse.firebaseapp.com",
-    databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId: "hannahenglishcourse",
-    storageBucket: "hannahenglishcourse.appspot.com",
-    messagingSenderId: "449818788486",
-    appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
-    measurementId: "G-07VVJG9LRS"
-};
-
-// Inicializa o Firebase
-firebase.initializeApp(firebaseConfig);
-
 document.addEventListener('DOMContentLoaded', function() {
     const database = firebase.database();
     const auth = firebase.auth();
@@ -101,24 +19,28 @@ document.addEventListener('DOMContentLoaded', function() {
         if (user) {
             const userId = user.uid;
             console.log(`Usuário autenticado: ${userId}`);
-            updateLoginContainer(userId); // Atualiza o quadro branco com o usuário logado
+            updateLoginContainer(userId);
 
+            // Busca o role do usuário para definir o comportamento
             database.ref(`/usuarios/${userId}/role`).once('value').then((snapshot) => {
                 const role = snapshot.val();
                 if (role === 'professor' || role === 'proprietario') {
+                    // Libera todas as fases para professor ou proprietário
                     activities.forEach(activity => activity.unlocked = true);
-                    lastUnlockedIndex = activities.length - 1;
+                    lastUnlockedIndex = activities.length - 1;  // Marca todas as fases como desbloqueadas
                     initializeMap();
 
+                    // Busca o avatar no banco de dados
                     const avatarPath = `/usuarios/${userId}/avatar`;
                     database.ref(avatarPath).once('value').then((avatarSnapshot) => {
                         const avatarFileName = avatarSnapshot.val();
                         const avatarImgPath = avatarFileName ? `../../imagens/${avatarFileName}` : '../../imagens/bonequinho.png';
-                        createPlayer(avatarImgPath, true);
+                        createPlayer(avatarImgPath, true); // Define para começar na primeira fase
                     }).catch(() => {
-                        createPlayer('../../imagens/bonequinho.png', true);
+                        createPlayer('../../imagens/bonequinho.png', true); // Usa bonequinho se houver erro
                     });
                 } else if (role === 'aluno') {
+                    // Carrega progresso para aluno
                     loadUserProgress(userId);
                 } else {
                     console.error("Role não reconhecido!");
@@ -129,70 +51,170 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    function updateLoginContainer(userId) {
-        const loginLink = document.getElementById("loginLink");
-        const userDropdown = document.getElementById("userDropdown");
+    function loadUserProgress(userId) {
+        const urlPathParts = window.location.pathname.split('/');
+        const level = urlPathParts[urlPathParts.length - 3];
+        const unit = urlPathParts[urlPathParts.length - 2];
 
-        const userRef = firebase.database().ref('usuarios/' + userId);
-        userRef.once('value').then((snapshot) => {
-            const userData = snapshot.val();
-            const userName = userData.nome || user.email;
-            const userAvatar = userData.avatar ? `imagens/${userData.avatar}` : 'imagens/bonecologin1.png';
+        const progressPath = `/usuarios/${userId}/progresso/${level}/${unit}`;
+        const avatarPath = `/usuarios/${userId}/avatar`;
 
-            loginLink.innerHTML = `<img src="${userAvatar}" alt="User Icon" class="user-icon"><p class="user-name">${userName}</p>`;
-            loginLink.removeAttribute('href');
+        database.ref(progressPath).once('value')
+            .then((snapshot) => {
+                const progress = snapshot.val();
+                if (progress) {
+                    activities.forEach((activity, index) => {
+                        if (progress[`fase${activity.id}`] === true) {
+                            activity.unlocked = true;
+                            lastUnlockedIndex = index;  // Atualiza com o índice da última fase desbloqueada
+                        } else {
+                            activity.unlocked = false;  // Garante que a fase permaneça bloqueada se não estiver no progresso
+                        }
+                    });
+                } else {
+                    console.error("Nenhum progresso encontrado para este nível e unidade.");
+                }
 
-            let dashboardLink = '';
-            if (userData.role === 'proprietario') {
-                dashboardLink = '<a href="painel_proprietario.html" class="dashboard-link">OWNER DASHBOARD</a>';
-            } else if (userData.role === 'professor') {
-                dashboardLink = '<a href="painel_professor.html" class="dashboard-link">TEACHER DASHBOARD</a>';
-            } else if (userData.role === 'aluno') {
-                dashboardLink = '<a href="painel_aluno.html" class="dashboard-link">STUDENT DASHBOARD</a>';
+                initializeMap();
+
+                database.ref(avatarPath).once('value').then((avatarSnapshot) => {
+                    const avatarFileName = avatarSnapshot.val();
+                    const avatarImgPath = avatarFileName ? `../../imagens/${avatarFileName}` : '../../imagens/bonequinho.png';
+                    createPlayer(avatarImgPath); // Para aluno, posiciona o bonequinho na fase desbloqueada
+                }).catch(() => {
+                    createPlayer(); // Se erro, usar avatar padrão
+                });
+            })
+            .catch((error) => {
+                console.error("Erro ao carregar o progresso do usuário:", error);
+                initializeMap();
+                createPlayer();
+            });
+    }
+
+    function createPlayer(avatarPath = '../../imagens/bonequinho.png', startAtFirstPhase = false) {
+        player = document.createElement('img');
+        player.src = avatarPath;
+        player.classList.add('player');
+        mapContainer.appendChild(player);
+
+        // Determina a fase para posicionar o bonequinho
+        const initialPhaseIndex = startAtFirstPhase ? 0 : (lastUnlockedIndex > 0 ? lastUnlockedIndex - 1 : 0);
+        moveToPhase(initialPhaseIndex);  // Move para a primeira fase ou uma antes da última desbloqueada
+    }
+
+    function initializeMap() {
+        // Rola para o topo antes de desenhar as linhas
+        window.scrollTo(0, 0);
+
+        activities.forEach((activity, index) => {
+            const phaseDiv = document.createElement('div');
+            phaseDiv.classList.add('phase');
+
+            const baseTopPosition = 200;
+            let topPosition = baseTopPosition + index * 20 * window.innerHeight / 100;
+            let horizontalPosition = index % 2 === 0 ? 10 : 85;
+
+            phaseDiv.style.top = `${topPosition}px`;
+            phaseDiv.style.left = `${horizontalPosition}%`;
+
+            const phaseImage = document.createElement('img');
+            phaseImage.src = activity.img;
+            phaseImage.alt = activity.name;
+            phaseImage.classList.add('phase-img');
+            phaseDiv.appendChild(phaseImage);
+
+            mapContainer.appendChild(phaseDiv);
+
+            if (activity.unlocked) {
+                phaseDiv.classList.add('active');
+            } else {
+                phaseDiv.classList.add('locked');
+                const lockIcon = document.createElement('img');
+                lockIcon.src = '../../imagens/lock_icon_resized.png';
+                lockIcon.classList.add('lock-icon');
+                phaseDiv.appendChild(lockIcon);
             }
 
-            userDropdown.innerHTML = `${dashboardLink}<a href="#" id="logout">LEAVE</a>`;
-
-            document.querySelectorAll('.dashboard-link').forEach(link => {
-                link.addEventListener('click', function(event) {
-                    event.preventDefault();
-                    window.location.href = this.getAttribute('href');
-                });
+            phaseDiv.addEventListener('click', () => {
+                if (activity.unlocked) {
+                    moveToPhase(index, activity.path);
+                }
             });
+        });
+
+        drawLines();
+
+        // Aplica a animação de desbloqueio na última fase desbloqueada
+        if (lastUnlockedIndex >= 0) {
+            const lastUnlockedPhase = document.querySelectorAll('.phase')[lastUnlockedIndex];
+            animateUnlock(lastUnlockedPhase);
+
+            // Rola para a fase desbloqueada após desenhar as linhas
+            scrollToPhase(lastUnlockedIndex);
+        }
+    }
+
+    function animateUnlock(phaseDiv) {
+        const unlockGif = document.createElement('img');
+        unlockGif.src = '../../imagens/cadeado.gif';
+        unlockGif.classList.add('unlock-gif');
+        phaseDiv.appendChild(unlockGif);
+
+        const unlockSound = new Audio('../../imagens/unlock-padlock.mp3');
+        unlockSound.play(); // Toca o som de desbloqueio
+
+        setTimeout(() => {
+            unlockGif.remove();
+        }, 3000);
+    }
+
+    function moveToPhase(index, path = null) {
+        const phase = document.querySelectorAll('.phase')[index];
+        const coords = phase.getBoundingClientRect();
+
+        player.style.top = `${coords.top + window.scrollY + coords.height / 2}px`;
+        player.style.left = `${coords.left + window.scrollX + coords.width / 2}px`;
+        player.classList.add('moving');
+
+        if (path) {
+            setTimeout(() => {
+                window.location.href = path;
+            }, 600);
+        }
+    }
+
+    function scrollToPhase(index) {
+        const phase = document.querySelectorAll('.phase')[index];
+        const coords = phase.getBoundingClientRect();
+        window.scrollTo({
+            top: coords.top + window.scrollY - window.innerHeight / 2,
+            behavior: 'smooth'
         });
     }
 
-    // Funções de carregamento e controle das atividades permanecem as mesmas...
+    function drawLines() {
+        svgContainer.innerHTML = '';
+        const phases = document.querySelectorAll('.phase');
+        for (let i = 0; i < activities.length - 1; i++) {
+            const phase1 = phases[i];
+            const phase2 = phases[i + 1];
+            if (!phase1 || !phase2) continue;
 
-    // Alternar o dropdown ao clicar
-    document.getElementById("loginContainer").addEventListener("click", function(event) {
-        const user = firebase.auth().currentUser;
-        if (!user) return;
+            const coords1 = phase1.getBoundingClientRect();
+            const coords2 = phase2.getBoundingClientRect();
+            const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
+            const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150;
+            const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
+            const controlPointY2 = coords2.top - 150;
 
-        event.preventDefault();
-        const dropdown = document.getElementById("userDropdown");
-        dropdown.style.display = (dropdown.style.display === 'none' || dropdown.style.display === '') ? 'block' : 'none';
-    });
-
-    // Fecha o dropdown ao clicar fora dele
-    window.addEventListener("click", function(event) {
-        const dropdown = document.getElementById("userDropdown");
-        const loginContainer = document.getElementById("loginContainer");
-        if (!loginContainer.contains(event.target)) {
-            dropdown.style.display = 'none';
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
+                       C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
+                       ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
+            path.setAttribute('d', d);
+            path.setAttribute('class', `path path-blue`);
+            svgContainer.appendChild(path);
         }
-    });
-
-    // Função para deslogar
-    document.addEventListener("click", function(event) {
-        if (event.target.id === "logout") {
-            firebase.auth().signOut().then(() => {
-                console.log("Usuário deslogado");
-                location.reload();
-            }).catch((error) => {
-                console.error("Erro ao deslogar:", error);
-            });
-        }
-    });
+    }
 });
-</script>
