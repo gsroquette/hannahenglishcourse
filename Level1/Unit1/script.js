@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const database = firebase.database();
     const auth = firebase.auth();
 
-    // Define a persistência de autenticação para manter o usuário logado
+    // Define a persistência de autenticação
     auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
         .then(() => {
             console.log("Persistência de autenticação definida para LOCAL.");
@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const loginLink = document.getElementById("loginLink");
     const userDropdown = document.getElementById("userDropdown");
 
-    // Verificar o estado de autenticação após carregar o DOM
+    // Verifica o estado de autenticação
     auth.onAuthStateChanged(function(user) {
         if (user) {
             console.log("Usuário autenticado:", user.uid);
@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Função para atualizar o quadro branco com as informações do usuário
+    // Atualiza o quadro branco com as informações do usuário
     function atualizarQuadroBranco(user) {
         const userRef = database.ref('usuarios/' + user.uid);
         userRef.once('value')
@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 if (!userData) {
                     console.error("Dados do usuário não encontrados no banco de dados.");
-                    exibirLinkDeLogin(); // Mostra o link de login
+                    exibirLinkDeLogin(); 
                     return;
                 }
 
@@ -57,8 +57,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // Atualiza o quadro branco de login
                 loginLink.innerHTML = `<img src="${userAvatar}" alt="User Icon" class="user-icon"><p class="user-name">${userName}</p>`;
-                loginLink.removeAttribute('href'); // Remove o link de login
-                userDropdown.style.display = 'block'; // Mostra o dropdown
+                loginLink.removeAttribute('href'); 
+                userDropdown.style.display = 'block'; 
 
                 // Define o dashboard conforme o tipo de usuário
                 let dashboardLink = '';
@@ -70,7 +70,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     dashboardLink = '<a href="painel_aluno.html" class="dashboard-link">STUDENT DASHBOARD</a>';
                 }
 
-                // Atualiza o dropdown com o link do dashboard e botão de logout
                 userDropdown.innerHTML = `${dashboardLink}<a href="#" id="logout">LEAVE</a>`;
                 console.log("Quadro branco atualizado com o usuário:", userName);
             })
@@ -80,11 +79,11 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
-    // Função para exibir o link de login
+    // Exibir link de login
     function exibirLinkDeLogin() {
         loginLink.innerHTML = 'Login';
         loginLink.setAttribute('href', 'Formulario/login.html');
-        userDropdown.style.display = 'none'; // Esconde o dropdown
+        userDropdown.style.display = 'none'; 
     }
 
     // Alternar dropdown ao clicar
@@ -120,7 +119,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Função para carregar o progresso do usuário
+    // Carregar o progresso do usuário
     function loadUserProgress(userId) {
         console.log("Carregando progresso do usuário:", userId);
 
@@ -138,7 +137,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     activities.forEach((activity, index) => {
                         if (progress[`fase${activity.id}`] === true) {
                             activity.unlocked = true;
-                            lastUnlockedIndex = index; // Atualiza a última fase desbloqueada
+                            lastUnlockedIndex = index;
                         } else {
                             activity.unlocked = false;
                         }
@@ -152,31 +151,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 database.ref(avatarPath).once('value').then((avatarSnapshot) => {
                     const avatarFileName = avatarSnapshot.val();
                     const avatarImgPath = avatarFileName ? `../../imagens/${avatarFileName}` : '../../imagens/bonequinho.png';
-                    createPlayer(avatarImgPath); // Cria o jogador com o avatar do usuário
+                    createPlayer(avatarImgPath);
                 }).catch(() => {
-                    createPlayer(); // Usa o avatar padrão em caso de erro
+                    createPlayer();
                 });
             })
             .catch((error) => {
                 console.error("Erro ao carregar o progresso do usuário:", error);
                 initializeMap();
-                createPlayer(); // Cria o jogador com o avatar padrão em caso de erro
+                createPlayer();
             });
     }
 
-    // Função para criar o jogador no mapa
+    // Criar jogador no mapa
     function createPlayer(avatarPath = '../../imagens/bonequinho.png', startAtFirstPhase = false) {
         player = document.createElement('img');
         player.src = avatarPath;
         player.classList.add('player');
         mapContainer.appendChild(player);
 
-        // Determina a fase inicial
         const initialPhaseIndex = startAtFirstPhase ? 0 : (lastUnlockedIndex > 0 ? lastUnlockedIndex - 1 : 0);
         moveToPhase(initialPhaseIndex);
     }
 
-    // Função para inicializar o mapa
+    // Inicializar mapa
     function initializeMap() {
         console.log("Inicializando mapa...");
         window.scrollTo(0, 0);
@@ -221,12 +219,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (lastUnlockedIndex >= 0) {
             const lastUnlockedPhase = document.querySelectorAll('.phase')[lastUnlockedIndex];
             animateUnlock(lastUnlockedPhase);
-
             scrollToPhase(lastUnlockedIndex);
         }
     }
 
-    // Função para mover o jogador para a fase
+    // Mover jogador para a fase
     function moveToPhase(index, path = null) {
         const phase = document.querySelectorAll('.phase')[index];
         const coords = phase.getBoundingClientRect();
@@ -242,7 +239,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Função para desenhar linhas entre fases
+    // Desenhar linhas entre fases
     function drawLines() {
         console.log("Desenhando linhas entre fases...");
         svgContainer.innerHTML = '';
@@ -269,7 +266,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Função para animar o desbloqueio
+    // Animar desbloqueio
     function animateUnlock(phaseDiv) {
         const unlockGif = document.createElement('img');
         unlockGif.src = '../../imagens/cadeado.gif';
@@ -277,14 +274,14 @@ document.addEventListener('DOMContentLoaded', function() {
         phaseDiv.appendChild(unlockGif);
 
         const unlockSound = new Audio('../../imagens/unlock-padlock.mp3');
-        unlockSound.play(); // Toca o som de desbloqueio
+        unlockSound.play();
 
         setTimeout(() => {
             unlockGif.remove();
         }, 3000);
     }
 
-    // Função para rolar para a fase
+    // Rolar para a fase
     function scrollToPhase(index) {
         const phase = document.querySelectorAll('.phase')[index];
         const coords = phase.getBoundingClientRect();
