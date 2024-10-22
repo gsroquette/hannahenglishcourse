@@ -19,30 +19,20 @@ document.addEventListener('DOMContentLoaded', function() {
         if (user) {
             const userId = user.uid;
             console.log(`Usuário autenticado: ${userId}`);
-
-            // Obtendo o token para verificar o role do usuário
-            user.getIdTokenResult().then((idTokenResult) => {
-                const userRole = idTokenResult.claims.role || '';
-                console.log(`Role do usuário: ${userRole}`);
-
-                // Verifica se o usuário é "proprietário" ou "professor"
-                if (userRole.toLowerCase() === 'proprietario' || userRole.toLowerCase() === 'professor') {
-                    console.log("Usuário é proprietário ou professor. Liberando todas as fases.");
-
-                    // Libera todas as fases
-                    activities.forEach(activity => {
-                        activity.unlocked = true;
-                    });
-                    lastUnlockedIndex = activities.length - 1; // Define última fase como desbloqueada
-                    initializeMap(); // Inicializa o mapa
-                    createPlayer(); // Cria o jogador
+            database.ref(`/usuarios/${userId}/role`).once('value').then((snapshot) => {
+                const role = snapshot.val();
+                if (role === 'professor' || role === 'proprietario') {
+                    // Libera todas as fases para professor ou proprietário
+                    activities.forEach(activity => activity.unlocked = true);
+                    lastUnlockedIndex = activities.length - 1;  // Marca todas as fases como desbloqueadas
+                    initializeMap();
+                    createPlayer();
+                } else if (role === 'aluno') {
+                    // Carrega progresso para aluno
+                    loadUserProgress(userId);
                 } else {
-                    console.log("Usuário não é proprietário ou professor. Carregando progresso normal.");
-                    loadUserProgress(userId); // Carrega progresso normal do usuário
+                    console.error("Role não reconhecido!");
                 }
-            }).catch((error) => {
-                console.error("Erro ao obter o token do usuário:", error);
-                loadUserProgress(userId); // Tenta carregar o progresso em caso de erro
             });
         } else {
             console.error("Usuário não autenticado!");
@@ -62,11 +52,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 const progress = snapshot.val();
                 if (progress) {
                     activities.forEach((activity, index) => {
+                        // Atualiza a fase com base no ID da atividade
                         if (progress[`fase${activity.id}`] === true) {
                             activity.unlocked = true;
-                            lastUnlockedIndex = index;
+                            lastUnlockedIndex = index;  // Atualiza com o índice da última fase desbloqueada
                         } else {
-                            activity.unlocked = false;
+                            activity.unlocked = false;  // Garante que a fase permaneça bloqueada se não estiver no progresso
                         }
                     });
                 } else {
@@ -96,11 +87,13 @@ document.addEventListener('DOMContentLoaded', function() {
         player.classList.add('player');
         mapContainer.appendChild(player);
 
+        // Determina a fase para posicionar o bonequinho
         const initialPhaseIndex = lastUnlockedIndex > 0 ? lastUnlockedIndex - 1 : 0;
-        moveToPhase(initialPhaseIndex);
+        moveToPhase(initialPhaseIndex);  // Move para a fase uma antes da última desbloqueada, ou a primeira fase
     }
 
     function initializeMap() {
+        // Rola para o topo antes de desenhar as linhas
         window.scrollTo(0, 0);
 
         activities.forEach((activity, index) => {
@@ -141,12 +134,76 @@ document.addEventListener('DOMContentLoaded', function() {
 
         drawLines();
 
+        // Aplica a animação de desbloqueio na última fase desbloqueada
         if (lastUnlockedIndex >= 0) {
             const lastUnlockedPhase = document.querySelectorAll('.phase')[lastUnlockedIndex];
             animateUnlock(lastUnlockedPhase);
+
+            // Rola para a fase desbloqueada após desenhar as linhas
             scrollToPhase(lastUnlockedIndex);
         }
     }
 
-    // Outras funções (animateUnlock, moveToPhase, scrollToPhase, drawLines) permanecem inalteradas
+    function animateUnlock(phaseDiv) {
+        const unlockGif = document.createElement('img');
+        unlockGif.src = '../../imagens/cadeado.gif';
+        unlockGif.classList.add('unlock-gif');
+        phaseDiv.appendChild(unlockGif);
+
+        const unlockSound = new Audio('../../imagens/unlock-padlock.mp3');
+        unlockSound.play(); // Toca o som de desbloqueio
+
+        setTimeout(() => {
+            unlockGif.remove();
+        }, 3000);
+    }
+
+    function moveToPhase(index, path = null) {
+        const phase = document.querySelectorAll('.phase')[index];
+        const coords = phase.getBoundingClientRect();
+
+        player.style.top = `${coords.top + window.scrollY + coords.height / 2}px`;
+        player.style.left = `${coords.left + window.scrollX + coords.width / 2}px`;
+        player.classList.add('moving');
+
+        if (path) {
+            setTimeout(() => {
+                window.location.href = path;
+            }, 600);
+        }
+    }
+
+    function scrollToPhase(index) {
+        const phase = document.querySelectorAll('.phase')[index];
+        const coords = phase.getBoundingClientRect();
+        window.scrollTo({
+            top: coords.top + window.scrollY - window.innerHeight / 2,
+            behavior: 'smooth'
+        });
+    }
+
+    function drawLines() {
+        svgContainer.innerHTML = '';
+        const phases = document.querySelectorAll('.phase');
+        for (let i = 0; i < activities.length - 1; i++) {
+            const phase1 = phases[i];
+            const phase2 = phases[i + 1];
+            if (!phase1 || !phase2) continue;
+
+            const coords1 = phase1.getBoundingClientRect();
+            const coords2 = phase2.getBoundingClientRect();
+            const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
+            const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150;
+            const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
+            const controlPointY2 = coords2.top - 150;
+
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
+                       C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
+                       ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
+            path.setAttribute('d', d);
+            path.setAttribute('class', `path path-blue`);
+            svgContainer.appendChild(path);
+        }
+    }
 });
