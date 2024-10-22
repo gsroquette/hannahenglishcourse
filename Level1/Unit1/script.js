@@ -2,14 +2,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const database = firebase.database();
     const auth = firebase.auth();
 
-    // Define a persistência de autenticação
+    // Configurar persistência
     auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
-        .then(() => {
-            console.log("Persistência de autenticação definida para LOCAL.");
-        })
-        .catch((error) => {
-            console.error("Erro ao definir a persistência:", error.message);
-        });
+        .then(() => console.log("Persistência de autenticação definida para LOCAL."))
+        .catch(error => console.error("Erro ao definir a persistência:", error.message));
 
     const activities = [
         { id: 1, name: "StoryCards", path: "../Unit1/StoryCards/index.html?fase=1", img: "../../imagens/botoes/storycards_button.png", unlocked: false },
@@ -24,10 +20,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let player;
     let lastUnlockedIndex = -1;
 
-    const loginLink = document.getElementById("loginLink");
-    const userDropdown = document.getElementById("userDropdown");
-
-    // Verifica o estado de autenticação
+    // Verificar autenticação
     auth.onAuthStateChanged(function(user) {
         if (user) {
             console.log("Usuário autenticado:", user.uid);
@@ -38,7 +31,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Atualiza o quadro branco com as informações do usuário
+    // Atualiza o quadro branco
     function atualizarQuadroBranco(user) {
         const userRef = database.ref('usuarios/' + user.uid);
         userRef.once('value')
@@ -48,19 +41,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 if (!userData) {
                     console.error("Dados do usuário não encontrados no banco de dados.");
-                    exibirLinkDeLogin(); 
+                    exibirLinkDeLogin();
                     return;
                 }
 
                 const userName = userData.nome || user.email;
                 const userAvatar = userData.avatar ? `imagens/${userData.avatar}` : 'imagens/bonecologin1.png';
 
-                // Atualiza o quadro branco de login
+                // Atualiza o quadro branco
                 loginLink.innerHTML = `<img src="${userAvatar}" alt="User Icon" class="user-icon"><p class="user-name">${userName}</p>`;
                 loginLink.removeAttribute('href'); 
-                userDropdown.style.display = 'block'; 
+                userDropdown.style.display = 'block';
 
-                // Define o dashboard conforme o tipo de usuário
+                // Define o dashboard
                 let dashboardLink = '';
                 if (userData.role === 'proprietario') {
                     dashboardLink = '<a href="painel_proprietario.html" class="dashboard-link">OWNER DASHBOARD</a>';
@@ -83,7 +76,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function exibirLinkDeLogin() {
         loginLink.innerHTML = 'Login';
         loginLink.setAttribute('href', 'Formulario/login.html');
-        userDropdown.style.display = 'none'; 
+        userDropdown.style.display = 'none';
     }
 
     // Alternar dropdown ao clicar
@@ -107,7 +100,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Função para deslogar
+    // Logout
     document.addEventListener("click", function(event) {
         if (event.target.id === "logout") {
             auth.signOut().then(() => {
@@ -119,7 +112,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Carregar o progresso do usuário
+    // Carregar progresso do usuário
     function loadUserProgress(userId) {
         console.log("Carregando progresso do usuário:", userId);
 
@@ -128,8 +121,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const unit = urlPathParts[urlPathParts.length - 2];
 
         const progressPath = `/usuarios/${userId}/progresso/${level}/${unit}`;
-        const avatarPath = `/usuarios/${userId}/avatar`;
-
         database.ref(progressPath).once('value')
             .then((snapshot) => {
                 const progress = snapshot.val();
@@ -147,19 +138,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 initializeMap();
-
-                database.ref(avatarPath).once('value').then((avatarSnapshot) => {
-                    const avatarFileName = avatarSnapshot.val();
-                    const avatarImgPath = avatarFileName ? `../../imagens/${avatarFileName}` : '../../imagens/bonequinho.png';
-                    createPlayer(avatarImgPath);
-                }).catch(() => {
-                    createPlayer();
-                });
             })
             .catch((error) => {
                 console.error("Erro ao carregar o progresso do usuário:", error);
                 initializeMap();
-                createPlayer();
             });
     }
 
@@ -223,7 +205,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Mover jogador para a fase
+    // Rolar jogador para a fase
     function moveToPhase(index, path = null) {
         const phase = document.querySelectorAll('.phase')[index];
         const coords = phase.getBoundingClientRect();
