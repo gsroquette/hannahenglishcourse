@@ -3,7 +3,20 @@ document.addEventListener('DOMContentLoaded', function() {
     const database = firebase.database();
     const auth = firebase.auth();
 
-    // Função para gerenciar a caixa de login
+    const activities = [
+        { id: 1, name: "StoryCards", path: "../Unit1/StoryCards/index.html?fase=1", img: "../../imagens/botoes/storycards_button.png", unlocked: false },
+        { id: 2, name: "Flashcards", path: "../Unit1/Flashcards/index.html?fase=2", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+        { id: 3, name: "Flashcards2", path: "../Unit1/Flashcards2/index.html?fase=3", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+        { id: 4, name: "Flashcards3", path: "../Unit1/Flashcards3/index.html?fase=4", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+        { id: 5, name: "QUIZ", path: "../Unit1/QUIZ/index.html?fase=5", img: "../../imagens/botoes/quiz_button.png", unlocked: false }
+    ];
+
+    const mapContainer = document.getElementById('mapContainer');
+    const svgContainer = document.getElementById('linesSvg');
+    let player;
+    let lastUnlockedIndex = -1;
+
+    // Função para gerenciar a caixa de login e desbloqueio das fases
     auth.onAuthStateChanged(user => {
         const loginLink = document.getElementById("loginLink");
         const userDropdown = document.getElementById("userDropdown");
@@ -19,23 +32,36 @@ document.addEventListener('DOMContentLoaded', function() {
                 loginLink.innerHTML = `<img src="${userAvatar}" alt="User Icon" class="user-icon"><p class="user-name">${userName}</p>`;
                 loginLink.removeAttribute('href');
 
-                // Define o dashboard conforme o tipo de usuário
                 let dashboardLink = '';
-                if (userData.role === 'proprietario') {
-                    dashboardLink = '<a href="painel_proprietario.html" class="dashboard-link">OWNER DASHBOARD</a>';
-                } else if (userData.role === 'professor') {
-                    dashboardLink = '<a href="painel_professor.html" class="dashboard-link">TEACHER DASHBOARD</a>';
+                if (userData.role === 'proprietario' || userData.role === 'professor') {
+                    dashboardLink = userData.role === 'proprietario' ? 
+                                    '<a href="painel_proprietario.html" class="dashboard-link">OWNER DASHBOARD</a>' : 
+                                    '<a href="painel_professor.html" class="dashboard-link">TEACHER DASHBOARD</a>';
+
+                    activities.forEach(activity => activity.unlocked = true); // Desbloqueia todas as fases
+                    lastUnlockedIndex = activities.length - 1; // Marca todas as fases como desbloqueadas
+                    initializeMap(); // Inicializa o mapa
+
+                    // Busca o avatar e cria o jogador
+                    const avatarPath = `/usuarios/${userId}/avatar`;
+                    database.ref(avatarPath).once('value').then((avatarSnapshot) => {
+                        const avatarFileName = avatarSnapshot.val();
+                        const avatarImgPath = avatarFileName ? `../../imagens/${avatarFileName}` : '../../imagens/bonequinho.png';
+                        createPlayer(avatarImgPath, true); // Começa na primeira fase
+                    }).catch(() => {
+                        createPlayer('../../imagens/bonequinho.png', true); // Avatar padrão
+                    });
                 } else if (userData.role === 'aluno') {
                     dashboardLink = '<a href="painel_aluno.html" class="dashboard-link">STUDENT DASHBOARD</a>';
+                    loadUserProgress(userId); // Carrega o progresso do aluno
                 }
 
-                // Atualiza o dropdown com o link do dashboard e botão de logout
                 userDropdown.innerHTML = `
                     ${dashboardLink}
                     <a href="#" id="logout">LEAVE</a>
                 `;
 
-                // Adiciona funcionalidade de logout
+                // Função de logout
                 document.getElementById("logout").addEventListener("click", function() {
                     auth.signOut().then(() => {
                         console.log("Usuário deslogado");
@@ -45,12 +71,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                 });
             });
-
-            // Chamando a função original para carregar o progresso e o mapa
-            loadUserProgress(userId);
         } else {
             loginLink.setAttribute('href', 'Formulario/login.html');
-            bloquearTodosNiveis(); // Bloqueia todos os níveis se não estiver autenticado
+            bloquearTodosNiveis(); // Bloqueia os níveis para usuários não autenticados
         }
     });
 
@@ -68,13 +91,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 activities.forEach((activity, index) => {
                     if (progress[`fase${activity.id}`] === true) {
                         activity.unlocked = true;
-                        lastUnlockedIndex = index;  // Atualiza com o índice da última fase desbloqueada
-                    } else {
-                        activity.unlocked = false;  // Garante que a fase permaneça bloqueada se não estiver no progresso
+                        lastUnlockedIndex = index;  // Atualiza com a última fase desbloqueada
                     }
                 });
-            } else {
-                console.error("Nenhum progresso encontrado para este nível e unidade.");
             }
 
             initializeMap();
@@ -94,6 +113,54 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Restante do código original para gerenciar o mapa e as fases
+    function initializeMap() {
+        window.scrollTo(0, 0); // Rola para o topo antes de desenhar as linhas
+
+        activities.forEach((activity, index) => {
+            const phaseDiv = document.createElement('div');
+            phaseDiv.classList.add('phase');
+
+            const baseTopPosition = 200;
+            let topPosition = baseTopPosition + index * 20 * window.innerHeight / 100;
+            let horizontalPosition = index % 2 === 0 ? 10 : 85;
+
+            phaseDiv.style.top = `${topPosition}px`;
+            phaseDiv.style.left = `${horizontalPosition}%`;
+
+            const phaseImage = document.createElement('img');
+            phaseImage.src = activity.img;
+            phaseImage.alt = activity.name;
+            phaseImage.classList.add('phase-img');
+            phaseDiv.appendChild(phaseImage);
+
+            mapContainer.appendChild(phaseDiv);
+
+            if (activity.unlocked) {
+                phaseDiv.classList.add('active');
+            } else {
+                phaseDiv.classList.add('locked');
+                const lockIcon = document.createElement('img');
+                lockIcon.src = '../../imagens/lock_icon_resized.png';
+                lockIcon.classList.add('lock-icon');
+                phaseDiv.appendChild(lockIcon);
+            }
+
+            phaseDiv.addEventListener('click', () => {
+                if (activity.unlocked) {
+                    moveToPhase(index, activity.path);
+                }
+            });
+        });
+
+        drawLines();
+
+        if (lastUnlockedIndex >= 0) {
+            const lastUnlockedPhase = document.querySelectorAll('.phase')[lastUnlockedIndex];
+            animateUnlock(lastUnlockedPhase);
+            scrollToPhase(lastUnlockedIndex); // Rola para a fase desbloqueada
+        }
+    }
+
+    // Restante das funções originais para criar o jogador, mover fases, etc.
     // ...
 });
