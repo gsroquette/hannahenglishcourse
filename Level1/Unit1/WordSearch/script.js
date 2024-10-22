@@ -43,27 +43,6 @@ function createWordSearchGrid() {
     }
 }
 
-// Função para verificar se a fase está completa
-function checkCompletion() {
-    // Verifica se todas as palavras foram encontradas
-    const foundWords = [...new Set(foundCells.map(cell => cell.word))];
-    if (foundWords.length === wordsToFind.length) {
-        showCompletionModal();
-    }
-}
-
-// Função para exibir o modal de conclusão
-function showCompletionModal() {
-    document.getElementById('overlay').style.display = 'block';
-    document.getElementById('completion-modal').style.display = 'block';
-}
-
-// Função para fechar o modal de conclusão
-function closeModal() {
-    document.getElementById('overlay').style.display = 'none';
-    document.getElementById('completion-modal').style.display = 'none';
-}
-
 // Função para colocar uma palavra na grade
 function placeWordInGrid(word) {
     const directions = [
@@ -74,7 +53,6 @@ function placeWordInGrid(word) {
     ];
 
     const direction = directions[Math.floor(Math.random() * directions.length)];
-
     let row, col;
 
     do {
@@ -199,11 +177,88 @@ function checkWord() {
     }
 }
 
+// Função para verificar se a fase está completa
+function checkCompletion() {
+    const foundWords = [...new Set(foundCells.map(cell => cell.word))];
+    if (foundWords.length === wordsToFind.length) {
+        showCompletionModal();
+        completePhase(); // Chama a função de completar fase
+    }
+}
+
+// Função para iniciar o processo de atualização após a conclusão
+function completePhase() {
+    ensureUserIsAuthenticated(updateNextPhase);
+}
+
+// Função para capturar fase, level e unit do URL
+function getPhaseFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('fase');
+}
+
+function getLevelAndUnitFromURL() {
+    const url = window.location.pathname;
+    const parts = url.split('/');
+    const level = parts[1];
+    const unit = parts[2];
+    return { level, unit };
+}
+
+// Função para verificar autenticação do usuário
+function ensureUserIsAuthenticated(callback) {
+    firebase.auth().onAuthStateChanged(function(user) {
+        if (user) {
+            console.log("Usuário autenticado, UID:", user.uid);
+            callback(user.uid);
+        } else {
+            console.error("Usuário não autenticado");
+        }
+    });
+}
+
+// Função para atualizar o progresso no banco de dados
+async function updateNextPhase(userId) {
+    const currentPhase = getPhaseFromURL();
+    const { level, unit } = getLevelAndUnitFromURL();
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+    try {
+        if (currentPhase === "last") {
+            const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+            await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
+            console.log(`Nova unidade criada: ${nextUnit}, com fase1 desbloqueada.`);
+        } else if (currentPhase === "end") {
+            const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+            await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+            console.log(`Novo nível criado: ${nextLevel}, com Unit1 e fase1 desbloqueadas.`);
+        } else {
+            const nextPhase = parseInt(currentPhase) + 1;
+            await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
+            console.log(`Fase atual (${currentPhase}) e próxima fase (${nextPhase}) desbloqueadas.`);
+        }
+    } catch (error) {
+        console.error("Erro ao atualizar o progresso da fase:", error);
+    }
+}
+
 // Função para reiniciar o jogo
 function resetGame() {
     selectedCells = [];
     foundCells = [];
     init();
+}
+
+// Função para exibir o modal de conclusão
+function showCompletionModal() {
+    document.getElementById('overlay').style.display = 'block';
+    document.getElementById('completion-modal').style.display = 'block';
+}
+
+// Função para fechar o modal de conclusão
+function closeModal() {
+    document.getElementById('overlay').style.display = 'none';
+    document.getElementById('completion-modal').style.display = 'none';
 }
 
 // Função para inicializar o jogo
@@ -217,52 +272,3 @@ function init() {
 // Inicializa o jogo e carrega as palavras
 document.getElementById('reset-button').addEventListener('click', resetGame);
 loadWords();
- // Função para capturar fase, level e unit do URL
-    function getPhaseFromURL() {
-        const params = new URLSearchParams(window.location.search);
-        return params.get('fase'); // Obtém o valor de 'fase'
-    }
-
-    function getLevelAndUnitFromURL() {
-        const url = window.location.pathname;
-        const parts = url.split('/');
-        const level = parts[1];
-        const unit = parts[2];
-        return { level, unit };
-    }
-
-    // Função para verificar autenticação do usuário
-    function ensureUserIsAuthenticated(callback) {
-        firebase.auth().onAuthStateChanged(function(user) {
-            if (user) {
-                callback(user.uid); // Executa a função de callback se o usuário estiver logado
-            } else {
-                console.error("Usuário não autenticado");
-            }
-        });
-    }
-
-    // Função para atualizar o progresso no banco de dados
-    async function updateNextPhase(userId) {
-        const currentPhase = getPhaseFromURL();
-        const { level, unit } = getLevelAndUnitFromURL();
-        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-
-        try {
-            if (currentPhase === "last") {
-                // Cria uma nova Unit dentro do mesmo Level
-                const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-                await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
-            } else if (currentPhase === "end") {
-                // Cria um novo Level com Unit1
-                const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
-                await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
-            } else {
-                // Para fases normais, desbloqueia a próxima fase
-                const nextPhase = parseInt(currentPhase) + 1;
-                await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
-            }
-        } catch (error) {
-            console.error("Erro ao atualizar o progresso da fase:", error);
-        }
-    }
