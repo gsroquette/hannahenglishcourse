@@ -21,28 +21,40 @@ document.addEventListener('DOMContentLoaded', function() {
         const userDropdown = document.getElementById("userDropdown");
 
         if (user) {
+            console.log("Usuário autenticado:", user.uid);
             const userRef = database.ref('usuarios/' + user.uid);
-            userRef.once('value').then((snapshot) => {
-                const userData = snapshot.val();
-                const userName = userData.nome || user.email;
-                const userAvatar = userData.avatar ? `imagens/${userData.avatar}` : 'imagens/bonecologin1.png';
 
-                // Atualiza o quadro branco de login
-                loginLink.innerHTML = `<img src="${userAvatar}" alt="User Icon" class="user-icon"><p class="user-name">${userName}</p>`;
-                loginLink.removeAttribute('href');
+            userRef.once('value')
+                .then((snapshot) => {
+                    const userData = snapshot.val();
+                    if (!userData) {
+                        console.error("Dados do usuário não encontrados no banco de dados.");
+                        return;
+                    }
 
-                let dashboardLink = '';
-                if (userData.role === 'proprietario') {
-                    dashboardLink = '<a href="painel_proprietario.html" class="dashboard-link">OWNER DASHBOARD</a>';
-                } else if (userData.role === 'professor') {
-                    dashboardLink = '<a href="painel_professor.html" class="dashboard-link">TEACHER DASHBOARD</a>';
-                } else if (userData.role === 'aluno') {
-                    dashboardLink = '<a href="painel_aluno.html" class="dashboard-link">STUDENT DASHBOARD</a>';
-                }
+                    const userName = userData.nome || user.email;
+                    const userAvatar = userData.avatar ? `imagens/${userData.avatar}` : 'imagens/bonecologin1.png';
 
-                userDropdown.innerHTML = `${dashboardLink}<a href="#" id="logout">LEAVE</a>`;
-            });
+                    // Atualiza o quadro branco de login
+                    loginLink.innerHTML = `<img src="${userAvatar}" alt="User Icon" class="user-icon"><p class="user-name">${userName}</p>`;
+                    loginLink.removeAttribute('href');
+
+                    let dashboardLink = '';
+                    if (userData.role === 'proprietario') {
+                        dashboardLink = '<a href="painel_proprietario.html" class="dashboard-link">OWNER DASHBOARD</a>';
+                    } else if (userData.role === 'professor') {
+                        dashboardLink = '<a href="painel_professor.html" class="dashboard-link">TEACHER DASHBOARD</a>';
+                    } else if (userData.role === 'aluno') {
+                        dashboardLink = '<a href="painel_aluno.html" class="dashboard-link">STUDENT DASHBOARD</a>';
+                    }
+
+                    userDropdown.innerHTML = `${dashboardLink}<a href="#" id="logout">LEAVE</a>`;
+                })
+                .catch((error) => {
+                    console.error("Erro ao acessar os dados do usuário:", error.message);
+                });
         } else {
+            console.log("Usuário não autenticado.");
             loginLink.setAttribute('href', 'Formulario/login.html');
         }
     });
@@ -73,18 +85,39 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.log("Usuário deslogado");
                 location.reload();
             }).catch((error) => {
-                console.error("Erro ao deslogar:", error);
+                console.error("Erro ao deslogar:", error.message);
             });
         }
     });
 
     // Funções existentes (loadUserProgress, createPlayer, etc.) permanecem inalteradas
-    function loadUserProgress(userId) { /* Código original permanece */ }
-    function createPlayer(avatarPath = '../../imagens/bonequinho.png', startAtFirstPhase = false) { /* Código original permanece */ }
-    function initializeMap() { /* Código original permanece */ }
-    function moveToPhase(index, path = null) { /* Código original permanece */ }
-    function scrollToPhase(index) { /* Código original permanece */ }
+    function loadUserProgress(userId) {
+        console.log("Carregando progresso do usuário:", userId);
+        // Código original permanece aqui
+    }
+
+    function createPlayer(avatarPath = '../../imagens/bonequinho.png', startAtFirstPhase = false) {
+        console.log("Criando jogador com avatar:", avatarPath);
+        // Código original permanece aqui
+    }
+
+    function initializeMap() {
+        console.log("Inicializando mapa...");
+        // Código original permanece aqui
+    }
+
+    function moveToPhase(index, path = null) {
+        console.log(`Movendo para a fase ${index}`);
+        // Código original permanece aqui
+    }
+
+    function scrollToPhase(index) {
+        console.log(`Rolando para a fase ${index}`);
+        // Código original permanece aqui
+    }
+
     function drawLines() {
+        console.log("Desenhando linhas entre fases...");
         svgContainer.innerHTML = '';
         const phases = document.querySelectorAll('.phase');
         for (let i = 0; i < activities.length - 1; i++) {
