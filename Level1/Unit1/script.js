@@ -22,13 +22,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (user) {
             console.log("Usuário autenticado:", user.uid);
-            const userRef = database.ref('usuarios/' + user.uid);
 
+            const userRef = database.ref('usuarios/' + user.uid);
             userRef.once('value')
                 .then((snapshot) => {
                     const userData = snapshot.val();
+
                     if (!userData) {
                         console.error("Dados do usuário não encontrados no banco de dados.");
+                        loginLink.innerText = 'Login'; // Reverte para o login
                         return;
                     }
 
@@ -37,8 +39,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     // Atualiza o quadro branco de login
                     loginLink.innerHTML = `<img src="${userAvatar}" alt="User Icon" class="user-icon"><p class="user-name">${userName}</p>`;
-                    loginLink.removeAttribute('href');
+                    loginLink.removeAttribute('href'); // Remove o link de login
 
+                    // Define o dashboard conforme o tipo de usuário
                     let dashboardLink = '';
                     if (userData.role === 'proprietario') {
                         dashboardLink = '<a href="painel_proprietario.html" class="dashboard-link">OWNER DASHBOARD</a>';
@@ -48,14 +51,18 @@ document.addEventListener('DOMContentLoaded', function() {
                         dashboardLink = '<a href="painel_aluno.html" class="dashboard-link">STUDENT DASHBOARD</a>';
                     }
 
+                    // Atualiza o dropdown com o link do dashboard e botão de logout
                     userDropdown.innerHTML = `${dashboardLink}<a href="#" id="logout">LEAVE</a>`;
+                    userDropdown.style.display = 'none'; // Inicialmente escondido
+
+                    console.log("Quadro branco atualizado com o usuário:", userName);
                 })
                 .catch((error) => {
                     console.error("Erro ao acessar os dados do usuário:", error.message);
                 });
         } else {
             console.log("Usuário não autenticado.");
-            loginLink.setAttribute('href', 'Formulario/login.html');
+            loginLink.setAttribute('href', 'Formulario/login.html'); // Adiciona o link de login
         }
     });
 
