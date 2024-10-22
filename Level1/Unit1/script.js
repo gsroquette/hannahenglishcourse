@@ -31,10 +31,7 @@ document.addEventListener('DOMContentLoaded', function() {
     auth.onAuthStateChanged(function(user) {
         if (user) {
             console.log("Usuário autenticado:", user.uid);
-            // Adiciona um pequeno atraso para garantir que o Firebase esteja sincronizado
-            setTimeout(() => {
-                atualizarQuadroBranco(user);
-            }, 500); // Espera de 500ms antes de atualizar o quadro branco
+            atualizarQuadroBranco(user);
         } else {
             console.log("Usuário não autenticado.");
             exibirLinkDeLogin();
@@ -47,7 +44,7 @@ document.addEventListener('DOMContentLoaded', function() {
         userRef.once('value')
             .then((snapshot) => {
                 const userData = snapshot.val();
-                console.log("Dados do usuário recebidos:", userData); // Log de depuração
+                console.log("Dados do usuário recebidos:", userData);
 
                 if (!userData) {
                     console.error("Dados do usuário não encontrados no banco de dados.");
