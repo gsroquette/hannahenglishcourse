@@ -90,5 +90,54 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
-    // Funções createPlayer, initializeMap, e outras continuam inalteradas
+    function initializeMap() {
+        console.log("Inicializando o mapa..."); // Log para depuração
+        window.scrollTo(0, 0);
+
+        activities.forEach((activity, index) => {
+            const phaseDiv = document.createElement('div');
+            phaseDiv.classList.add('phase');
+
+            const baseTopPosition = 200;
+            let topPosition = baseTopPosition + index * 20 * window.innerHeight / 100;
+            let horizontalPosition = index % 2 === 0 ? 10 : 85;
+
+            phaseDiv.style.top = `${topPosition}px`;
+            phaseDiv.style.left = `${horizontalPosition}%`;
+
+            const phaseImage = document.createElement('img');
+            phaseImage.src = activity.img;
+            phaseImage.alt = activity.name;
+            phaseImage.classList.add('phase-img');
+            phaseDiv.appendChild(phaseImage);
+
+            mapContainer.appendChild(phaseDiv);
+
+            if (activity.unlocked) {
+                phaseDiv.classList.add('active');
+            } else {
+                phaseDiv.classList.add('locked');
+                const lockIcon = document.createElement('img');
+                lockIcon.src = '../../imagens/lock_icon_resized.png';
+                lockIcon.classList.add('lock-icon');
+                phaseDiv.appendChild(lockIcon);
+            }
+
+            phaseDiv.addEventListener('click', () => {
+                if (activity.unlocked) {
+                    moveToPhase(index, activity.path);
+                }
+            });
+        });
+
+        drawLines();
+
+        if (lastUnlockedIndex >= 0) {
+            const lastUnlockedPhase = document.querySelectorAll('.phase')[lastUnlockedIndex];
+            animateUnlock(lastUnlockedPhase);
+            scrollToPhase(lastUnlockedIndex);
+        }
+    }
+
+    // Outras funções como createPlayer, moveToPhase, e drawLines continuam inalteradas
 });
