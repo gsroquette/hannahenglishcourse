@@ -109,16 +109,20 @@ function startSelection(event) {
     isSelecting = true;
     selectedCells = [];
     const cell = getCellFromMouse(event);
-    if (cell) selectedCells.push(cell);
+    if (cell) {
+        selectedCells.push(cell);
+        highlightCell(cell, 'rgba(0, 0, 255, 0.3)'); // Destaque inicial
+    }
 }
 
 // Função para continuar a seleção
 function continueSelection(event) {
     if (!isSelecting) return;
+
     const cell = getCellFromMouse(event);
     if (cell && !isCellSelected(cell)) {
         selectedCells.push(cell);
-        highlightCell(cell);
+        highlightCell(cell, 'rgba(0, 0, 255, 0.3)'); // Destaque ao selecionar
     }
 }
 
@@ -126,7 +130,8 @@ function continueSelection(event) {
 function endSelection() {
     if (isSelecting) {
         isSelecting = false;
-        checkSelectedWord();
+        checkSelectedWord(); // Verifica a palavra selecionada
+        selectedCells = [];  // Limpa a seleção
     }
 }
 
@@ -150,8 +155,8 @@ function isCellSelected(cell) {
 }
 
 // Função para destacar a célula selecionada
-function highlightCell(cell) {
-    ctx.fillStyle = 'rgba(0, 0, 255, 0.3)'; // Cor de destaque
+function highlightCell(cell, color) {
+    ctx.fillStyle = color;
     ctx.fillRect(cell.col * cellSize, cell.row * cellSize, cellSize, cellSize);
     ctx.fillStyle = '#000'; // Restaura a cor da letra
     ctx.fillText(grid[cell.row][cell.col], cell.col * cellSize + cellSize / 4, cell.row * cellSize + cellSize / 1.5);
@@ -162,7 +167,10 @@ function checkSelectedWord() {
     const selectedWord = selectedCells.map(cell => grid[cell.row][cell.col]).join('');
     if (wordsToFind.includes(selectedWord)) {
         // Destaque final para palavra encontrada
-        selectedCells.forEach(cell => highlightCell(cell, true));
+        selectedCells.forEach(cell => highlightCell(cell, 'rgba(0, 255, 0, 0.3)')); // Destaque em verde
+    } else {
+        // Limpa a seleção se a palavra estiver incorreta
+        selectedCells.forEach(cell => highlightCell(cell, 'rgba(255, 0, 0, 0.3)')); // Destaque em vermelho
     }
 }
 
