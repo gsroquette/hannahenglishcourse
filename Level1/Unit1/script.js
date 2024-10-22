@@ -2,6 +2,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const database = firebase.database();
     const auth = firebase.auth();
 
+    // Define a persistência de autenticação para manter o usuário logado
+    auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+        .then(() => {
+            console.log("Persistência de autenticação definida para LOCAL.");
+        })
+        .catch((error) => {
+            console.error("Erro ao definir a persistência:", error.message);
+        });
+
     const activities = [
         { id: 1, name: "StoryCards", path: "../Unit1/StoryCards/index.html?fase=1", img: "../../imagens/botoes/storycards_button.png", unlocked: false },
         { id: 2, name: "Flashcards", path: "../Unit1/Flashcards/index.html?fase=2", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
@@ -34,6 +43,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const userRef = database.ref('usuarios/' + user.uid);
         userRef.once('value')
             .then((snapshot) => {
+                console.log("Dados do usuário:", snapshot.val());  // Log de depuração
                 const userData = snapshot.val();
 
                 if (!userData) {
@@ -256,5 +266,30 @@ document.addEventListener('DOMContentLoaded', function() {
             path.setAttribute('class', `path path-blue`);
             svgContainer.appendChild(path);
         }
+    }
+
+    // Função para animar o desbloqueio
+    function animateUnlock(phaseDiv) {
+        const unlockGif = document.createElement('img');
+        unlockGif.src = '../../imagens/cadeado.gif';
+        unlockGif.classList.add('unlock-gif');
+        phaseDiv.appendChild(unlockGif);
+
+        const unlockSound = new Audio('../../imagens/unlock-padlock.mp3');
+        unlockSound.play(); // Toca o som de desbloqueio
+
+        setTimeout(() => {
+            unlockGif.remove();
+        }, 3000);
+    }
+
+    // Função para rolar para a fase
+    function scrollToPhase(index) {
+        const phase = document.querySelectorAll('.phase')[index];
+        const coords = phase.getBoundingClientRect();
+        window.scrollTo({
+            top: coords.top + window.scrollY - window.innerHeight / 2,
+            behavior: 'smooth'
+        });
     }
 });
