@@ -17,7 +17,7 @@ canvas.height = cellSize * gridSize;
 async function loadWords() {
     try {
         // Ajuste no caminho do arquivo para garantir o carregamento correto
-        const response = await fetch('../../data1/words.txt');
+        const response = await fetch('../data1/words.txt');
         if (!response.ok) throw new Error('Não foi possível carregar as palavras.');
         
         const text = await response.text();
