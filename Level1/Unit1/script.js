@@ -63,30 +63,7 @@ auth.onAuthStateChanged(user => {
         if (user) {
             const userId = user.uid;
             console.log(`Usuário autenticado: ${userId}`);
-            database.ref(`/usuarios/${userId}/role`).once('value').then((snapshot) => {
-                const role = snapshot.val();
-                if (role === 'professor' || role === 'proprietario') {
-                    // Libera todas as fases para professor ou proprietário
-                    activities.forEach(activity => activity.unlocked = true);
-                    lastUnlockedIndex = activities.length - 1;  // Marca todas as fases como desbloqueadas
-                    initializeMap();
-
-                    // Busca o avatar no banco de dados
-                    const avatarPath = `/usuarios/${userId}/avatar`;
-                    database.ref(avatarPath).once('value').then((avatarSnapshot) => {
-                        const avatarFileName = avatarSnapshot.val();
-                        const avatarImgPath = avatarFileName ? `../../imagens/${avatarFileName}` : '../../imagens/bonequinho.png';
-                        createPlayer(avatarImgPath, true); // Define para começar na primeira fase
-                    }).catch(() => {
-                        createPlayer('../../imagens/bonequinho.png', true); // Usa bonequinho se houver erro
-                    });
-                } else if (role === 'aluno') {
-                    // Carrega progresso para aluno
-                    loadUserProgress(userId);
-                } else {
-                    console.error("Role não reconhecido!");
-                }
-            });
+            loadUserProgress(userId);
         } else {
             console.error("Usuário não autenticado!");
         }
@@ -105,6 +82,7 @@ auth.onAuthStateChanged(user => {
                 const progress = snapshot.val();
                 if (progress) {
                     activities.forEach((activity, index) => {
+                        // Atualiza a fase com base no ID da atividade
                         if (progress[`fase${activity.id}`] === true) {
                             activity.unlocked = true;
                             lastUnlockedIndex = index;  // Atualiza com o índice da última fase desbloqueada
@@ -120,8 +98,8 @@ auth.onAuthStateChanged(user => {
 
                 database.ref(avatarPath).once('value').then((avatarSnapshot) => {
                     const avatarFileName = avatarSnapshot.val();
-                    const avatarImgPath = avatarFileName ? `../../imagens/${avatarFileName}` : '../../imagens/bonequinho.png';
-                    createPlayer(avatarImgPath); // Para aluno, posiciona o bonequinho na fase desbloqueada
+                    const avatarImgPath = `../../imagens/${avatarFileName}`;
+                    createPlayer(avatarImgPath);
                 }).catch(() => {
                     createPlayer(); // Se erro, usar avatar padrão
                 });
@@ -133,15 +111,15 @@ auth.onAuthStateChanged(user => {
             });
     }
 
-    function createPlayer(avatarPath = '../../imagens/bonequinho.png', startAtFirstPhase = false) {
+    function createPlayer(avatarPath = '../../imagens/bonequinho.png') {
         player = document.createElement('img');
         player.src = avatarPath;
         player.classList.add('player');
         mapContainer.appendChild(player);
 
         // Determina a fase para posicionar o bonequinho
-        const initialPhaseIndex = startAtFirstPhase ? 0 : (lastUnlockedIndex > 0 ? lastUnlockedIndex - 1 : 0);
-        moveToPhase(initialPhaseIndex);  // Move para a primeira fase ou uma antes da última desbloqueada
+        const initialPhaseIndex = lastUnlockedIndex > 0 ? lastUnlockedIndex - 1 : 0;
+        moveToPhase(initialPhaseIndex);  // Move para a fase uma antes da última desbloqueada, ou a primeira fase
     }
 
     function initializeMap() {
