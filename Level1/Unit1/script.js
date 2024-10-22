@@ -58,6 +58,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Atualiza o quadro branco de login
                 loginLink.innerHTML = `<img src="${userAvatar}" alt="User Icon" class="user-icon"><p class="user-name">${userName}</p>`;
                 loginLink.removeAttribute('href'); // Remove o link de login
+                userDropdown.style.display = 'block'; // Mostra o dropdown
 
                 // Define o dashboard conforme o tipo de usuário
                 let dashboardLink = '';
@@ -71,8 +72,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // Atualiza o dropdown com o link do dashboard e botão de logout
                 userDropdown.innerHTML = `${dashboardLink}<a href="#" id="logout">LEAVE</a>`;
-                userDropdown.style.display = 'none'; // Inicialmente escondido
-
                 console.log("Quadro branco atualizado com o usuário:", userName);
             })
             .catch((error) => {
@@ -85,6 +84,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function exibirLinkDeLogin() {
         loginLink.innerHTML = 'Login';
         loginLink.setAttribute('href', 'Formulario/login.html');
+        userDropdown.style.display = 'none'; // Esconde o dropdown
     }
 
     // Alternar dropdown ao clicar
