@@ -2,7 +2,7 @@ const gridSize = 15;
 const canvas = document.getElementById('word-search-canvas');
 const ctx = canvas.getContext('2d');
 
-// Variáveis globais do jogo
+// Variáveis globais
 let grid = [];
 let selectedCells = [];
 let foundCells = [];
@@ -13,21 +13,89 @@ const cellSize = Math.min(canvas.clientWidth / gridSize, 30);
 canvas.width = cellSize * gridSize;
 canvas.height = cellSize * gridSize;
 
-// Função para carregar as palavras
+// Função para carregar as palavras da fase
 async function loadWords() {
     try {
-        // Ajuste no caminho do arquivo para garantir o carregamento correto
         const response = await fetch('../data1/words.txt');
         if (!response.ok) throw new Error('Não foi possível carregar as palavras.');
         
         const text = await response.text();
-        wordsToFind = text.trim().split('\n');
+        wordsToFind = text.split(/\r?\n/).filter(word => word.trim() !== '');
         
-        // Inicializa o jogo após carregar as palavras
-        init();
+        init(); // Inicializa o jogo após carregar as palavras
     } catch (error) {
         console.error('Erro ao carregar as palavras:', error);
-        alert('Erro ao carregar as palavras. Verifique o arquivo de palavras.');
+    }
+}
+
+// Função para criar a grade do caça-palavras
+function createWordSearchGrid() {
+    grid = Array.from({ length: gridSize }, () => Array(gridSize).fill(''));
+
+    wordsToFind.forEach(word => placeWordInGrid(word));
+
+    for (let row = 0; row < gridSize; row++) {
+        for (let col = 0; col < gridSize; col++) {
+            if (grid[row][col] === '') {
+                grid[row][col] = String.fromCharCode(65 + Math.floor(Math.random() * 26));
+            }
+        }
+    }
+}
+
+// Função para colocar uma palavra na grade
+function placeWordInGrid(word) {
+    const directions = [
+        { row: 0, col: 1 }, // Horizontal
+        { row: 1, col: 0 }, // Vertical
+        { row: 1, col: 1 }, // Diagonal principal
+        { row: 1, col: -1 } // Diagonal secundária
+    ];
+
+    let placed = false;
+
+    while (!placed) {
+        const direction = directions[Math.floor(Math.random() * directions.length)];
+        let row = Math.floor(Math.random() * gridSize);
+        let col = Math.floor(Math.random() * gridSize);
+
+        if (canPlaceWord(grid, word, row, col, direction)) {
+            for (let i = 0; i < word.length; i++) {
+                grid[row + i * direction.row][col + i * direction.col] = word[i];
+            }
+            placed = true;
+        }
+    }
+}
+
+// Função para verificar se a palavra pode ser colocada na grade
+function canPlaceWord(grid, word, row, col, direction) {
+    for (let i = 0; i < word.length; i++) {
+        const newRow = row + i * direction.row;
+        const newCol = col + i * direction.col;
+        if (
+            newRow < 0 || newRow >= gridSize || 
+            newCol < 0 || newCol >= gridSize || 
+            (grid[newRow][newCol] !== '' && grid[newRow][newCol] !== word[i])
+        ) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Função para desenhar a grade do caça-palavras
+function drawWordSearchGrid() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.font = `${cellSize * 0.6}px Arial`;
+    ctx.fillStyle = '#000';
+
+    for (let row = 0; row < gridSize; row++) {
+        for (let col = 0; col < gridSize; col++) {
+            ctx.strokeRect(col * cellSize, row * cellSize, cellSize, cellSize);
+            ctx.fillText(grid[row][col], col * cellSize + cellSize / 4, row * cellSize + cellSize / 1.5);
+        }
     }
 }
 
@@ -39,67 +107,6 @@ function init() {
     canvas.addEventListener('click', handleCanvasClick);
 }
 
-// Função para exibir a lista de palavras na tela
-function displayWordsList() {
-    const wordsListElement = document.getElementById('words');
-    wordsListElement.innerHTML = ''; // Limpa a lista antes de adicionar novas palavras
-
-    wordsToFind.forEach(word => {
-        const li = document.createElement('li');
-        li.textContent = word;
-        wordsListElement.appendChild(li);
-    });
-}
-
-// Função para verificar autenticação do usuário
-function ensureUserIsAuthenticated(callback) {
-    firebase.auth().onAuthStateChanged(user => {
-        if (user) {
-            console.log("Usuário autenticado:", user.uid);
-            callback(user.uid);
-        } else {
-            console.error("Usuário não autenticado");
-        }
-    });
-}
-
-// Função para atualizar o progresso no banco de dados
-async function updateNextPhase(userId) {
-    const currentPhase = getPhaseFromURL();
-    const level = getLevelFromURL();
-    const unit = getUnitFromURL();
-    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-
-    try {
-        if (currentPhase === "last") {
-            const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-            await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
-        } else if (currentPhase === "end") {
-            const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
-            await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
-        } else {
-            const nextPhase = parseInt(currentPhase) + 1;
-            await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
-        }
-    } catch (error) {
-        console.error("Erro ao atualizar o progresso da fase:", error);
-    }
-}
-
-// Função para exibir o modal de conclusão
-function showCompletionModal() {
-    document.getElementById('overlay').style.display = 'block';
-    document.getElementById('completion-modal').style.display = 'block';
-    ensureUserIsAuthenticated(updateNextPhase);
-}
-
-// Outras funções do jogo permanecem inalteradas
-function createWordSearchGrid() { /* Função original para criar a grade */ }
-function drawWordSearchGrid() { /* Função original para desenhar a grade */ }
-function handleCanvasClick(event) { /* Função original para lidar com cliques no canvas */ }
-function resetGame() { /* Função original para resetar o jogo */ }
-function closeModal() { /* Função original para fechar o modal */ }
-
-// Inicializa o jogo
+// Inicializa o jogo e carrega as palavras
 document.getElementById('reset-button').addEventListener('click', resetGame);
 document.addEventListener('DOMContentLoaded', loadWords);
