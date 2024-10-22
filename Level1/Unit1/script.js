@@ -204,7 +204,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 phaseDiv.classList.add('locked');
                 const lockIcon = document.createElement('img');
                 lockIcon.src = '../../imagens/lock_icon_resized.png';
-                lockIcon.classList.add('lock-icon');
                 phaseDiv.appendChild(lockIcon);
             }
 
