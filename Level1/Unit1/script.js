@@ -2,6 +2,50 @@ document.addEventListener('DOMContentLoaded', function() {
     const database = firebase.database();
     const auth = firebase.auth();
 
+// Configuração de autenticação com integração da caixa de login e dropdown
+auth.onAuthStateChanged(user => {
+    const loginLink = document.getElementById("loginLink");
+    const userDropdown = document.getElementById("userDropdown");
+
+    if (user) {
+        const userId = user.uid;
+        database.ref('/usuarios/' + userId).once('value').then(snapshot => {
+            const userData = snapshot.val();
+            const userName = userData.nome || user.email;
+            const userAvatar = userData.avatar ? `../../imagens/${userData.avatar}` : '../../imagens/bonecologin1.png';
+
+            // Atualiza a interface do usuário com nome e avatar
+            loginLink.innerHTML = `<img src="${userAvatar}" alt="User Icon" class="user-icon"><p class="user-name">${userName}</p>`;
+            loginLink.removeAttribute('href');
+            userDropdown.innerHTML = `
+                <a href="#" id="logout" class="dropdown-item">LEAVE</a>
+            `;
+
+            let dashboardLink = '';
+            if (userData.role === 'proprietario' || userData.role === 'professor') {
+                dashboardLink = userData.role === 'proprietario' ? 
+                                '<a href="painel_proprietario.html" class="dropdown-item">OWNER DASHBOARD</a>' : 
+                                '<a href="painel_professor.html" class="dropdown-item">TEACHER DASHBOARD</a>';
+            } else if (userData.role === 'aluno') {
+                dashboardLink = '<a href="painel_aluno.html" class="dropdown-item">STUDENT DASHBOARD</a>';
+            }
+
+            userDropdown.insertAdjacentHTML('afterbegin', dashboardLink);
+
+            // Adiciona funcionalidade de logout
+            document.getElementById("logout").addEventListener("click", function() {
+                auth.signOut().then(() => {
+                    location.reload();
+                }).catch(error => {
+                    console.error("Erro ao deslogar:", error);
+                });
+            });
+        });
+    } else {
+        loginLink.setAttribute('href', 'Formulario/login.html');
+    }
+});
+
     const activities = [
         { id: 1, name: "StoryCards", path: "../Unit1/StoryCards/index.html?fase=1", img: "../../imagens/botoes/storycards_button.png", unlocked: false },
         { id: 2, name: "Flashcards", path: "../Unit1/Flashcards/index.html?fase=2", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
@@ -15,54 +59,36 @@ document.addEventListener('DOMContentLoaded', function() {
     let player;
     let lastUnlockedIndex = -1;
 
-    // Configuração de autenticação com integração da caixa de login e dropdown
     auth.onAuthStateChanged(user => {
-        const loginLink = document.getElementById("loginLink");
-        const userDropdown = document.getElementById("userDropdown");
-
         if (user) {
             const userId = user.uid;
-            database.ref('/usuarios/' + userId).once('value').then(snapshot => {
-                const userData = snapshot.val();
-                const userName = userData.nome || user.email;
-                const userAvatar = userData.avatar ? `../../imagens/${userData.avatar}` : '../../imagens/bonecologin1.png';
-
-                // Atualiza a interface do usuário com nome e avatar
-                loginLink.innerHTML = `<img src="${userAvatar}" alt="User Icon" class="user-icon"><p class="user-name">${userName}</p>`;
-                loginLink.removeAttribute('href');
-                userDropdown.innerHTML = `
-                    <a href="#" id="logout" class="dropdown-item">LEAVE</a>
-                `;
-
-                let dashboardLink = '';
-                if (userData.role === 'proprietario' || userData.role === 'professor') {
+            console.log(`Usuário autenticado: ${userId}`);
+            database.ref(`/usuarios/${userId}/role`).once('value').then((snapshot) => {
+                const role = snapshot.val();
+                if (role === 'professor' || role === 'proprietario') {
+                    // Libera todas as fases para professor ou proprietário
                     activities.forEach(activity => activity.unlocked = true);
-                    lastUnlockedIndex = activities.length - 1;
-                    dashboardLink = userData.role === 'proprietario' ? 
-                                    '<a href="painel_proprietario.html" class="dropdown-item">OWNER DASHBOARD</a>' : 
-                                    '<a href="painel_professor.html" class="dropdown-item">TEACHER DASHBOARD</a>';
-
+                    lastUnlockedIndex = activities.length - 1;  // Marca todas as fases como desbloqueadas
                     initializeMap();
-                    createPlayer(userAvatar, true); // Começa na primeira fase
-                } else if (userData.role === 'aluno') {
-                    dashboardLink = '<a href="painel_aluno.html" class="dropdown-item">STUDENT DASHBOARD</a>';
-                    loadUserProgress(userId);
-                }
 
-                userDropdown.insertAdjacentHTML('afterbegin', dashboardLink);
-
-                // Adiciona funcionalidade de logout
-                document.getElementById("logout").addEventListener("click", function() {
-                    auth.signOut().then(() => {
-                        location.reload();
-                    }).catch(error => {
-                        console.error("Erro ao deslogar:", error);
+                    // Busca o avatar no banco de dados
+                    const avatarPath = `/usuarios/${userId}/avatar`;
+                    database.ref(avatarPath).once('value').then((avatarSnapshot) => {
+                        const avatarFileName = avatarSnapshot.val();
+                        const avatarImgPath = avatarFileName ? `../../imagens/${avatarFileName}` : '../../imagens/bonequinho.png';
+                        createPlayer(avatarImgPath, true); // Define para começar na primeira fase
+                    }).catch(() => {
+                        createPlayer('../../imagens/bonequinho.png', true); // Usa bonequinho se houver erro
                     });
-                });
+                } else if (role === 'aluno') {
+                    // Carrega progresso para aluno
+                    loadUserProgress(userId);
+                } else {
+                    console.error("Role não reconhecido!");
+                }
             });
         } else {
-            loginLink.setAttribute('href', 'Formulario/login.html');
-            bloquearTodosNiveis(); // Bloqueia os níveis para não autenticados
+            console.error("Usuário não autenticado!");
         }
     });
 
@@ -74,31 +100,37 @@ document.addEventListener('DOMContentLoaded', function() {
         const progressPath = `/usuarios/${userId}/progresso/${level}/${unit}`;
         const avatarPath = `/usuarios/${userId}/avatar`;
 
-        database.ref(progressPath).once('value').then(snapshot => {
-            const progress = snapshot.val();
-            if (progress) {
-                activities.forEach((activity, index) => {
-                    if (progress[`fase${activity.id}`] === true) {
-                        activity.unlocked = true;
-                        lastUnlockedIndex = index;
-                    }
+        database.ref(progressPath).once('value')
+            .then((snapshot) => {
+                const progress = snapshot.val();
+                if (progress) {
+                    activities.forEach((activity, index) => {
+                        if (progress[`fase${activity.id}`] === true) {
+                            activity.unlocked = true;
+                            lastUnlockedIndex = index;  // Atualiza com o índice da última fase desbloqueada
+                        } else {
+                            activity.unlocked = false;  // Garante que a fase permaneça bloqueada se não estiver no progresso
+                        }
+                    });
+                } else {
+                    console.error("Nenhum progresso encontrado para este nível e unidade.");
+                }
+
+                initializeMap();
+
+                database.ref(avatarPath).once('value').then((avatarSnapshot) => {
+                    const avatarFileName = avatarSnapshot.val();
+                    const avatarImgPath = avatarFileName ? `../../imagens/${avatarFileName}` : '../../imagens/bonequinho.png';
+                    createPlayer(avatarImgPath); // Para aluno, posiciona o bonequinho na fase desbloqueada
+                }).catch(() => {
+                    createPlayer(); // Se erro, usar avatar padrão
                 });
-            }
-
-            initializeMap();
-
-            database.ref(avatarPath).once('value').then(avatarSnapshot => {
-                const avatarFileName = avatarSnapshot.val();
-                const avatarImgPath = avatarFileName ? `../../imagens/${avatarFileName}` : '../../imagens/bonequinho.png';
-                createPlayer(avatarImgPath);
-            }).catch(() => {
+            })
+            .catch((error) => {
+                console.error("Erro ao carregar o progresso do usuário:", error);
+                initializeMap();
                 createPlayer();
             });
-        }).catch(error => {
-            console.error("Erro ao carregar o progresso do usuário:", error);
-            initializeMap();
-            createPlayer();
-        });
     }
 
     function createPlayer(avatarPath = '../../imagens/bonequinho.png', startAtFirstPhase = false) {
@@ -107,11 +139,13 @@ document.addEventListener('DOMContentLoaded', function() {
         player.classList.add('player');
         mapContainer.appendChild(player);
 
+        // Determina a fase para posicionar o bonequinho
         const initialPhaseIndex = startAtFirstPhase ? 0 : (lastUnlockedIndex > 0 ? lastUnlockedIndex - 1 : 0);
-        moveToPhase(initialPhaseIndex);
+        moveToPhase(initialPhaseIndex);  // Move para a primeira fase ou uma antes da última desbloqueada
     }
 
     function initializeMap() {
+        // Rola para o topo antes de desenhar as linhas
         window.scrollTo(0, 0);
 
         activities.forEach((activity, index) => {
@@ -152,11 +186,28 @@ document.addEventListener('DOMContentLoaded', function() {
 
         drawLines();
 
+        // Aplica a animação de desbloqueio na última fase desbloqueada
         if (lastUnlockedIndex >= 0) {
             const lastUnlockedPhase = document.querySelectorAll('.phase')[lastUnlockedIndex];
             animateUnlock(lastUnlockedPhase);
+
+            // Rola para a fase desbloqueada após desenhar as linhas
             scrollToPhase(lastUnlockedIndex);
         }
+    }
+
+    function animateUnlock(phaseDiv) {
+        const unlockGif = document.createElement('img');
+        unlockGif.src = '../../imagens/cadeado.gif';
+        unlockGif.classList.add('unlock-gif');
+        phaseDiv.appendChild(unlockGif);
+
+        const unlockSound = new Audio('../../imagens/unlock-padlock.mp3');
+        unlockSound.play(); // Toca o som de desbloqueio
+
+        setTimeout(() => {
+            unlockGif.remove();
+        }, 3000);
     }
 
     function moveToPhase(index, path = null) {
