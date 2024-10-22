@@ -5,6 +5,8 @@ const ctx = canvas.getContext('2d');
 // Variáveis globais
 let grid = [];
 let wordsToFind = [];
+let selectedCells = [];
+let foundWords = [];
 
 // Configurações do canvas
 const cellSize = Math.min(canvas.clientWidth / gridSize, 30);
@@ -28,13 +30,10 @@ async function loadWords() {
 
 // Função para criar a grade do caça-palavras
 function createWordSearchGrid() {
-    // Inicializa a grade vazia
     grid = Array.from({ length: gridSize }, () => Array(gridSize).fill(''));
 
-    // Coloca cada palavra na grade
     wordsToFind.forEach(word => placeWordInGrid(word));
 
-    // Preenche as células vazias com letras aleatórias
     for (let row = 0; row < gridSize; row++) {
         for (let col = 0; col < gridSize; col++) {
             if (grid[row][col] === '') {
@@ -100,6 +99,65 @@ function drawWordSearchGrid() {
     }
 }
 
+// Função para lidar com cliques no canvas
+canvas.addEventListener('mousedown', handleMouseDown);
+canvas.addEventListener('mouseup', handleMouseUp);
+
+let isSelecting = false;
+
+// Função para iniciar a seleção
+function handleMouseDown(event) {
+    isSelecting = true;
+    const { row, col } = getCellFromCoordinates(event.offsetX, event.offsetY);
+    selectedCells = [{ row, col }];
+}
+
+// Função para finalizar a seleção
+function handleMouseUp(event) {
+    if (!isSelecting) return;
+
+    isSelecting = false;
+    const { row, col } = getCellFromCoordinates(event.offsetX, event.offsetY);
+    selectedCells.push({ row, col });
+    
+    checkSelectedWord();
+}
+
+// Função para obter a célula a partir das coordenadas do mouse
+function getCellFromCoordinates(x, y) {
+    return {
+        row: Math.floor(y / cellSize),
+        col: Math.floor(x / cellSize)
+    };
+}
+
+// Função para verificar se a palavra selecionada está correta
+function checkSelectedWord() {
+    const selectedWord = selectedCells.map(cell => grid[cell.row][cell.col]).join('');
+    
+    if (wordsToFind.includes(selectedWord)) {
+        foundWords.push(selectedWord);
+        highlightSelectedWord();
+        checkCompletion();
+    }
+}
+
+// Função para destacar a palavra encontrada
+function highlightSelectedWord() {
+    ctx.fillStyle = 'rgba(0, 255, 0, 0.3)';  // Cor verde com opacidade
+
+    selectedCells.forEach(cell => {
+        ctx.fillRect(cell.col * cellSize, cell.row * cellSize, cellSize, cellSize);
+    });
+}
+
+// Função para verificar se todas as palavras foram encontradas
+function checkCompletion() {
+    if (foundWords.length === wordsToFind.length) {
+        showCompletionModal();
+    }
+}
+
 // Função para inicializar o jogo
 function init() {
     createWordSearchGrid();
@@ -107,18 +165,5 @@ function init() {
     displayWordsList();
 }
 
-// Função para exibir a lista de palavras na tela
-function displayWordsList() {
-    const wordsListElement = document.getElementById('words');
-    wordsListElement.innerHTML = ''; // Limpa a lista antes de adicionar novas palavras
-
-    wordsToFind.forEach(word => {
-        const li = document.createElement('li');
-        li.textContent = word;
-        wordsListElement.appendChild(li);
-    });
-}
-
 // Inicializa o jogo e carrega as palavras
-document.getElementById('reset-button').addEventListener('click', init);
 document.addEventListener('DOMContentLoaded', loadWords);
