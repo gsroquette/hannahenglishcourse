@@ -19,22 +19,26 @@ document.addEventListener('DOMContentLoaded', function() {
         if (user) {
             const userId = user.uid;
             console.log(`Usuário autenticado: ${userId}`);
+
+            // Obtendo o token do usuário para verificar o role
             user.getIdTokenResult().then((idTokenResult) => {
                 const userRole = idTokenResult.claims.role || '';
-                if (userRole === 'professor' || userRole === 'proprietario') {
-                    // Libera todas as fases para "professor" ou "proprietário"
+
+                // Verifica se o usuário é "proprietário" ou "professor"
+                if (userRole.toLowerCase() === 'proprietario' || userRole.toLowerCase() === 'professor') {
+                    // Libera todas as fases
                     activities.forEach(activity => {
                         activity.unlocked = true;
                     });
-                    lastUnlockedIndex = activities.length - 1; // Define como última fase desbloqueada
+                    lastUnlockedIndex = activities.length - 1; // Define última fase como desbloqueada
                     initializeMap(); // Inicializa o mapa
                     createPlayer(); // Cria o jogador
                 } else {
-                    loadUserProgress(userId); // Carrega progresso do usuário
+                    loadUserProgress(userId); // Carrega progresso normal do usuário
                 }
             }).catch((error) => {
                 console.error("Erro ao obter o token do usuário:", error);
-                loadUserProgress(userId); // Tenta carregar o progresso do usuário em caso de erro
+                loadUserProgress(userId); // Tenta carregar o progresso em caso de erro
             });
         } else {
             console.error("Usuário não autenticado!");
