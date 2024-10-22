@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -23,14 +23,59 @@
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
 
-        // Test Firebase connection
-        firebase.database().ref('/').once('value')
-          .then((snapshot) => {
-            console.log('Database connected:', snapshot.val());
-          })
-          .catch((error) => {
-            console.error('Error connecting to database:', error);
-          });
+        // Function to unlock specific phases for students
+        function unlockStudentPhases(phasesUnlocked) {
+            const phases = document.querySelectorAll('.phase');
+            phases.forEach((phase, index) => {
+                if (index < phasesUnlocked) {
+                    phase.classList.add('unlocked');
+                    phase.disabled = false; // Enable phase button
+                }
+            });
+        }
+
+        // Function to unlock all phases
+        function unlockAllPhases() {
+            const phases = document.querySelectorAll('.phase');
+            phases.forEach(phase => {
+                phase.classList.add('unlocked');
+                phase.disabled = false; // Enable phase button
+            });
+        }
+
+        // Check user role and unlock phases accordingly
+        firebase.auth().onAuthStateChanged((user) => {
+            if (user) {
+                const userId = user.uid;
+                const userRoleRef = firebase.database().ref(`/usuarios/${userId}/role`);
+                const userProgressRef = firebase.database().ref(`/usuarios/${userId}/progresso`);
+
+                // Get user role
+                userRoleRef.once('value')
+                    .then((snapshot) => {
+                        const role = snapshot.val();
+                        if (role === 'professor' || role === 'proprietario') {
+                            // Unlock all phases if the user is a professor or owner
+                            unlockAllPhases();
+                        } else if (role === 'aluno') {
+                            // Get user progress for students
+                            userProgressRef.once('value')
+                                .then((progressSnapshot) => {
+                                    const progressData = progressSnapshot.val();
+                                    if (progressData && progressData.lastPhaseUnlocked) {
+                                        unlockStudentPhases(progressData.lastPhaseUnlocked);
+                                    }
+                                })
+                                .catch((error) => {
+                                    console.error('Error fetching user progress:', error);
+                                });
+                        }
+                    })
+                    .catch((error) => {
+                        console.error('Error fetching user role:', error);
+                    });
+            }
+        });
     </script>
 </head>
 <body>
@@ -42,6 +87,14 @@
         <!-- Imagem de título centralizada sobre o fundo -->
         <div class="title-container">
             <img src="../../imagens/titulo.png" alt="Hannah English Course" class="title-image">
+        </div>
+
+        <!-- Fases (Exemplo) -->
+        <div class="phase-container">
+            <button class="phase locked" disabled>Phase 1</button>
+            <button class="phase locked" disabled>Phase 2</button>
+            <button class="phase locked" disabled>Phase 3</button>
+            <!-- Adicione mais fases conforme necessário -->
         </div>
 
         <!-- SVG para as linhas -->
