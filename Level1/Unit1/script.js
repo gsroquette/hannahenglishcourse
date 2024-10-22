@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let player;
     let lastUnlockedIndex = -1;
 
-    // Configuração de autenticação com caixa de login
+    // Configuração de autenticação com integração da caixa de login e dropdown
     auth.onAuthStateChanged(user => {
         const loginLink = document.getElementById("loginLink");
         const userDropdown = document.getElementById("userDropdown");
@@ -31,26 +31,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Atualiza a interface do usuário com nome e avatar
                 loginLink.innerHTML = `<img src="${userAvatar}" alt="User Icon" class="user-icon"><p class="user-name">${userName}</p>`;
                 loginLink.removeAttribute('href');
+                userDropdown.innerHTML = `
+                    <a href="#" id="logout" class="dropdown-item">LEAVE</a>
+                `;
 
                 let dashboardLink = '';
                 if (userData.role === 'proprietario' || userData.role === 'professor') {
                     activities.forEach(activity => activity.unlocked = true);
                     lastUnlockedIndex = activities.length - 1;
                     dashboardLink = userData.role === 'proprietario' ? 
-                                    '<a href="painel_proprietario.html" class="dashboard-link">OWNER DASHBOARD</a>' : 
-                                    '<a href="painel_professor.html" class="dashboard-link">TEACHER DASHBOARD</a>';
+                                    '<a href="painel_proprietario.html" class="dropdown-item">OWNER DASHBOARD</a>' : 
+                                    '<a href="painel_professor.html" class="dropdown-item">TEACHER DASHBOARD</a>';
 
                     initializeMap();
                     createPlayer(userAvatar, true); // Começa na primeira fase
                 } else if (userData.role === 'aluno') {
-                    dashboardLink = '<a href="painel_aluno.html" class="dashboard-link">STUDENT DASHBOARD</a>';
+                    dashboardLink = '<a href="painel_aluno.html" class="dropdown-item">STUDENT DASHBOARD</a>';
                     loadUserProgress(userId);
                 }
 
-                userDropdown.innerHTML = `
-                    ${dashboardLink}
-                    <a href="#" id="logout">LEAVE</a>
-                `;
+                userDropdown.insertAdjacentHTML('afterbegin', dashboardLink);
 
                 // Adiciona funcionalidade de logout
                 document.getElementById("logout").addEventListener("click", function() {
@@ -91,14 +91,14 @@ document.addEventListener('DOMContentLoaded', function() {
             database.ref(avatarPath).once('value').then(avatarSnapshot => {
                 const avatarFileName = avatarSnapshot.val();
                 const avatarImgPath = avatarFileName ? `../../imagens/${avatarFileName}` : '../../imagens/bonequinho.png';
-                createPlayer(avatarImgPath); // Posiciona o avatar
+                createPlayer(avatarImgPath);
             }).catch(() => {
-                createPlayer(); // Usa avatar padrão
+                createPlayer();
             });
         }).catch(error => {
             console.error("Erro ao carregar o progresso do usuário:", error);
             initializeMap();
-            createPlayer(); // Garante que o bonequinho apareça
+            createPlayer();
         });
     }
 
@@ -160,5 +160,5 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // As funções restantes como moveToPhase, animateUnlock e drawLines foram incluídas para manter o layout e funcionalidade originais
+    // Funções auxiliares como drawLines, animateUnlock e moveToPhase permanecem iguais para manter a funcionalidade original
 });
