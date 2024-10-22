@@ -95,6 +95,7 @@ document.addEventListener('DOMContentLoaded', function() {
         event.preventDefault();
         const dropdown = document.getElementById("userDropdown");
         dropdown.style.display = (dropdown.style.display === 'none' || dropdown.style.display === '') ? 'block' : 'none';
+        console.log("Dropdown exibido:", dropdown.style.display);
     });
 
     // Fecha o dropdown ao clicar fora dele
@@ -103,6 +104,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const loginContainer = document.getElementById("loginContainer");
         if (!loginContainer.contains(event.target)) {
             dropdown.style.display = 'none';
+            console.log("Dropdown oculto.");
         }
     });
 
