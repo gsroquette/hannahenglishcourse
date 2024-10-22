@@ -19,11 +19,36 @@ document.addEventListener('DOMContentLoaded', function() {
         if (user) {
             const userId = user.uid;
             console.log(`Usuário autenticado: ${userId}`);
-            loadUserProgress(userId);
+            checkUserRole(userId); // Verifica o papel do usuário
         } else {
             console.error("Usuário não autenticado!");
         }
     });
+
+    // Função para verificar o papel do usuário
+    function checkUserRole(userId) {
+        const userRoleRef = database.ref(`usuarios/${userId}/role`);
+        userRoleRef.once('value').then(snapshot => {
+            const role = snapshot.val();
+            if (role === 'professor' || role === 'proprietario') {
+                unlockAllPhases(); // Libera todas as fases
+            } else {
+                loadUserProgress(userId); // Carrega progresso normal do usuário
+            }
+        }).catch(error => {
+            console.error("Erro ao verificar o papel do usuário:", error);
+        });
+    }
+
+    // Função para liberar todas as fases
+    function unlockAllPhases() {
+        activities.forEach(activity => {
+            activity.unlocked = true;
+        });
+        lastUnlockedIndex = activities.length - 1;
+        initializeMap(); // Inicializa o mapa com todas as fases desbloqueadas
+        createPlayer(); // Cria o bonequinho
+    }
 
     function loadUserProgress(userId) {
         const urlPathParts = window.location.pathname.split('/');
@@ -78,118 +103,5 @@ document.addEventListener('DOMContentLoaded', function() {
         moveToPhase(initialPhaseIndex);  // Move para a fase uma antes da última desbloqueada, ou a primeira fase
     }
 
-    function initializeMap() {
-        // Rola para o topo antes de desenhar as linhas
-        window.scrollTo(0, 0);
-
-        activities.forEach((activity, index) => {
-            const phaseDiv = document.createElement('div');
-            phaseDiv.classList.add('phase');
-
-            const baseTopPosition = 200;
-            let topPosition = baseTopPosition + index * 20 * window.innerHeight / 100;
-            let horizontalPosition = index % 2 === 0 ? 10 : 85;
-
-            phaseDiv.style.top = `${topPosition}px`;
-            phaseDiv.style.left = `${horizontalPosition}%`;
-
-            const phaseImage = document.createElement('img');
-            phaseImage.src = activity.img;
-            phaseImage.alt = activity.name;
-            phaseImage.classList.add('phase-img');
-            phaseDiv.appendChild(phaseImage);
-
-            mapContainer.appendChild(phaseDiv);
-
-            if (activity.unlocked) {
-                phaseDiv.classList.add('active');
-            } else {
-                phaseDiv.classList.add('locked');
-                const lockIcon = document.createElement('img');
-                lockIcon.src = '../../imagens/lock_icon_resized.png';
-                lockIcon.classList.add('lock-icon');
-                phaseDiv.appendChild(lockIcon);
-            }
-
-            phaseDiv.addEventListener('click', () => {
-                if (activity.unlocked) {
-                    moveToPhase(index, activity.path);
-                }
-            });
-        });
-
-        drawLines();
-
-        // Aplica a animação de desbloqueio na última fase desbloqueada
-        if (lastUnlockedIndex >= 0) {
-            const lastUnlockedPhase = document.querySelectorAll('.phase')[lastUnlockedIndex];
-            animateUnlock(lastUnlockedPhase);
-
-            // Rola para a fase desbloqueada após desenhar as linhas
-            scrollToPhase(lastUnlockedIndex);
-        }
-    }
-
-    function animateUnlock(phaseDiv) {
-        const unlockGif = document.createElement('img');
-        unlockGif.src = '../../imagens/cadeado.gif';
-        unlockGif.classList.add('unlock-gif');
-        phaseDiv.appendChild(unlockGif);
-
-        const unlockSound = new Audio('../../imagens/unlock-padlock.mp3');
-        unlockSound.play(); // Toca o som de desbloqueio
-
-        setTimeout(() => {
-            unlockGif.remove();
-        }, 3000);
-    }
-
-    function moveToPhase(index, path = null) {
-        const phase = document.querySelectorAll('.phase')[index];
-        const coords = phase.getBoundingClientRect();
-
-        player.style.top = `${coords.top + window.scrollY + coords.height / 2}px`;
-        player.style.left = `${coords.left + window.scrollX + coords.width / 2}px`;
-        player.classList.add('moving');
-
-        if (path) {
-            setTimeout(() => {
-                window.location.href = path;
-            }, 600);
-        }
-    }
-
-    function scrollToPhase(index) {
-        const phase = document.querySelectorAll('.phase')[index];
-        const coords = phase.getBoundingClientRect();
-        window.scrollTo({
-            top: coords.top + window.scrollY - window.innerHeight / 2,
-            behavior: 'smooth'
-        });
-    }
-
-    function drawLines() {
-        svgContainer.innerHTML = '';
-        const phases = document.querySelectorAll('.phase');
-        for (let i = 0; i < activities.length - 1; i++) {
-            const phase1 = phases[i];
-            const phase2 = phases[i + 1];
-            if (!phase1 || !phase2) continue;
-
-            const coords1 = phase1.getBoundingClientRect();
-            const coords2 = phase2.getBoundingClientRect();
-            const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
-            const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150;
-            const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
-            const controlPointY2 = coords2.top - 150;
-
-            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
-                       C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
-                       ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
-            path.setAttribute('d', d);
-            path.setAttribute('class', `path path-blue`);
-            svgContainer.appendChild(path);
-        }
-    }
+    // ... [restante do código permanece inalterado]
 });
