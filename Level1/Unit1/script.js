@@ -2,6 +2,31 @@ document.addEventListener('DOMContentLoaded', function() {
     const database = firebase.database();
     const auth = firebase.auth();
 
+    function updateLoginContainer(userId) {
+        const loginLink = document.getElementById("loginLink");
+        const userDropdown = document.getElementById("userDropdown");
+
+        database.ref('usuarios/' + userId).once('value').then((snapshot) => {
+            const userData = snapshot.val();
+            const userName = userData.nome || user.email;
+            const userAvatar = userData.avatar ? `imagens/${userData.avatar}` : 'imagens/bonecologin1.png';
+
+            loginLink.innerHTML = `<img src="${userAvatar}" alt="User Icon" class="user-icon"><p class="user-name">${userName}</p>`;
+            loginLink.removeAttribute('href');
+
+            let dashboardLink = '';
+            if (userData.role === 'proprietario') {
+                dashboardLink = '<a href="painel_proprietario.html" class="dashboard-link">OWNER DASHBOARD</a>';
+            } else if (userData.role === 'professor') {
+                dashboardLink = '<a href="painel_professor.html" class="dashboard-link">TEACHER DASHBOARD</a>';
+            } else if (userData.role === 'aluno') {
+                dashboardLink = '<a href="painel_aluno.html" class="dashboard-link">STUDENT DASHBOARD</a>';
+            }
+
+            userDropdown.innerHTML = `${dashboardLink}<a href="#" id="logout">LEAVE</a>`;
+        });
+    }
+
     const activities = [
         { id: 1, name: "StoryCards", path: "../Unit1/StoryCards/index.html?fase=1", img: "../../imagens/botoes/storycards_button.png", unlocked: false },
         { id: 2, name: "Flashcards", path: "../Unit1/Flashcards/index.html?fase=2", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
@@ -11,7 +36,6 @@ document.addEventListener('DOMContentLoaded', function() {
     ];
 
     const mapContainer = document.getElementById('mapContainer');
-    const svgContainer = document.getElementById('linesSvg');
     let player;
     let lastUnlockedIndex = -1;
 
@@ -21,33 +45,26 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log(`Usuário autenticado: ${userId}`);
             updateLoginContainer(userId);
 
-            // Busca o role do usuário para definir o comportamento
+            // Verifica o role do usuário
             database.ref(`/usuarios/${userId}/role`).once('value').then((snapshot) => {
                 const role = snapshot.val();
                 if (role === 'professor' || role === 'proprietario') {
-                    // Libera todas as fases para professor ou proprietário
                     activities.forEach(activity => activity.unlocked = true);
-                    lastUnlockedIndex = activities.length - 1;  // Marca todas as fases como desbloqueadas
+                    lastUnlockedIndex = activities.length - 1;
                     initializeMap();
 
-                    // Busca o avatar no banco de dados
                     const avatarPath = `/usuarios/${userId}/avatar`;
                     database.ref(avatarPath).once('value').then((avatarSnapshot) => {
                         const avatarFileName = avatarSnapshot.val();
                         const avatarImgPath = avatarFileName ? `../../imagens/${avatarFileName}` : '../../imagens/bonequinho.png';
-                        createPlayer(avatarImgPath, true); // Define para começar na primeira fase
+                        createPlayer(avatarImgPath, true);
                     }).catch(() => {
-                        createPlayer('../../imagens/bonequinho.png', true); // Usa bonequinho se houver erro
+                        createPlayer('../../imagens/bonequinho.png', true);
                     });
                 } else if (role === 'aluno') {
-                    // Carrega progresso para aluno
                     loadUserProgress(userId);
-                } else {
-                    console.error("Role não reconhecido!");
                 }
             });
-        } else {
-            console.error("Usuário não autenticado!");
         }
     });
 
@@ -59,37 +76,28 @@ document.addEventListener('DOMContentLoaded', function() {
         const progressPath = `/usuarios/${userId}/progresso/${level}/${unit}`;
         const avatarPath = `/usuarios/${userId}/avatar`;
 
-        database.ref(progressPath).once('value')
-            .then((snapshot) => {
-                const progress = snapshot.val();
-                if (progress) {
-                    activities.forEach((activity, index) => {
-                        if (progress[`fase${activity.id}`] === true) {
-                            activity.unlocked = true;
-                            lastUnlockedIndex = index;  // Atualiza com o índice da última fase desbloqueada
-                        } else {
-                            activity.unlocked = false;  // Garante que a fase permaneça bloqueada se não estiver no progresso
-                        }
-                    });
-                } else {
-                    console.error("Nenhum progresso encontrado para este nível e unidade.");
-                }
-
-                initializeMap();
-
-                database.ref(avatarPath).once('value').then((avatarSnapshot) => {
-                    const avatarFileName = avatarSnapshot.val();
-                    const avatarImgPath = avatarFileName ? `../../imagens/${avatarFileName}` : '../../imagens/bonequinho.png';
-                    createPlayer(avatarImgPath); // Para aluno, posiciona o bonequinho na fase desbloqueada
-                }).catch(() => {
-                    createPlayer(); // Se erro, usar avatar padrão
+        database.ref(progressPath).once('value').then((snapshot) => {
+            const progress = snapshot.val();
+            if (progress) {
+                activities.forEach((activity, index) => {
+                    if (progress[`fase${activity.id}`] === true) {
+                        activity.unlocked = true;
+                        lastUnlockedIndex = index;
+                    } else {
+                        activity.unlocked = false;
+                    }
                 });
-            })
-            .catch((error) => {
-                console.error("Erro ao carregar o progresso do usuário:", error);
-                initializeMap();
+            }
+            initializeMap();
+
+            database.ref(avatarPath).once('value').then((avatarSnapshot) => {
+                const avatarFileName = avatarSnapshot.val();
+                const avatarImgPath = avatarFileName ? `../../imagens/${avatarFileName}` : '../../imagens/bonequinho.png';
+                createPlayer(avatarImgPath);
+            }).catch(() => {
                 createPlayer();
             });
+        });
     }
 
     function createPlayer(avatarPath = '../../imagens/bonequinho.png', startAtFirstPhase = false) {
@@ -98,33 +106,22 @@ document.addEventListener('DOMContentLoaded', function() {
         player.classList.add('player');
         mapContainer.appendChild(player);
 
-        // Determina a fase para posicionar o bonequinho
         const initialPhaseIndex = startAtFirstPhase ? 0 : (lastUnlockedIndex > 0 ? lastUnlockedIndex - 1 : 0);
-        moveToPhase(initialPhaseIndex);  // Move para a primeira fase ou uma antes da última desbloqueada
+        moveToPhase(initialPhaseIndex);
     }
 
     function initializeMap() {
-        // Rola para o topo antes de desenhar as linhas
-        window.scrollTo(0, 0);
-
         activities.forEach((activity, index) => {
             const phaseDiv = document.createElement('div');
             phaseDiv.classList.add('phase');
-
-            const baseTopPosition = 200;
-            let topPosition = baseTopPosition + index * 20 * window.innerHeight / 100;
-            let horizontalPosition = index % 2 === 0 ? 10 : 85;
-
-            phaseDiv.style.top = `${topPosition}px`;
-            phaseDiv.style.left = `${horizontalPosition}%`;
+            phaseDiv.style.top = `${200 + index * 20}%`;
+            phaseDiv.style.left = index % 2 === 0 ? '10%' : '85%';
 
             const phaseImage = document.createElement('img');
             phaseImage.src = activity.img;
             phaseImage.alt = activity.name;
             phaseImage.classList.add('phase-img');
             phaseDiv.appendChild(phaseImage);
-
-            mapContainer.appendChild(phaseDiv);
 
             if (activity.unlocked) {
                 phaseDiv.classList.add('active');
@@ -136,85 +133,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 phaseDiv.appendChild(lockIcon);
             }
 
+            mapContainer.appendChild(phaseDiv);
             phaseDiv.addEventListener('click', () => {
-                if (activity.unlocked) {
-                    moveToPhase(index, activity.path);
-                }
+                if (activity.unlocked) moveToPhase(index, activity.path);
             });
         });
-
-        drawLines();
-
-        // Aplica a animação de desbloqueio na última fase desbloqueada
-        if (lastUnlockedIndex >= 0) {
-            const lastUnlockedPhase = document.querySelectorAll('.phase')[lastUnlockedIndex];
-            animateUnlock(lastUnlockedPhase);
-
-            // Rola para a fase desbloqueada após desenhar as linhas
-            scrollToPhase(lastUnlockedIndex);
-        }
-    }
-
-    function animateUnlock(phaseDiv) {
-        const unlockGif = document.createElement('img');
-        unlockGif.src = '../../imagens/cadeado.gif';
-        unlockGif.classList.add('unlock-gif');
-        phaseDiv.appendChild(unlockGif);
-
-        const unlockSound = new Audio('../../imagens/unlock-padlock.mp3');
-        unlockSound.play(); // Toca o som de desbloqueio
-
-        setTimeout(() => {
-            unlockGif.remove();
-        }, 3000);
     }
 
     function moveToPhase(index, path = null) {
         const phase = document.querySelectorAll('.phase')[index];
         const coords = phase.getBoundingClientRect();
-
         player.style.top = `${coords.top + window.scrollY + coords.height / 2}px`;
         player.style.left = `${coords.left + window.scrollX + coords.width / 2}px`;
-        player.classList.add('moving');
 
-        if (path) {
-            setTimeout(() => {
-                window.location.href = path;
-            }, 600);
-        }
-    }
-
-    function scrollToPhase(index) {
-        const phase = document.querySelectorAll('.phase')[index];
-        const coords = phase.getBoundingClientRect();
-        window.scrollTo({
-            top: coords.top + window.scrollY - window.innerHeight / 2,
-            behavior: 'smooth'
-        });
-    }
-
-    function drawLines() {
-        svgContainer.innerHTML = '';
-        const phases = document.querySelectorAll('.phase');
-        for (let i = 0; i < activities.length - 1; i++) {
-            const phase1 = phases[i];
-            const phase2 = phases[i + 1];
-            if (!phase1 || !phase2) continue;
-
-            const coords1 = phase1.getBoundingClientRect();
-            const coords2 = phase2.getBoundingClientRect();
-            const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
-            const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150;
-            const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
-            const controlPointY2 = coords2.top - 150;
-
-            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
-                       C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
-                       ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
-            path.setAttribute('d', d);
-            path.setAttribute('class', `path path-blue`);
-            svgContainer.appendChild(path);
-        }
+        if (path) setTimeout(() => window.location.href = path, 600);
     }
 });
