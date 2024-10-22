@@ -16,12 +16,18 @@ canvas.height = cellSize * gridSize;
 // Função para carregar as palavras
 async function loadWords() {
     try {
-        const response = await fetch('../data1/words.txt');
+        // Ajuste no caminho do arquivo para garantir o carregamento correto
+        const response = await fetch('../../data1/words.txt');
+        if (!response.ok) throw new Error('Não foi possível carregar as palavras.');
+        
         const text = await response.text();
         wordsToFind = text.trim().split('\n');
+        
+        // Inicializa o jogo após carregar as palavras
         init();
     } catch (error) {
         console.error('Erro ao carregar as palavras:', error);
+        alert('Erro ao carregar as palavras. Verifique o arquivo de palavras.');
     }
 }
 
@@ -31,6 +37,18 @@ function init() {
     drawWordSearchGrid();
     displayWordsList();
     canvas.addEventListener('click', handleCanvasClick);
+}
+
+// Função para exibir a lista de palavras na tela
+function displayWordsList() {
+    const wordsListElement = document.getElementById('words');
+    wordsListElement.innerHTML = ''; // Limpa a lista antes de adicionar novas palavras
+
+    wordsToFind.forEach(word => {
+        const li = document.createElement('li');
+        li.textContent = word;
+        wordsListElement.appendChild(li);
+    });
 }
 
 // Função para verificar autenticação do usuário
@@ -79,7 +97,6 @@ function showCompletionModal() {
 function createWordSearchGrid() { /* Função original para criar a grade */ }
 function drawWordSearchGrid() { /* Função original para desenhar a grade */ }
 function handleCanvasClick(event) { /* Função original para lidar com cliques no canvas */ }
-function displayWordsList() { /* Função original para exibir a lista de palavras */ }
 function resetGame() { /* Função original para resetar o jogo */ }
 function closeModal() { /* Função original para fechar o modal */ }
 
