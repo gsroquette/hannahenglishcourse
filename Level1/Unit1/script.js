@@ -1,4 +1,3 @@
-
 document.addEventListener('DOMContentLoaded', function() {
     const database = firebase.database();
     const auth = firebase.auth();
@@ -160,5 +159,52 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Funções auxiliares como drawLines, animateUnlock e moveToPhase permanecem iguais para manter a funcionalidade original
+    function moveToPhase(index, path = null) {
+        const phase = document.querySelectorAll('.phase')[index];
+        const coords = phase.getBoundingClientRect();
+
+        player.style.top = `${coords.top + window.scrollY + coords.height / 2}px`;
+        player.style.left = `${coords.left + window.scrollX + coords.width / 2}px`;
+        player.classList.add('moving');
+
+        if (path) {
+            setTimeout(() => {
+                window.location.href = path;
+            }, 600);
+        }
+    }
+
+    function scrollToPhase(index) {
+        const phase = document.querySelectorAll('.phase')[index];
+        const coords = phase.getBoundingClientRect();
+        window.scrollTo({
+            top: coords.top + window.scrollY - window.innerHeight / 2,
+            behavior: 'smooth'
+        });
+    }
+
+    function drawLines() {
+        svgContainer.innerHTML = '';
+        const phases = document.querySelectorAll('.phase');
+        for (let i = 0; i < activities.length - 1; i++) {
+            const phase1 = phases[i];
+            const phase2 = phases[i + 1];
+            if (!phase1 || !phase2) continue;
+
+            const coords1 = phase1.getBoundingClientRect();
+            const coords2 = phase2.getBoundingClientRect();
+            const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
+            const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150;
+            const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
+            const controlPointY2 = coords2.top - 150;
+
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
+                       C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
+                       ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
+            path.setAttribute('d', d);
+            path.setAttribute('class', `path path-blue`);
+            svgContainer.appendChild(path);
+        }
+    }
 });
