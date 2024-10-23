@@ -95,6 +95,17 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
+function scrollToPhase(index) {
+    const phase = document.querySelectorAll('.phase')[index];
+    if (phase) {
+        const coords = phase.getBoundingClientRect();
+        window.scrollTo({
+            top: coords.top + window.scrollY - window.innerHeight / 2,
+            behavior: 'smooth'
+        });
+    }
+}
+
     function createPlayer(avatarPath) {
         if (!player) {
             player = document.createElement('img');
