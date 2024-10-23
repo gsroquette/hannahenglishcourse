@@ -17,11 +17,8 @@
         }
 
         .header-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-top: 20px;
             text-align: center;
+            margin-top: 20px;
         }
 
         .header-container h1 {
@@ -31,12 +28,11 @@
         }
 
         .level-display {
-            margin-top: 10px;
+            margin-top: 5px;
             font-family: Times, serif;
             font-weight: bold;
             color: black;
             font-size: 24px;
-            text-align: center;
         }
 
         .back-button {
@@ -91,15 +87,18 @@
 </head>
 <body>
     <div class="map-container">
+        <!-- Cabeçalho -->
         <header class="header-container">
             <h1>Select a Unit</h1>
             <div id="level-display" class="level-display"></div>
         </header>
-
+        
+        <!-- Botão de voltar -->
         <div style="text-align: center;">
             <button class="back-button" onclick="window.location.href='../index.html';">Back</button>
         </div>
 
+        <!-- Unidades -->
         <main>
             <div class="units">
                 <a href="Unit1/index.html" id="unit1" class="unit-button">Unit 1</a>
@@ -136,7 +135,44 @@
         const db = firebase.database();
         const auth = firebase.auth();
 
-        // Load user's progress and role
+        // Função para desbloquear unidades
+        function desbloquearUnidades(userId, role) {
+            if (role === 'proprietario' || role === 'professor') {
+                desbloquearTodasUnidades();
+            } else {
+                carregarProgresso(userId);
+            }
+        }
+
+        // Carregar o progresso do aluno
+        function carregarProgresso(userId) {
+            db.ref(`usuarios/${userId}/progresso/Level1`).once('value')
+                .then(snapshot => {
+                    const progresso = snapshot.val();
+                    const units = document.querySelectorAll('.unit-button');
+                    
+                    units.forEach(unit => {
+                        const unitId = unit.id.replace('unit', 'Unit');
+                        
+                        if (progresso && progresso[unitId] && progresso[unitId].fase1 === true) {
+                            unit.classList.remove('disabled');
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error("Erro ao acessar o banco de dados:", error);
+                });
+        }
+
+        // Desbloquear todas as unidades
+        function desbloquearTodasUnidades() {
+            const units = document.querySelectorAll('.unit-button');
+            units.forEach(unit => {
+                unit.classList.remove('disabled');
+            });
+        }
+
+        // Monitorar autenticação
         auth.onAuthStateChanged(user => {
             if (user) {
                 db.ref(`usuarios/${user.uid}/role`).once('value')
@@ -152,13 +188,14 @@
             }
         });
 
-        // Display Level in the header
+        // Exibir o Level atual
         document.addEventListener("DOMContentLoaded", function() {
             const levelDisplay = document.getElementById('level-display');
             const url = window.location.href;
             const levelMatch = url.match(/Level\d+/);
+
             if (levelMatch) {
-                levelDisplay.textContent = levelMatch[0];
+                levelDisplay.textContent = levelMatch[0]; // Exibe o Level encontrado
             }
         });
     </script>
