@@ -66,7 +66,7 @@ auth.onAuthStateChanged(user => {
             .then((snapshot) => {
                 const avatarFileName = snapshot.val();
                 // Verifica se o avatar está definido
-                const avatarImgPath = avatarFileName ? `../../../../imagens/${avatarFileName}` : '../../../../imagens/bonequinho.png';
+                const avatarImgPath = avatarFileName ? `../../../imagens/${avatarFileName}` : '../../../../imagens/bonequinho.png';
                 createPlayer(avatarImgPath, true); // Cria o jogador no mapa com o avatar
             })
             .catch(() => {
