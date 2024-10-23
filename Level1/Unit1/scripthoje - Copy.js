@@ -2,62 +2,49 @@ document.addEventListener('DOMContentLoaded', function() {
     const database = firebase.database();
     const auth = firebase.auth();
 
-    // Configuração de autenticação com integração da caixa de login e dropdown
-    auth.onAuthStateChanged(user => {
-        const loginLink = document.getElementById("loginLink");
-        const userDropdown = document.getElementById("userDropdown");
+// Configuração de autenticação com integração da caixa de login e dropdown
+auth.onAuthStateChanged(user => {
+    const loginLink = document.getElementById("loginLink");
+    const userDropdown = document.getElementById("userDropdown");
 
-        if (user) {
-            const userId = user.uid;
-            database.ref('/usuarios/' + userId).once('value').then(snapshot => {
-                const userData = snapshot.val();
-                const userName = userData.nome || user.email;
-                const userAvatar = userData.avatar ? `../../imagens/${userData.avatar}` : '../../imagens/bonecologin1.png';
+    if (user) {
+        const userId = user.uid;
+        database.ref('/usuarios/' + userId).once('value').then(snapshot => {
+            const userData = snapshot.val();
+            const userName = userData.nome || user.email;
+            const userAvatar = userData.avatar ? `../../imagens/${userData.avatar}` : '../../imagens/bonecologin1.png';
 
-                // Atualiza a interface do usuário com nome e avatar
-                loginLink.innerHTML = `<img src="${userAvatar}" alt="User Icon" class="user-icon"><p class="user-name">${userName}</p>`;
-                loginLink.removeAttribute('href');
-                userDropdown.innerHTML = `
-                    <a href="#" id="logout" class="dropdown-item">LEAVE</a>
-                `;
+            // Atualiza a interface do usuário com nome e avatar
+            loginLink.innerHTML = `<img src="${userAvatar}" alt="User Icon" class="user-icon"><p class="user-name">${userName}</p>`;
+            loginLink.removeAttribute('href');
+            userDropdown.innerHTML = `
+                <a href="#" id="logout" class="dropdown-item">LEAVE</a>
+            `;
 
-                let dashboardLink = '';
-                if (userData.role === 'proprietario' || userData.role === 'professor') {
-                    dashboardLink = userData.role === 'proprietario' ? 
-                                    '<a href="painel_proprietario.html" class="dropdown-item">OWNER DASHBOARD</a>' : 
-                                    '<a href="painel_professor.html" class="dropdown-item">TEACHER DASHBOARD</a>';
-                } else if (userData.role === 'aluno') {
-                    dashboardLink = '<a href="painel_aluno.html" class="dropdown-item">STUDENT DASHBOARD</a>';
-                }
+            let dashboardLink = '';
+            if (userData.role === 'proprietario' || userData.role === 'professor') {
+                dashboardLink = userData.role === 'proprietario' ? 
+                                '<a href="painel_proprietario.html" class="dropdown-item">OWNER DASHBOARD</a>' : 
+                                '<a href="painel_professor.html" class="dropdown-item">TEACHER DASHBOARD</a>';
+            } else if (userData.role === 'aluno') {
+                dashboardLink = '<a href="painel_aluno.html" class="dropdown-item">STUDENT DASHBOARD</a>';
+            }
 
-                userDropdown.insertAdjacentHTML('afterbegin', dashboardLink);
+            userDropdown.insertAdjacentHTML('afterbegin', dashboardLink);
 
-                // Adiciona funcionalidade de logout
-                document.getElementById("logout").addEventListener("click", function() {
-                    auth.signOut().then(() => {
-                        location.reload();
-                    }).catch(error => {
-                        console.error("Erro ao deslogar:", error);
-                    });
+            // Adiciona funcionalidade de logout
+            document.getElementById("logout").addEventListener("click", function() {
+                auth.signOut().then(() => {
+                    location.reload();
+                }).catch(error => {
+                    console.error("Erro ao deslogar:", error);
                 });
             });
-
-            // Carregar o avatar no mapa
-            database.ref(`/usuarios/${userId}/avatar`).once('value')
-                .then((snapshot) => {
-                    const avatarFileName = snapshot.val();
-                    // Verifica se o avatar está definido
-                    const avatarImgPath = avatarFileName ? `../../imagens/${avatarFileName}` : '../../imagens/bonequinho.png';
-                    createPlayer(avatarImgPath, true); // Cria o jogador no mapa com o avatar
-                })
-                .catch(() => {
-                    // Se ocorrer um erro na leitura do avatar, usa a imagem padrão 'bonequinho.png'
-                    createPlayer('../../imagens/bonequinho.png', true);
-                });
-        } else {
-            loginLink.setAttribute('href', 'Formulario/login.html');
-        }
-    });
+        });
+    } else {
+        loginLink.setAttribute('href', 'Formulario/login.html');
+    }
+});
 
     const activities = [
         { id: 1, name: "StoryCards", path: "../Unit1/StoryCards/index.html?fase=1", img: "../../imagens/botoes/storycards_button.png", unlocked: false },
@@ -71,6 +58,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const svgContainer = document.getElementById('linesSvg');
     let player;
     let lastUnlockedIndex = -1;
+
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            const userId = user.uid;
+            console.log(`Usuário autenticado: ${userId}`);
+            loadUserProgress(userId);
+        } else {
+            console.error("Usuário não autenticado!");
+        }
+    });
 
     function loadUserProgress(userId) {
         const urlPathParts = window.location.pathname.split('/');
@@ -101,7 +98,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 database.ref(avatarPath).once('value').then((avatarSnapshot) => {
                     const avatarFileName = avatarSnapshot.val();
-                    const avatarImgPath = avatarFileName ? `../../imagens/${avatarFileName}` : '../../imagens/bonequinho.png';
+                    const avatarImgPath = `../../imagens/${avatarFileName}`;
                     createPlayer(avatarImgPath);
                 }).catch(() => {
                     createPlayer(); // Se erro, usar avatar padrão
