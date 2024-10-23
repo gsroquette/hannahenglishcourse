@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const database = firebase.database();
     const auth = firebase.auth();
 
-    // Configuração de autenticação com integração da caixa de login e dropdown
+    // Configuração de autenticação e integração da caixa de login e dropdown
     auth.onAuthStateChanged(user => {
         const loginLink = document.getElementById("loginLink");
         const userDropdown = document.getElementById("userDropdown");
@@ -24,10 +24,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 let dashboardLink = '';
                 if (userData.role === 'proprietario' || userData.role === 'professor') {
                     dashboardLink = userData.role === 'proprietario' ? 
-                                    '<a href="painel_proprietario.html" class="dropdown-item">OWNER DASHBOARD</a>' : 
-                                    '<a href="painel_professor.html" class="dropdown-item">TEACHER DASHBOARD</a>';
+                                    '<a href="../../painel_proprietario.html" class="dropdown-item">OWNER DASHBOARD</a>' : 
+                                    '<a href="../../painel_professor.html" class="dropdown-item">TEACHER DASHBOARD</a>';
                 } else if (userData.role === 'aluno') {
-                    dashboardLink = '<a href="painel_aluno.html" class="dropdown-item">STUDENT DASHBOARD</a>';
+                    dashboardLink = '<a href="../../painel_aluno.html" class="dropdown-item">STUDENT DASHBOARD</a>';
                 }
 
                 userDropdown.insertAdjacentHTML('afterbegin', dashboardLink);
@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
 
                 // Carrega o progresso do usuário e define o avatar no mapa
-                loadUserProgress(userId, userAvatar);
+                loadUserProgress(userId, userAvatar, userData.role);
             });
         } else {
             loginLink.setAttribute('href', 'Formulario/login.html');
@@ -75,7 +75,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const progressPath = `/usuarios/${userId}/progresso/${level}/${unit}`;
 
-        // Se o role for 'proprietario' ou 'professor', liberar todas as fases
         if (userRole === 'proprietario' || userRole === 'professor') {
             activities.forEach(activity => {
                 activity.unlocked = true; // Libera todas as fases
@@ -83,7 +82,6 @@ document.addEventListener('DOMContentLoaded', function() {
             lastUnlockedIndex = 0; // Avatar começa na primeira fase
             initializeMap(userAvatar); // Inicializa o mapa com todas as fases liberadas
         } else {
-            // Se o role for 'aluno', carregar o progresso do banco de dados
             database.ref(progressPath).once('value')
                 .then((snapshot) => {
                     const progress = snapshot.val();
@@ -96,10 +94,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                 activity.unlocked = false;
                             }
                         });
-                    } else {
-                        console.error("Nenhum progresso encontrado para este nível e unidade.");
                     }
-                    initializeMap(userAvatar); // Inicializa o mapa com base no progresso
+                    initializeMap(userAvatar);
                 })
                 .catch((error) => {
                     console.error("Erro ao carregar o progresso do usuário:", error);
@@ -131,14 +127,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function animateUnlock(phaseDiv) {
         const unlockGif = document.createElement('img');
-        unlockGif.src = '../../imagens/cadeado.gif'; // Caminho do GIF
+        unlockGif.src = '../../imagens/cadeado.gif';
         unlockGif.classList.add('unlock-gif');
         phaseDiv.appendChild(unlockGif);
 
-        const unlockSound = new Audio('../../imagens/unlock-padlock.mp3'); // Caminho do som
-        unlockSound.play(); // Toca o som de desbloqueio
+        const unlockSound = new Audio('../../imagens/unlock-padlock.mp3');
+        unlockSound.play();
 
-        // Remove o GIF de desbloqueio após 3 segundos
         setTimeout(() => {
             unlockGif.remove();
         }, 3000);
@@ -186,11 +181,10 @@ document.addEventListener('DOMContentLoaded', function() {
         drawLines();
         createPlayer(userAvatar);
 
-        // Aplica a animação de desbloqueio na última fase desbloqueada
         if (lastUnlockedIndex >= 0) {
             const lastUnlockedPhase = document.querySelectorAll('.phase')[lastUnlockedIndex];
-            animateUnlock(lastUnlockedPhase); // Chama a animação aqui
-            scrollToPhase(lastUnlockedIndex); // Rola para a fase desbloqueada
+            animateUnlock(lastUnlockedPhase);
+            scrollToPhase(lastUnlockedIndex);
         }
     }
 

@@ -17,8 +17,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Atualiza a interface do usuário com nome e avatar
                 loginLink.innerHTML = `<img src="${userAvatar}" alt="User Icon" class="user-icon"><p class="user-name">${userName}</p>`;
                 loginLink.removeAttribute('href');
+
+                // Adiciona os itens do dropdown
+                const currentURL = window.location.href;
+                const baseURL = currentURL.split('/Level')[0];
+                const levelMatch = currentURL.match(/\/Level\d+/);
+                const unitMatch = currentURL.match(/\/Unit\d+/);
+
+                const levelURL = levelMatch ? baseURL + levelMatch[0] + '/index.html' : baseURL + '/index.html';
+                const unitURL = unitMatch ? baseURL + levelMatch[0] + unitMatch[0] + '/index.html' : levelURL;
+
                 userDropdown.innerHTML = `
-                    <a href="#" id="logout" class="dropdown-item">LEAVE</a>
+                    <a href="${baseURL}/index.html" class="dropdown-item">SELECT A NEW LEVEL</a>
+                    <a href="${levelURL}" class="dropdown-item">SELECT A NEW UNIT</a>
+                    <a href="${unitURL}" class="dropdown-item">SELECT A NEW ACTIVITY</a>
                 `;
 
                 let dashboardLink = '';
@@ -36,15 +48,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 loginLink.addEventListener("click", function(event) {
                     event.preventDefault();
                     userDropdown.style.display = userDropdown.style.display === 'flex' ? 'none' : 'flex';
-                });
-
-                // Adiciona funcionalidade de logout
-                document.getElementById("logout").addEventListener("click", function() {
-                    auth.signOut().then(() => {
-                        location.reload();
-                    }).catch(error => {
-                        console.error("Erro ao deslogar:", error);
-                    });
                 });
 
                 // Carrega o progresso do usuário e define o avatar no mapa
@@ -127,12 +130,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function animateUnlock(phaseDiv) {
         const unlockGif = document.createElement('img');
-        unlockGif.src = '../../imagens/cadeado.gif';
+        unlockGif.src = '../../imagens/cadeado.gif'; // Caminho do GIF
         unlockGif.classList.add('unlock-gif');
         phaseDiv.appendChild(unlockGif);
 
-        const unlockSound = new Audio('../../imagens/unlock-padlock.mp3');
-        unlockSound.play();
+        const unlockSound = new Audio('../../imagens/unlock-padlock.mp3'); // Caminho do som
+        unlockSound.play(); // Toca o som de desbloqueio
 
         setTimeout(() => {
             unlockGif.remove();
