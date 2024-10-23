@@ -32,6 +32,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 userDropdown.insertAdjacentHTML('afterbegin', dashboardLink);
 
+                // Adiciona funcionalidade de abrir/fechar dropdown
+                loginLink.addEventListener("click", function(event) {
+                    event.preventDefault();
+                    userDropdown.style.display = userDropdown.style.display === 'flex' ? 'none' : 'flex';
+                });
+
                 // Adiciona funcionalidade de logout
                 document.getElementById("logout").addEventListener("click", function() {
                     auth.signOut().then(() => {
@@ -42,7 +48,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
 
                 // Carrega o progresso do usuário e define o avatar no mapa
-                loadUserProgress(userId, userAvatar, userData.role);
+                loadUserProgress(userId, userAvatar);
             });
         } else {
             loginLink.setAttribute('href', 'Formulario/login.html');
