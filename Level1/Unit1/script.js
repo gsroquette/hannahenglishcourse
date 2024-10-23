@@ -1,12 +1,31 @@
 document.addEventListener('DOMContentLoaded', function() {
     const database = firebase.database();
     const auth = firebase.auth();
+    const loginLink = document.getElementById("loginLink");
+    const userDropdown = document.getElementById("userDropdown");
+    const levelUnitInfo = document.getElementById("levelUnitInfo");
+    const mapContainer = document.getElementById('mapContainer');
+    const svgContainer = document.getElementById('linesSvg');
+    let player;
+    let lastUnlockedIndex = -1;
 
-    // Configuração de autenticação com integração da caixa de login e dropdown
+    const activities = [
+        { id: 1, name: "StoryCards", path: "../Unit1/StoryCards/index.html?fase=1", img: "../../imagens/botoes/storycards_button.png", unlocked: false },
+        { id: 2, name: "Flashcards", path: "../Unit1/Flashcards/index.html?fase=2", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+        { id: 3, name: "Flashcards2", path: "../Unit1/Flashcards2/index.html?fase=3", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+        { id: 4, name: "Flashcards3", path: "../Unit1/Flashcards3/index.html?fase=4", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+        { id: 5, name: "QUIZ", path: "../Unit1/QUIZ/index.html?fase=5", img: "../../imagens/botoes/quiz_button.png", unlocked: false }
+    ];
+
+    // Fechar o dropdown ao clicar fora dele
+    document.addEventListener("click", function(event) {
+        if (!userDropdown.contains(event.target) && event.target !== loginLink) {
+            userDropdown.style.display = 'none';
+        }
+    });
+
+    // Configuração de autenticação
     auth.onAuthStateChanged(user => {
-        const loginLink = document.getElementById("loginLink");
-        const userDropdown = document.getElementById("userDropdown");
-
         if (user) {
             const userId = user.uid;
             database.ref('/usuarios/' + userId).once('value').then(snapshot => {
@@ -29,41 +48,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 userDropdown.innerHTML = `
                     ${dashboardLink}
-                    <a href="#" id="newLevel" class="dropdown-item">SELECT A NEW LEVEL</a>
-                    <a href="#" id="newUnit" class="dropdown-item">SELECT A NEW UNIT</a>
-                    <a href="#" id="newActivity" class="dropdown-item">SELECT A NEW ACTIVITY</a>
+                    <a href="/index.html" class="dropdown-item">SELECT A NEW LEVEL</a>
+                    <a href="/${getLevelPath()}/index.html" class="dropdown-item">SELECT A NEW UNIT</a>
+                    <a href="/${getLevelPath()}/${getUnitPath()}/index.html" class="dropdown-item">SELECT A NEW ACTIVITY</a>
                 `;
 
-                // Adiciona funcionalidade de abrir/fechar dropdown
+                // Abre e fecha o dropdown ao clicar no loginLink
                 loginLink.addEventListener("click", function(event) {
                     event.preventDefault();
                     userDropdown.style.display = userDropdown.style.display === 'flex' ? 'none' : 'flex';
-                });
-
-                // Fecha o dropdown ao clicar fora dele
-                document.addEventListener('click', function(event) {
-                    if (!loginLink.contains(event.target) && !userDropdown.contains(event.target)) {
-                        userDropdown.style.display = 'none';
-                    }
-                });
-
-                // Redireciona para a nova página
-                document.getElementById("newLevel").addEventListener("click", () => {
-                    const baseUrl = window.location.origin;
-                    window.location.href = `${baseUrl}/index.html`;
-                });
-
-                document.getElementById("newUnit").addEventListener("click", () => {
-                    const baseUrl = window.location.origin;
-                    const level = window.location.pathname.split('/')[2];
-                    window.location.href = `${baseUrl}/${level}/index.html`;
-                });
-
-                document.getElementById("newActivity").addEventListener("click", () => {
-                    const baseUrl = window.location.origin;
-                    const level = window.location.pathname.split('/')[2];
-                    const unit = window.location.pathname.split('/')[3];
-                    window.location.href = `${baseUrl}/${level}/${unit}/index.html`;
                 });
 
                 // Carrega o progresso do usuário e define o avatar no mapa
@@ -74,94 +67,51 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    const activities = [
-        { id: 1, name: "StoryCards", path: "../Unit1/StoryCards/index.html?fase=1", img: "../../imagens/botoes/storycards_button.png", unlocked: false },
-        { id: 2, name: "Flashcards", path: "../Unit1/Flashcards/index.html?fase=2", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-        { id: 3, name: "Flashcards2", path: "../Unit1/Flashcards2/index.html?fase=3", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-        { id: 4, name: "Flashcards3", path: "../Unit1/Flashcards3/index.html?fase=4", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-        { id: 5, name: "QUIZ", path: "../Unit1/QUIZ/index.html?fase=5", img: "../../imagens/botoes/quiz_button.png", unlocked: false }
-    ];
+    // Atualiza o texto com o nível e a unidade atual
+    const urlPathParts = window.location.pathname.split('/');
+    levelUnitInfo.innerHTML = `
+        Level: ${urlPathParts[1]}<br>
+        Unit: ${urlPathParts[2]}
+    `;
 
-    const mapContainer = document.getElementById('mapContainer');
-    const svgContainer = document.getElementById('linesSvg');
-    let player;
-    let lastUnlockedIndex = -1;
+    // Funções auxiliares para os links do dropdown
+    function getLevelPath() {
+        return urlPathParts[1]; // Obtém o nível atual
+    }
+
+    function getUnitPath() {
+        return urlPathParts[2]; // Obtém a unidade atual
+    }
 
     // Função para carregar o progresso do usuário
     function loadUserProgress(userId, userAvatar, userRole) {
-        const urlPathParts = window.location.pathname.split('/');
-        const level = urlPathParts[2];
-        const unit = urlPathParts[3];
+        const progressPath = `/usuarios/${userId}/progresso/${getLevelPath()}/${getUnitPath()}`;
 
-        document.getElementById("currentLevelUnit").innerHTML = `
-            Level: ${level} <br> Unit: ${unit}
-        `;
-
-        const progressPath = `/usuarios/${userId}/progresso/${level}/${unit}`;
-
-        // Se o role for 'proprietario' ou 'professor', liberar todas as fases
         if (userRole === 'proprietario' || userRole === 'professor') {
-            activities.forEach(activity => {
-                activity.unlocked = true;
-            });
+            activities.forEach(activity => activity.unlocked = true);
             lastUnlockedIndex = 0;
             initializeMap(userAvatar);
         } else {
-            // Se o role for 'aluno', carregar o progresso do banco de dados
-            database.ref(progressPath).once('value')
-                .then((snapshot) => {
-                    const progress = snapshot.val();
-                    if (progress) {
-                        activities.forEach((activity, index) => {
-                            if (progress[`fase${activity.id}`] === true) {
-                                activity.unlocked = true;
-                                lastUnlockedIndex = index;
-                            } else {
-                                activity.unlocked = false;
-                            }
-                        });
-                    } else {
-                        console.error("Nenhum progresso encontrado para este nível e unidade.");
-                    }
-                    initializeMap(userAvatar);
-                })
-                .catch((error) => {
-                    console.error("Erro ao carregar o progresso do usuário:", error);
-                    initializeMap(userAvatar);
-                });
+            database.ref(progressPath).once('value').then(snapshot => {
+                const progress = snapshot.val();
+                if (progress) {
+                    activities.forEach((activity, index) => {
+                        if (progress[`fase${activity.id}`] === true) {
+                            activity.unlocked = true;
+                            lastUnlockedIndex = index;
+                        }
+                    });
+                }
+                initializeMap(userAvatar);
+            }).catch(error => {
+                console.error("Erro ao carregar o progresso do usuário:", error);
+                initializeMap(userAvatar);
+            });
         }
     }
 
-    // Função para criar o avatar do usuário
-    function createPlayer(avatarPath) {
-        if (!player) {
-            player = document.createElement('img');
-            player.classList.add('player');
-            mapContainer.appendChild(player);
-        }
-        player.src = avatarPath;
-        moveToPhase(lastUnlockedIndex > 0 ? lastUnlockedIndex - 1 : 0);
-    }
-
-    // Função para animar o desbloqueio
-    function animateUnlock(phaseDiv) {
-        const unlockGif = document.createElement('img');
-        unlockGif.src = '../../imagens/cadeado.gif';
-        unlockGif.classList.add('unlock-gif');
-        phaseDiv.appendChild(unlockGif);
-
-        const unlockSound = new Audio('../../imagens/unlock-padlock.mp3');
-        unlockSound.play();
-
-        setTimeout(() => {
-            unlockGif.remove();
-        }, 3000);
-    }
-
-    // Inicialização do mapa
+    // Funções para desenhar o mapa, linhas e posicionar o avatar
     function initializeMap(userAvatar) {
-        window.scrollTo(0, 0);
-
         activities.forEach((activity, index) => {
             const phaseDiv = document.createElement('div');
             phaseDiv.classList.add('phase');
@@ -208,7 +158,16 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Função para mover para a fase
+    function createPlayer(avatarPath) {
+        if (!player) {
+            player = document.createElement('img');
+            player.classList.add('player');
+            mapContainer.appendChild(player);
+        }
+        player.src = avatarPath;
+        moveToPhase(lastUnlockedIndex > 0 ? lastUnlockedIndex - 1 : 0);
+    }
+
     function moveToPhase(index, path = null) {
         const phase = document.querySelectorAll('.phase')[index];
         const coords = phase.getBoundingClientRect();
@@ -223,7 +182,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Função para desenhar as linhas
     function drawLines() {
         svgContainer.innerHTML = '';
         const phases = document.querySelectorAll('.phase');
@@ -249,7 +207,20 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Função para rolar para a fase
+    function animateUnlock(phaseDiv) {
+        const unlockGif = document.createElement('img');
+        unlockGif.src = '../../imagens/cadeado.gif';
+        unlockGif.classList.add('unlock-gif');
+        phaseDiv.appendChild(unlockGif);
+
+        const unlockSound = new Audio('../../imagens/unlock-padlock.mp3');
+        unlockSound.play();
+
+        setTimeout(() => {
+            unlockGif.remove();
+        }, 3000);
+    }
+
     function scrollToPhase(index) {
         const phase = document.querySelectorAll('.phase')[index];
         if (phase) {
