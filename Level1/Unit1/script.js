@@ -72,20 +72,15 @@ document.addEventListener('DOMContentLoaded', function() {
         const urlPathParts = window.location.pathname.split('/');
         const level = urlPathParts[urlPathParts.length - 3];
         const unit = urlPathParts[urlPathParts.length - 2];
-
         const progressPath = `/usuarios/${userId}/progresso/${level}/${unit}`;
 
-        // Se o role for 'proprietario' ou 'professor', liberar todas as fases
         if (userRole === 'proprietario' || userRole === 'professor') {
-            activities.forEach(activity => {
-                activity.unlocked = true; // Libera todas as fases
-            });
-            lastUnlockedIndex = 0; // Avatar começa na primeira fase
-            initializeMap(userAvatar); // Inicializa o mapa com todas as fases liberadas
+            activities.forEach(activity => activity.unlocked = true);
+            lastUnlockedIndex = 0;
+            initializeMap(userAvatar);
         } else {
-            // Se o role for 'aluno', carregar o progresso do banco de dados
             database.ref(progressPath).once('value')
-                .then((snapshot) => {
+                .then(snapshot => {
                     const progress = snapshot.val();
                     if (progress) {
                         activities.forEach((activity, index) => {
@@ -99,54 +94,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     } else {
                         console.error("Nenhum progresso encontrado para este nível e unidade.");
                     }
-                    initializeMap(userAvatar); // Inicializa o mapa com base no progresso
+                    initializeMap(userAvatar);
                 })
-                .catch((error) => {
+                .catch(error => {
                     console.error("Erro ao carregar o progresso do usuário:", error);
                     initializeMap(userAvatar);
                 });
         }
     }
 
-    function scrollToPhase(index) {
-        const phase = document.querySelectorAll('.phase')[index];
-        if (phase) {
-            const coords = phase.getBoundingClientRect();
-            window.scrollTo({
-                top: coords.top + window.scrollY - window.innerHeight / 2,
-                behavior: 'smooth'
-            });
-        }
-    }
-
-    function createPlayer(avatarPath) {
-        if (!player) {
-            player = document.createElement('img');
-            player.classList.add('player');
-            mapContainer.appendChild(player);
-        }
-        player.src = avatarPath;
-        moveToPhase(lastUnlockedIndex > 0 ? lastUnlockedIndex - 1 : 0);
-    }
-
-    function animateUnlock(phaseDiv) {
-        const unlockGif = document.createElement('img');
-        unlockGif.src = '../../imagens/cadeado.gif'; // Caminho do GIF
-        unlockGif.classList.add('unlock-gif');
-        phaseDiv.appendChild(unlockGif);
-
-        const unlockSound = new Audio('../../imagens/unlock-padlock.mp3'); // Caminho do som
-        unlockSound.play(); // Toca o som de desbloqueio
-
-        // Remove o GIF de desbloqueio após 3 segundos
-        setTimeout(() => {
-            unlockGif.remove();
-        }, 3000);
-    }
-
     function initializeMap(userAvatar) {
         window.scrollTo(0, 0);
-
         activities.forEach((activity, index) => {
             const phaseDiv = document.createElement('div');
             phaseDiv.classList.add('phase');
@@ -186,12 +144,21 @@ document.addEventListener('DOMContentLoaded', function() {
         drawLines();
         createPlayer(userAvatar);
 
-        // Aplica a animação de desbloqueio na última fase desbloqueada
         if (lastUnlockedIndex >= 0) {
             const lastUnlockedPhase = document.querySelectorAll('.phase')[lastUnlockedIndex];
-            animateUnlock(lastUnlockedPhase); // Chama a animação aqui
-            scrollToPhase(lastUnlockedIndex); // Rola para a fase desbloqueada
+            animateUnlock(lastUnlockedPhase);
+            scrollToPhase(lastUnlockedIndex);
         }
+    }
+
+    function createPlayer(avatarPath) {
+        if (!player) {
+            player = document.createElement('img');
+            player.classList.add('player');
+            mapContainer.appendChild(player);
+        }
+        player.src = avatarPath;
+        moveToPhase(lastUnlockedIndex > 0 ? lastUnlockedIndex - 1 : 0);
     }
 
     function moveToPhase(index, path = null) {
@@ -205,6 +172,31 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => {
                 window.location.href = path;
             }, 600);
+        }
+    }
+
+    function animateUnlock(phaseDiv) {
+        const unlockGif = document.createElement('img');
+        unlockGif.src = '../../imagens/cadeado.gif';
+        unlockGif.classList.add('unlock-gif');
+        phaseDiv.appendChild(unlockGif);
+
+        const unlockSound = new Audio('../../imagens/unlock-padlock.mp3');
+        unlockSound.play();
+
+        setTimeout(() => {
+            unlockGif.remove();
+        }, 3000);
+    }
+
+    function scrollToPhase(index) {
+        const phase = document.querySelectorAll('.phase')[index];
+        if (phase) {
+            const coords = phase.getBoundingClientRect();
+            window.scrollTo({
+                top: coords.top + window.scrollY - window.innerHeight / 2,
+                behavior: 'smooth'
+            });
         }
     }
 
@@ -228,7 +220,7 @@ document.addEventListener('DOMContentLoaded', function() {
                        C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
                        ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
             path.setAttribute('d', d);
-            path.setAttribute('class', `path path-blue`);
+            path.setAttribute('class', 'path path-blue');
             svgContainer.appendChild(path);
         }
     }
