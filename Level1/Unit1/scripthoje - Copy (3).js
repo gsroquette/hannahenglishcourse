@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
 
                 // Carrega o progresso do usuário e define o avatar no mapa
-                loadUserProgress(userId, userAvatar, userData.role);
+                loadUserProgress(userId, userAvatar);
             });
         } else {
             loginLink.setAttribute('href', 'Formulario/login.html');
