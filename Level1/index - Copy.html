@@ -16,19 +16,21 @@
             overflow-y: auto;
         }
 
-        .header-container {
-            text-align: center;
-            margin-top: 20px;
-        }
+       .header-container {
+           display: flex;
+           flex-direction: column; /* Organiza em coluna */
+           align-items: center; /* Centraliza os itens */
+           text-align: center;
 
-        .level-display {
-            margin-top: 10px;
-            font-family: Times, serif;
-            font-weight: bold;
-            color: black;
-            font-size: 24px;
-            text-align: center;
-        }
+       }
+       .level-display {
+           margin-top: 10px; /* Adiciona um espaço entre o título e o nível */
+           font-family: Times, serif;
+           font-weight: bold;
+           color: black;
+           font-size: 24px;
+           text-align: center;
+       }
 
         .back-button {
             display: block;
@@ -82,15 +84,13 @@
 </head>
 <body>
     <div class="map-container">
-        <header class="header-container">
+        <header style="text-align: center;">
             <h1>Select a Unit</h1>
             <div id="level-display" class="level-display"></div>
-        </header>
-        
-        <div style="text-align: center;">
+           </header>
+       <div style="text-align: center;">
             <button class="back-button" onclick="window.location.href='../index.html';">Back</button>
         </div>
-        
         <main>
             <div class="units">
                 <a href="Unit1/index.html" id="unit1" class="unit-button">Unit 1</a>
@@ -127,7 +127,44 @@
         const db = firebase.database();
         const auth = firebase.auth();
 
-        // Load user's progress and role
+        // Desbloquear unidades com base no papel e progresso do usuário
+        function desbloquearUnidades(userId, role) {
+            if (role === 'proprietario' || role === 'professor') {
+                desbloquearTodasUnidades();
+            } else {
+                carregarProgresso(userId);
+            }
+        }
+
+        // Carregar o progresso do aluno
+        function carregarProgresso(userId) {
+            db.ref(`usuarios/${userId}/progresso/Level1`).once('value')
+                .then(snapshot => {
+                    const progresso = snapshot.val();
+                    const units = document.querySelectorAll('.unit-button');
+                    
+                    units.forEach(unit => {
+                        const unitId = unit.id.replace('unit', 'Unit');
+                        
+                        if (progresso && progresso[unitId] && progresso[unitId].fase1 === true) {
+                            unit.classList.remove('disabled');
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error("Erro ao acessar o banco de dados:", error);
+                });
+        }
+
+        // Desbloquear todas as unidades
+        function desbloquearTodasUnidades() {
+            const units = document.querySelectorAll('.unit-button');
+            units.forEach(unit => {
+                unit.classList.remove('disabled');
+            });
+        }
+
+        // Carregar o papel do usuário e verificar progresso
         auth.onAuthStateChanged(user => {
             if (user) {
                 db.ref(`usuarios/${user.uid}/role`).once('value')
@@ -143,13 +180,52 @@
             }
         });
 
-        // Display Level in the header
+        // Remover o estado 'disabled' da Unit1 para todos os usuários
+        document.getElementById('unit1').classList.remove('disabled');
+
+        // Adicionar evento de clique na Unit1
+        document.getElementById('unit1').addEventListener('click', () => {
+            // Verificar se o usuário está autenticado
+            auth.onAuthStateChanged(user => {
+                if (user) {
+                    const userId = user.uid;
+                    const dbPath = `usuarios/${userId}/progresso/Level1/Unit1/fase1`;
+
+                    // Verificar se a chave fase1 já existe
+                    db.ref(dbPath).once('value')
+                        .then(snapshot => {
+                            if (!snapshot.exists()) {
+                                // Se não existir, criar chave e definir fase1 como true
+                                db.ref(dbPath).set(true)
+                                    .then(() => {
+                                        console.log('Fase 1 criada com sucesso!');
+                                    })
+                                    .catch(error => {
+                                        console.error('Erro ao criar fase1:', error);
+                                    });
+                            } else {
+                                console.log('Fase 1 já existe.');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Erro ao verificar fase1:', error);
+                        });
+                } else {
+                    console.error('Erro: Usuário não autenticado.');
+                }
+            });
+        });
+    </script>
+ <script>
         document.addEventListener("DOMContentLoaded", function() {
             const levelDisplay = document.getElementById('level-display');
+            
+            // Obter a parte do Level na URL
             const url = window.location.href;
             const levelMatch = url.match(/Level\d+/);
+
             if (levelMatch) {
-                levelDisplay.textContent = levelMatch[0];
+                levelDisplay.textContent = levelMatch[0]; // Exibe o Level encontrado
             }
         });
     </script>
