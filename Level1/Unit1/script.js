@@ -70,8 +70,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Atualiza o texto com o nível e a unidade atual
     const urlPathParts = window.location.pathname.split('/');
     levelUnitInfo.innerHTML = `
-        Level: ${urlPathParts[1]}<br>
-        Unit: ${urlPathParts[2]}
+          ${urlPathParts[1]}<br>
+          ${urlPathParts[2]}
     `;
 
     // Funções auxiliares para os links do dropdown
