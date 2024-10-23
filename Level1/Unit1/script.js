@@ -105,6 +105,21 @@ document.addEventListener('DOMContentLoaded', function() {
         moveToPhase(lastUnlockedIndex > 0 ? lastUnlockedIndex - 1 : 0);
     }
 
+function animateUnlock(phaseDiv) {
+    const unlockGif = document.createElement('img');
+    unlockGif.src = '../../imagens/unlock.gif'; // Altere para o caminho correto do GIF
+    unlockGif.classList.add('unlock-gif');
+    phaseDiv.appendChild(unlockGif);
+
+    const unlockSound = new Audio('../../imagens/unlock-padlock.mp3'); // Altere para o caminho correto do som
+    unlockSound.play(); // Toca o som de desbloqueio
+
+    // Remove o GIF de desbloqueio após 3 segundos
+    setTimeout(() => {
+        unlockGif.remove();
+    }, 3000);
+}
+
     function initializeMap(userAvatar) {
         window.scrollTo(0, 0);
 
