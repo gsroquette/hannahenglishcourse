@@ -107,11 +107,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function animateUnlock(phaseDiv) {
     const unlockGif = document.createElement('img');
-    unlockGif.src = '../../imagens/unlock.gif'; // Altere para o caminho correto do GIF
+    unlockGif.src = '../../imagens/cadeado.gif'; // Caminho do GIF
     unlockGif.classList.add('unlock-gif');
     phaseDiv.appendChild(unlockGif);
 
-    const unlockSound = new Audio('../../imagens/unlock-padlock.mp3'); // Altere para o caminho correto do som
+    const unlockSound = new Audio('../../imagens/unlock-padlock.mp3'); // Caminho do som
     unlockSound.play(); // Toca o som de desbloqueio
 
     // Remove o GIF de desbloqueio após 3 segundos
@@ -161,8 +161,15 @@ function animateUnlock(phaseDiv) {
 
         drawLines();
         createPlayer(userAvatar);
-    }
+// Aplica a animação de desbloqueio na última fase desbloqueada
+if (lastUnlockedIndex >= 0) {
+    const lastUnlockedPhase = document.querySelectorAll('.phase')[lastUnlockedIndex];
+    animateUnlock(lastUnlockedPhase); // Chama a animação aqui
 
+    // Rola para a fase desbloqueada após desenhar as linhas
+    scrollToPhase(lastUnlockedIndex);
+    }
+}
     function moveToPhase(index, path = null) {
         const phase = document.querySelectorAll('.phase')[index];
         const coords = phase.getBoundingClientRect();
