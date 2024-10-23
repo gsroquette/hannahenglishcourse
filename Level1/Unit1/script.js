@@ -112,6 +112,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Funções para desenhar o mapa, linhas e posicionar o avatar
     function initializeMap(userAvatar) {
+        window.scrollTo(0, 0);
         activities.forEach((activity, index) => {
             const phaseDiv = document.createElement('div');
             phaseDiv.classList.add('phase');
