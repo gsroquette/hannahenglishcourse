@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
 
                 // Carrega o progresso do usuário e define o avatar no mapa
-                loadUserProgress(userId, userAvatar, userData.role);
+                loadUserProgress(userId, userAvatar);
             });
         } else {
             loginLink.setAttribute('href', 'Formulario/login.html');
@@ -62,56 +62,49 @@ document.addEventListener('DOMContentLoaded', function() {
     let player;
     let lastUnlockedIndex = -1;
 
-    function loadUserProgress(userId, userAvatar, userRole) {
+    function loadUserProgress(userId, userAvatar) {
         const urlPathParts = window.location.pathname.split('/');
         const level = urlPathParts[urlPathParts.length - 3];
         const unit = urlPathParts[urlPathParts.length - 2];
 
         const progressPath = `/usuarios/${userId}/progresso/${level}/${unit}`;
+        const avatarPath = `/usuarios/${userId}/avatar`;
 
-        // Se o role for 'proprietario' ou 'professor', liberar todas as fases
-        if (userRole === 'proprietario' || userRole === 'professor') {
-            activities.forEach(activity => {
-                activity.unlocked = true; // Libera todas as fases
+        database.ref(progressPath).once('value')
+            .then((snapshot) => {
+                const progress = snapshot.val();
+                if (progress) {
+                    activities.forEach((activity, index) => {
+                        if (progress[`fase${activity.id}`] === true) {
+                            activity.unlocked = true;
+                            lastUnlockedIndex = index;
+                        } else {
+                            activity.unlocked = false;
+                        }
+                    });
+                } else {
+                    console.error("Nenhum progresso encontrado para este nível e unidade.");
+                }
+
+                initializeMap(userAvatar);
+
+            })
+            .catch((error) => {
+                console.error("Erro ao carregar o progresso do usuário:", error);
+                initializeMap(userAvatar);
             });
-            lastUnlockedIndex = 0; // Avatar começa na primeira fase
-            initializeMap(userAvatar); // Inicializa o mapa com todas as fases liberadas
-        } else {
-            // Se o role for 'aluno', carregar o progresso do banco de dados
-            database.ref(progressPath).once('value')
-                .then((snapshot) => {
-                    const progress = snapshot.val();
-                    if (progress) {
-                        activities.forEach((activity, index) => {
-                            if (progress[`fase${activity.id}`] === true) {
-                                activity.unlocked = true;
-                                lastUnlockedIndex = index;
-                            } else {
-                                activity.unlocked = false;
-                            }
-                        });
-                    } else {
-                        console.error("Nenhum progresso encontrado para este nível e unidade.");
-                    }
-                    initializeMap(userAvatar); // Inicializa o mapa com base no progresso
-                })
-                .catch((error) => {
-                    console.error("Erro ao carregar o progresso do usuário:", error);
-                    initializeMap(userAvatar);
-                });
-        }
     }
 
-    function scrollToPhase(index) {
-        const phase = document.querySelectorAll('.phase')[index];
-        if (phase) {
-            const coords = phase.getBoundingClientRect();
-            window.scrollTo({
-                top: coords.top + window.scrollY - window.innerHeight / 2,
-                behavior: 'smooth'
-            });
-        }
+function scrollToPhase(index) {
+    const phase = document.querySelectorAll('.phase')[index];
+    if (phase) {
+        const coords = phase.getBoundingClientRect();
+        window.scrollTo({
+            top: coords.top + window.scrollY - window.innerHeight / 2,
+            behavior: 'smooth'
+        });
     }
+}
 
     function createPlayer(avatarPath) {
         if (!player) {
@@ -123,20 +116,20 @@ document.addEventListener('DOMContentLoaded', function() {
         moveToPhase(lastUnlockedIndex > 0 ? lastUnlockedIndex - 1 : 0);
     }
 
-    function animateUnlock(phaseDiv) {
-        const unlockGif = document.createElement('img');
-        unlockGif.src = '../../imagens/cadeado.gif'; // Caminho do GIF
-        unlockGif.classList.add('unlock-gif');
-        phaseDiv.appendChild(unlockGif);
+function animateUnlock(phaseDiv) {
+    const unlockGif = document.createElement('img');
+    unlockGif.src = '../../imagens/cadeado.gif'; // Caminho do GIF
+    unlockGif.classList.add('unlock-gif');
+    phaseDiv.appendChild(unlockGif);
 
-        const unlockSound = new Audio('../../imagens/unlock-padlock.mp3'); // Caminho do som
-        unlockSound.play(); // Toca o som de desbloqueio
+    const unlockSound = new Audio('../../imagens/unlock-padlock.mp3'); // Caminho do som
+    unlockSound.play(); // Toca o som de desbloqueio
 
-        // Remove o GIF de desbloqueio após 3 segundos
-        setTimeout(() => {
-            unlockGif.remove();
-        }, 3000);
-    }
+    // Remove o GIF de desbloqueio após 3 segundos
+    setTimeout(() => {
+        unlockGif.remove();
+    }, 3000);
+}
 
     function initializeMap(userAvatar) {
         window.scrollTo(0, 0);
@@ -179,15 +172,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
         drawLines();
         createPlayer(userAvatar);
+// Aplica a animação de desbloqueio na última fase desbloqueada
+if (lastUnlockedIndex >= 0) {
+    const lastUnlockedPhase = document.querySelectorAll('.phase')[lastUnlockedIndex];
+    animateUnlock(lastUnlockedPhase); // Chama a animação aqui
 
-        // Aplica a animação de desbloqueio na última fase desbloqueada
-        if (lastUnlockedIndex >= 0) {
-            const lastUnlockedPhase = document.querySelectorAll('.phase')[lastUnlockedIndex];
-            animateUnlock(lastUnlockedPhase); // Chama a animação aqui
-            scrollToPhase(lastUnlockedIndex); // Rola para a fase desbloqueada
-        }
+    // Rola para a fase desbloqueada após desenhar as linhas
+    scrollToPhase(lastUnlockedIndex);
     }
-
+}
     function moveToPhase(index, path = null) {
         const phase = document.querySelectorAll('.phase')[index];
         const coords = phase.getBoundingClientRect();
