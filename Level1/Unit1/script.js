@@ -60,14 +60,23 @@ auth.onAuthStateChanged(user => {
     let lastUnlockedIndex = -1;
 
     auth.onAuthStateChanged(user => {
-        if (user) {
-            const userId = user.uid;
-            console.log(`Usuário autenticado: ${userId}`);
-            loadUserProgress(userId);
-        } else {
-            console.error("Usuário não autenticado!");
-        }
-    });
+    if (user) {
+        const userId = user.uid;
+        database.ref(`/usuarios/${userId}/avatar`).once('value')
+            .then((snapshot) => {
+                const avatarFileName = snapshot.val();
+                // Verifica se o avatar está definido
+                const avatarImgPath = avatarFileName ? `../../../../imagens/${avatarFileName}` : '../../../../imagens/bonequinho.png';
+                createPlayer(avatarImgPath, true); // Cria o jogador no mapa com o avatar
+            })
+            .catch(() => {
+                // Se ocorrer um erro na leitura do avatar, usa a imagem padrão 'bonequinho.png'
+                createPlayer('../../../../imagens/bonequinho.png', true);
+            });
+    } else {
+        console.error("Usuário não autenticado!");
+    }
+});
 
     function loadUserProgress(userId) {
         const urlPathParts = window.location.pathname.split('/');
