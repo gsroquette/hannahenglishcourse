@@ -268,42 +268,60 @@
 });
 
     function addStudentToClass(teacherId, classId) {
-      const emailInput = document.getElementById(`student-email-${classId}`);
-      const email = emailInput.value.trim();
-      if (!email) {
-        alert("Please enter a student's email.");
-        return;
-      }
+  const emailInput = document.getElementById(`student-email-${classId}`);
+  const email = emailInput.value.trim();
 
-      db.ref('usuarios').orderByChild('email').equalTo(email).once('value', snapshot => {
-        if (snapshot.exists()) {
-          snapshot.forEach(childSnapshot => {
-            const studentId = childSnapshot.key;
-            const studentRef = db.ref(`usuarios/${studentId}`);
+  if (!email) {
+    alert("Please enter a student's email.");
+    return;
+  }
 
+  // Verificar se o aluno existe no banco de dados
+  db.ref('usuarios').orderByChild('email').equalTo(email).once('value', snapshot => {
+    if (snapshot.exists()) {
+      snapshot.forEach(childSnapshot => {
+        const studentId = childSnapshot.key;
+        const studentRef = db.ref(`usuarios/${studentId}`);
+
+        // Verificar se o aluno já está em uma turma do mesmo professor
+        db.ref(`usuarios/${teacherId}/turmas`).once('value', turmasSnapshot => {
+          let alreadyInClass = false;
+
+          turmasSnapshot.forEach(turmaSnap => {
+            const turmaStudents = turmaSnap.child('students');
+            if (turmaStudents.hasChild(studentId)) {
+              alreadyInClass = true;
+            }
+          });
+
+          if (alreadyInClass) {
+            alert("This student is already enrolled in another class.");
+          } else {
+            // Verificar se o aluno já está vinculado a outro professor
             studentRef.child('atrelado_professor').once('value').then(snap => {
               const linkedTeacherId = snap.val();
 
-              if (!linkedTeacherId) {
+              if (!linkedTeacherId || linkedTeacherId === teacherId) {
+                // Se o aluno não estiver vinculado ou estiver vinculado ao professor atual, adicioná-lo
                 studentRef.child('atrelado_professor').set(teacherId).then(() => {
                   enrollStudentInClass(teacherId, classId, studentId, childSnapshot.val().nome);
                 });
-              } else if (linkedTeacherId === teacherId) {
-                enrollStudentInClass(teacherId, classId, studentId, childSnapshot.val().nome);
               } else {
                 alert("This student is already assigned to another teacher and cannot be added to your class.");
               }
             }).catch(error => {
               console.error("Error checking student record:", error);
             });
-          });
-        } else {
-          alert("Student not found in the database.");
-        }
+          }
+        });
       });
-
-      emailInput.value = '';
+    } else {
+      alert("Student not found in the database.");
     }
+  });
+
+  emailInput.value = '';
+}
 
     function enrollStudentInClass(teacherId, classId, studentId, studentName) {
   const classStudentRef = db.ref(`usuarios/${teacherId}/turmas/${classId}/students/${studentId}`);
