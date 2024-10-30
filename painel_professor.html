@@ -372,45 +372,45 @@
       actions.style.display = actions.style.display === 'none' || actions.style.display === '' ? 'block' : 'none';
     }
 
-    function toggleProgress(teacherId, classId, studentId) {
-      const progressContainer = document.getElementById(`progress-container-${studentId}`);
-      
-      if (progressContainer.style.display === 'none' || progressContainer.style.display === '') {
-        progressContainer.style.display = 'block';
-        progressContainer.innerHTML = '<p>Loading...</p>';
+   function toggleProgress(teacherId, classId, studentId) {
+  const progressContainer = document.getElementById(`progress-container-${studentId}`);
+  
+  if (progressContainer.style.display === 'none' || progressContainer.style.display === '') {
+    progressContainer.style.display = 'block';
+    progressContainer.innerHTML = '<p>Loading...</p>';
 
-        db.ref(`usuarios/${studentId}/progresso`).once('value', snapshot => {
-          if (snapshot.exists()) {
-            let progressHTML = '<h3>Progress</h3>';
-            snapshot.forEach(levelSnap => {
-              const level = levelSnap.key;
-              progressHTML += `<p><strong>Level ${level}</strong></p>`;
-              levelSnap.forEach(unitSnap => {
-                const unit = unitSnap.key;
-                progressHTML += `<p>Unit ${unit}</p>`;
-                unitSnap.forEach(phaseSnap => {
-                  const phase = phaseSnap.key;
-                  const isComplete = phaseSnap.val();
+    db.ref(`usuarios/${studentId}/progresso`).once('value', snapshot => {
+      if (snapshot.exists()) {
+        let progressHTML = '<h3>Progress</h3>';
+        snapshot.forEach(levelSnap => {
+          const level = levelSnap.key.replace('Level', ''); // Remove "Level"
+          progressHTML += `<p><strong>Level ${level}</strong></p>`;
+          levelSnap.forEach(unitSnap => {
+            const unit = unitSnap.key.replace('Unit', ''); // Remove "Unit"
+            progressHTML += `<p>Unit ${unit}</p>`;
+            unitSnap.forEach(phaseSnap => {
+              const phase = phaseSnap.key.replace('fase', ''); // Remove "fase"
+              const isComplete = phaseSnap.val();
 
-                  progressHTML += `
-                    <label>Phase ${phase} Complete</label>
-                    <input type="checkbox" ${isComplete ? 'checked' : ''} onchange="updatePhaseStatus('${studentId}', '${level}', '${unit}', '${phase}', this.checked)">
-                  `;
-                });
-              });
+              progressHTML += `
+                <label>Phase ${phase} Complete</label>
+                <input type="checkbox" ${isComplete ? 'checked' : ''} onchange="updatePhaseStatus('${studentId}', '${level}', '${unit}', '${phase}', this.checked)">
+              `;
             });
-            progressContainer.innerHTML = progressHTML;
-          } else {
-            progressContainer.innerHTML = '<p>No progress data available.</p>';
-          }
-        }).catch(error => {
-          console.error("Error loading progress:", error);
-          progressContainer.innerHTML = '<p>Error loading progress data. Please try again later.</p>';
+          });
         });
+        progressContainer.innerHTML = progressHTML;
       } else {
-        progressContainer.style.display = 'none';
+        progressContainer.innerHTML = '<p>No progress data available.</p>';
       }
-    }
+    }).catch(error => {
+      console.error("Error loading progress:", error);
+      progressContainer.innerHTML = '<p>Error loading progress data. Please try again later.</p>';
+    });
+  } else {
+    progressContainer.style.display = 'none';
+  }
+}
 
     function updatePhaseStatus(studentId, level, unit, phase, isComplete) {
       const progressRef = db.ref(`usuarios/${studentId}/progresso/${level}/${unit}/${phase}`);
