@@ -9,7 +9,6 @@
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-database.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
     <script>
         // Configuração do Firebase
@@ -27,126 +26,43 @@
         // Inicializa o Firebase
         firebase.initializeApp(firebaseConfig);
 
-        let storyTitle = "Hannah Story";
-        let storyText = "";
+        // Função para identificar Level, Unit e fase atual pelo URL
+        function getParamsFromURL() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const fase = urlParams.get('fase');
+            const pathParts = window.location.pathname.split('/');
+            const level = pathParts.find(part => part.startsWith('Level'));
+            const unit = pathParts.find(part => part.startsWith('Unit'));
+            return { level, unit, fase };
+        }
 
-        function checkUserRole() {
-            firebase.auth().onAuthStateChanged(async function(user) {
-                if (user) {
-                    const uid = user.uid;
-                    const roleRef = firebase.database().ref(`usuarios/${uid}/role`);
-                    const snapshot = await roleRef.once('value');
-                    const role = snapshot.val();
+        // Função para salvar progresso no Firebase com todas as regras
+        async function salvarProgressoAluno(uid, fase) {
+            const { level, unit } = getParamsFromURL();
+            const dbRef = firebase.database().ref(`usuarios/${uid}/progresso`);
 
-                    if (role === "professor" || role === "proprietário") {
-                        document.getElementById("pdfButton").style.display = "block";
-                    }
+            try {
+                if (fase === "end") {
+                    // Criar nova Level com Unit1/fase1
+                    const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+                    await dbRef.child(nextLevel).set({});
+                    await dbRef.child(`${nextLevel}/Unit1/fase1`).set(true);
+                    console.log(`Nova Level ${nextLevel} criada com Unit1/fase1.`);
+                } else if (fase === "last") {
+                    // Criar nova Unit com fase1
+                    const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+                    await dbRef.child(`${level}/${nextUnit}`).set({});
+                    await dbRef.child(`${level}/${nextUnit}/fase1`).set(true);
+                    console.log(`Nova Unit ${nextUnit} criada com fase1 em ${level}.`);
                 } else {
-                    console.log("Nenhum usuário logado.");
+                    // Criar próxima fase na mesma Unit
+                    const nextFase = `fase${parseInt(fase) + 1}`;
+                    await dbRef.child(`${level}/${unit}/${nextFase}`).set(true);
+                    console.log(`Fase ${nextFase} criada em ${level}/${unit}.`);
                 }
-            });
-        }
-
-        document.addEventListener("DOMContentLoaded", () => {
-            checkUserRole();
-            init();
-        });
-
-        async function loadContent() {
-            const response = await fetch('images.txt');
-            const text = await response.text();
-            const lines = text.split('\n');
-            let cards = [];
-            let currentImage = '';
-            let currentText = '';
-
-            lines.forEach(line => {
-                if (line.startsWith('#imagem')) {
-                    if (currentImage && currentText) {
-                        cards.push({ image: currentImage, text: currentText });
-                    }
-                    currentImage = line.replace('#', '').trim();
-                    currentText = '';
-                } else {
-                    currentText += line + ' ';
-                }
-            });
-
-            if (currentImage && currentText) {
-                cards.push({ image: currentImage, text: currentText });
+            } catch (error) {
+                console.error("Erro ao atualizar o progresso da fase:", error);
             }
-
-            storyText = cards.map(card => card.text).join('\n\n');
-            return cards;
-        }
-
-        function displayCard(index) {
-            const container = document.getElementById('cardsContainer');
-            container.innerHTML = '';
-            const cardData = cardsData[index];
-            container.innerHTML = `
-                <div class="story-text">
-                    <p>${cardData.text}</p>
-                </div>`;
-        }
-
-        async function init() {
-            cardsData = await loadContent();
-            displayCard(0);
-        }
-
-        function generatePDF() {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-
-            doc.addImage('Logo.png', 'PNG', 85, 10, 40, 40);
-            doc.setFontSize(12);
-            doc.text("Name:_______________________________________________________  Date:_______________", 10, 60);
-            doc.setFontSize(20);
-            doc.text(storyTitle, 105, 80, { align: "center" });
-
-            if (!storyText) {
-                alert("A história ainda não foi carregada. Tente novamente.");
-                return;
-            }
-
-            doc.setFontSize(12);
-            let y = 100;
-            const marginLeft = 10;
-            const maxLineWidth = 180;
-            const lineHeight = 10;
-
-            const splitText = doc.splitTextToSize(storyText, maxLineWidth);
-            splitText.forEach(line => {
-                if (y > 280) {
-                    doc.addPage();
-                    y = 20;
-                }
-                doc.text(line, marginLeft, y);
-                y += lineHeight;
-            });
-
-            doc.save("story.pdf");
-        }
-
-        let showText = false;
-        let currentCardIndex = 0;
-        let cardsData = [];
-
-        function toggleView() {
-            showText = !showText;
-            document.getElementById("toggleButton").innerText = showText ? "See the story" : "Read the story";
-            displayCard(currentCardIndex);
-        }
-
-        function showNextCard() {
-            currentCardIndex = (currentCardIndex + 1) % cardsData.length;
-            displayCard(currentCardIndex);
-        }
-
-        function showPreviousCard() {
-            currentCardIndex = (currentCardIndex - 1 + cardsData.length) % cardsData.length;
-            displayCard(currentCardIndex);
         }
     </script>
 
@@ -175,18 +91,62 @@
             box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
             border-radius: 10px;
             overflow: hidden;
+        }
+        h1 {
+            font-size: 2.5em;
+            color: #4CAF50;
+            margin-bottom: 30px;
             text-align: center;
         }
-
-        .story-text {
-            background-color: #e7f3ff;
+        .title {
+            font-size: 2em;
+            color: #333;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .card {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
             padding: 20px;
+            background-color: #f0f8ff;
             border-radius: 10px;
-            margin: 0 auto;
-            max-width: 80%;
-            text-align: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+            cursor: pointer;
+            width: 100%;
+            max-width: 100%;
+            min-height: 100px;
+            position: relative;
         }
-
+        .active {
+            display: flex;
+        }
+        .card img {
+            max-width: 100%;
+            max-height: calc(100vh - 150px);
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .card p {
+            font-size: 1.5em;
+            text-align: center;
+            color: #333;
+            margin: 0;
+        }
+        .businessman {
+            position: absolute;
+            top: 10px;
+            right: 30px;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            z-index: 10;
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+        }
         button {
             margin: 20px;
             padding: 15px 30px;
@@ -197,16 +157,22 @@
             border-radius: 50px;
             cursor: pointer;
         }
-
         button:hover {
             background-color: #45a049;
         }
-
         .navigation {
             display: flex;
             justify-content: space-between;
             width: 100%;
             margin-top: 20px;
+        }
+        .button-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
         }
     </style>
 </head>
@@ -217,13 +183,124 @@
         <h1>Hannah StoryCard</h1>
         <div class="button-container">
             <button id="toggleButton" onclick="toggleView()">Read the story</button>
-            <button id="pdfButton" onclick="generatePDF()" style="display: none;">Generate PDF</button>
         </div>
+        <div class="title" id="storyTitle"></div>
         <div id="cardsContainer"></div>
         <div class="navigation">
             <button id="prevBtn" onclick="showPreviousCard()">Previous</button>
             <button id="nextBtn" onclick="showNextCard()">Next</button>
         </div>
     </div>
+
+    <script>
+        let showText = false;
+        let currentCardIndex = 0;
+        let cardsData = [];
+
+        // Função para alternar entre texto e imagem
+        function toggleView() {
+            showText = !showText;
+            document.getElementById("toggleButton").innerText = showText ? "See the story" : "Read the story";
+            displayCard(currentCardIndex);
+        }
+
+        // Função para carregar o conteúdo do arquivo images.txt
+        async function loadContent() {
+            const response = await fetch('images.txt');
+            const text = await response.text();
+            const lines = text.split('\n');
+            let cards = [];
+            let currentImage = '';
+            let currentText = '';
+
+            lines.forEach(line => {
+                if (line.startsWith('#imagem')) {
+                    if (currentImage && currentText) {
+                        cards.push({ image: currentImage, text: currentText });
+                    }
+                    currentImage = line.replace('#', '').trim();
+                    currentText = '';
+                } else {
+                    currentText += line + ' ';
+                }
+            });
+
+            if (currentImage && currentText) {
+                cards.push({ image: currentImage, text: currentText });
+            }
+
+            return cards;
+        }
+
+        // Função para exibir o card atual
+        function displayCard(index) {
+            const container = document.getElementById('cardsContainer');
+            container.innerHTML = '';
+            const cardData = cardsData[index];
+            const cardElement = document.createElement('div');
+            cardElement.className = 'card active';
+
+            if (showText) {
+                cardElement.innerHTML = `<div class="card-text"><p>${cardData.text}</p></div>`;
+            } else {
+                cardElement.innerHTML = `<img src="images/${cardData.image}.jpeg" alt="Image">`;
+            }
+
+            const businessmanImage = document.createElement('img');
+            businessmanImage.src = 'businessman.png';
+            businessmanImage.className = 'businessman';
+            businessmanImage.onclick = () => toggleSpeech(cardData.text);
+
+            cardElement.appendChild(businessmanImage);
+            container.appendChild(cardElement);
+
+            // Verifica se é o último card
+            if (index === cardsData.length - 1) {
+                firebase.auth().onAuthStateChanged(function(user) {
+                    if (user) {
+                        const { fase } = getParamsFromURL();
+                        salvarProgressoAluno(user.uid, fase);
+                    } else {
+                        console.log("Nenhum usuário logado.");
+                    }
+                });
+            }
+
+            // Atualiza botões de navegação
+            document.getElementById('prevBtn').style.display = (index === 0) ? 'none' : 'block';
+            document.getElementById('nextBtn').style.display = (index === cardsData.length - 1) ? 'none' : 'block';
+        }
+
+        // Função para iniciar ou parar a leitura do texto
+        function toggleSpeech(text) {
+            if (window.speechSynthesis.speaking) {
+                window.speechSynthesis.cancel();
+            } else {
+                let utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US';
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        // Função para exibir o próximo card
+        function showNextCard() {
+            currentCardIndex = (currentCardIndex + 1) % cardsData.length;
+            displayCard(currentCardIndex);
+        }
+
+        // Função para exibir o card anterior
+        function showPreviousCard() {
+            currentCardIndex = (currentCardIndex - 1 + cardsData.length) % cardsData.length;
+            displayCard(currentCardIndex);
+        }
+
+        // Função para inicializar a página com o primeiro card
+        async function init() {
+            cardsData = await loadContent();
+            displayCard(0);
+        }
+
+        init();
+    </script>
 </body>
 </html>
