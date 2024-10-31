@@ -27,6 +27,10 @@
         // Inicializa o Firebase
         firebase.initializeApp(firebaseConfig);
 
+        // Variáveis globais para o título e texto da história para o PDF
+            let storyTitle = "Hannah Story"; // Exemplo de título para o PDF
+            let storyText = ""; // Variável que irá conter o texto da história
+
         // Função para identificar Level, Unit e fase atual pelo URL
         function getParamsFromURL() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -99,6 +103,37 @@ function generatePDF() {
     });
 
     doc.save("story.pdf");  // Salva o PDF com o nome 'story.pdf'
+}
+
+document.addEventListener("DOMContentLoaded", init);
+
+async function loadContent() {
+    const response = await fetch('images.txt');
+    const text = await response.text();
+    const lines = text.split('\n');
+    let cards = [];
+    let currentImage = '';
+    let currentText = '';
+
+    lines.forEach(line => {
+        if (line.startsWith('#imagem')) {
+            if (currentImage && currentText) {
+                cards.push({ image: currentImage, text: currentText });
+            }
+            currentImage = line.replace('#', '').trim();
+            currentText = '';
+        } else {
+            currentText += line + ' ';
+        }
+    });
+
+    if (currentImage && currentText) {
+        cards.push({ image: currentImage, text: currentText });
+    }
+
+    // Preenche storyText com o conteúdo da história para o PDF
+    storyText = cards.map(card => card.text).join('\n\n');
+    return cards;
 }
     </script>
 
@@ -239,34 +274,6 @@ function generatePDF() {
             showText = !showText;
             document.getElementById("toggleButton").innerText = showText ? "See the story" : "Read the story";
             displayCard(currentCardIndex);
-        }
-
-        // Função para carregar o conteúdo do arquivo images.txt
-        async function loadContent() {
-            const response = await fetch('images.txt');
-            const text = await response.text();
-            const lines = text.split('\n');
-            let cards = [];
-            let currentImage = '';
-            let currentText = '';
-
-            lines.forEach(line => {
-                if (line.startsWith('#imagem')) {
-                    if (currentImage && currentText) {
-                        cards.push({ image: currentImage, text: currentText });
-                    }
-                    currentImage = line.replace('#', '').trim();
-                    currentText = '';
-                } else {
-                    currentText += line + ' ';
-                }
-            });
-
-            if (currentImage && currentText) {
-                cards.push({ image: currentImage, text: currentText });
-            }
-
-            return cards;
         }
 
         // Função para exibir o card atual
