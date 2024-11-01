@@ -399,64 +399,65 @@ function generatePDF() {
     let currentUtterance = null;  // Para rastrear a leitura atual
 
 // Carregar as lições e explicações dinamicamente do arquivo texto.txt
-fetch('texto.txt')
-    .then(response => {
-        if (!response.ok) {
-            throw new Error("Erro ao carregar o arquivo texto.txt");
-        }
-        return response.text();
-    })
-    .then(data => {
-        console.log("Conteúdo do arquivo texto.txt:", data);  // Exibe o conteúdo do arquivo
-        const lines = data.split('\n').filter(line => line.trim() !== '');  // Filtra linhas vazias
-        
-        lines.forEach((line, index) => {
-            const [type, lesson, explanation] = line.split('|').map(item => item.trim());
-            if (type === 'lesson' && lesson && explanation) {  // Verifica se todos os campos estão preenchidos
-                lessonData.push({
-                    img: `imagens/imagem${index + 1}.png`,
-                    title: lesson,
-                    text: explanation,
-                    matchIndex: index + 1
-                });
+    fetch('texto.txt')
+        .then(response => {
+            if (!response.ok) {
+                console.error("Erro ao carregar o arquivo texto.txt. Status:", response.status);
+                throw new Error("Erro ao carregar o arquivo texto.txt");
             }
+            return response.text();
+        })
+        .then(data => {
+            console.log("Conteúdo do arquivo texto.txt:", data);  // Exibe o conteúdo do arquivo para depuração
+            const lines = data.split('\n').filter(line => line.trim() !== '');  // Filtra linhas vazias
+
+            lines.forEach((line, index) => {
+                const [type, lesson, explanation] = line.split('|').map(item => item.trim());
+                if (type === 'lesson' && lesson && explanation) {  // Verifica se todos os campos estão preenchidos
+                    lessonData.push({
+                        img: `imagens/imagem${index + 1}.png`,
+                        title: lesson,
+                        text: explanation,
+                        matchIndex: index + 1
+                    });
+                }
+            });
+
+            console.log("Dados das lições carregadas:", lessonData);  // Exibe os dados carregados
+            
+            if (lessonData.length === 0) {
+                throw new Error("Nenhuma lição carregada. Verifique o conteúdo do arquivo texto.txt.");
+            }
+
+            // Restante do código para embaralhar e exibir as lições
+            const shuffledLessons = shuffleArray([...lessonData]);
+            const shuffledExplanations = shuffleArray([...lessonData]);
+
+            const lessonsContainer = document.getElementById('lessons');
+            const explanationsContainer = document.getElementById('explanations');
+
+            // Preencher as colunas com as lições e explicações embaralhadas
+            shuffledLessons.forEach(item => {
+                const lessonDiv = document.createElement('div');
+                lessonDiv.classList.add('list-item');
+                lessonDiv.textContent = item.title;
+                lessonDiv.dataset.match = item.matchIndex;
+                lessonDiv.onclick = () => selectLeftItem(lessonDiv);
+                lessonsContainer.appendChild(lessonDiv);
+            });
+
+            shuffledExplanations.forEach(item => {
+                const explanationDiv = document.createElement('div');
+                explanationDiv.classList.add('drop-zone');
+                explanationDiv.textContent = item.text;
+                explanationDiv.dataset.match = item.matchIndex;
+                explanationDiv.onclick = () => selectRightItem(explanationDiv);
+                explanationsContainer.appendChild(explanationDiv);
+            });
+        })
+        .catch(error => {
+            console.error("Erro ao carregar os dados:", error);
         });
-
-        console.log("Dados das lições carregadas:", lessonData);  // Exibe os dados carregados
-        
-        if (lessonData.length === 0) {
-            throw new Error("Nenhuma lição carregada. Verifique o conteúdo do arquivo texto.txt.");
-        }
-        
-        // Embaralhar as lições e explicações de forma independente
-        const shuffledLessons = shuffleArray([...lessonData]);
-        const shuffledExplanations = shuffleArray([...lessonData]);
-
-        const lessonsContainer = document.getElementById('lessons');
-        const explanationsContainer = document.getElementById('explanations');
-
-        // Preencher as colunas com as lições e explicações embaralhadas
-        shuffledLessons.forEach(item => {
-            const lessonDiv = document.createElement('div');
-            lessonDiv.classList.add('list-item');
-            lessonDiv.textContent = item.title;
-            lessonDiv.dataset.match = item.matchIndex;
-            lessonDiv.onclick = () => selectLeftItem(lessonDiv);
-            lessonsContainer.appendChild(lessonDiv);
-        });
-
-        shuffledExplanations.forEach(item => {
-            const explanationDiv = document.createElement('div');
-            explanationDiv.classList.add('drop-zone');
-            explanationDiv.textContent = item.text;
-            explanationDiv.dataset.match = item.matchIndex;
-            explanationDiv.onclick = () => selectRightItem(explanationDiv);
-            explanationsContainer.appendChild(explanationDiv);
-        });
-    })
-    .catch(error => {
-        console.error("Erro ao carregar os dados:", error);
-    });
 
 // Função para embaralhar o array de itens
 function shuffleArray(array) {
