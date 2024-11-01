@@ -181,14 +181,65 @@
             background-color: #7b1fa2;
             transform: scale(1.05);
         }
+#overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: none;
+    z-index: 1000;
+}
+
+#completion-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    text-align: center;
+    display: none;
+    z-index: 1001;
+}
+
+#completion-modal h2 {
+    margin-top: 0;
+    font-size: 2rem;
+    color: #32CD32;
+}
+
+#completion-modal p {
+    font-size: 1.2rem;
+    margin: 10px 0;
+}
+
+#completion-modal button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    font-size: 1rem;
+    cursor: pointer;
+    border: none;
+    border-radius: 5px;
+    background-color: #32CD32;
+    color: white;
+    transition: background-color 0.3s ease;
+}
+
+#completion-modal button:hover {
+    background-color: #28a428;
+}
     </style>
 </head>
 <body>
-
 <button onclick="window.location.href='../index.html'" class="back-btn">
     Back
 </button>
-
+<button class="pdf-btn" onclick="generatePDF()">Generate PDF</button>
+     
 <h1>Hannah Matching Game</h1>
 
 <div class="container">
@@ -201,7 +252,107 @@
             <!-- Explanations will be loaded here dynamically -->
         </div>
     </div>
+<!-- Modal de conclusão -->
+<div id="overlay" style="display: none;"></div>
+<div id="completion-modal" style="display: none;">
+    <h2>Phase Completed!</h2>
+    <p>Congratulations! You have completed this phase.</p>
+    <button onclick="closeModal()">Close</button>
 </div>
+
+</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+
+<script>
+    // Configuração do Firebase
+    const firebaseConfig = {
+        apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+        authDomain: "hannahenglishcourse.firebaseapp.com",
+        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "hannahenglishcourse",
+        storageBucket: "hannahenglishcourse.appspot.com",
+        messagingSenderId: "449818788486",
+        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707"
+    };
+
+    // Inicialização do Firebase
+    firebase.initializeApp(firebaseConfig);
+
+    // Função de autenticação simples
+    firebase.auth().onAuthStateChanged((user) => {
+        if (user) {
+            console.log("Usuário autenticado:", user);
+        } else {
+            console.log("Nenhum usuário autenticado.");
+        }
+    });
+
+function generatePDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    // Caminho da logo
+    const logoPath = '../../../../imagens/hannah_logo.pdf';
+
+    // Cria um elemento <img> para carregar a logo
+    const logo = new Image();
+    logo.src = logoPath;
+
+    logo.onload = function() {
+        // Adiciona a logo ao PDF
+        doc.addImage(logo, 'PNG', 10, 10, 30, 30);  // Ajusta as coordenadas e tamanho conforme necessário
+
+        // Adiciona o título e a linha para "Name" e "Date" ao lado da logo
+        doc.setFontSize(12);
+        doc.text("Name: ______________________________________________ Date: ____________", 50, 20);
+        
+        // Adiciona o título abaixo da linha de "Name" e "Date"
+        doc.setFontSize(16);
+        doc.text("Hannah Matching Game", 10, 50);  // Posiciona o título
+
+        let yOffset = 60;  // Define a posição vertical inicial após a logo e o título
+
+        // Adiciona as lições e explicações ao PDF
+        document.querySelectorAll('.list-item, .drop-zone').forEach((item, index) => {
+            if (yOffset > 280) {  // Se ultrapassar o limite da página
+                doc.addPage();
+                yOffset = 10;
+            }
+
+            doc.text(item.textContent, 10, yOffset);
+            yOffset += 10;  // Move a posição vertical para a próxima linha
+        });
+
+        doc.save("Hannah_Matching_Game.pdf");
+    };
+
+    // Caso a logo não carregue, salva o PDF sem a imagem
+    logo.onerror = function() {
+        doc.setFontSize(12);
+        doc.text("Name: ______________________________________________ Date: ____________", 50, 20);
+        doc.setFontSize(16);
+        doc.text("Hannah Matching Game", 10, 50);
+
+        let yOffset = 60; // Define a posição vertical inicial
+
+        document.querySelectorAll('.list-item, .drop-zone').forEach((item, index) => {
+            if (yOffset > 280) {
+                doc.addPage();
+                yOffset = 10;
+            }
+
+            doc.text(item.textContent, 10, yOffset);
+            yOffset += 10;
+        });
+
+        doc.save("Hannah_Matching_Game.pdf");
+    };
+}
 
 <!-- Container para mostrar a imagem e o texto -->
 <div class="image-container" id="image-container">
@@ -307,7 +458,9 @@
             selectedLeftItem.classList.remove('selected');
             showLessonData(selectedLeftItem.dataset.match - 1);  // Mostrar imagem e texto correspondente
             document.getElementById('try-again').style.display = 'none'; // Esconde "Try Again"
-        } else {
+      // Chama a função para verificar se todas as correlações estão completas
+         checkCompletion();
+         } else {
             element.classList.add('wrong');
             document.getElementById('try-again').style.display = 'block'; // Mostra "Try Again"
             selectedLeftItem.classList.remove('selected');
@@ -316,10 +469,42 @@
         }
     }
 
+function checkCompletion() {
+    const allItems = document.querySelectorAll('.list-item.used'); // Itens correlacionados corretamente
+    const totalItems = document.querySelectorAll('.list-item').length; // Total de itens
+
+    // Verifica se todos os itens foram usados
+    if (allItems.length === totalItems) {
+        showCompletionModal();
+    }
+}
+
+function showCompletionModal() {
+    updateProgressInDatabase();  // Chama a função para atualizar o progresso no banco de dados
+    document.getElementById('overlay').style.display = 'block';
+    document.getElementById('completion-modal').style.display = 'block';
+}
+
+function closeModal() {
+    document.getElementById('overlay').style.display = 'none';
+    document.getElementById('completion-modal').style.display = 'none';
+}
+
     function animateCorrectMatch(element) {
         element.classList.add('correct');
         currentAnimatedItem = element;
     }
+
+function getPhaseFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('fase'); // Obtém o valor de 'fase'
+}
+
+function getLevelAndUnitFromURL() {
+    const url = window.location.pathname;
+    const parts = url.split('/');
+    return { level: parts[1], unit: parts[2] };
+}
 
     function resetWrongSelections() {
         const wrongElements = document.querySelectorAll('.wrong');
@@ -363,6 +548,42 @@
     function restartGame() {
         window.location.reload();
     }
+function updateProgressInDatabase() {
+    const currentPhase = getPhaseFromURL();  // Obtém a fase atual da URL
+    const { level, unit } = getLevelAndUnitFromURL();  // Obtém o nível e unidade da URL
+    
+    // Verifica se o usuário está autenticado
+    firebase.auth().onAuthStateChanged(function(user) {
+        if (user) {
+            const userId = user.uid;
+            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+            // Verifica se a fase atual é "last" (última fase da unidade)
+            if (currentPhase === "last") {
+                const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+                // Cria uma nova unidade no mesmo Level
+                dbRef.parent.child(nextUnit).set({ fase1: true });
+            } 
+            // Verifica se a fase atual é "end" (última fase do nível)
+            else if (currentPhase === "end") {
+                const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+                // Cria um novo level e adiciona Unit1 com fase1 concluída
+                firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+            } 
+            // Se a fase atual é numérica (representando um número de fase)
+            else {
+                const phaseNumber = parseInt(currentPhase);
+                if (!isNaN(phaseNumber)) {
+                    dbRef.update({ [`fase${currentPhase}`]: true });  // Marca a fase atual como concluída
+                    const nextPhase = phaseNumber + 1;  // Incrementa a fase para a próxima
+                    dbRef.update({ [`fase${nextPhase}`]: true });  // Marca a próxima fase como concluída
+                }
+            }
+        } else {
+            console.error("Usuário não autenticado");
+        }
+    });
+}
 </script>
 </body>
 </html>
