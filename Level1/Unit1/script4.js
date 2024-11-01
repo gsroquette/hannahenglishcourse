@@ -11,13 +11,13 @@ document.addEventListener('DOMContentLoaded', function() {
     let lastUnlockedIndex = -1;
 
    const activities = [
-        { id: 9, name: "Speak", path: "../Unit1/Speak/index.html?fase=9", img: "../../imagens/botoes/speak_button.png", unlocked: false },
-        { id: 10, name: "Speak2", path: "../Unit1/Speak2/index.html?fase=10", img: "../../imagens/botoes/speak_button.png", unlocked: false },
-        { id: 11, name: "Speak3", path: "../Unit1/Speak3/index.html?fase=11", img: "../../imagens/botoes/speak_button.png", unlocked: false },
-        { id: 12, name: "MemoryGame", path: "../Unit1/MemoryGame/index.html?fase=12", img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
-        { id: 13, name: "MemoryGame2", path: "../Unit1/MemoryGame2/index.html?fase=13", img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
-        { id: 14, name: "MemoryGame3", path: "../Unit1/MemoryGame3/index.html?fase=14", img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
-        { id: 15, name: "WordSearch2", path: "../Unit1/WordSearch2/index.html?fase=15", img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
+        { id: 16, name: "Mixed Letters FIXO", path: "../Unit1/Mixed Letters FIXO/index.html?fase=16", img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
+        { id: 17, name: "Mixed Letters FIXO2", path: "../Unit1/Mixed Letters FIXO2/index.html?fase=17", img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
+        { id: 18, name: "Mixed Letters FIXO3", path: "../Unit1/Mixed Letters FIXO3/index.html?fase=18", img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
+        { id: 19, name: "Missing Word", path: "../Unit1/Missing Word/index.html?fase=19", img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
+        { id: 20, name: "Missing Word2", path: "../Unit1/Missing Word2/index.html?fase=20", img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
+        { id: 21, name: "Missing Word3", path: "../Unit1/Missing Word3/index.html?fase=21", img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
+        { id: 22, name: "MatchingGame", path: "../Unit1/MatchingGame/index.html?fase=22", img: "../../imagens/botoes/matching_game_button", unlocked: false }
     ];
 
     // Fechar o dropdown ao clicar fora dele
