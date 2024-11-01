@@ -399,6 +399,149 @@ function generatePDF() {
     let currentUtterance = null;  // Para rastrear a leitura atual
 
 // Carregar as lições e explicações dinamicamente do arquivo texto.txt
+    fetch('texto.txt')
+        .then(response => response.text())
+        .then(data => {
+            const lines = data.split('\n');
+
+            // Montar o array de lições e explicações
+            lines.forEach((line, index) => {
+                const [type, lesson, explanation] = line.split('|');
+                if (type === 'lesson') {
+                    lessonData.push({
+                        img: `imagens/imagem${index + 1}.png`,
+                        title: lesson,
+                        text: explanation,
+                        matchIndex: index + 1 // Guarda o índice original
+                    });
+                }
+            });
+
+            // Embaralhar as lições e explicações independentemente
+            const shuffledLessons = shuffleArray([...lessonData]);
+            const shuffledExplanations = shuffleArray([...lessonData]);
+
+            // Preencher as colunas com as lições e explicações embaralhadas
+            const lessonsContainer = document.getElementById('lessons');
+            const explanationsContainer = document.getElementById('explanations');
+
+            shuffledLessons.forEach(item => {
+                const lessonDiv = document.createElement('div');
+                lessonDiv.classList.add('list-item');
+                lessonDiv.textContent = item.title;
+                lessonDiv.dataset.match = item.matchIndex;
+                lessonDiv.onclick = () => selectLeftItem(lessonDiv);
+                lessonsContainer.appendChild(lessonDiv);
+            });
+
+            shuffledExplanations.forEach(item => {
+                const explanationDiv = document.createElement('div');
+                explanationDiv.classList.add('drop-zone');
+                explanationDiv.textContent = item.text;
+                explanationDiv.dataset.match = item.matchIndex;
+                explanationDiv.onclick = () => selectRightItem(explanationDiv);
+                explanationsContainer.appendChild(explanationDiv);
+            });
+        });
+
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    function removeCurrentAnimatedItem() {
+        if (currentAnimatedItem) {
+            currentAnimatedItem.classList.add('fade-out');
+            setTimeout(() => {
+                currentAnimatedItem.style.display = 'none';
+                currentAnimatedItem = null;
+            }, 500);
+        }
+    }
+
+    function selectLeftItem(element) {
+        removeCurrentAnimatedItem();
+        if (selectedLeftItem) {
+            selectedLeftItem.classList.remove('selected');
+        }
+        selectedLeftItem = element;
+        element.classList.add('selected');
+        resetWrongSelections();  // Reseta as seleções erradas
+        speakText(element.textContent);
+    }
+
+    function selectRightItem(element) {
+        removeCurrentAnimatedItem();
+        if (!selectedLeftItem) return;
+
+        if (selectedLeftItem.dataset.match === element.dataset.match) {
+            speakText(element.textContent);
+            animateCorrectMatch(element);
+            selectedLeftItem.classList.add('used');
+            selectedLeftItem.classList.remove('selected');
+            showLessonData(selectedLeftItem.dataset.match - 1);  // Mostrar imagem e texto correspondente
+            document.getElementById('try-again').style.display = 'none'; // Esconde "Try Again"
+        } else {
+            element.classList.add('wrong');
+            document.getElementById('try-again').style.display = 'block'; // Mostra "Try Again"
+            selectedLeftItem.classList.remove('selected');
+            selectedLeftItem = null;
+            speakText("Try Again");
+        }
+    }
+
+    function animateCorrectMatch(element) {
+        element.classList.add('correct');
+        currentAnimatedItem = element;
+    }
+
+    function resetWrongSelections() {
+        const wrongElements = document.querySelectorAll('.wrong');
+        wrongElements.forEach(element => {
+            element.classList.remove('wrong');
+        });
+    }
+
+    function speakText(text) {
+        window.speechSynthesis.cancel();  // Interrompe qualquer leitura anterior
+        if (currentUtterance) {
+            currentUtterance.onend = null;  // Remove o listener anterior, se houver
+        }
+        currentUtterance = new SpeechSynthesisUtterance(text);
+        currentUtterance.lang = 'en-US';
+        window.speechSynthesis.speak(currentUtterance);
+    }
+
+    function showLessonData(index) {
+        const data = lessonData[index];
+        const imageContainer = document.getElementById('image-container');
+        const lessonImage = document.getElementById('lesson-image');
+        const lessonTitle = document.getElementById('lesson-title');
+        const lessonText = document.getElementById('lesson-text');
+
+        lessonImage.src = data.img;
+        lessonTitle.textContent = data.title;
+        lessonText.textContent = data.text;
+
+        imageContainer.style.display = 'flex';
+
+        // Ler o texto em voz alta
+        speakText(data.text);
+    }
+
+    function closeImage() {
+        const imageContainer = document.getElementById('image-container');
+        imageContainer.style.display = 'none';
+    }
+
+    function restartGame() {
+        window.location.reload();
+    }
+
+// Carregar as lições e explicações dinamicamente do arquivo texto.txt
 fetch('/Level1/Unit1/MatchingGame/texto.txt')
     .then(response => {
         if (!response.ok) {
@@ -459,62 +602,6 @@ fetch('/Level1/Unit1/MatchingGame/texto.txt')
         console.error("Erro ao carregar os dados:", error);
     });
 
-// Função para embaralhar o array de itens
-function shuffleArray(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-    }
-    return array;
-}
-
-// Função para remover o item animado atual, se existir
-function removeCurrentAnimatedItem() {
-    if (currentAnimatedItem) {
-        currentAnimatedItem.classList.add('fade-out');
-        setTimeout(() => {
-            currentAnimatedItem.style.display = 'none';
-            currentAnimatedItem = null;
-        }, 500);
-    }
-}
-
-// Função para selecionar um item à esquerda (lições)
-function selectLeftItem(element) {
-    removeCurrentAnimatedItem();
-    if (selectedLeftItem) {
-        selectedLeftItem.classList.remove('selected');
-    }
-    selectedLeftItem = element;
-    element.classList.add('selected');
-    resetWrongSelections();  // Reseta seleções incorretas
-    speakText(element.textContent);
-}
-
-// Função para selecionar um item à direita (explicações)
-function selectRightItem(element) {
-    removeCurrentAnimatedItem();
-    if (!selectedLeftItem) return;
-
-    if (selectedLeftItem.dataset.match === element.dataset.match) {
-        speakText(element.textContent);
-        animateCorrectMatch(element);
-        selectedLeftItem.classList.add('used');
-        selectedLeftItem.classList.remove('selected');
-        showLessonData(selectedLeftItem.dataset.match - 1);  // Exibe a imagem e texto correspondentes
-        document.getElementById('try-again').style.display = 'none'; // Esconde "Try Again"
-        
-        // Verifica se todas as correlações foram concluídas
-        checkCompletion();
-    } else {
-        element.classList.add('wrong');
-        document.getElementById('try-again').style.display = 'block'; // Mostra "Try Again"
-        selectedLeftItem.classList.remove('selected');
-        selectedLeftItem = null;
-        speakText("Try Again");
-    }
-}
-
 // Função para verificar se todas as correlações foram completadas
 function checkCompletion() {
     const allItems = document.querySelectorAll('.list-item.used'); // Itens correlacionados corretamente
@@ -537,11 +624,6 @@ function closeModal() {
     document.getElementById('completion-modal').style.display = 'none';
 }
 
-    function animateCorrectMatch(element) {
-        element.classList.add('correct');
-        currentAnimatedItem = element;
-    }
-
 function getPhaseFromURL() {
     const params = new URLSearchParams(window.location.search);
     return params.get('fase'); // Obtém o valor de 'fase'
@@ -553,48 +635,6 @@ function getLevelAndUnitFromURL() {
     return { level: parts[1], unit: parts[2] };
 }
 
-    function resetWrongSelections() {
-        const wrongElements = document.querySelectorAll('.wrong');
-        wrongElements.forEach(element => {
-            element.classList.remove('wrong');
-        });
-    }
-
-    function speakText(text) {
-        window.speechSynthesis.cancel();  // Interrompe qualquer leitura anterior
-        if (currentUtterance) {
-            currentUtterance.onend = null;  // Remove o listener anterior, se houver
-        }
-        currentUtterance = new SpeechSynthesisUtterance(text);
-        currentUtterance.lang = 'en-US';
-        window.speechSynthesis.speak(currentUtterance);
-    }
-
-    function showLessonData(index) {
-        const data = lessonData[index];
-        const imageContainer = document.getElementById('image-container');
-        const lessonImage = document.getElementById('lesson-image');
-        const lessonTitle = document.getElementById('lesson-title');
-        const lessonText = document.getElementById('lesson-text');
-
-        lessonImage.src = data.img;
-        lessonTitle.textContent = data.title;
-        lessonText.textContent = data.text;
-
-        imageContainer.style.display = 'flex';
-
-        // Ler o texto em voz alta
-        speakText(data.text);
-    }
-
-    function closeImage() {
-        const imageContainer = document.getElementById('image-container');
-        imageContainer.style.display = 'none';
-    }
-
-    function restartGame() {
-        window.location.reload();
-    }
 function updateProgressInDatabase() {
     const currentPhase = getPhaseFromURL();  // Obtém a fase atual da URL
     const { level, unit } = getLevelAndUnitFromURL();  // Obtém o nível e unidade da URL
