@@ -52,12 +52,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     <a href="/${getLevelPath()}/index.html" class="dropdown-item">SELECT A NEW UNIT</a>
                     <a href="/${getLevelPath()}/${getUnitPath()}/index.html" class="dropdown-item">SELECT A NEW ACTIVITY</a>
                 `;
+                
+                // Substitua "loginLink" por "loginContainer" para que o evento de clique funcione na caixa inteira
+                const loginContainer = document.getElementById("loginContainer");
 
-                // Abre e fecha o dropdown ao clicar no loginLink
-                loginLink.addEventListener("click", function(event) {
-                    event.preventDefault();
-                    userDropdown.style.display = userDropdown.style.display === 'flex' ? 'none' : 'flex';
-                });
+loginContainer.addEventListener("click", function(event) {
+    event.preventDefault();
+    userDropdown.style.display = userDropdown.style.display === 'flex' ? 'none' : 'flex';
+});
 
                 // Carrega o progresso do usuário e define o avatar no mapa
                 loadUserProgress(userId, userAvatar, userData.role);
