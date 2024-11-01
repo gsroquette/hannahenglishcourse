@@ -18,10 +18,10 @@ document.addEventListener('DOMContentLoaded', function() {
     ];
 
     // Fechar o dropdown ao clicar fora dele
-    document.addEventListener("click", function(event) {
-        if (!userDropdown.contains(event.target) && event.target !== loginLink) {
-            userDropdown.style.display = 'none';
-        }
+       document.addEventListener("click", function(event) {
+    if (!userDropdown.contains(event.target) && !loginContainer.contains(event.target)) {
+        userDropdown.style.display = 'none';
+                    }
     });
 
     // Configuração de autenticação
