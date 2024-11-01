@@ -57,9 +57,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 const loginContainer = document.getElementById("loginContainer");
 
 loginContainer.addEventListener("click", function(event) {
-    event.preventDefault();
-    userDropdown.style.display = userDropdown.style.display === 'flex' ? 'none' : 'flex';
-});
+    // Somente alterna o dropdown se o alvo não for um link
+    if (event.target.tagName !== 'A') {
+        userDropdown.style.display = userDropdown.style.display === 'flex' ? 'none' : 'flex';
 
                 // Carrega o progresso do usuário e define o avatar no mapa
                 loadUserProgress(userId, userAvatar, userData.role);
