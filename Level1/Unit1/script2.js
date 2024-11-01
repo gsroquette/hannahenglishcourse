@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const database = firebase.database();
     const auth = firebase.auth();
     const loginLink = document.getElementById("loginLink");
+    const loginContainer = document.getElementById("loginContainer"); // Definido fora do bloco de autenticação
     const userDropdown = document.getElementById("userDropdown");
     const levelUnitInfo = document.getElementById("levelUnitInfo");
     const mapContainer = document.getElementById('mapContainer');
