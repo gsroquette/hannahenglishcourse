@@ -52,12 +52,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     <a href="/${getLevelPath()}/${getUnitPath()}/index.html" class="dropdown-item">SELECT A NEW ACTIVITY</a>
                 `;
 
-                // Abre e fecha o dropdown ao clicar no loginLink
+                // Evento de clique no loginContainer para abrir/fechar o dropdown
                 const loginContainer = document.getElementById("loginContainer");
 
-loginContainer.addEventListener("click", function(event) {
-    event.preventDefault();
-    userDropdown.style.display = userDropdown.style.display === 'flex' ? 'none' : 'flex';
+                loginContainer.addEventListener("click", function(event) {
+                    // Somente alterna o dropdown se o alvo não for um link
+                    if (event.target.tagName !== 'A') {
+                        userDropdown.style.display = userDropdown.style.display === 'flex' ? 'none' : 'flex';
+                    }
                 });
 
                 // Carrega o progresso do usuário e define o avatar no mapa
