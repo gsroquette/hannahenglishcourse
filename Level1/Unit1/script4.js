@@ -11,12 +11,12 @@ document.addEventListener('DOMContentLoaded', function() {
     let lastUnlockedIndex = -1;
 
     const activities = [
-        { id: 16, name: "Missing Word", path: "../Unit1/Missing Word/index.html?fase=16", img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
-        { id: 17, name: "Missing Word2", path: "../Unit1/Missing Word2/index.html?fase=17", img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
-        { id: 18, name: "Missing Word3", path: "../Unit1/Missing Word3/index.html?fase=18", img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
-        { id: 19, name: "Mixed Letters FIXO", path: "../Unit1/Mixed Letters FIXO/index.html?fase=19", img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
-        { id: 20, name: "Mixed Letters FIXO2", path: "../Unit1/Mixed Letters FIXO2/index.html?fase=20", img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
-        { id: 21, name: "Mixed Letters FIXO3", path: "../Unit1/Mixed Letters FIXO3/index.html?fase=21", img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
+        { id: 16, name: "Mixed Letters FIXO", path: "../Unit1/Mixed Letters FIXO/index.html?fase=16", img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
+        { id: 17, name: "Mixed Letters FIXO2", path: "../Unit1/Mixed Letters FIXO2/index.html?fase=17", img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
+        { id: 18, name: "Mixed Letters FIXO3", path: "../Unit1/Mixed Letters FIXO3/index.html?fase=18", img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
+        { id: 19, name: "Missing Word", path: "../Unit1/Missing Word/index.html?fase=19", img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
+        { id: 20, name: "Missing Word2", path: "../Unit1/Missing Word2/index.html?fase=20", img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
+        { id: 21, name: "Missing Word3", path: "../Unit1/Missing Word3/index.html?fase=21", img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
         { id: 22, name: "WordSearch3", path: "../Unit1/WordSearch3/index.html?fase=last", img: "../../imagens/botoes/wordsearch_button.png", unlocked: false }
     ];
 
