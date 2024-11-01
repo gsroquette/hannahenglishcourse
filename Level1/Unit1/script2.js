@@ -17,8 +17,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Fechar o dropdown ao clicar fora dele
     document.addEventListener("click", function(event) {
-        if (!userDropdown.contains(event.target) && event.target !== loginLink) {
-            userDropdown.style.display = 'none';
+    if (!userDropdown.contains(event.target) && !loginContainer.contains(event.target)) {
+        userDropdown.style.display = 'none';
         }
     });
 
@@ -52,9 +52,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 `;
 
                 // Abre e fecha o dropdown ao clicar no loginLink
-                loginLink.addEventListener("click", function(event) {
-                    event.preventDefault();
-                    userDropdown.style.display = userDropdown.style.display === 'flex' ? 'none' : 'flex';
+                const loginContainer = document.getElementById("loginContainer");
+
+loginContainer.addEventListener("click", function(event) {
+    event.preventDefault();
+    userDropdown.style.display = userDropdown.style.display === 'flex' ? 'none' : 'flex';
                 });
 
                 // Carrega o progresso do usuário e define o avatar no mapa
