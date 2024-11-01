@@ -17,7 +17,8 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 19, name: "Missing Word", path: "../Unit1/Missing Word/index.html?fase=19", img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
         { id: 20, name: "Missing Word2", path: "../Unit1/Missing Word2/index.html?fase=20", img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
         { id: 21, name: "Missing Word3", path: "../Unit1/Missing Word3/index.html?fase=21", img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
-        { id: 22, name: "MatchingGame", path: "../Unit1/MatchingGame/index.html?fase=22", img: "../../imagens/botoes/matching_game_button", unlocked: false }
+        { id: 22, name: "MatchingGame", path: "../Unit1/MatchingGame/index.html?fase=22", img: "../../imagens/botoes/matching_game_button.png", unlocked: false },
+        { id: 23, name: "WordSearch3", path: "../Unit1/WordSearch3/index.html?fase=last", img: "../../imagens/botoes/wordsearch_button.png", unlocked: false }
     ];
 
     // Fechar o dropdown ao clicar fora dele
