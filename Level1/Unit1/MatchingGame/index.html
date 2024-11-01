@@ -401,35 +401,38 @@ function generatePDF() {
     // Carregar as lições e explicações dinamicamente do arquivo texto.txt
 fetch('texto.txt')
     .then(response => {
+        // Verifica se a resposta é bem-sucedida
         if (!response.ok) {
             throw new Error("Erro ao carregar o arquivo texto.txt");
         }
+        // Retorna o conteúdo do arquivo como texto
         return response.text();
     })
     .then(data => {
         const lines = data.split('\n');
-
-        // Montar o array de lições e explicações
+        
+        // Montar o array de lições e explicações a partir das linhas do arquivo
         lines.forEach((line, index) => {
             const [type, lesson, explanation] = line.split('|');
             if (type === 'lesson') {
                 lessonData.push({
-                    img: `imagens/imagem${index + 1}.png`,
+                    img: `imagens/imagem${index + 1}.png`,  // Caminho para a imagem correspondente
                     title: lesson,
                     text: explanation,
-                    matchIndex: index + 1 // Guarda o índice original
+                    matchIndex: index + 1  // Guarda o índice original
                 });
             }
         });
 
-        // Embaralhar as lições e explicações independentemente
+        // Embaralhar as lições e explicações de forma independente
         const shuffledLessons = shuffleArray([...lessonData]);
         const shuffledExplanations = shuffleArray([...lessonData]);
 
-        // Preencher as colunas com as lições e explicações embaralhadas
+        // Seleciona os elementos de contêiner para preencher as colunas de lições e explicações
         const lessonsContainer = document.getElementById('lessons');
         const explanationsContainer = document.getElementById('explanations');
 
+        // Preencher as colunas com as lições e explicações embaralhadas
         shuffledLessons.forEach(item => {
             const lessonDiv = document.createElement('div');
             lessonDiv.classList.add('list-item');
@@ -449,69 +452,77 @@ fetch('texto.txt')
         });
     })
     .catch(error => {
+        // Exibe o erro no console se houver problemas ao carregar o arquivo
         console.error("Erro ao carregar os dados:", error);
     });
 
-    function shuffleArray(array) {
-        for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
-        }
-        return array;
+// Função para embaralhar o array de itens
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
     }
+    return array;
+}
 
-    function removeCurrentAnimatedItem() {
-        if (currentAnimatedItem) {
-            currentAnimatedItem.classList.add('fade-out');
-            setTimeout(() => {
-                currentAnimatedItem.style.display = 'none';
-                currentAnimatedItem = null;
-            }, 500);
-        }
+// Função para remover o item animado atual, se existir
+function removeCurrentAnimatedItem() {
+    if (currentAnimatedItem) {
+        currentAnimatedItem.classList.add('fade-out');
+        setTimeout(() => {
+            currentAnimatedItem.style.display = 'none';
+            currentAnimatedItem = null;
+        }, 500);
     }
+}
 
-    function selectLeftItem(element) {
-        removeCurrentAnimatedItem();
-        if (selectedLeftItem) {
-            selectedLeftItem.classList.remove('selected');
-        }
-        selectedLeftItem = element;
-        element.classList.add('selected');
-        resetWrongSelections();  // Reseta as seleções erradas
+// Função para selecionar um item à esquerda (lições)
+function selectLeftItem(element) {
+    removeCurrentAnimatedItem();
+    if (selectedLeftItem) {
+        selectedLeftItem.classList.remove('selected');
+    }
+    selectedLeftItem = element;
+    element.classList.add('selected');
+    resetWrongSelections();  // Reseta seleções incorretas
+    speakText(element.textContent);
+}
+
+// Função para selecionar um item à direita (explicações)
+function selectRightItem(element) {
+    removeCurrentAnimatedItem();
+    if (!selectedLeftItem) return;
+
+    if (selectedLeftItem.dataset.match === element.dataset.match) {
         speakText(element.textContent);
+        animateCorrectMatch(element);
+        selectedLeftItem.classList.add('used');
+        selectedLeftItem.classList.remove('selected');
+        showLessonData(selectedLeftItem.dataset.match - 1);  // Exibe a imagem e texto correspondentes
+        document.getElementById('try-again').style.display = 'none'; // Esconde "Try Again"
+        
+        // Verifica se todas as correlações foram concluídas
+        checkCompletion();
+    } else {
+        element.classList.add('wrong');
+        document.getElementById('try-again').style.display = 'block'; // Mostra "Try Again"
+        selectedLeftItem.classList.remove('selected');
+        selectedLeftItem = null;
+        speakText("Try Again");
     }
+}
 
-    function selectRightItem(element) {
-        removeCurrentAnimatedItem();
-        if (!selectedLeftItem) return;
-
-        if (selectedLeftItem.dataset.match === element.dataset.match) {
-            speakText(element.textContent);
-            animateCorrectMatch(element);
-            selectedLeftItem.classList.add('used');
-            selectedLeftItem.classList.remove('selected');
-            showLessonData(selectedLeftItem.dataset.match - 1);  // Mostrar imagem e texto correspondente
-            document.getElementById('try-again').style.display = 'none'; // Esconde "Try Again"
-      // Chama a função para verificar se todas as correlações estão completas
-         checkCompletion();
-         } else {
-            element.classList.add('wrong');
-            document.getElementById('try-again').style.display = 'block'; // Mostra "Try Again"
-            selectedLeftItem.classList.remove('selected');
-            selectedLeftItem = null;
-            speakText("Try Again");
-        }
-    }
-
+// Função para verificar se todas as correlações foram completadas
 function checkCompletion() {
     const allItems = document.querySelectorAll('.list-item.used'); // Itens correlacionados corretamente
     const totalItems = document.querySelectorAll('.list-item').length; // Total de itens
 
-    // Verifica se todos os itens foram usados
+    // Se todos os itens foram usados, mostra o modal de conclusão
     if (allItems.length === totalItems) {
         showCompletionModal();
     }
 }
+
 
 function showCompletionModal() {
     updateProgressInDatabase();  // Chama a função para atualizar o progresso no banco de dados
