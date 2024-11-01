@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const database = firebase.database();
     const auth = firebase.auth();
     const loginLink = document.getElementById("loginLink");
+    const loginContainer = document.getElementById("loginContainer"); // Definido fora do bloco de autenticação
     const userDropdown = document.getElementById("userDropdown");
     const levelUnitInfo = document.getElementById("levelUnitInfo");
     const mapContainer = document.getElementById('mapContainer');
@@ -17,11 +18,11 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 5, name: "QUIZ", path: "../Unit1/QUIZ/index.html?fase=5", img: "../../imagens/botoes/quiz_button.png", unlocked: false }
     ];
 
-    // Fechar o dropdown ao clicar fora dele
-       document.addEventListener("click", function(event) {
-    if (!userDropdown.contains(event.target) && !loginContainer.contains(event.target)) {
-        userDropdown.style.display = 'none';
-                    }
+     // Fechar o dropdown ao clicar fora dele
+    document.addEventListener("click", function(event) {
+        if (!userDropdown.contains(event.target) && !loginContainer.contains(event.target)) {
+            userDropdown.style.display = 'none';
+        }
     });
 
     // Configuração de autenticação
@@ -53,13 +54,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     <a href="/${getLevelPath()}/${getUnitPath()}/index.html" class="dropdown-item">SELECT A NEW ACTIVITY</a>
                 `;
                 
-                // Substitua "loginLink" por "loginContainer" para que o evento de clique funcione na caixa inteira
+             // Evento de clique no loginContainer para abrir/fechar o dropdown
                 const loginContainer = document.getElementById("loginContainer");
 
-loginContainer.addEventListener("click", function(event) {
-    // Somente alterna o dropdown se o alvo não for um link
-    if (event.target.tagName !== 'A') {
-        userDropdown.style.display = userDropdown.style.display === 'flex' ? 'none' : 'flex';
+                loginContainer.addEventListener("click", function(event) {
+                    // Somente alterna o dropdown se o alvo não for um link
+                    if (event.target.tagName !== 'A') {
+                        userDropdown.style.display = userDropdown.style.display === 'flex' ? 'none' : 'flex';
+                    }
+                });
 
                 // Carrega o progresso do usuário e define o avatar no mapa
                 loadUserProgress(userId, userAvatar, userData.role);
