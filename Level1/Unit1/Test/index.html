@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<div id="grade-display" class="grade-style"></div>
     <title>Hannah Test</title>
     <style>
         /* Estilos existentes mantidos */
@@ -152,7 +151,9 @@
     Back
 </button>
 
-<h1>Hannah Quiz</h1>
+<h1>Hannah Test</h1>
+
+<div id="grade-display" class="grade-style"></div>
 
 <div class="btn-group">
     <button class="read-btn" id="read-btn" onclick="readQuestion()">Read</button>
@@ -190,33 +191,61 @@
     // Inicializa o Firebase
     firebase.initializeApp(firebaseConfig);
 
-// Função para exibir a nota e a mensagem acima do título
-    function displayGradeAndMessage(userId) {
-    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/Level1/Unit1/nota`);
+function isStudentLinkedToProfessor(userId) {
+    const dbRef = firebase.database().ref("usuarios"); // Referência a todos os usuários (onde estão os professores)
     
-    dbRef.once('value').then((snapshot) => {
-        const grade = snapshot.val();
-        const gradeDisplay = document.getElementById('grade-display');
-
-        if (grade !== null) {
-            gradeDisplay.innerHTML = `Your Grade: ${grade}%`;
+    return new Promise((resolve) => { // Usamos uma Promise para lidar com o resultado da pesquisa
+        dbRef.once("value").then(snapshot => { // Carrega todos os usuários do banco de dados
+            let isLinked = false; // Variável para saber se o aluno está vinculado a um professor
             
-            firebase.database().ref(`usuarios/${userId}/role`).once('value').then((roleSnapshot) => {
-                const role = roleSnapshot.val();
-                if (role === 'aluno') {
-                    firebase.database().ref(`usuarios/${userId}/professor`).once('value').then((professorSnapshot) => {
-                        if (professorSnapshot.exists()) {
-                            gradeDisplay.innerHTML += "<br><span>Only your teacher can cancel this grade</span>";
+            snapshot.forEach(professorSnapshot => { // Percorre cada usuário (professor)
+                const professorData = professorSnapshot.val(); // Dados do professor
+                
+                // Verifica se o professor tem turmas
+                if (professorData.turmas) {
+                    // Percorre cada turma do professor
+                    Object.keys(professorData.turmas).forEach(turmaId => {
+                        const turma = professorData.turmas[turmaId];
+                        
+                        // Verifica se a turma tem o aluno com o userId fornecido
+                        if (turma.students && turma.students[userId]) {
+                            isLinked = true; // Se o aluno está em uma turma, marca como vinculado
                         }
                     });
                 }
             });
+            
+            resolve(isLinked); // Retorna true se o aluno estiver vinculado, ou false caso contrário
+        }).catch(error => {
+            console.error("Error checking if student is linked to a professor:", error);
+            resolve(false); // Em caso de erro, resolve como false (não vinculado)
+        });
+    });
+}
+
+// Função para exibir a nota e a mensagem acima do título
+    function displayGradeAndMessage(userId) {
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/Level1/Unit1/nota`);
+
+    dbRef.once("value").then(snapshot => {
+        const grade = snapshot.val(); // Pega a nota do banco de dados
+        const gradeDisplay = document.getElementById("grade-display"); // Seleciona o elemento para exibir a nota
+
+        if (grade !== null) {
+            gradeDisplay.innerHTML = `Your Grade: ${grade}%`; // Exibe a nota
+
+            // Verifica se o aluno está vinculado a um professor
+            isStudentLinkedToProfessor(userId).then(isLinked => {
+                if (isLinked) { // Se estiver vinculado
+                    gradeDisplay.innerHTML += "<br><span style='color: red;'>Only your teacher can cancel this grade</span>";
+                }
+            });
         } else {
-            gradeDisplay.innerHTML = "No grade available.";
+            gradeDisplay.innerHTML = "No grade available."; // Exibe mensagem se a nota não estiver disponível
         }
-    }).catch((error) => {
+    }).catch(error => {
         console.error("Error retrieving grade:", error);
-        document.getElementById('grade-display').innerHTML = "Error loading grade.";
+        document.getElementById("grade-display").innerHTML = "Error loading grade."; // Exibe mensagem de erro, se houver
     });
 }
 
