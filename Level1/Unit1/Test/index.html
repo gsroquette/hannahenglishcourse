@@ -43,6 +43,12 @@
     display: block;
     margin-top: 5px;
 }
+
+.grade-style-red {
+    color: #FF0000; /* Cor vermelha para o texto da nota */
+    border-color: #FF0000; /* Borda vermelha */
+    background-color: #fdecea; /* Fundo vermelho claro */
+}
        
         .question-container {
             display: flex;
@@ -225,27 +231,39 @@ function isStudentLinkedToProfessor(userId) {
 
 // Função para exibir a nota e a mensagem acima do título
     function displayGradeAndMessage(userId) {
-    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/Level1/Unit1/nota`);
+    if (gradeRef) gradeRef.off(); // Remove qualquer listener anterior
 
-    dbRef.on("value", (snapshot) => { // Listener para mudanças em tempo real
+    gradeRef = firebase.database().ref(`usuarios/${userId}/progresso/Level1/Unit1/nota`);
+
+    gradeRef.on("value", (snapshot) => {
         const grade = snapshot.val(); // Pega a nota do banco de dados
-        const gradeDisplay = document.getElementById("grade-display"); // Seleciona o elemento para exibir a nota
+        const gradeDisplay = document.getElementById("grade-display");
 
         if (grade !== null) {
-            gradeDisplay.innerHTML = `Your Grade: ${grade}%`; // Exibe a nota
+            // Define o conteúdo da nota
+            gradeDisplay.innerHTML = `Your Grade: ${grade}%`;
+
+            // Aplica a classe vermelha se a nota for menor que 70, caso contrário, aplica a padrão
+            if (grade < 70) {
+                gradeDisplay.classList.add("grade-style-red");
+                gradeDisplay.classList.remove("grade-style");
+            } else {
+                gradeDisplay.classList.add("grade-style");
+                gradeDisplay.classList.remove("grade-style-red");
+            }
 
             // Verifica se o aluno está vinculado a um professor
             isStudentLinkedToProfessor(userId).then(isLinked => {
-                if (isLinked) { // Se estiver vinculado
+                if (isLinked) {
                     gradeDisplay.innerHTML += "<br><span style='color: red;'>Only your teacher can cancel this grade</span>";
                 }
             });
         } else {
-            gradeDisplay.innerHTML = "No grade available."; // Exibe mensagem se a nota não estiver disponível
+            gradeDisplay.innerHTML = "No grade available.";
         }
     }, (error) => {
         console.error("Error retrieving grade:", error);
-        document.getElementById("grade-display").innerHTML = "Error loading grade."; // Exibe mensagem de erro, se houver
+        document.getElementById("grade-display").innerHTML = "Error loading grade.";
     });
 }
 
