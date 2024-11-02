@@ -294,15 +294,16 @@ firebase.auth().onAuthStateChanged(function(user) {
         }
     }
 
-    function checkAnswer(radioElement, selectedAnswer) {
+  function checkAnswer(radioElement, selectedAnswer) {
     const q = questions[currentQuestionIndex];
 
     // Verifica se a resposta está correta e atualiza o contador
-    if (selectedAnswer === q.correct) {
+    if (selectedAnswer === q.correct && !answeredQuestions[currentQuestionIndex]) {
         answeredQuestions[currentQuestionIndex] = true; // Marca como correta
-        correctAnswers++; // Incrementa acertos
-    } else {
+        correctAnswers++; // Incrementa acertos apenas se for a primeira vez que acertou a questão
+    } else if (selectedAnswer !== q.correct && answeredQuestions[currentQuestionIndex]) {
         answeredQuestions[currentQuestionIndex] = false; // Marca como incorreta
+        correctAnswers--; // Decrementa acertos se a resposta correta for alterada
     }
 
     // Permite que o aluno altere a resposta
@@ -323,8 +324,9 @@ firebase.auth().onAuthStateChanged(function(user) {
         }
     }
 
-    function checkCompletion() {
-    if (answeredQuestions.every((answered) => answered)) {
+ function checkCompletion() {
+    console.log("checkCompletion chamado."); // Verificação de depuração
+    if (answeredQuestions.every((answered) => answered !== false)) {
         // Calcula a nota como uma porcentagem de acertos
         const grade = Math.round((correctAnswers / totalQuestions) * 100);
 
@@ -340,6 +342,8 @@ firebase.auth().onAuthStateChanged(function(user) {
 
         // Salva a nota no banco de dados
         ensureUserIsAuthenticated((userId) => saveGrade(userId, grade));
+    } else {
+        console.log("Nem todas as perguntas foram respondidas corretamente.");
     }
 }
 
