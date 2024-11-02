@@ -436,17 +436,21 @@ function saveGrade(userId, grade) {
     const { level, unit } = getLevelAndUnitFromURL(); // Obtém o Level e Unit da URL
     const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
 
+    // Verifica a nota existente e se o aluno está vinculado a um professor
     dbRef.child('nota').once('value').then(snapshot => {
         const existingGrade = snapshot.val();
 
-        // Se o aluno não tem professor ou a nota é zero ou nula, permita sobrescrever
-        if (!existingGrade || existingGrade === 0) {
-            dbRef.update({ nota: grade })
-                .then(() => console.log("Nota salva com sucesso."))
-                .catch(error => console.error("Erro ao salvar a nota:", error));
-        } else {
-            console.log("Nota já registrada. Somente o professor pode modificar.");
-        }
+        // Chama a função para verificar se o aluno está vinculado a um professor
+        isStudentLinkedToProfessor(userId).then(isLinked => {
+            // Se o aluno não estiver vinculado ou a nota for zero/nula, permite a atualização
+            if (!isLinked || !existingGrade || existingGrade === 0) {
+                dbRef.update({ nota: grade })
+                    .then(() => console.log("Nota salva com sucesso."))
+                    .catch(error => console.error("Erro ao salvar a nota:", error));
+            } else {
+                console.log("Nota já registrada. Somente o professor pode modificar.");
+            }
+        });
     });
 }
 
