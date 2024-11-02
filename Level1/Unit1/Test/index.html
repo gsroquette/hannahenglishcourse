@@ -206,6 +206,50 @@
     // Inicializa o Firebase
     firebase.initializeApp(firebaseConfig);
 
+// Declaração global para gradeRef
+let gradeRef;
+
+// Função para exibir a nota e a mensagem acima do título
+function displayGradeAndMessage(userId) {
+    if (gradeRef) gradeRef.off(); // Remove qualquer listener anterior
+
+    gradeRef = firebase.database().ref(`usuarios/${userId}/progresso/Level1/Unit1/nota`);
+
+    gradeRef.on("value", (snapshot) => {
+        const grade = snapshot.val();
+        const gradeDisplay = document.getElementById("grade-display");
+
+        if (grade !== null) {
+            gradeDisplay.innerHTML = `Your Grade: ${grade}%`;
+            if (grade < 70) {
+                gradeDisplay.classList.add("grade-style-red");
+                gradeDisplay.classList.remove("grade-style");
+            } else {
+                gradeDisplay.classList.add("grade-style");
+                gradeDisplay.classList.remove("grade-style-red");
+            }
+
+            isStudentLinkedToProfessor(userId).then(isLinked => {
+                if (isLinked) {
+                    gradeDisplay.innerHTML += "<br><span style='color: red;'>Only your teacher can cancel this grade</span>";
+                }
+            });
+        } else {
+            gradeDisplay.innerHTML = "No grade available.";
+        }
+    }, (error) => {
+        console.error("Error retrieving grade:", error);
+        document.getElementById("grade-display").innerHTML = "Error loading grade.";
+    });
+}
+
+// Autenticação do usuário e exibição da nota
+firebase.auth().onAuthStateChanged(function(user) {
+    if (user) {
+        displayGradeAndMessage(user.uid);
+    }
+});
+
 function isStudentLinkedToProfessor(userId) {
     const dbRef = firebase.database().ref("usuarios"); // Referência a todos os usuários (onde estão os professores)
     
@@ -235,44 +279,6 @@ function isStudentLinkedToProfessor(userId) {
             console.error("Error checking if student is linked to a professor:", error);
             resolve(false); // Em caso de erro, resolve como false (não vinculado)
         });
-    });
-}
-
-// Função para exibir a nota e a mensagem acima do título
-    function displayGradeAndMessage(userId) {
-    if (gradeRef) gradeRef.off(); // Remove qualquer listener anterior
-
-    gradeRef = firebase.database().ref(`usuarios/${userId}/progresso/Level1/Unit1/nota`);
-
-    gradeRef.on("value", (snapshot) => {
-        const grade = snapshot.val(); // Pega a nota do banco de dados
-        const gradeDisplay = document.getElementById("grade-display");
-
-        if (grade !== null) {
-            // Define o conteúdo da nota
-            gradeDisplay.innerHTML = `Your Grade: ${grade}%`;
-
-            // Aplica a classe vermelha se a nota for menor que 70, caso contrário, aplica a padrão
-            if (grade < 70) {
-                gradeDisplay.classList.add("grade-style-red");
-                gradeDisplay.classList.remove("grade-style");
-            } else {
-                gradeDisplay.classList.add("grade-style");
-                gradeDisplay.classList.remove("grade-style-red");
-            }
-
-            // Verifica se o aluno está vinculado a um professor
-            isStudentLinkedToProfessor(userId).then(isLinked => {
-                if (isLinked) {
-                    gradeDisplay.innerHTML += "<br><span style='color: red;'>Only your teacher can cancel this grade</span>";
-                }
-            });
-        } else {
-            gradeDisplay.innerHTML = "No grade available.";
-        }
-    }, (error) => {
-        console.error("Error retrieving grade:", error);
-        document.getElementById("grade-display").innerHTML = "Error loading grade.";
     });
 }
 
