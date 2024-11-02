@@ -22,7 +22,7 @@
             margin-bottom: 20px;
         }
  
-/* Estilo para a exibição da nota */
+/* Estilo para a exibição da nota - nota alta (verde) */
 .grade-style {
     text-align: center;
     font-size: 1.4em;
@@ -44,12 +44,21 @@
     margin-top: 5px;
 }
 
+/* Estilo para a exibição da nota - nota baixa (vermelho) */
 .grade-style-red {
+    text-align: center;
+    font-size: 1.4em;
     color: #FF0000; /* Cor vermelha para o texto da nota */
-    border-color: #FF0000; /* Borda vermelha */
+    font-weight: bold;
+    margin-bottom: 20px;
+    padding: 10px;
+    border: 2px solid #FF0000;
+    border-radius: 10px;
     background-color: #fdecea; /* Fundo vermelho claro */
+    width: 50%;
+    margin: 20px auto;
 }
-       
+      
         .question-container {
             display: flex;
             justify-content: center;
@@ -435,21 +444,41 @@ function checkCompletion() {
     
     // Calcula a nota como uma porcentagem de acertos
     const grade = Math.round((correctAnswers / totalQuestions) * 100);
+    const gradeDisplay = document.getElementById('grade-display');
 
     // Exibe a nota no modal de conclusão
     document.getElementById('completion-modal').innerHTML = `
         <h2>Test Completed!</h2>
-        <p>Congratulations! You scored ${grade}% on this test.</p>
+        <p>Your score: ${grade}%</p>
         <button onclick="closeModal()">Close</button>
     `;
 
-    // Exibe o modal de conclusão
-    showModal();
-
-    // Salva a nota no banco de dados e, após salvar, atualiza a exibição da nota na tela
+    // Salva sempre a nota no banco de dados
     ensureUserIsAuthenticated((userId) => {
-        saveGrade(userId, grade).then(() => {
-            displayGradeAndMessage(userId); // Atualiza a exibição da nota na tela
+        saveGrade(userId, grade);
+
+        // Verifica se o aluno está vinculado a um professor
+        isStudentLinkedToProfessor(userId).then(isLinked => {
+            if (grade >= 70) {
+                // Altera a cor da nota com base na pontuação
+                gradeDisplay.classList.remove('low-grade'); // Remove a classe de nota baixa, se houver
+                gradeDisplay.classList.add('grade-style'); // Estilo padrão para nota >= 70
+                showModal(); // Exibe o modal de conclusão
+
+                // Avança a fase apenas se o aproveitamento for suficiente
+                updateNextPhase(userId);
+            } else {
+                // Estilo de nota baixa
+                gradeDisplay.classList.remove('grade-style'); // Remove a classe de nota alta, se houver
+                gradeDisplay.classList.add('low-grade'); // Adiciona estilo de nota baixa
+                gradeDisplay.innerHTML = `Your Grade: ${grade}% - Minimum 70% required to pass.`;
+
+                if (isLinked) {
+                    gradeDisplay.innerHTML += "<br><span style='color: red;'>Please contact your teacher to allow you to retake the test.</span>";
+                } else {
+                    gradeDisplay.innerHTML += "<br><span style='color: red;'>You need to score at least 70% to pass. Please try again.</span>";
+                }
+            }
         });
     });
 }
