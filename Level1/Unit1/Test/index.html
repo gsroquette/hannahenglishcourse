@@ -537,42 +537,44 @@ function saveGrade(userId, grade) {
         });
     }
 
-    async function updateNextPhase(userId) {
-        const currentPhase = getPhaseFromURL(); 
-        const { level, unit } = getLevelAndUnitFromURL(); 
-        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso`);
+   async function updateNextPhase(userId) {
+    const currentPhase = getPhaseFromURL();
+    const { level, unit } = getLevelAndUnitFromURL();
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso`);
 
-        try {
-            if (currentPhase === "end") {
-                // Criar nova Level
-                const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
-                await dbRef.child(nextLevel).set({});
-                console.log(`Level ${nextLevel} criada.`);
+    try {
+        if (currentPhase === "end") {
+            // Caso "end": cria um novo Level e define Unit1/fase1 como true
+            const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+            await dbRef.child(nextLevel).set({});
+            console.log(`Novo Level criado: ${nextLevel}`);
 
-                // Criar Unit1/fase1 como true dentro da nova Level
-                await dbRef.child(`${nextLevel}/Unit1/fase1`).set(true);
-                console.log(`Unit1/fase1 criada como true dentro de ${nextLevel}.`);
-            } else if (currentPhase === "last") {
-                const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-                // Primeiro, cria a nova Unit
-                await dbRef.child(`${level}/${nextUnit}`).set({});
-                console.log(`Unit ${nextUnit} criada dentro de ${level}.`);
+            await dbRef.child(`${nextLevel}/Unit1/fase1`).set(true);
+            console.log(`Primeira fase liberada no novo Level: ${nextLevel}/Unit1/fase1`);
 
-                // Em seguida, adiciona a fase1 como true dentro da nova Unit
-                await dbRef.child(`${level}/${nextUnit}/fase1`).set(true);
-                console.log(`Fase1 marcada como true dentro de ${nextUnit}.`);
-            } else {
-                const nextPhase = parseInt(currentPhase) + 1;
-                await dbRef.child(`${level}/${unit}`).update({ 
-                    [`fase${currentPhase}`]: true, 
-                    [`fase${nextPhase}`]: true 
-                });
-                console.log(`Fase ${currentPhase} marcada como concluída e fase ${nextPhase} liberada.`);
-            }
-        } catch (error) {
-            console.error("Erro ao atualizar o progresso da fase:", error);
+        } else if (currentPhase === "last") {
+            // Caso "last": cria a próxima Unit e libera fase1
+            const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+            await dbRef.child(`${level}/${nextUnit}`).set({});
+            console.log(`Nova Unidade criada dentro de ${level}: ${nextUnit}`);
+
+            await dbRef.child(`${level}/${nextUnit}/fase1`).set(true);
+            console.log(`Primeira fase liberada na nova Unidade: ${level}/${nextUnit}/fase1`);
+
+        } else {
+            // Caso fase intermediária: libera a próxima fase
+            const nextPhase = parseInt(currentPhase) + 1;
+            await dbRef.child(`${level}/${unit}`).update({
+                [`fase${currentPhase}`]: true,
+                [`fase${nextPhase}`]: true
+            });
+            console.log(`Fase atual concluída: ${level}/${unit}/fase${currentPhase}`);
+            console.log(`Próxima fase liberada: ${level}/${unit}/fase${nextPhase}`);
         }
+    } catch (error) {
+        console.error("Erro ao atualizar o progresso da fase:", error);
     }
+}
 
     function getPhaseFromURL() {
         const params = new URLSearchParams(window.location.search);
