@@ -177,23 +177,34 @@
 
 // Função para exibir a nota e a mensagem acima do título
     function displayGradeAndMessage(userId) {
-        const dbRef = firebase.database().ref(`usuarios/${userId}`);
-        dbRef.once('value').then((snapshot) => {
-            const data = snapshot.val();
-            const gradeDisplay = document.getElementById('grade-display');
+    const { level, unit } = getLevelAndUnitFromURL();
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/nota`);
+    
+    dbRef.once('value').then((snapshot) => {
+        const grade = snapshot.val();
+        const gradeDisplay = document.getElementById('grade-display');
 
-            if (data && data.progresso && data.progresso.nota !== undefined) {
-                const grade = data.progresso.nota;
-                gradeDisplay.innerHTML = `Your Grade: ${grade}%`;
-
-                if (data.role === 'aluno' && data.professor) {
-                    gradeDisplay.innerHTML += "<br><span style='color: red;'>Only your teacher can cancel this grade</span>";
+        if (grade !== null) {
+            gradeDisplay.innerHTML = `Your Grade: ${grade}%`;
+            
+            firebase.database().ref(`usuarios/${userId}/role`).once('value').then((roleSnapshot) => {
+                const role = roleSnapshot.val();
+                if (role === 'aluno') {
+                    firebase.database().ref(`usuarios/${userId}/professor`).once('value').then((professorSnapshot) => {
+                        if (professorSnapshot.exists()) {
+                            gradeDisplay.innerHTML += "<br><span style='color: red;'>Only your teacher can cancel this grade</span>";
+                        }
+                    });
                 }
-            } else {
-                gradeDisplay.innerHTML = "No grade available.";
-            }
-        });
-    }
+            });
+        } else {
+            gradeDisplay.innerHTML = "No grade available.";
+        }
+    }).catch((error) => {
+        console.error("Error retrieving grade:", error);
+        document.getElementById('grade-display').innerHTML = "Error loading grade.";
+    });
+}
 
     firebase.auth().onAuthStateChanged(function(user) {
         if (user) {
