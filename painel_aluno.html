@@ -239,14 +239,14 @@
 
 // Função para carregar o progresso do aluno e renderizar as unidades, fases e notas
 function loadProgress(studentId) {
-  console.log("Carregando progresso para:", studentId); // Log para verificar o studentId
+  console.log("Carregando progresso para:", studentId);
 
   const progressContainer = document.getElementById('progress-container');
   const progressRef = db.ref(`usuarios/${studentId}/progresso`);
 
   progressRef.once('value', snapshot => {
     if (snapshot.exists()) {
-      console.log("Dados de progresso encontrados:", snapshot.val()); // Log para verificar os dados de progresso
+      console.log("Dados de progresso encontrados:", snapshot.val());
       let progressHTML = '<div class="progress-panel"><h3>Your Progress</h3>';
 
       // Estrutura de Levels e Units
@@ -255,18 +255,58 @@ function loadProgress(studentId) {
         let totalCompletedPhases = 0;
         let totalPhasesInLevel = 0;
 
-        // Título do Level
-        progressHTML += `<h2>Level ${level}</h2>`;
-
-        // Calcular o progresso do Level em relação ao número de fases completas
+        // Cálculo de progresso de cada Level
         Object.keys(structure[levelKey]).forEach(unitKey => {
           const totalPhases = structure[levelKey][unitKey];
           const unitSnap = snapshot.child(`${levelKey}/${unitKey}`);
+          
+          for (let phaseNumber = 1; phaseNumber <= totalPhases; phaseNumber++) {
+            const phaseKey = `fase${phaseNumber}`;
+            const phaseSnap = unitSnap.child(phaseKey);
+            const isComplete = phaseSnap.exists() && phaseSnap.val();
+
+            if (isComplete) {
+              totalCompletedPhases++;
+            }
+          }
+
+          totalPhasesInLevel += totalPhases;
+        });
+
+        // Calcular porcentagem de progresso do Level
+        const progressPercentage = Math.round((totalCompletedPhases / totalPhasesInLevel) * 100);
+        console.log(`Progresso do Level ${level}: ${progressPercentage}%`);
+
+        // Definir cor da barra com base no progresso
+        let colorClass = '';
+        if (progressPercentage < 25) {
+          colorClass = 'low';
+        } else if (progressPercentage < 75) {
+          colorClass = 'medium';
+        } else {
+          colorClass = 'high';
+        }
+
+        // Adicionar título do Level, barra de progresso e botões das unidades na ordem correta
+        progressHTML += `<h2>Level ${level}</h2>`;
+        progressHTML += `
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill ${colorClass}" style="width: ${progressPercentage}%; position: relative;">
+              <span style="position: absolute; color: white; padding-left: 5px;">${progressPercentage}%</span>
+            </div>
+          </div>
+        `;
+
+        // Renderizar botões e informações detalhadas para cada unidade
+        Object.keys(structure[levelKey]).forEach(unitKey => {
+          const unitId = `${levelKey}-${unitKey}`;
+          const totalPhases = structure[levelKey][unitKey];
           let completedPhases = 0;
           let phasesHTML = '';
           let notesHTML = '';
 
-          // Processar as fases e adicionar informações de fase
+          // Calcular o número de fases completas e listar cada fase
+          const unitSnap = snapshot.child(`${levelKey}/${unitKey}`);
           for (let phaseNumber = 1; phaseNumber <= totalPhases; phaseNumber++) {
             const phaseKey = `fase${phaseNumber}`;
             const phaseSnap = unitSnap.child(phaseKey);
@@ -275,6 +315,7 @@ function loadProgress(studentId) {
             if (isComplete) {
               completedPhases++;
             }
+
             phasesHTML += `<p>Phase ${phaseNumber}: ${isComplete ? 'Complete ✅' : 'Incomplete ❌'}</p>`;
           }
 
@@ -289,7 +330,6 @@ function loadProgress(studentId) {
           });
 
           // Adicionar botão da unidade e detalhes com fases e notas
-          const unitId = `${levelKey}-${unitKey}`;
           progressHTML += `
             <div style="margin-top: 10px;">
               <button onclick="toggleVisibility('${unitId}')">Unit ${unitKey.replace('Unit', '')}</button>
@@ -300,43 +340,17 @@ function loadProgress(studentId) {
               </div>
             </div>
           `;
-
-          totalCompletedPhases += completedPhases;
-          totalPhasesInLevel += totalPhases;
         });
-
-        // Cálculo da porcentagem de progresso do Level
-        const progressPercentage = Math.round((totalCompletedPhases / totalPhasesInLevel) * 100);
-        console.log(`Progresso do Level ${level}: ${progressPercentage}%`); // Log para verificar o progresso de cada Level
-
-        // Definir cor da barra com base no progresso
-        let colorClass = '';
-        if (progressPercentage < 25) {
-          colorClass = 'low';
-        } else if (progressPercentage < 75) {
-          colorClass = 'medium';
-        } else {
-          colorClass = 'high';
-        }
-
-        // Barra de progresso do Level
-        progressHTML += `
-          <div class="progress-bar-container">
-            <div class="progress-bar-fill ${colorClass}" style="width: ${progressPercentage}%; position: relative;">
-              <span style="position: absolute; color: white; padding-left: 5px;">${progressPercentage}%</span>
-            </div>
-          </div>
-        `;
       });
 
       progressHTML += '</div>';
       progressContainer.innerHTML = progressHTML;
     } else {
-      console.log("Nenhum dado de progresso disponível para o usuário."); // Log se não houver dados de progresso
+      console.log("Nenhum dado de progresso disponível para o usuário.");
       progressContainer.innerHTML = '<p>No progress data available.</p>';
     }
   }).catch(error => {
-    console.error("Erro ao carregar os dados de progresso:", error); // Log de erro
+    console.error("Erro ao carregar os dados de progresso:", error);
     progressContainer.innerHTML = '<p>Error loading progress data. Please try again later.</p>';
   });
 }
