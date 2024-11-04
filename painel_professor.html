@@ -420,7 +420,59 @@
       });
     }
 
-    function toggleProgress(teacherId, classId, studentId) {
+// Estrutura estática de Levels, Units e fases
+const structure = {
+  Level1: {
+    Unit1: 25,
+    Unit2: 25,
+    Unit3: 25,
+    Unit4: 25,
+    Unit5: 25,
+    Unit6: 25,
+    Unit7: 25,
+    Unit8: 25,
+    Unit9: 25,
+    Unit10: 25,
+  },
+  Level2: {
+    Unit1: 25,
+    Unit2: 25,
+    Unit3: 25,
+    Unit4: 25,
+    Unit5: 25,
+    Unit6: 25,
+    Unit7: 25,
+    Unit8: 25,
+    Unit9: 25,
+    Unit10: 25,
+  },
+  Level3: {
+    Unit1: 25,
+    Unit2: 25,
+    Unit3: 25,
+    Unit4: 25,
+    Unit5: 25,
+    Unit6: 25,
+    Unit7: 25,
+    Unit8: 25,
+    Unit9: 25,
+    Unit10: 25,
+  },
+  Level4: {
+    Unit1: 25,
+    Unit2: 25,
+    Unit3: 25,
+    Unit4: 25,
+    Unit5: 25,
+    Unit6: 25,
+    Unit7: 25,
+    Unit8: 25,
+    Unit9: 25,
+    Unit10: 25,
+  }
+};
+
+   function toggleProgress(teacherId, classId, studentId) {
   const progressContainer = document.getElementById(`progress-container-${studentId}`);
   
   if (progressContainer.style.display === 'none' || progressContainer.style.display === '') {
@@ -430,29 +482,78 @@
     db.ref(`usuarios/${studentId}/progresso`).once('value', snapshot => {
       if (snapshot.exists()) {
         let progressHTML = '<div class="progress-panel"><h3>Progress</h3>';
-        snapshot.forEach(levelSnap => {
-          const level = levelSnap.key.replace('Level', ''); // Remove "Level"
-          progressHTML += `<p><strong>Level ${level}</strong></p>`;
-          levelSnap.forEach(unitSnap => {
-            const unit = unitSnap.key.replace('Unit', ''); // Remove "Unit"
-            progressHTML += `<p>Unit ${unit}</p>`;
-            unitSnap.forEach(phaseSnap => {
-              const phase = phaseSnap.key.replace('fase', ''); // Remove "fase"
-              const isComplete = phaseSnap.val();
 
-              progressHTML += `
-                <label>Phase ${phase}: </label>
-                <input type="checkbox" ${isComplete ? 'checked' : ''} onchange="updatePhaseStatus('${studentId}', '${level}', '${unit}', '${phase}', this.checked)">
-              `;
-            });
+        // Estrutura dos levels
+        Object.keys(structure).forEach(levelKey => {
+          const level = levelKey.replace('Level', ''); // Remove "Level"
+          let totalCompletedPhases = 0;
+          let totalPhasesInLevel = 0;
+
+          // Calcular o progresso do Level
+          Object.keys(structure[levelKey]).forEach(unitKey => {
+            const totalPhases = structure[levelKey][unitKey];
+            const unitSnap = snapshot.child(`${levelKey}/${unitKey}`);
+            
+            let completedPhases = 0;
+            let phasesHTML = '';
+            let notesHTML = '';
+            let noteCount = 1;
+
+            for (let phaseNumber = 1; phaseNumber <= totalPhases; phaseNumber++) {
+              const phaseKey = `fase${phaseNumber}`;
+              const phaseSnap = unitSnap.child(phaseKey);
+              const isComplete = phaseSnap.exists() && phaseSnap.val();
+
+              if (isComplete) {
+                completedPhases++;
+                totalCompletedPhases++;
+              }
+
+              const nota = unitSnap.child(`nota${phaseNumber}`).val();
+              phasesHTML += `
+                <p>Phase ${phaseNumber}: ${isComplete ? 'Complete ✅' : 'Incomplete ❌'}
+                  <input type="checkbox" ${isComplete ? 'checked' : ''} 
+                    onchange="updatePhaseStatus('${studentId}', '${levelKey}', '${unitKey}', '${phaseKey}', this.checked)">
+                </p>`;
+              
+              // Exibir notas e botão para apagá-las
+              if (nota !== null && nota !== undefined) {
+                notesHTML += `
+                  <p>Your Test Score ${noteCount}: <span style="font-weight: bold; color: ${nota >= 70 ? 'blue' : 'red'};">${nota}</span>
+                  <button onclick="clearIndividualTestScore('${studentId}', '${levelKey}', '${unitKey}', 'nota${phaseNumber}')">Clear Score</button></p>`;
+                noteCount++;
+              }
+            }
+
+            totalPhasesInLevel += totalPhases;
+
+            // Adiciona as unidades com botões de alternância de visibilidade
+            progressHTML += `
+              <div>
+                <button onclick="toggleVisibility('${studentId}-${unitKey}')">Unit ${unitKey.replace('Unit', '')}</button>
+                <div id="${studentId}-${unitKey}" style="display: none; margin-left: 20px;">
+                  <p>${completedPhases}/${totalPhases} phases completed</p>
+                  ${phasesHTML}
+                  ${notesHTML || '<p>No scores available</p>'}
+                </div>
+              </div>
+            `;
           });
+
+          // Barra de progresso do Level
+          const progressPercentage = Math.round((totalCompletedPhases / totalPhasesInLevel) * 100);
+          progressHTML += `
+            <div>
+              <p>Level ${level}: ${progressPercentage}% completed</p>
+              <div style="background: #ddd; border-radius: 5px; width: 100%; height: 10px; margin-top: 5px;">
+                <div style="width: ${progressPercentage}%; background-color: #4CAF50; height: 100%; border-radius: 5px;"></div>
+              </div>
+            </div>
+          `;
         });
-        // Adiciona botão para apagar a nota com confirmação
-        progressHTML += `
-          <div style="margin-top: 15px;">
-            <button onclick="clearTestScores('${studentId}')">Clear Test Scores</button>
-          </div>
-        </div>`;
+        
+        // Fechar a div progress-panel
+        progressHTML += '</div>';
         progressContainer.innerHTML = progressHTML;
       } else {
         progressContainer.innerHTML = '<div class="progress-panel"><p>No progress data available.</p></div>';
@@ -526,6 +627,24 @@ function toggleStudentActions(studentId) {
   } else {
     studentActions.style.display = 'none';
   }
+}
+
+function clearIndividualTestScore(studentId, levelKey, unitKey, noteKey) {
+  if (confirm("Are you sure you want to clear this test score? This action cannot be undone.")) {
+    const noteRef = db.ref(`usuarios/${studentId}/progresso/${levelKey}/${unitKey}/${noteKey}`);
+    noteRef.set(null).then(() => {
+      alert("Test score has been cleared.");
+      toggleProgress(teacherId, classId, studentId); // Atualiza o progresso após apagar a nota
+    }).catch(error => {
+      console.error("Error clearing test score:", error);
+      alert("An error occurred while clearing the test score. Please try again later.");
+    });
+  }
+}
+
+function toggleVisibility(unitId) {
+  const unitDiv = document.getElementById(unitId);
+  unitDiv.style.display = unitDiv.style.display === 'none' ? 'block' : 'none';
 }
   </script>
 </body>
