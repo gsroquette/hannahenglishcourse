@@ -158,6 +158,17 @@
     .student-link:hover {
       color: #2e7d32;
     }
+
+.progress-panel {
+  background-color: #ffffff; /* Cor de fundo branca */
+  width: 90%; /* Largura máxima para alinhar com o contêiner superior */
+  max-width: 600px; /* Limite de largura máxima */
+  margin: 20px auto; /* Centralizar o contêiner */
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Sombra semelhante ao contêiner superior */
+  text-align: center;
+}
   </style>
 </head>
 <body>
@@ -409,12 +420,7 @@
       });
     }
 
-    function toggleStudentActions(studentId) {
-      const actions = document.getElementById(`student-actions-${studentId}`);
-      actions.style.display = actions.style.display === 'none' || actions.style.display === '' ? 'block' : 'none';
-    }
-
-   function toggleProgress(teacherId, classId, studentId) {
+    function toggleProgress(teacherId, classId, studentId) {
   const progressContainer = document.getElementById(`progress-container-${studentId}`);
   
   if (progressContainer.style.display === 'none' || progressContainer.style.display === '') {
@@ -423,7 +429,7 @@
 
     db.ref(`usuarios/${studentId}/progresso`).once('value', snapshot => {
       if (snapshot.exists()) {
-        let progressHTML = '<h3>Progress</h3>';
+        let progressHTML = '<div class="progress-panel"><h3>Progress</h3>';
         snapshot.forEach(levelSnap => {
           const level = levelSnap.key.replace('Level', ''); // Remove "Level"
           progressHTML += `<p><strong>Level ${level}</strong></p>`;
@@ -435,22 +441,51 @@
               const isComplete = phaseSnap.val();
 
               progressHTML += `
-                <label>Phase ${phase} Complete</label>
+                <label>Phase ${phase}: </label>
                 <input type="checkbox" ${isComplete ? 'checked' : ''} onchange="updatePhaseStatus('${studentId}', '${level}', '${unit}', '${phase}', this.checked)">
               `;
             });
           });
         });
+        // Adiciona botão para apagar a nota com confirmação
+        progressHTML += `
+          <div style="margin-top: 15px;">
+            <button onclick="clearTestScores('${studentId}')">Clear Test Scores</button>
+          </div>
+        </div>`;
         progressContainer.innerHTML = progressHTML;
       } else {
-        progressContainer.innerHTML = '<p>No progress data available.</p>';
+        progressContainer.innerHTML = '<div class="progress-panel"><p>No progress data available.</p></div>';
       }
     }).catch(error => {
       console.error("Error loading progress:", error);
-      progressContainer.innerHTML = '<p>Error loading progress data. Please try again later.</p>';
+      progressContainer.innerHTML = '<div class="progress-panel"><p>Error loading progress data. Please try again later.</p></div>';
     });
   } else {
     progressContainer.style.display = 'none';
+  }
+}
+
+function clearTestScores(studentId) {
+  if (confirm("Are you sure you want to clear all test scores? This action cannot be undone.")) {
+    const scoresRef = db.ref(`usuarios/${studentId}/progresso`);
+
+    scoresRef.once('value', snapshot => {
+      snapshot.forEach(levelSnap => {
+        levelSnap.forEach(unitSnap => {
+          unitSnap.forEach(phaseSnap => {
+            const phaseKey = phaseSnap.key;
+            if (phaseKey.startsWith('nota')) { // Verifica se é uma nota
+              unitSnap.child(phaseKey).ref.set(null); // Apaga a nota
+            }
+          });
+        });
+      });
+      alert("All test scores have been cleared.");
+    }).catch(error => {
+      console.error("Error clearing test scores:", error);
+      alert("An error occurred while clearing test scores. Please try again later.");
+    });
   }
 }
 
