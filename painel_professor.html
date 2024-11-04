@@ -502,12 +502,15 @@ function toggleProgress(teacherId, classId, studentId) {
 
     db.ref(`usuarios/${studentId}/progresso`).once('value', snapshot => {
       if (snapshot.exists()) {
-        let progressHTML = '<div class="progress-panel"><h3>Your Progress</h3>';
+        let progressHTML = '<div class="progress-panel"><h3>Student Progress</h3>';
 
         Object.keys(structure).forEach(levelKey => {
           const level = levelKey.replace('Level', '');
           let totalCompletedPhases = 0;
           let totalPhasesInLevel = 0;
+
+          // Adicionar o título "LEVEL X" antes das unidades
+          progressHTML += `<h4>LEVEL ${level}</h4>`;
 
           Object.keys(structure[levelKey]).forEach(unitKey => {
             const totalPhases = structure[levelKey][unitKey];
@@ -534,7 +537,7 @@ function toggleProgress(teacherId, classId, studentId) {
                 </p>`;
             }
 
-            // Adicionar as notas, se existirem, verificando todas as chaves que começam com "nota"
+            // Adicionar as notas, se existirem
             unitSnap.forEach(childSnap => {
               if (childSnap.key.startsWith('nota')) {
                 const notaValue = childSnap.val();
@@ -545,7 +548,17 @@ function toggleProgress(teacherId, classId, studentId) {
               }
             });
 
+            totalCompletedPhases += completedPhases;
             totalPhasesInLevel += totalPhases;
+
+            // Barra de progresso entre "LEVEL X" e Units
+            const progressPercentage = Math.round((totalCompletedPhases / totalPhasesInLevel) * 100);
+            progressHTML += `
+              <div class="progress-bar-container" style="margin-bottom: 10px;">
+                <div class="progress-bar-fill" style="width: ${progressPercentage}%; background-color: #4CAF50;">
+                  <span style="position: absolute; color: white; padding-left: 5px;">${progressPercentage}%</span>
+                </div>
+              </div>`;
 
             progressHTML += `
               <div>
@@ -558,18 +571,6 @@ function toggleProgress(teacherId, classId, studentId) {
               </div>
             `;
           });
-
-          const progressPercentage = Math.round((totalCompletedPhases / totalPhasesInLevel) * 100);
-          progressHTML += `
-            <div>
-              <p>Level ${level}: ${progressPercentage}% completed</p>
-              <div class="progress-bar-container">
-                <div class="progress-bar-fill" style="width: ${progressPercentage}%; background-color: #4CAF50;">
-                  <span style="position: absolute; color: white; padding-left: 5px;">${progressPercentage}%</span>
-                </div>
-              </div>
-            </div>
-          `;
         });
         
         progressHTML += '</div>';
