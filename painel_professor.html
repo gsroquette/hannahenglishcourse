@@ -513,41 +513,11 @@ const structure = {
             const totalPhases = structure[levelKey][unitKey];
             const unitSnap = snapshot.child(`${levelKey}/${unitKey}`);
             
-            for (let phaseNumber = 1; phaseNumber <= totalPhases; phaseNumber++) {
-              const phaseKey = `fase${phaseNumber}`;
-              const phaseSnap = unitSnap.child(phaseKey);
-              const isComplete = phaseSnap.exists() && phaseSnap.val();
-
-              if (isComplete) {
-                totalCompletedPhases++;
-              }
-            }
-
-            totalPhasesInLevel += totalPhases;
-          });
-
-          const progressPercentage = Math.round((totalCompletedPhases / totalPhasesInLevel) * 100);
-
-          progressHTML += `<h2>Level ${level}</h2>`;
-          progressHTML += `
-            <div class="progress-bar-container">
-              <div class="progress-bar-fill" style="width: ${progressPercentage}%; background-color: #4CAF50;">
-                <span style="position: absolute; color: white; padding-left: 5px;">${progressPercentage}%</span>
-              </div>
-            </div>
-          `;
-
-          Object.keys(structure[levelKey]).forEach(unitKey => {
-            const unitId = `${levelKey}-${unitKey}`;
-            const totalPhases = structure[levelKey][unitKey];
             let completedPhases = 0;
-
             let phasesHTML = '';
             let notesHTML = '';
             let noteCount = 1;
 
-            const unitSnap = snapshot.child(`${levelKey}/${unitKey}`);
-            
             for (let phaseNumber = 1; phaseNumber <= totalPhases; phaseNumber++) {
               const phaseKey = `fase${phaseNumber}`;
               const phaseSnap = unitSnap.child(phaseKey);
@@ -562,15 +532,19 @@ const structure = {
                   <input type="checkbox" ${isComplete ? 'checked' : ''} 
                     onchange="updatePhaseStatus('${studentId}', '${levelKey}', '${unitKey}', '${phaseKey}', this.checked)">
                 </p>`;
+
+              // Adicionar as notas, se existirem
+              let notaIndex = 1;
+              while (unitSnap.child(`nota${notaIndex}`).exists()) {
+                const notaValue = unitSnap.child(`nota${notaIndex}`).val();
+                notesHTML += `
+                  <p>Your Test Score ${notaIndex}: <span style="font-weight: bold; color: ${notaValue >= 70 ? 'blue' : 'red'};">${notaValue}</span>
+                  <button onclick="clearIndividualTestScore('${studentId}', '${levelKey}', '${unitKey}', 'nota${notaIndex}')">Clear Score</button></p>`;
+                notaIndex++;
+              }
             }
 
-            // Verificar se a nota existe para a unidade e exibir se disponível
-            const nota = unitSnap.child('nota').val();
-            if (nota !== null && nota !== undefined) {
-              notesHTML += `
-                <p>Your Test Score: <span style="font-weight: bold; color: ${nota >= 70 ? 'blue' : 'red'};">${nota}</span>
-                <button onclick="clearIndividualTestScore('${studentId}', '${levelKey}', '${unitKey}', 'nota')">Clear Score</button></p>`;
-            }
+            totalPhasesInLevel += totalPhases;
 
             progressHTML += `
               <div>
@@ -583,6 +557,18 @@ const structure = {
               </div>
             `;
           });
+
+          const progressPercentage = Math.round((totalCompletedPhases / totalPhasesInLevel) * 100);
+          progressHTML += `
+            <div>
+              <p>Level ${level}: ${progressPercentage}% completed</p>
+              <div class="progress-bar-container">
+                <div class="progress-bar-fill" style="width: ${progressPercentage}%; background-color: #4CAF50;">
+                  <span style="position: absolute; color: white; padding-left: 5px;">${progressPercentage}%</span>
+                </div>
+              </div>
+            </div>
+          `;
         });
         
         progressHTML += '</div>';
