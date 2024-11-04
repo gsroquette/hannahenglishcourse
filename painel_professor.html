@@ -169,6 +169,27 @@
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Sombra semelhante ao contêiner superior */
   text-align: center;
 }
+
+.progress-bar-container {
+  background-color: #ddd;
+  border-radius: 5px;
+  width: 100%;
+  height: 10px;
+  margin: 10px 0; /* Espaçamento ao redor */
+  position: relative;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background-color: #4CAF50; /* Cor verde para representar o progresso */
+  border-radius: 5px;
+  text-align: center;
+  color: white;
+  font-size: 0.8em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
   </style>
 </head>
 <body>
@@ -481,7 +502,7 @@ const structure = {
 
     db.ref(`usuarios/${studentId}/progresso`).once('value', snapshot => {
       if (snapshot.exists()) {
-        let progressHTML = '<div class="progress-panel"><h3>Progress</h3>';
+        let progressHTML = '<div class="progress-panel"><h3>Your Progress</h3>';
 
         // Estrutura dos levels
         Object.keys(structure).forEach(levelKey => {
@@ -494,31 +515,61 @@ const structure = {
             const totalPhases = structure[levelKey][unitKey];
             const unitSnap = snapshot.child(`${levelKey}/${unitKey}`);
             
-            let completedPhases = 0;
-            let phasesHTML = '';
-            let notesHTML = '';
-            let noteCount = 1;
-
             for (let phaseNumber = 1; phaseNumber <= totalPhases; phaseNumber++) {
               const phaseKey = `fase${phaseNumber}`;
               const phaseSnap = unitSnap.child(phaseKey);
               const isComplete = phaseSnap.exists() && phaseSnap.val();
 
-              // Marcar fases completas e incrementar o contador de fases
               if (isComplete) {
-                completedPhases++;
                 totalCompletedPhases++;
               }
+            }
 
-              // Exibir a fase com a caixa de seleção para o status
+            totalPhasesInLevel += totalPhases;
+          });
+
+          // Cálculo da porcentagem de progresso do Level
+          const progressPercentage = Math.round((totalCompletedPhases / totalPhasesInLevel) * 100);
+
+          // Adicionar título do Level e a barra de progresso
+          progressHTML += `<h2>Level ${level}</h2>`;
+          progressHTML += `
+            <div class="progress-bar-container">
+              <div class="progress-bar-fill" style="width: ${progressPercentage}%; background-color: #4CAF50;">
+                <span style="position: absolute; color: white; padding-left: 5px;">${progressPercentage}%</span>
+              </div>
+            </div>
+          `;
+
+          // Adicionar cada Unit dentro do Level
+          Object.keys(structure[levelKey]).forEach(unitKey => {
+            const unitId = `${levelKey}-${unitKey}`;
+            const totalPhases = structure[levelKey][unitKey];
+            let completedPhases = 0;
+
+            let phasesHTML = '';
+            let notesHTML = '';
+            let noteCount = 1;
+
+            const unitSnap = snapshot.child(`${levelKey}/${unitKey}`);
+            
+            for (let phaseNumber = 1; phaseNumber <= totalPhases; phaseNumber++) {
+              const phaseKey = `fase${phaseNumber}`;
+              const phaseSnap = unitSnap.child(phaseKey);
+              const isComplete = phaseSnap.exists() && phaseSnap.val();
+
+              if (isComplete) {
+                completedPhases++;
+              }
+
+              const nota = unitSnap.child(`nota${phaseNumber}`).val();
               phasesHTML += `
                 <p>Phase ${phaseNumber}: 
                   <input type="checkbox" ${isComplete ? 'checked' : ''} 
                     onchange="updatePhaseStatus('${studentId}', '${levelKey}', '${unitKey}', '${phaseKey}', this.checked)">
                 </p>`;
-
-              // Adicionar notas e o botão para apagá-las
-              const nota = unitSnap.child(`nota${phaseNumber}`).val();
+              
+              // Exibir nota e botão para apagar, se disponível
               if (nota !== null && nota !== undefined) {
                 notesHTML += `
                   <p>Your Test Score ${noteCount}: <span style="font-weight: bold; color: ${nota >= 70 ? 'blue' : 'red'};">${nota}</span>
@@ -527,9 +578,6 @@ const structure = {
               }
             }
 
-            totalPhasesInLevel += totalPhases;
-
-            // Adicionar as unidades ao HTML com botões de alternância de visibilidade
             progressHTML += `
               <div>
                 <button onclick="toggleVisibility('${studentId}-${unitKey}')">Unit ${unitKey.replace('Unit', '')}</button>
@@ -541,17 +589,6 @@ const structure = {
               </div>
             `;
           });
-
-          // Barra de progresso do Level
-          const progressPercentage = Math.round((totalCompletedPhases / totalPhasesInLevel) * 100);
-          progressHTML += `
-            <div>
-              <p>Level ${level}: ${progressPercentage}% completed</p>
-              <div style="background: #ddd; border-radius: 5px; width: 100%; height: 10px; margin-top: 5px;">
-                <div style="width: ${progressPercentage}%; background-color: #4CAF50; height: 100%; border-radius: 5px;"></div>
-              </div>
-            </div>
-          `;
         });
         
         // Fechar a div progress-panel
