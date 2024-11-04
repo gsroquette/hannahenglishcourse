@@ -326,44 +326,36 @@ const structure = {
       Object.keys(structure).forEach(levelKey => {
         const level = levelKey.replace('Level', ''); // Remove "Level" from key
         let completedUnits = 0;
-        let totalUnits = Object.keys(structure[levelKey]).length; // Número total de unidades no nível
+        let totalUnits = Object.keys(structure[levelKey]).length; // Total de unidades no nível
         
         progressHTML += `<h2>Level ${level}</h2>`;
         
         Object.keys(structure[levelKey]).forEach(unitKey => {
           const unitId = `${levelKey}-${unitKey}`;
+          const totalPhases = structure[levelKey][unitKey]; // Total de fases na unidade
           let completedPhases = 0;
-          const totalPhases = structure[levelKey][unitKey]; // Número total de fases na unidade
-          
+
           let phasesHTML = '';
           let notesHTML = '';
           let noteCount = 1; // Contador para numerar as notas
 
-          // Checar se a unidade e suas fases estão no banco de dados
+          // Referência para a Unit específica no snapshot do banco de dados
           const unitSnap = snapshot.child(`${levelKey}/${unitKey}`);
           
-          if (unitSnap.exists()) {
-            unitSnap.forEach(childSnap => {
-              const key = childSnap.key;
-              const value = childSnap.val();
-              
-              if (key.startsWith('fase')) {
-                const phase = key.replace('fase', ''); // Remove "fase" from key
-                const isComplete = value;
+          // Exibir todas as fases da Unit, de 1 até totalPhases (25)
+          for (let phaseNumber = 1; phaseNumber <= totalPhases; phaseNumber++) {
+            const phaseKey = `fase${phaseNumber}`;
+            const phaseSnap = unitSnap.child(phaseKey);
+            const isComplete = phaseSnap.exists() && phaseSnap.val();
 
-                if (isComplete) {
-                  completedPhases++;
-                }
+            if (isComplete) {
+              completedPhases++;
+            }
 
-                phasesHTML += `<p>Phase ${phase}: ${isComplete ? 'Complete ✅' : 'Incomplete ❌'}</p>`;
-              } else if (key.startsWith('nota')) {
-                const color = value < 70 ? 'red' : 'blue';
-                notesHTML += `<p>Your Test Score ${noteCount}: <span style="color: ${color}; font-weight: bold;">${value !== null ? value : 'No score available'}</span></p>`;
-                noteCount++;
-              }
-            });
+            // Exibir a fase como "Complete ✅" ou "Incomplete ❌"
+            phasesHTML += `<p>Phase ${phaseNumber}: ${isComplete ? 'Complete ✅' : 'Incomplete ❌'}</p>`;
           }
-
+          
           if (completedPhases === totalPhases) {
             completedUnits++;
           }
@@ -399,6 +391,12 @@ const structure = {
     console.error("Error loading progress:", error);
     progressContainer.innerHTML = '<p>Error loading progress data. Please try again later.</p>';
   });
+}
+
+// Função para alternar visibilidade da Unit
+function toggleVisibility(unitId) {
+  const unitDiv = document.getElementById(unitId);
+  unitDiv.style.display = unitDiv.style.display === 'none' ? 'block' : 'none';
 }
 
 function toggleVisibility(unitId) {
