@@ -344,9 +344,40 @@ const structure = {
         let totalCompletedPhases = 0;
         let totalPhasesInLevel = 0;
 
-        progressHTML += `<h2>Level ${level}</h2>`;
-        
         // Calcular o progresso do Level em relação ao número de fases completas
+        Object.keys(structure[levelKey]).forEach(unitKey => {
+          const totalPhases = structure[levelKey][unitKey];
+          const unitSnap = snapshot.child(`${levelKey}/${unitKey}`);
+          
+          for (let phaseNumber = 1; phaseNumber <= totalPhases; phaseNumber++) {
+            const phaseKey = `fase${phaseNumber}`;
+            const phaseSnap = unitSnap.child(phaseKey);
+            const isComplete = phaseSnap.exists() && phaseSnap.val();
+
+            if (isComplete) {
+              totalCompletedPhases++;
+            }
+          }
+
+          totalPhasesInLevel += totalPhases;
+        });
+
+        // Cálculo da porcentagem de progresso do Level
+        const progressPercentage = Math.round((totalCompletedPhases / totalPhasesInLevel) * 100);
+
+        // Adicionar título do Level
+        progressHTML += `<h2>Level ${level}</h2>`;
+
+        // Barra de progresso customizada entre o título do Level e os botões das Units
+        progressHTML += `
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill" style="width: ${progressPercentage}%;">
+              <span style="position: absolute; color: white; padding-left: 5px;">${progressPercentage}%</span>
+            </div>
+          </div>
+        `;
+
+        // Adicionar cada Unit dentro do Level
         Object.keys(structure[levelKey]).forEach(unitKey => {
           const unitId = `${levelKey}-${unitKey}`;
           const totalPhases = structure[levelKey][unitKey];
@@ -365,13 +396,10 @@ const structure = {
 
             if (isComplete) {
               completedPhases++;
-              totalCompletedPhases++;
             }
 
             phasesHTML += `<p>Phase ${phaseNumber}: ${isComplete ? 'Complete ✅' : 'Incomplete ❌'}</p>`;
           }
-
-          totalPhasesInLevel += totalPhases;
 
           progressHTML += `
             <div>
@@ -384,18 +412,6 @@ const structure = {
             </div>
           `;
         });
-        
-        // Cálculo da porcentagem de progresso do Level
-        const progressPercentage = Math.round((totalCompletedPhases / totalPhasesInLevel) * 100);
-
-        // Barra de progresso customizada
-        progressHTML += `
-          <div class="progress-bar-container">
-            <div class="progress-bar-fill" style="width: ${progressPercentage}%;">
-              <span style="position: absolute; color: white; padding-left: 5px;">${progressPercentage}%</span>
-            </div>
-          </div>
-        `;
       });
       
       progressContainer.innerHTML = progressHTML;
