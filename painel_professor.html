@@ -493,27 +493,29 @@ const structure = {
   }
 };
 
- function toggleProgress(teacherId, classId, studentId) {
+function toggleProgress(teacherId, classId, studentId) {
   const progressContainer = document.getElementById(`progress-container-${studentId}`);
   
+  // Verificar se o contêiner de progresso está oculto ou visível
   if (progressContainer.style.display === 'none' || progressContainer.style.display === '') {
     progressContainer.style.display = 'block';
     progressContainer.innerHTML = '<p>Loading...</p>';
 
+    // Consultar o progresso do aluno no banco de dados
     db.ref(`usuarios/${studentId}/progresso`).once('value', snapshot => {
       if (snapshot.exists()) {
         let progressHTML = '';
 
-        // Percorrer cada nível (Level1, Level2, etc.)
+        // Iterar pelos níveis e unidades configurados na estrutura
         Object.keys(structure).forEach(levelKey => {
           const level = levelKey.replace('Level', '');
           let totalCompletedPhases = 0;
           let totalPhasesInLevel = 0;
 
-          // Adiciona o título do nível
+          // Adicionar o título do nível
           progressHTML += `<h3>LEVEL ${level}</h3>`;
 
-          // Calcula e adiciona a barra de progresso do nível
+          // Adicionar a barra de progresso do nível
           Object.keys(structure[levelKey]).forEach(unitKey => {
             const totalPhases = structure[levelKey][unitKey];
             const unitSnap = snapshot.child(`${levelKey}/${unitKey}`);
@@ -539,7 +541,7 @@ const structure = {
                 </p>`;
             }
 
-            // Loop para exibir todas as notas
+            // Exibir todas as notas
             let notaIndex = 0;
             while (unitSnap.child(`nota${notaIndex}`).exists()) {
               const notaValue = unitSnap.child(`nota${notaIndex}`).val();
@@ -554,7 +556,7 @@ const structure = {
             totalCompletedPhases += completedPhases;
           });
 
-          // Calcula e adiciona o progresso do nível
+          // Calcular e exibir o progresso do nível
           const progressPercentage = Math.round((totalCompletedPhases / totalPhasesInLevel) * 100);
           progressHTML += `
             <div>
@@ -566,12 +568,13 @@ const structure = {
               </div>
             </div>`;
 
-          // Adiciona os botões das unidades do nível abaixo da barra de progresso
+          // Adicionar os botões das unidades do nível
           Object.keys(structure[levelKey]).forEach(unitKey => {
             progressHTML += `
               <div>
                 <button onclick="toggleVisibility('${studentId}-${unitKey}')">Unit ${unitKey.replace('Unit', '')}</button>
                 <div id="${studentId}-${unitKey}" style="display: none; margin-left: 20px;">
+                  ${phasesHTML}
                   ${notesHTML || '<p>No scores available</p>'}
                 </div>
               </div>`;
