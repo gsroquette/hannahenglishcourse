@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let lastUnlockedIndex = -1;
 
     const activities = [
-          { id: 23, name: "MatchingGame", path: "../Unit1/MatchingGame/index.html?fase=23", img: "../../imagens/botoes/matching_game_button.png", unlocked: false },
+        { id: 24, name: "Test", path: "../Unit1/Test/index.html?fase=last", img: "../../imagens/test.png", unlocked: false },        
     ];
 
      // Fechar o dropdown ao clicar fora dele
