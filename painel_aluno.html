@@ -138,12 +138,9 @@
     </div>
   </div>
 
-  <div class="panel" id="progress">
-    <h2>Your Progress</h2>
-    <div id="progress-container" class="progress-container">
-      <p>Loading your progress...</p>
-    </div>
-  </div>
+  <div id="progress-container" class="progress-container">
+  <p>Loading your progress...</p>
+</div>
 
   <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-auth.js"></script>
@@ -266,29 +263,56 @@
       }
     }
 
-    function loadProgress(studentId) {
+   function loadProgress(studentId) {
   const progressContainer = document.getElementById('progress-container');
   const progressRef = db.ref(`usuarios/${studentId}/progresso`);
   
   progressRef.once('value', snapshot => {
     if (snapshot.exists()) {
       let progressHTML = '<h3>Your Progress</h3>';
+      
       snapshot.forEach(levelSnap => {
-        const level = levelSnap.key.replace('Level', ''); // Remove "Level"
-        progressHTML += `<p><strong>Level ${level}</strong></p>`;
+        const level = levelSnap.key.replace('Level', ''); // Remover "Level"
+        let completedUnits = 0;
+        let totalUnits = 0;
+        
         levelSnap.forEach(unitSnap => {
-          const unit = unitSnap.key.replace('Unit', ''); // Remove "Unit"
-          progressHTML += `<p>Unit ${unit}</p>`;
+          totalUnits++;
+          let completedPhases = 0;
+          let totalPhases = 0;
+          
           unitSnap.forEach(phaseSnap => {
-            const phase = phaseSnap.key.replace('fase', ''); // Remove "fase"
-            const isComplete = phaseSnap.val();
-
-            progressHTML += `
-              <p>Phase ${phase}: ${isComplete ? 'Complete' : 'Incomplete'}</p>
-            `;
+            totalPhases++;
+            if (phaseSnap.val()) completedPhases++;
           });
+          
+          if (completedPhases === totalPhases) completedUnits++;
+          
+          progressHTML += `
+            <div>
+              <button onclick="toggleVisibility('${unitSnap.key}')">Unit ${unitSnap.key.replace('Unit', '')}</button>
+              <div id="${unitSnap.key}" style="display: none; margin-left: 20px;">
+                <p>${completedPhases}/${totalPhases} phases completed</p>
+                ${Array.from(unitSnap).map(phaseSnap => `
+                  <p>Phase ${phaseSnap.key.replace('fase', '')}: ${phaseSnap.val() ? 'Complete ✅' : 'Incomplete ❌'}</p>
+                `).join('')}
+              </div>
+            </div>
+          `;
         });
+        
+        // Barra de progresso do nível
+        const progressPercentage = Math.round((completedUnits / totalUnits) * 100);
+        progressHTML += `
+          <div>
+            <p>Level ${level}: ${progressPercentage}% completed</p>
+            <div style="background: #ddd; border-radius: 5px; width: 100%; height: 10px; margin-top: 5px;">
+              <div style="width: ${progressPercentage}%; background-color: #4CAF50; height: 100%; border-radius: 5px;"></div>
+            </div>
+          </div>
+        `;
       });
+      
       progressContainer.innerHTML = progressHTML;
     } else {
       progressContainer.innerHTML = '<p>No progress data available.</p>';
@@ -297,6 +321,11 @@
     console.error("Error loading progress:", error);
     progressContainer.innerHTML = '<p>Error loading progress data. Please try again later.</p>';
   });
+}
+
+function toggleVisibility(unitId) {
+  const unitDiv = document.getElementById(unitId);
+  unitDiv.style.display = unitDiv.style.display === 'none' ? 'block' : 'none';
 }
   </script>
 </body>
