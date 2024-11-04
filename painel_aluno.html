@@ -122,6 +122,21 @@
   transition: width 0.4s ease; /* Animação suave ao carregar */
 }
 
+.progress-bar-fill.low {
+    background-color: #e57373; /* vermelho claro */
+    color: white;
+}
+
+.progress-bar-fill.medium {
+    background-color: #fff176; /* amarelo claro */
+    color: black;
+}
+
+.progress-bar-fill.high {
+    background-color: #81c784; /* verde claro */
+    color: white;
+}
+
 /* Estilo para o contêiner de progresso para combinar com o contêiner superior */
 .progress-panel {
   background-color: #ffffff; /* Cor de fundo branca */
@@ -217,80 +232,136 @@
           document.getElementById('teacher-info').innerHTML = '<p>You are not currently linked to a teacher.</p>';
         }
 
-        loadProgress(studentId);
+     // Função para carregar o progresso do aluno
+function loadProgress(studentId) {
+  const progressContainer = document.getElementById('progress-container');
+  const progressRef = db.ref(`usuarios/${studentId}/progresso`);
+
+  progressRef.once('value', snapshot => {
+    if (snapshot.exists()) {
+      let progressHTML = '<div class="progress-panel"><h3>Your Progress</h3>';
+
+      Object.keys(structure).forEach(levelKey => {
+        const level = levelKey.replace('Level', ''); // Remove "Level" do nome da chave
+        let totalCompletedPhases = 0;
+        let totalPhasesInLevel = 0;
+
+        Object.keys(structure[levelKey]).forEach(unitKey => {
+          const totalPhases = structure[levelKey][unitKey];
+          const unitSnap = snapshot.child(`${levelKey}/${unitKey}`);
+          
+          for (let phaseNumber = 1; phaseNumber <= totalPhases; phaseNumber++) {
+            const phaseKey = `fase${phaseNumber}`;
+            const phaseSnap = unitSnap.child(phaseKey);
+            const isComplete = phaseSnap.exists() && phaseSnap.val();
+
+            if (isComplete) {
+              totalCompletedPhases++;
+            }
+          }
+
+          totalPhasesInLevel += totalPhases;
+        });
+
+        const progressPercentage = Math.round((totalCompletedPhases / totalPhasesInLevel) * 100);
+        let colorClass = '';
+        if (progressPercentage < 25) {
+          colorClass = 'low';
+        } else if (progressPercentage < 75) {
+          colorClass = 'medium';
+        } else {
+          colorClass = 'high';
+        }
+
+        progressHTML += `<h2>Level ${level}</h2>`;
+        progressHTML += `
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill ${colorClass}" style="width: ${progressPercentage}%; position: relative;">
+              <span style="position: absolute; color: white; padding-left: 5px;">${progressPercentage}%</span>
+            </div>
+          </div>
+        `;
       });
 
-      document.getElementById('student-avatar').addEventListener('change', function() {
+      progressHTML += '</div>';
+      progressContainer.innerHTML = progressHTML;
+    } else {
+      progressContainer.innerHTML = '<p>No progress data available.</p>';
+    }
+  }).catch(error => {
+    console.error("Error loading progress:", error);
+    progressContainer.innerHTML = '<p>Error loading progress data. Please try again later.</p>';
+  });
+}
+
+// Evento para atualizar o avatar ao ser selecionado
+document.getElementById('student-avatar').addEventListener('change', function() {
   const avatar = this.value;
   const avatarPreview = document.getElementById('avatar-preview');
   const loadingSpinner = document.getElementById('loading-spinner');
-  
-  // Mostrar o spinner de carregamento
+
   loadingSpinner.style.display = 'block';
   avatarPreview.style.display = 'none';
 
-  // Criar um novo objeto de imagem para garantir o carregamento correto
   const img = new Image();
   img.src = 'imagens/' + avatar;
 
   img.onload = function() {
-    // Atualizar a imagem do avatar quando terminar de carregar
     avatarPreview.src = img.src;
-
-    // Ocultar o spinner e mostrar o avatar carregado
     loadingSpinner.style.display = 'none';
     avatarPreview.style.display = 'block';
   };
 
   img.onerror = function() {
-    // Se houver erro no carregamento, mostrar mensagem de erro e ocultar o spinner
     loadingSpinner.textContent = 'Error loading avatar';
   };
 });
-    }
 
-    function saveAvatarChoice() {
-      const studentId = auth.currentUser.uid;
-      const avatar = document.getElementById('student-avatar').value;
-      const avatarRef = db.ref('usuarios/' + studentId + '/avatar');
+// Função para salvar a escolha do avatar
+function saveAvatarChoice() {
+  const studentId = auth.currentUser.uid;
+  const avatar = document.getElementById('student-avatar').value;
+  const avatarRef = db.ref('usuarios/' + studentId + '/avatar');
 
-      avatarRef.set(avatar).then(() => {
-        alert("Avatar updated successfully!");
-      }).catch(error => {
-        console.error("Error updating avatar:", error);
-        alert("An error occurred while updating the avatar. Please try again.");
+  avatarRef.set(avatar).then(() => {
+    alert("Avatar updated successfully!");
+  }).catch(error => {
+    console.error("Error updating avatar:", error);
+    alert("An error occurred while updating the avatar. Please try again.");
+  });
+}
+
+// Função para carregar as informações do professor vinculado
+function loadTeacherInfo(teacherId) {
+  const teacherRef = db.ref('usuarios/' + teacherId);
+  teacherRef.once('value', snapshot => {
+    const teacherData = snapshot.val();
+    const teacherName = teacherData ? teacherData.nome : 'Unknown Teacher';
+
+    document.getElementById('teacher-info').innerHTML = `
+      <p>Linked to Teacher: ${teacherName}</p>
+      <button onclick="unlinkTeacher()">Unlink from Teacher</button>
+    `;
+  });
+}
+
+// Função para desvincular o aluno do professor
+function unlinkTeacher() {
+  if (confirm("Are you sure you want to unlink from your teacher? You will no longer have a teacher if you proceed.")) {
+    const studentId = auth.currentUser.uid;
+    const studentRef = db.ref('usuarios/' + studentId + '/atrelado_professor');
+
+    studentRef.remove()
+      .then(() => {
+        alert("You have been unlinked from your teacher.");
+        document.getElementById('teacher-info').innerHTML = '<p>You are not currently linked to a teacher.</p>';
+      })
+      .catch(error => {
+        console.error("Error unlinking from teacher:", error);
+        alert("An error occurred while trying to unlink. Please try again later.");
       });
-    }
-
-    function loadTeacherInfo(teacherId) {
-      const teacherRef = db.ref('usuarios/' + teacherId);
-      teacherRef.once('value', snapshot => {
-        const teacherData = snapshot.val();
-        const teacherName = teacherData ? teacherData.nome : 'Unknown Teacher';
-
-        document.getElementById('teacher-info').innerHTML = `
-          <p>Linked to Teacher: ${teacherName}</p>
-          <button onclick="unlinkTeacher()">Unlink from Teacher</button>
-        `;
-      });
-    }
-
-    function unlinkTeacher() {
-      if (confirm("Are you sure you want to unlink from your teacher? You will no longer have a teacher if you proceed.")) {
-        const studentId = auth.currentUser.uid;
-        const studentRef = db.ref('usuarios/' + studentId + '/atrelado_professor');
-
-        studentRef.remove()
-          .then(() => {
-            alert("You have been unlinked from your teacher.");
-            document.getElementById('teacher-info').innerHTML = '<p>You are not currently linked to a teacher.</p>';
-          })
-          .catch(error => {
-            console.error("Error unlinking from teacher:", error);
-            alert("An error occurred while trying to unlink. Please try again later.");
-          });
-      }
-    }
+  }
+}
 
 // Estrutura estática de Levels, Units e fases
 const structure = {
