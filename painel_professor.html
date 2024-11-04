@@ -500,21 +500,14 @@ function toggleProgress(teacherId, classId, studentId) {
     progressContainer.style.display = 'block';
     progressContainer.innerHTML = '<p>Loading...</p>';
 
-    console.log(`Carregando progresso para o aluno ID: ${studentId}`);
-
-    // Consultar o progresso do aluno no banco de dados
     db.ref(`usuarios/${studentId}/progresso`).once('value', snapshot => {
       if (snapshot.exists()) {
-        let progressHTML = '';
+        let progressHTML = '<div class="progress-panel"><h3>Your Progress</h3>';
 
-        // Iterar pelos níveis e unidades configurados na estrutura
         Object.keys(structure).forEach(levelKey => {
           const level = levelKey.replace('Level', '');
           let totalCompletedPhases = 0;
           let totalPhasesInLevel = 0;
-
-          // Adicionar o título do nível
-          progressHTML += `<h3>LEVEL ${level}</h3>`;
 
           Object.keys(structure[levelKey]).forEach(unitKey => {
             const totalPhases = structure[levelKey][unitKey];
@@ -525,7 +518,6 @@ function toggleProgress(teacherId, classId, studentId) {
             let notesHTML = '';
             let noteCount = 1;
 
-            // Iterar pelas fases e verificar se estão completas
             for (let phaseNumber = 1; phaseNumber <= totalPhases; phaseNumber++) {
               const phaseKey = `fase${phaseNumber}`;
               const phaseSnap = unitSnap.child(phaseKey);
@@ -542,31 +534,29 @@ function toggleProgress(teacherId, classId, studentId) {
                 </p>`;
             }
 
-            // Exibir notas dentro da unidade
+            // Adicionar as notas, se existirem
             let notaIndex = 0;
             while (unitSnap.child(`nota${notaIndex}`).exists()) {
               const notaValue = unitSnap.child(`nota${notaIndex}`).val();
               notesHTML += `
-                <p>Your Test Score ${noteCount}: <span style="font-weight: bold; color: ${notaValue >= 70 ? 'blue' : 'red'};">${notaValue}</span>
+                <p>Your Test Score ${notaIndex + 1}: <span style="font-weight: bold; color: ${notaValue >= 70 ? 'blue' : 'red'};">${notaValue}</span>
                 <button onclick="clearIndividualTestScore('${studentId}', '${levelKey}', '${unitKey}', 'nota${notaIndex}')">Clear Score</button></p>`;
               notaIndex++;
-              noteCount++;
             }
 
             totalPhasesInLevel += totalPhases;
-            totalCompletedPhases += completedPhases;
 
             progressHTML += `
               <div>
                 <button onclick="toggleVisibility('${studentId}-${unitKey}')">Unit ${unitKey.replace('Unit', '')}</button>
                 <div id="${studentId}-${unitKey}" style="display: none; margin-left: 20px;">
+                  <p>${completedPhases}/${totalPhases} phases completed</p>
                   ${phasesHTML}
                   ${notesHTML || '<p>No scores available</p>'}
                 </div>
               </div>`;
           });
 
-          // Calcular e exibir o progresso do nível
           const progressPercentage = Math.round((totalCompletedPhases / totalPhasesInLevel) * 100);
           progressHTML += `
             <div>
@@ -578,12 +568,11 @@ function toggleProgress(teacherId, classId, studentId) {
               </div>
             </div>`;
         });
-
+        
+        progressHTML += '</div>';
         progressContainer.innerHTML = progressHTML;
-        console.log(`Progresso carregado para o aluno ID: ${studentId}`);
       } else {
         progressContainer.innerHTML = '<div class="progress-panel"><p>No progress data available.</p></div>';
-        console.log(`Nenhum dado de progresso disponível para o aluno ID: ${studentId}`);
       }
     }).catch(error => {
       console.error("Error loading progress:", error);
