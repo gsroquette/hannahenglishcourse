@@ -500,29 +500,25 @@ function toggleProgress(teacherId, classId, studentId) {
     progressContainer.style.display = 'block';
     progressContainer.innerHTML = '<p>Loading...</p>';
 
-    // Log para verificar o início do carregamento
     console.log(`Carregando progresso para o aluno ID: ${studentId}`);
 
     db.ref(`usuarios/${studentId}/progresso`).once('value', snapshot => {
       if (snapshot.exists()) {
         let progressHTML = '';
 
-        // Iterar pelos níveis e unidades configurados na estrutura
         Object.keys(structure).forEach(levelKey => {
           const level = levelKey.replace('Level', '');
           let totalCompletedPhases = 0;
           let totalPhasesInLevel = 0;
 
-          // Adicionar o título do nível
           progressHTML += `<h3>LEVEL ${level}</h3>`;
 
-          // Adicionar a barra de progresso do nível
           Object.keys(structure[levelKey]).forEach(unitKey => {
             const totalPhases = structure[levelKey][unitKey];
             const unitSnap = snapshot.child(`${levelKey}/${unitKey}`);
             
             let completedPhases = 0;
-            let phasesHTML = '';
+            let phasesHTML = '';  // Inicializa phasesHTML corretamente
             let notesHTML = '';
             let noteCount = 1;
 
@@ -554,6 +550,15 @@ function toggleProgress(teacherId, classId, studentId) {
 
             totalPhasesInLevel += totalPhases;
             totalCompletedPhases += completedPhases;
+
+            progressHTML += `
+              <div>
+                <button onclick="toggleVisibility('${studentId}-${unitKey}')">Unit ${unitKey.replace('Unit', '')}</button>
+                <div id="${studentId}-${unitKey}" style="display: none; margin-left: 20px;">
+                  ${phasesHTML}
+                  ${notesHTML || '<p>No scores available</p>'}
+                </div>
+              </div>`;
           });
 
           const progressPercentage = Math.round((totalCompletedPhases / totalPhasesInLevel) * 100);
@@ -566,17 +571,6 @@ function toggleProgress(teacherId, classId, studentId) {
                 </div>
               </div>
             </div>`;
-
-          Object.keys(structure[levelKey]).forEach(unitKey => {
-            progressHTML += `
-              <div>
-                <button onclick="toggleVisibility('${studentId}-${unitKey}')">Unit ${unitKey.replace('Unit', '')}</button>
-                <div id="${studentId}-${unitKey}" style="display: none; margin-left: 20px;">
-                  ${phasesHTML}
-                  ${notesHTML || '<p>No scores available</p>'}
-                </div>
-              </div>`;
-          });
         });
 
         progressContainer.innerHTML = progressHTML;
