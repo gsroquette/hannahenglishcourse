@@ -259,17 +259,45 @@ function loadProgress(studentId) {
         Object.keys(structure[levelKey]).forEach(unitKey => {
           const totalPhases = structure[levelKey][unitKey];
           const unitSnap = snapshot.child(`${levelKey}/${unitKey}`);
-          
+          let completedPhases = 0;
+          let phasesHTML = '';
+          let notesHTML = '';
+
           for (let phaseNumber = 1; phaseNumber <= totalPhases; phaseNumber++) {
             const phaseKey = `fase${phaseNumber}`;
             const phaseSnap = unitSnap.child(phaseKey);
             const isComplete = phaseSnap.exists() && phaseSnap.val();
 
             if (isComplete) {
-              totalCompletedPhases++;
+              completedPhases++;
             }
+            phasesHTML += `<p>Phase ${phaseNumber}: ${isComplete ? 'Complete ✅' : 'Incomplete ❌'}</p>`;
           }
 
+          // Adicionar notas para a unidade
+          const testScores = ['nota', 'nota1', 'nota2', 'nota3']; // Chaves das notas
+          testScores.forEach((scoreKey, index) => {
+            const score = unitSnap.child(scoreKey).val();
+            if (score !== null && score !== undefined) {
+              const scoreColor = score >= 70 ? 'blue' : 'red'; // Define cor baseada no valor da nota
+              notesHTML += `<p style="color: ${scoreColor}; font-weight: bold;">Test Score ${index + 1}: ${score}</p>`;
+            }
+          });
+
+          // Adicionar botão da unidade e detalhes com fases e notas
+          const unitId = `${levelKey}-${unitKey}`;
+          progressHTML += `
+            <div style="margin-top: 10px;">
+              <button onclick="toggleVisibility('${unitId}')">Unit ${unitKey.replace('Unit', '')}</button>
+              <div id="${unitId}" style="display: none; margin-left: 20px;">
+                <p>${completedPhases}/${totalPhases} phases completed</p>
+                ${phasesHTML}
+                ${notesHTML || '<p>No scores available</p>'}
+              </div>
+            </div>
+          `;
+
+          totalCompletedPhases += completedPhases;
           totalPhasesInLevel += totalPhases;
         });
 
@@ -296,41 +324,6 @@ function loadProgress(studentId) {
             </div>
           </div>
         `;
-
-        // Renderizar botões e informações detalhadas para cada unidade
-        Object.keys(structure[levelKey]).forEach(unitKey => {
-          const unitId = `${levelKey}-${unitKey}`;
-          const totalPhases = structure[levelKey][unitKey];
-          let completedPhases = 0;
-          let phasesHTML = '';
-          let notesHTML = '';
-
-          // Calcular o número de fases completas e listar cada fase
-          const unitSnap = snapshot.child(`${levelKey}/${unitKey}`);
-          for (let phaseNumber = 1; phaseNumber <= totalPhases; phaseNumber++) {
-            const phaseKey = `fase${phaseNumber}`;
-            const phaseSnap = unitSnap.child(phaseKey);
-            const isComplete = phaseSnap.exists() && phaseSnap.val();
-
-            if (isComplete) {
-              completedPhases++;
-            }
-
-            phasesHTML += `<p>Phase ${phaseNumber}: ${isComplete ? 'Complete ✅' : 'Incomplete ❌'}</p>`;
-          }
-
-          // Adicionar botão da unidade e detalhes com fases
-          progressHTML += `
-            <div style="margin-top: 10px;">
-              <button onclick="toggleVisibility('${unitId}')">Unit ${unitKey.replace('Unit', '')}</button>
-              <div id="${unitId}" style="display: none; margin-left: 20px;">
-                <p>${completedPhases}/${totalPhases} phases completed</p>
-                ${phasesHTML}
-                ${notesHTML || '<p>No scores available</p>'}
-              </div>
-            </div>
-          `;
-        });
       });
 
       progressHTML += '</div>';
