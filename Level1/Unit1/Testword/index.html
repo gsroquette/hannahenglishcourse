@@ -128,21 +128,21 @@
             }
         }
 
- /* Estilo do campo de entrada */
 .word-input {
-    width: 300px; /* Largura do campo de entrada */
-    height: 50px; /* Altura do campo de entrada */
-    padding: 10px; /* Espaçamento interno */
-    font-size: 20px; /* Tamanho da fonte */
-    border: 2px solid #ff4500; /* Cor da borda */
-    border-radius: 10px; /* Bordas arredondadas */
-    background-color: #fff; /* Cor de fundo */
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Sombra */
-    transition: border-color 0.3s ease; /* Transição para mudança de cor */
+    width: 300px;
+    height: 50px;
+    padding: 10px;
+    font-size: 20px;
+    border: 2px solid #ff4500; /* Cor da borda constante */
+    border-radius: 10px;
+    background-color: #fff;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.3s ease, border-width 0.3s ease;
 }
 .word-input:focus {
-    border-color: initial; /* Remove a mudança de cor da borda ao focar */
-    outline: none; /* Remove contorno padrão */
+    border-width: 3px; /* Borda mais grossa ao focar */
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.2); /* Efeito esfumaçado ao focar */
+    outline: none;
 }
    </style>
 </head>
@@ -359,9 +359,11 @@ async function loadActivities() {
     }
 }
  
-    function showCompletionModal() {
+    function showCompletionModal(message) {
     document.getElementById('overlay').style.display = 'block';
-    document.getElementById('completion-modal').style.display = 'block';
+    const modal = document.getElementById('completion-modal');
+    modal.style.display = 'block';
+    modal.querySelector('p').innerText = message; // Define a mensagem personalizada
 }
 
 function calculateGrade() {
@@ -375,24 +377,29 @@ function calculateGrade() {
     // Salva a nota no banco de dados independentemente do valor
     saveGradeToDatabase(grade);
 
-    // Exibe o modal de conclusão
-    showCompletionModal(); // Exibe o modal de conclusão
-
-    if (grade < 70) {
-        // Nota insuficiente; mensagens e ações sem desbloqueio
+    // Define a mensagem de conclusão com base na nota
+    let message = "";
+    if (grade >= 70) {
+        message = "Congratulations! You have completed this phase.";
+    } else {
         firebase.auth().onAuthStateChanged((user) => {
             if (user) {
                 const userId = user.uid;
                 isStudentLinkedToProfessor(userId).then(isLinked => {
                     if (isLinked) {
-                        alert("Nota insuficiente. Entre em contato com seu professor para alterar sua nota.");
+                        message = "Nota insuficiente. Entre em contato com seu professor para alterar sua nota.";
                     } else {
-                        alert("Nota insuficiente. Por favor, refaça o teste para obter uma nota mínima de 70%.");
+                        message = "Nota insuficiente. Por favor, refaça o teste para obter uma nota mínima de 70%.";
                     }
+                    showCompletionModal(message); // Exibe o modal com a mensagem adequada
                 });
             }
         });
+        return; // Sai da função para evitar o modal de conclusão sem mensagem
     }
+
+    // Exibe o modal de conclusão com a mensagem
+    showCompletionModal(message);
 }
 
 function saveGradeToDatabase(grade) {
@@ -443,10 +450,10 @@ function displayGrade(grade) {
     // Define a cor e a mensagem com base na nota
     if (grade >= 70) {
         gradeDisplay.innerHTML = `Your Grade: ${grade}% - Congratulations on passing!`;
-        gradeDisplay.style.color = '#4CAF50'; // Verde para nota suficiente
+        gradeDisplay.style.color = '#4CAF50';
     } else {
-        gradeDisplay.innerHTML = `Your Grade: ${grade}% - Please retake the test to score at least 70%.`;
-        gradeDisplay.style.color = '#FF0000'; // Vermelho para nota insuficiente
+        gradeDisplay.innerHTML = `Your Grade: ${grade}% - Nota insuficiente. Refaça o teste para obter ao menos 70%.`;
+        gradeDisplay.style.color = '#FF0000';
     }
 }
 
