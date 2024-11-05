@@ -45,45 +45,26 @@
             font-weight: bold;
             color: #ff4500;
         }
-        .missing-letter-input {
-            width: 40px;
-            font-size: 36px;
-            text-align: center;
-            border: 2px solid black;
-            margin-right: 10px;
-        }
-        .correct {
-            border-color: blue;
-        }
-        .incorrect {
-            border-color: red;
-        }
         .word-container {
             display: flex;
             flex-direction: column;
             align-items: center;
         }
-        .letter-animation {
-            font-size: 80px;
-            color: #32CD32;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            animation: grow-shrink 1s ease-in-out;
-            display: none;
-            font-family: 'Times New Roman', Times, serif;
+        /* Estilo do botão Finish Test */
+        #finishButton {
+            display: block;
+            margin: 20px auto;
+            padding: 15px 25px;
+            background-color: #32CD32;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
         }
-        @keyframes grow-shrink {
-            0% {
-                transform: translate(-50%, -50%) scale(0);
-            }
-            50% {
-                transform: translate(-50%, -50%) scale(1.5);
-            }
-            100% {
-                transform: translate(-50%, -50%) scale(1);
-            }
+        #finishButton:hover {
+            background-color: #28a428;
         }
 
         /* Estilos do modal de conclusão */
@@ -133,26 +114,19 @@
         #completion-modal button:hover {
             background-color: #28a428;
         }
-@media (max-width: 600px) {
-    .activity {
-        flex-direction: column; /* Coloca os elementos em coluna em vez de linha */
-        align-items: center; /* Centraliza os elementos */
-    }
-
-    .activity img {
-        margin: 0 0 15px 0; /* Remove a margem direita e adiciona margem inferior */
-    }
-
-    .missing-letter-input {
-        width: 30px; /* Diminui a largura dos campos de entrada */
-        font-size: 28px; /* Ajusta o tamanho da fonte */
-        margin-right: 3px; /* Reduz o espaço entre os campos */
-    }
-
-    .missing-word {
-        font-size: 28px; /* Reduz o tamanho da fonte para letras embaralhadas */
-    }
-}
+        
+        @media (max-width: 600px) {
+            .activity {
+                flex-direction: column;
+                align-items: center;
+            }
+            .activity img {
+                margin: 0 0 15px 0;
+            }
+            .missing-word {
+                font-size: 28px;
+            }
+        }
    </style>
 </head>
 <body>
@@ -167,6 +141,9 @@
 
 <div id="grade-display" style="display: none; text-align: center; font-size: 1.4em; color: #4CAF50; font-weight: bold; margin-bottom: 20px;"></div>
 <div id="activity-container" class="activity-container"></div>
+
+<!-- Botão Finish Test -->
+<button id="finishButton" onclick="checkCompletion()">Finish Test</button>
 
 <!-- Modal de conclusão -->
 <div id="overlay"></div>
@@ -324,7 +301,7 @@ function createActivity(imageUrl, word) {
 
     // Botão de som (ícone de alto-falante)
     const soundButton = document.createElement('button');
-    soundButton.innerHTML = '🔊'; // Ícone de som (ou use uma imagem para o ícone, se preferir)
+    soundButton.innerHTML = '🔊'; // Ícone de som
     soundButton.style.fontSize = '24px';
     soundButton.style.border = 'none';
     soundButton.style.background = 'transparent';
@@ -341,71 +318,20 @@ function createActivity(imageUrl, word) {
     const wordContainer = document.createElement('div');
     wordContainer.classList.add('word-container');
 
-    const missingWordElement = document.createElement('div');
-    missingWordElement.classList.add('missing-word');
+    // Campo de texto único para o aluno escrever a palavra
+    const wordInput = document.createElement('input');
+    wordInput.classList.add('word-input');
+    wordInput.type = 'text';
+    wordInput.placeholder = "Type the word here";
+    wordContainer.appendChild(wordInput);
 
-    const letterInputs = [];
-    word.split('').forEach((letter, index) => {
-        const letterInput = document.createElement('input');
-        letterInput.classList.add('missing-letter-input');
-        letterInput.maxLength = 1;
-
-        letterInput.addEventListener('input', function() {
-            if (letterInput.value.toUpperCase() === letter.toUpperCase()) {
-                letterInput.classList.add('correct');
-                letterInput.classList.remove('incorrect');
-
-                if (index < word.length - 1) {
-                    letterInputs[index + 1].focus(); 
-                }
-
-                const animationElement = document.createElement('div');
-                animationElement.classList.add('letter-animation');
-                animationElement.innerText = letter.toUpperCase();
-                activityDiv.appendChild(animationElement);
-                animationElement.style.display = 'block';
-
-                setTimeout(() => {
-                    animationElement.style.display = 'none';
-                    animationElement.remove();
-                }, 1000);
-
-                const userWord = letterInputs.map(input => input.value.toUpperCase()).join('');
-                if (userWord === word.toUpperCase()) {
-                    speakText(word);
-                    completedWords++;
-
-                    if (completedWords === activities.length) {
-                        showCompletionModal();
-                    }
-                } else {
-                    speakText(letter);
-                }
-            } else {
-                letterInput.classList.add('incorrect');
-                letterInput.classList.remove('correct');
-            }
-        });
-
-        letterInputs.push(letterInput);
-        missingWordElement.appendChild(letterInput);
-    });
-
-    wordContainer.appendChild(missingWordElement);
     activityDiv.appendChild(wordContainer);
     activityContainer.appendChild(activityDiv);
-    activities.push(word);
-}
-
-function playSound(word) {
-    const synth = window.speechSynthesis;
-    const utterance = new SpeechSynthesisUtterance(word);
-    utterance.lang = 'en-US'; // Inglês americano
-    synth.speak(utterance);
 }
  
     function showCompletionModal() {
-    calculateGrade(); // Calcula e exibe a nota ao concluir
+    document.getElementById('overlay').style.display = 'block';
+    document.getElementById('completion-modal').style.display = 'block';
 }
 
 function calculateGrade() {
@@ -503,6 +429,23 @@ function isStudentLinkedToProfessor(userId) {
         const parts = url.split('/');
         return { level: parts[1], unit: parts[2] };
     }
+
+function checkCompletion() {
+    const wordInputs = document.querySelectorAll('.word-input');
+    let allFilled = true;
+
+    wordInputs.forEach(input => {
+        if (input.value.trim() === "") {
+            allFilled = false;
+        }
+    });
+
+    if (allFilled) {
+        showCompletionModal();
+    } else {
+        alert("Please fill in all the fields before finishing the test.");
+    }
+ }
 
     document.addEventListener('DOMContentLoaded', loadActivities);
 </script>
