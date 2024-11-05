@@ -359,11 +359,11 @@ async function loadActivities() {
     }
 }
  
-    function showCompletionModal(message) {
+   function showCompletionModal(message, grade) {
     document.getElementById('overlay').style.display = 'block';
     const modal = document.getElementById('completion-modal');
     modal.style.display = 'block';
-    modal.querySelector('p').innerText = message; // Define a mensagem personalizada
+    modal.querySelector('p').innerText = `${message} Your Grade: ${grade}%.`; // Define a mensagem com a nota
 }
 
 function calculateGrade() {
@@ -380,22 +380,23 @@ function calculateGrade() {
     // Define a mensagem de conclusão com base na nota
     let message = "";
     if (grade >= 70) {
-        message = "Congratulations! You have completed this test.";
-        showCompletionModal(message); // Exibe o modal com a mensagem de conclusão
+        message = "Congratulations! You have completed this phase.";
+        showCompletionModal(message, grade); // Exibe o modal com a nota e a mensagem de conclusão
     } else {
         firebase.auth().onAuthStateChanged((user) => {
             if (user) {
                 const userId = user.uid;
                 isStudentLinkedToProfessor(userId).then(isLinked => {
                     if (isLinked) {
-                        message = "Insufficient score. Please contact your teacher to adjust your score.";
+                        message = "Insufficient score. Please contact your teacher to update your grade.";
                     } else {
                         message = "Insufficient score. Please retake the test to achieve a minimum score of 70%.";
                     }
-                    showCompletionModal(message); // Exibe o modal com a mensagem apropriada
+                    showCompletionModal(message, grade); // Exibe o modal com a nota e a mensagem de insuficiência
                 });
             }
         });
+        return; // Sai da função para evitar o modal de conclusão sem mensagem
     }
 }
 
@@ -449,8 +450,19 @@ function displayGrade(grade) {
         gradeDisplay.innerHTML = `Your Grade: ${grade}% - Congratulations on passing!`;
         gradeDisplay.style.color = '#4CAF50';
     } else {
-        gradeDisplay.innerHTML = `Your Grade: ${grade}% - Insufficient score. Please retake the test to achieve a minimum score of 70%.`;
-        gradeDisplay.style.color = '#FF0000';
+        firebase.auth().onAuthStateChanged((user) => {
+            if (user) {
+                const userId = user.uid;
+                isStudentLinkedToProfessor(userId).then(isLinked => {
+                    if (isLinked) {
+                        gradeDisplay.innerHTML = `Your Grade: ${grade}% - Insufficient score. Please contact your teacher to update your grade.`;
+                    } else {
+                        gradeDisplay.innerHTML = `Your Grade: ${grade}% - Insufficient score. Please retake the test to achieve at least 70%.`;
+                    }
+                    gradeDisplay.style.color = '#FF0000';
+                });
+            }
+        });
     }
 }
 
@@ -516,7 +528,37 @@ function checkCompletion() {
         alert("Please fill in all the fields before finishing the test."); 
     }
 }
-   
+ 
+function liberarProximaFase(userId, level, unit) {
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+    const faseAtual = getPhaseFromURL();
+
+    // Verifica o valor da fase na URL
+    if (faseAtual === 'last' || faseAtual === 'end') {
+        // Libera a primeira fase do próximo nível/unidade
+        const proximoLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+        const novaUnit = 'Unit1'; // Começa uma nova unidade no próximo nível
+
+        firebase.database().ref(`usuarios/${userId}/progresso/${proximoLevel}/${novaUnit}`)
+            .update({ fase1: true })
+            .then(() => console.log(`Primeira fase do ${proximoLevel} liberada.`))
+            .catch(error => console.error("Erro ao liberar nova fase:", error));
+    } else {
+        // Se faseAtual for um número, libera a próxima fase na mesma unidade
+        const proximaFase = `fase${parseInt(faseAtual) + 1}`;
+
+        dbRef.update({ [proximaFase]: true })
+            .then(() => console.log(`Fase ${proximaFase} liberada.`))
+            .catch(error => console.error("Erro ao liberar próxima fase:", error));
+    }
+}
+
+// Função para obter a fase atual do parâmetro na URL
+function getPhaseFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('fase');
+}
+  
 document.addEventListener('DOMContentLoaded', () => {
     loadActivities();
     loadExistingGrade(); // Adiciona esta linha para carregar a nota ao iniciar
