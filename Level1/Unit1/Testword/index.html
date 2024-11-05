@@ -128,22 +128,22 @@
             }
         }
 
-  /* Estilo do campo de entrada */
-    .word-input {
-        width: 300px; /* Largura do campo de entrada */
-        height: 50px; /* Altura do campo de entrada */
-        padding: 10px; /* Espaçamento interno */
-        font-size: 20px; /* Tamanho da fonte */
-        border: 2px solid #ff4500; /* Cor da borda */
-        border-radius: 10px; /* Bordas arredondadas */
-        background-color: #fff; /* Cor de fundo */
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Sombra */
-        transition: border-color 0.3s ease; /* Transição para mudança de cor */
-    }
-    .word-input:focus {
-        border-color: #32CD32; /* Cor da borda ao focar */
-        outline: none; /* Remove contorno padrão */
-    }
+ /* Estilo do campo de entrada */
+.word-input {
+    width: 300px; /* Largura do campo de entrada */
+    height: 50px; /* Altura do campo de entrada */
+    padding: 10px; /* Espaçamento interno */
+    font-size: 20px; /* Tamanho da fonte */
+    border: 2px solid #ff4500; /* Cor da borda */
+    border-radius: 10px; /* Bordas arredondadas */
+    background-color: #fff; /* Cor de fundo */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Sombra */
+    transition: border-color 0.3s ease; /* Transição para mudança de cor */
+}
+.word-input:focus {
+    border-color: initial; /* Remove a mudança de cor da borda ao focar */
+    outline: none; /* Remove contorno padrão */
+}
    </style>
 </head>
 <body>
@@ -372,11 +372,13 @@ function calculateGrade() {
     // Exibe a nota e mensagem abaixo do título
     displayGrade(grade);
 
-    if (grade >= 70) {
-        // Salva a nota no banco e libera a próxima fase
-        saveGradeToDatabase(grade);
-        showCompletionModal(); // Exibe o modal de conclusão
-    } else {
+    // Salva a nota no banco de dados independentemente do valor
+    saveGradeToDatabase(grade);
+
+    // Exibe o modal de conclusão
+    showCompletionModal(); // Exibe o modal de conclusão
+
+    if (grade < 70) {
         // Nota insuficiente; mensagens e ações sem desbloqueio
         firebase.auth().onAuthStateChanged((user) => {
             if (user) {
@@ -400,18 +402,10 @@ function saveGradeToDatabase(grade) {
             const { level, unit } = getLevelAndUnitFromURL();
             const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
 
-            dbRef.child('nota2').once('value').then((snapshot) => {
-                const existingGrade = snapshot.val();
-                isStudentLinkedToProfessor(userId).then(isLinked => {
-                    if (!isLinked || !existingGrade || grade >= 70) {
-                        dbRef.update({ nota2: grade })
-                            .then(() => console.log("Nota salva com sucesso."))
-                            .catch(error => console.error("Erro ao salvar a nota2:", error));
-                    } else {
-                        console.log("Nota já registrada. Somente o professor pode modificar.");
-                    }
-                });
-            });
+            // Atualiza a nota, independente de já existir uma
+            dbRef.update({ nota2: grade })
+                .then(() => console.log("Nota salva com sucesso."))
+                .catch(error => console.error("Erro ao salvar a nota2:", error));
         } else {
             console.error("Usuário não autenticado.");
         }
@@ -443,7 +437,6 @@ function loadExistingGrade() {
 }
 
 function displayGrade(grade) {
-    // Elemento de exibição da nota
     const gradeDisplay = document.getElementById('grade-display');
     gradeDisplay.style.display = 'block';
 
