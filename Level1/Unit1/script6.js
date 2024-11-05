@@ -12,7 +12,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const activities = [
         { id: 24, name: "Test", path: "../Unit1/Test/index.html?fase=24", img: "../../imagens/test.png", unlocked: false },
-        { id: 25, name: "Test1", path: "../Unit1/Testlistening/index.html?fase=last", img: "../../imagens/test.png", unlocked: false },                
+        { id: 25, name: "Test1", path: "../Unit1/Testlistening/index.html?fase=25", img: "../../imagens/test.png", unlocked: false },   
+        { id: 26, name: "Test2", path: "../Unit1/Testword/index.html?fase=last", img: "../../imagens/test.png", unlocked: false },                   
     ];
 
      // Fechar o dropdown ao clicar fora dele
