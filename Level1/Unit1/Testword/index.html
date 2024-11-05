@@ -348,11 +348,56 @@ async function loadActivities() {
 }
 
 function calculateGrade() {
-    const totalActivities = activities.length;
-    const grade = Math.round((completedWords / totalActivities) * 100); // Cálculo da nota em porcentagem
+    const totalActivities = document.querySelectorAll('.activity').length;
+    const completedWords = document.querySelectorAll('.word-input.correct').length;
+    const grade = Math.round((completedWords / totalActivities) * 100);
 
-    displayGrade(grade); // Exibir a nota no modal de conclusão
-    saveGradeToDatabase(grade); // Registrar a nota no banco de dados
+    displayGrade(grade);
+
+    if (grade >= 70) {
+        // Salva a nota no banco e libera a próxima fase
+        saveGradeToDatabase(grade);
+        showCompletionModal(); // Exibe o modal de conclusão
+    } else {
+        // Nota insuficiente; mensagens e ações sem desbloqueio
+        firebase.auth().onAuthStateChanged((user) => {
+            if (user) {
+                const userId = user.uid;
+                isStudentLinkedToProfessor(userId).then(isLinked => {
+                    if (isLinked) {
+                        alert("Nota insuficiente. Entre em contato com seu professor para alterar sua nota.");
+                    } else {
+                        alert("Nota insuficiente. Por favor, refaça o teste para obter uma nota mínima de 70%.");
+                    }
+                });
+            }
+        });
+    }
+}
+
+function saveGradeToDatabase(grade) {
+    firebase.auth().onAuthStateChanged((user) => {
+        if (user) {
+            const userId = user.uid;
+            const { level, unit } = getLevelAndUnitFromURL();
+            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+            dbRef.child('nota2').once('value').then((snapshot) => {
+                const existingGrade = snapshot.val();
+                isStudentLinkedToProfessor(userId).then(isLinked => {
+                    if (!isLinked || !existingGrade || grade >= 70) {
+                        dbRef.update({ nota2: grade })
+                            .then(() => console.log("Nota salva com sucesso."))
+                            .catch(error => console.error("Erro ao salvar a nota2:", error));
+                    } else {
+                        console.log("Nota já registrada. Somente o professor pode modificar.");
+                    }
+                });
+            });
+        } else {
+            console.error("Usuário não autenticado.");
+        }
+    });
 }
 
 function displayGrade(grade) {
@@ -379,31 +424,6 @@ function displayGrade(grade) {
     // Exibe o modal de conclusão
     document.getElementById('overlay').style.display = 'block';
     modalContent.style.display = 'block';
-}
-
-function saveGradeToDatabase(grade) {
-    firebase.auth().onAuthStateChanged((user) => {
-        if (user) {
-            const userId = user.uid;
-            const { level, unit } = getLevelAndUnitFromURL();
-            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-
-            dbRef.child('nota2').once('value').then((snapshot) => {
-                const existingGrade = snapshot.val();
-                isStudentLinkedToProfessor(userId).then(isLinked => {
-                    if (!isLinked || !existingGrade || existingGrade === 0) {
-                        dbRef.update({ nota2: grade })
-                            .then(() => console.log("Nota salva com sucesso."))
-                            .catch(error => console.error("Erro ao salvar a nota2:", error));
-                    } else {
-                        console.log("Nota já registrada. Somente o professor pode modificar.");
-                    }
-                });
-            });
-        } else {
-            console.error("Usuário não autenticado.");
-        }
-    });
 }
 
 function isStudentLinkedToProfessor(userId) {
@@ -449,21 +469,20 @@ function checkCompletion() {
     let allFilled = true; // Marca se todos os campos estão preenchidos
 
     wordInputs.forEach((input, index) => {
-        const userAnswer = input.value.trim().toLowerCase(); // Resposta do usuário em minúsculas
-        const correctAnswer = activities[index].toLowerCase(); // Resposta correta correspondente em minúsculas
+        const userAnswer = input.value.trim().toLowerCase(); 
+        const correctAnswer = activities[index].toLowerCase();
 
         if (userAnswer === "") {
-            allFilled = false; // Marca que ainda há campos vazios
+            allFilled = false; 
         } else if (userAnswer === correctAnswer) {
-            completedWords++; // Incrementa o contador apenas para respostas corretas
+            completedWords++; 
         }
     });
 
     if (allFilled) {
-        calculateGrade(); // Calcula a nota com base nas respostas corretas
-        showCompletionModal(); // Exibe o modal de conclusão
+        calculateGrade(); 
     } else {
-        alert("Please fill in all the fields before finishing the test."); // Alerta se algum campo está vazio
+        alert("Please fill in all the fields before finishing the test."); 
     }
 }
    
