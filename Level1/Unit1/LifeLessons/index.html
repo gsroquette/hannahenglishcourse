@@ -28,7 +28,7 @@
             border-radius: 8px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
-        .draggable-word {
+        .clickable-word {
             display: inline-block;
             padding: 8px 12px;
             background-color: #ddd;
@@ -47,6 +47,10 @@
             align-items: center;
             justify-content: center;
             border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
         }
         #nav-buttons {
             display: flex;
@@ -85,7 +89,7 @@
 <div id="questions-container">
     <div id="words-container"></div>
     <p id="question-text">Loading...</p>
-    <div id="answer-area" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
+    <div id="answer-area" onclick="removeAnswer()"></div>
     
     <div id="nav-buttons">
         <button class="nav-btn" onclick="prevQuestion()">Previous</button>
@@ -111,18 +115,41 @@
 
     function initializeActivity() {
         const words = questions.map(q => q.answer).sort(() => Math.random() - 0.5);
-        words.forEach(word => createDraggableWord(word));
+        words.forEach(word => createClickableWord(word));
         loadQuestion();
     }
 
-    function createDraggableWord(word) {
+    function createClickableWord(word) {
         const wordElem = document.createElement('div');
-        wordElem.classList.add('draggable-word');
+        wordElem.classList.add('clickable-word');
         wordElem.textContent = word;
-        wordElem.setAttribute('draggable', 'true');
-        wordElem.ondragstart = event => event.dataTransfer.setData('text', word);
+        wordElem.onclick = () => selectAnswer(wordElem, word);
         wordElem.id = `word-${word}`; // Set ID for easier removal
         document.getElementById('words-container').appendChild(wordElem);
+    }
+
+    function selectAnswer(wordElem, word) {
+        const answerArea = document.getElementById('answer-area');
+
+        // Move word to the answer area if it's empty
+        if (!answerArea.textContent) {
+            answerArea.textContent = word;
+            userAnswers[currentQuestionIndex] = word;
+            wordElem.remove(); // Remove from words container
+        }
+    }
+
+    function removeAnswer() {
+        const answerArea = document.getElementById('answer-area');
+        const wordsContainer = document.getElementById('words-container');
+
+        // If there is an answer in the answer area, return it to the words container
+        if (answerArea.textContent) {
+            const word = answerArea.textContent;
+            answerArea.textContent = '';
+            delete userAnswers[currentQuestionIndex];
+            wordsContainer.appendChild(createClickableWord(word)); // Return word to words container
+        }
     }
 
     function loadQuestion() {
@@ -130,57 +157,10 @@
         document.getElementById('question-text').textContent = questionObj.question;
 
         const answerArea = document.getElementById('answer-area');
-        answerArea.innerHTML = '';
+        answerArea.textContent = '';
 
         if (userAnswers[currentQuestionIndex]) {
-            const answerElem = createAnswerElem(userAnswers[currentQuestionIndex]);
-            answerArea.appendChild(answerElem);
-        }
-    }
-
-    function createAnswerElem(text) {
-        const answerElem = document.createElement('div');
-        answerElem.classList.add('draggable-word');
-        answerElem.textContent = text;
-        answerElem.setAttribute('draggable', 'true');
-        answerElem.ondragstart = event => event.dataTransfer.setData('text', text);
-        return answerElem;
-    }
-
-    function allowDrop(event) {
-        event.preventDefault();
-    }
-
-    function drop(event) {
-        event.preventDefault();
-        const word = event.dataTransfer.getData('text');
-        const answerArea = document.getElementById('answer-area');
-        const wordsContainer = document.getElementById('words-container');
-
-        // Check if dropped in the answer area
-        if (event.target.id === 'answer-area') {
-            if (answerArea.children.length === 0) {
-                answerArea.appendChild(createAnswerElem(word));
-                userAnswers[currentQuestionIndex] = word;
-                document.getElementById(`word-${word}`).remove(); // Remove from top
-            } else {
-                const existingWord = answerArea.children[0].textContent;
-                wordsContainer.appendChild(createDraggableWord(existingWord)); // Return existing word to top
-                answerArea.innerHTML = ''; // Clear answer area
-                answerArea.appendChild(createAnswerElem(word));
-                userAnswers[currentQuestionIndex] = word;
-                document.getElementById(`word-${word}`).remove();
-            }
-        } else {
-            // Return word to the top if dropped outside of answer area
-            if (userAnswers[currentQuestionIndex] === word) {
-                delete userAnswers[currentQuestionIndex];
-                const existingWordElem = document.getElementById(`word-${word}`);
-                if (!existingWordElem) {
-                    wordsContainer.appendChild(createDraggableWord(word)); // Show word back on top
-                }
-                answerArea.innerHTML = ''; // Clear answer area
-            }
+            answerArea.textContent = userAnswers[currentQuestionIndex];
         }
     }
 
