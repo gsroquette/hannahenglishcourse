@@ -119,10 +119,6 @@
             cursor: pointer;
             margin-top: 10px;
         }
-        /* Novo estilo para destacar respostas corretas */
-        .correct-answer {
-            border: 2px solid green !important;
-        }
     </style>
 </head>
 <body>
@@ -175,6 +171,7 @@
     let userAnswers = {};
     let userRole = '';
 
+    // Load questions and answers from perguntas.txt
     fetch('perguntas.txt')
         .then(response => response.text())
         .then(text => {
@@ -219,9 +216,6 @@
             answerArea.textContent = word;
             userAnswers[currentQuestionIndex] = word;
             wordElem.remove();
-            if (userAnswers[currentQuestionIndex] === questions[currentQuestionIndex].answer) {
-                answerArea.classList.add('correct-answer');
-            }
         }
     }
 
@@ -231,7 +225,6 @@
         if (answerArea.textContent) {
             const word = answerArea.textContent;
             answerArea.textContent = '';
-            answerArea.classList.remove('correct-answer');
             delete userAnswers[currentQuestionIndex];
             wordsContainer.appendChild(createClickableWord(word));
         }
@@ -239,14 +232,11 @@
 
     function loadQuestion() {
         const questionObj = questions[currentQuestionIndex];
-        const answerArea = document.getElementById('answer-area');
         document.getElementById('question-text').textContent = questionObj.question;
-        answerArea.textContent = userAnswers[currentQuestionIndex] || '';
-        
-        if (userAnswers[currentQuestionIndex] === questionObj.answer) {
-            answerArea.classList.add('correct-answer');
-        } else {
-            answerArea.classList.remove('correct-answer');
+        const answerArea = document.getElementById('answer-area');
+        answerArea.textContent = '';
+        if (userAnswers[currentQuestionIndex]) {
+            answerArea.textContent = userAnswers[currentQuestionIndex];
         }
     }
 
@@ -266,41 +256,29 @@
         }
     }
 
-  function checkAnswers() {
-    let allCorrect = true;
-
-    questions.forEach((q, index) => {
-        // Checa se a resposta armazenada pelo usuário está correta
-        if (userAnswers[index] !== q.answer) {
-            allCorrect = false;
+    function checkAnswers() {
+        let allCorrect = true;
+        for (let i = 0; i < questions.length; i++) {
+            if (userAnswers[i] !== questions[i].answer) {
+                allCorrect = false;
+                delete userAnswers[i];
+            }
         }
-    });
-
-    // Verifica a resposta atual e aplica/remover a classe
-    const currentAnswerArea = document.getElementById('answer-area');
-    if (userAnswers[currentQuestionIndex] === questions[currentQuestionIndex].answer) {
-        currentAnswerArea.classList.add('correct-answer');
-    } else {
-        currentAnswerArea.classList.remove('correct-answer');
+        if (allCorrect) {
+            showModal("Congratulations! You have completed the phase.");
+            updateProgressInDatabase();
+        } else {
+            showModal("Some answers were incorrect. Try again!");
+            currentQuestionIndex = 0;
+            loadQuestion();
+            resetIncorrectAnswers();
+        }
     }
-
-    // Mostra o modal de conclusão
-    if (allCorrect) {
-        showModal("Congratulations! You have completed the phase.");
-        updateProgressInDatabase();
-    } else {
-        showModal("Some answers were incorrect. Try again!");
-        currentQuestionIndex = 0;
-        loadQuestion();
-        resetIncorrectAnswers();
-    }
-}
 
     function resetIncorrectAnswers() {
-    document.getElementById('words-container').innerHTML = '';
-    document.getElementById('answer-area').classList.remove('correct-answer');
-    initializeActivity();
-}
+        document.getElementById('words-container').innerHTML = '';
+        initializeActivity();
+    }
 
     function showModal(message) {
         document.getElementById("modal-message").textContent = message;
@@ -316,7 +294,7 @@
         const params = new URLSearchParams(url.search);
         const fase = params.get('fase');
         const userId = firebase.auth().currentUser.uid;
-        const level = url.pathname.split('/')[3];
+        const level = url.pathname.split('/')[3];  // Adjust path based on actual URL structure
         const unit = url.pathname.split('/')[4];
 
         let path = `usuarios/${userId}/progresso/${level}/${unit}`;
@@ -331,48 +309,57 @@
         firebase.database().ref(path).set(true);
     }
 
-    function generatePDF() {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        const img = new Image();
-        img.src = '../../../../imagens/hannah_logo.png';
+   function generatePDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const img = new Image();
+    img.src = '../../../../imagens/hannah_logo.png';
 
-        img.onload = () => {
-            doc.addImage(img, 'PNG', 10, 10, 20, 20);
-            doc.setFontSize(12);
-            doc.text("Name:__________________________ Date:______________", 40, 20);
-            doc.setFontSize(16);
-            doc.text("Life Lessons from the Bible", 10, 40);
+    img.onload = () => {
+        // Adiciona logo, campos de Name e Date
+        doc.addImage(img, 'PNG', 10, 10, 20, 20);
+        doc.setFontSize(12);
+        doc.text("Name:__________________________ Date:______________", 40, 20);
+        
+        // Título da atividade
+        doc.setFontSize(16);
+        doc.text("Life Lessons from the Bible", 10, 40);
 
-            doc.setFontSize(12);
-            let answerOptions = questions.map(q => q.answer).join(", ");
-            let splitOptions = doc.splitTextToSize("Answer Options: " + answerOptions, 180);
-            doc.text(splitOptions, 10, 50);
+        // Adiciona um quadro com as opções de respostas no topo
+        doc.setFontSize(12);
+        let answerOptions = questions.map(q => q.answer).join(", ");
+        let splitOptions = doc.splitTextToSize("Answer Options: " + answerOptions, 180);
+        doc.text(splitOptions, 10, 50);
 
-            let y = 60 + (splitOptions.length * 10);
-            const lineHeight = 10;
-            const questionSpacing = 12;
-            const pageHeight = doc.internal.pageSize.height;
+        // Definições de layout e altura inicial
+        let y = 60 + (splitOptions.length * 10); // Posiciona abaixo das opções de respostas
+        const lineHeight = 10;
+        const questionSpacing = 12; // Espaçamento consistente entre perguntas
+        const pageHeight = doc.internal.pageSize.height;
 
-            questions.forEach((q, i) => {
-                let questionText = `${i + 1}. ${q.question}`;
-                let splitQuestion = doc.splitTextToSize(questionText, 180);
+        // Adiciona perguntas sem qualquer linha de resposta adicional
+        questions.forEach((q, i) => {
+            // Define o texto da pergunta, dividindo-o automaticamente para caber na largura permitida
+            let questionText = `${i + 1}. ${q.question}`;
+            let splitQuestion = doc.splitTextToSize(questionText, 180); // Ajusta largura para caber no espaço
 
-                if (y + (splitQuestion.length) * lineHeight > pageHeight - 20) {
-                    doc.addPage();
-                    y = 20;
-                    doc.addImage(img, 'PNG', 10, 10, 20, 20);
-                    doc.text("Name:__________________________ Date:______________", 40, 20);
-                    y += 30;
-                }
+            // Verifica se há espaço suficiente na página para a pergunta
+            if (y + (splitQuestion.length) * lineHeight > pageHeight - 20) {
+                doc.addPage();
+                y = 20;
+                doc.addImage(img, 'PNG', 10, 10, 20, 20); // Adiciona logo na nova página
+                doc.text("Name:__________________________ Date:______________", 40, 20);
+                y += 30; // Espaçamento para o conteúdo
+            }
 
-                doc.text(splitQuestion, 10, y);
-                y += splitQuestion.length * lineHeight + questionSpacing;
-            });
+            // Adiciona a pergunta no PDF sem linhas adicionais de resposta
+            doc.text(splitQuestion, 10, y);
+            y += splitQuestion.length * lineHeight + questionSpacing; // Atualiza y com espaçamento consistente
+        });
 
-            doc.save("activity.pdf");
-        };
-    }
+        doc.save("activity.pdf");
+    };
+}
 
     function goBack() {
         window.history.back();
