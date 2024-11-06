@@ -30,20 +30,25 @@
       flex-wrap: wrap;
       justify-content: center;
     }
+    #selectedImageContainer {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 20px;
+      display: none;
+    }
     #selectedImage {
       max-width: 80%;
       height: auto;
-      margin: 20px 0;
-      display: none;
     }
     #generatePdfBtn {
-      display: none;
       background-color: green;
       color: white;
       padding: 10px 20px;
       border: none;
       cursor: pointer;
       font-size: 16px;
+      margin-top: 10px;
     }
     #generatePdfBtn:hover {
       opacity: 0.9;
@@ -67,16 +72,12 @@
 <h1>Hannah Coloring</h1>
 <p>Choose a drawing to color</p>
 
-<div class="gallery">
-  <img src="imagens/imagem1.png" alt="Drawing 1" class="thumbnail" onclick="selectImage('imagens/imagem1.png')">
-  <img src="imagens/imagem2.png" alt="Drawing 2" class="thumbnail" onclick="selectImage('imagens/imagem2.png')">
-  <img src="imagens/imagem3.png" alt="Drawing 3" class="thumbnail" onclick="selectImage('imagens/imagem3.png')">
-  <!-- Continue adding thumbnails as needed -->
-</div>
+<div class="gallery" id="gallery"></div>
 
-<img id="selectedImage" src="" alt="Selected Drawing">
-<br>
-<button id="generatePdfBtn" onclick="generatePDF()">Generate PDF</button>
+<div id="selectedImageContainer">
+  <img id="selectedImage" src="" alt="Selected Drawing">
+  <button id="generatePdfBtn" onclick="generatePDF()">Generate PDF</button>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
 <script>
@@ -84,13 +85,31 @@
     window.history.back();
   }
 
+  // Buscar a lista de imagens do servidor
+  async function fetchImages() {
+    const response = await fetch('/images'); // Supondo que exista um endpoint /images que lista as imagens
+    const images = await response.json();
+    const gallery = document.getElementById("gallery");
+    images.forEach(image => {
+      const img = document.createElement("img");
+      img.src = `imagens/${image}`;
+      img.alt = "Drawing Thumbnail";
+      img.className = "thumbnail";
+      img.onclick = () => selectImage(img.src);
+      gallery.appendChild(img);
+    });
+  }
+
+  fetchImages();
+
+  // Exibir a imagem selecionada e o botão PDF
   function selectImage(src) {
     const selectedImage = document.getElementById("selectedImage");
     selectedImage.src = src;
-    selectedImage.style.display = "block";
-    document.getElementById("generatePdfBtn").style.display = "inline-block";
+    document.getElementById("selectedImageContainer").style.display = "flex";
   }
 
+  // Gerar PDF com a imagem selecionada
   function generatePDF() {
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF();
@@ -108,7 +127,7 @@
 
       const selectedImage = document.getElementById("selectedImage");
       pdf.addImage(selectedImage, "PNG", 10, 60, 190, 190 * (selectedImage.height / selectedImage.width));
-      
+
       pdf.save("Coloring_Page.pdf");
     };
   }
