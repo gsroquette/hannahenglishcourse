@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const activities = [
           { id: 23, name: "MatchingGame", path: "../Unit1/MatchingGame/index.html?fase=23", img: "../../imagens/botoes/matching_game_button.png", unlocked: false },
-          { id: 24, name: "LifeLessons", path: "../Unit1/LifeLessons/index.html?fase=last", img: "../../imagens/botoes/life_lessons_button.png", unlocked: false },
+          { id: 24, name: "LifeLessons", path: "../Unit1/LifeLessons/index.html?fase=24", img: "../../imagens/botoes/life_lessons_button.png", unlocked: false },
     ];
 
      // Fechar o dropdown ao clicar fora dele
