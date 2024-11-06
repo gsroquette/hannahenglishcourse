@@ -354,11 +354,14 @@ function updateProgressInDatabase() {
     const params = new URLSearchParams(url.search);
     const fase = params.get('fase'); // Captura a fase a partir da URL
     const userId = firebase.auth().currentUser ? firebase.auth().currentUser.uid : null;
-    const level = url.pathname.split('/')[3]; // Extrai o nível da URL
-    const unit = url.pathname.split('/')[4];  // Extrai a unidade da URL
 
-    if (!userId) {
-        console.error("Usuário não autenticado.");
+    // Extrai o nível e a unidade da URL de maneira segura
+    const pathSegments = url.pathname.split('/');
+    const level = pathSegments.find(segment => segment.startsWith('Level'));
+    const unit = pathSegments.find(segment => segment.startsWith('Unit'));
+
+    if (!userId || !level || !unit) {
+        console.error("Erro: Usuário não autenticado ou caminho inválido.");
         return;
     }
 
@@ -371,9 +374,12 @@ function updateProgressInDatabase() {
     } else if (fase === 'last') {
         const nextUnit = parseInt(unit.replace('Unit', '')) + 1;
         path = `usuarios/${userId}/progresso/${level}/Unit${nextUnit}/fase1`;
-    } else {
+    } else if (!isNaN(fase)) {
         const nextFase = parseInt(fase) + 1;
         path = `usuarios/${userId}/progresso/${level}/${unit}/fase${nextFase}`;
+    } else {
+        console.error("Erro: Fase inválida.");
+        return;
     }
 
     // Atualização do Firebase
