@@ -310,21 +310,48 @@
     }
 
     function generatePDF() {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        const img = new Image();
-        img.src = '../../../../imagens/hannah_logo.png';
-        img.onload = () => {
-            doc.addImage(img, 'PNG', 10, 10, 20, 20);
-            doc.text("Name:__________________________ Date:______________", 40, 20);
-            doc.text("Life Lessons from the Bible", 10, 40);
-            questions.forEach((q, i) => {
-                doc.text(`${i + 1}. ${q.question}`, 10, 50 + (i * 10));
-                doc.text(userAnswers[i] || "", 120, 50 + (i * 10));
-            });
-            doc.save("activity.pdf");
-        };
-    }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const img = new Image();
+    img.src = '../../../../imagens/hannah_logo.png';
+
+    img.onload = () => {
+        doc.addImage(img, 'PNG', 10, 10, 20, 20);
+        doc.setFontSize(12);
+        doc.text("Name:__________________________ Date:______________", 40, 20);
+        doc.setFontSize(16);
+        doc.text("Life Lessons from the Bible", 10, 40);
+        doc.setFontSize(12);
+
+        let y = 50; // Start position for questions
+        const lineHeight = 10; // Height for each line of text
+        const pageHeight = doc.internal.pageSize.height;
+
+        questions.forEach((q, i) => {
+            let questionText = `${i + 1}. ${q.question}`;
+            let answerText = userAnswers[i] || "________";
+
+            // Check if question text fits in the remaining space
+            let splitQuestion = doc.splitTextToSize(questionText, 180);
+            let splitAnswer = doc.splitTextToSize(answerText, 180);
+
+            // If adding this question exceeds the page height, add a new page
+            if (y + (splitQuestion.length + splitAnswer.length) * lineHeight > pageHeight - 20) {
+                doc.addPage();
+                y = 20; // Reset y position for new page
+                doc.addImage(img, 'PNG', 10, 10, 20, 20); // Add logo on new page
+                doc.text("Name:__________________________ Date:______________", 40, 20);
+                y += 20; // Add spacing after header
+            }
+
+            doc.text(splitQuestion, 10, y);
+            doc.text(splitAnswer, 120, y); // Place answer on the right side
+            y += (splitQuestion.length + splitAnswer.length) * lineHeight; // Update y position
+        });
+
+        doc.save("activity.pdf");
+    };
+}
 
     function goBack() {
         window.history.back();
