@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Life Lessons from the Bible</title>
     <style>
+        /* Estilos Básicos */
         body {
             background-image: url('../../../imagens/fundo.png');
             background-repeat: repeat;
@@ -17,7 +18,7 @@
             margin: 0;
         }
         h1 {
-            margin-top: 50px; /* Adds space at the top to avoid overlap */
+            margin-top: 50px;
             text-align: center;
             font-size: 24px;
             color: #333;
@@ -26,9 +27,9 @@
             width: 80%;
             max-width: 600px;
             padding: 20px;
-            background: transparent; /* Transparent background */
+            background: transparent;
             border-radius: 8px;
-            margin-top: 20px; /* Centers the activity area vertically */
+            margin-top: 20px;
         }
         .clickable-word {
             display: inline-block;
@@ -61,7 +62,7 @@
         }
         #back-btn {
             position: absolute;
-            top: 15px; /* Adjusted to prevent overlap */
+            top: 15px;
             left: 15px;
             background-color: #000;
             color: #fff;
@@ -69,7 +70,7 @@
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            z-index: 10; /* Ensures the back button stays on top */
+            z-index: 10;
         }
         .nav-btn {
             background-color: #4CAF50;
@@ -79,10 +80,19 @@
             border-radius: 4px;
             cursor: pointer;
         }
-
-        /* Modal styling */
+        #generate-pdf-btn {
+            display: none;
+            background-color: #FF5722;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        /* Modal Styling */
         #modal {
-            display: none; /* Hidden by default */
+            display: none;
             position: fixed;
             top: 0;
             left: 0;
@@ -99,16 +109,6 @@
             max-width: 400px;
             text-align: center;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-        }
-        #modal-content h2 {
-            margin: 0;
-            font-size: 20px;
-            color: #333;
-        }
-        #modal-content p {
-            margin: 15px 0;
-            font-size: 16px;
-            color: #555;
         }
         #modal-close {
             background-color: #4CAF50;
@@ -136,6 +136,7 @@
         <button class="nav-btn" onclick="prevQuestion()">Previous</button>
         <button class="nav-btn" onclick="nextQuestion()">Next</button>
     </div>
+    <button id="generate-pdf-btn" onclick="generatePDF()">Generate PDF</button>
 </div>
 
 <!-- Modal Structure -->
@@ -147,10 +148,28 @@
     </div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-database.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-auth.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+
 <script>
+    // Firebase Configuration
+    const firebaseConfig = {
+        apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+        authDomain: "hannahenglishcourse.firebaseapp.com",
+        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "hannahenglishcourse",
+        storageBucket: "hannahenglishcourse.appspot.com",
+        messagingSenderId: "449818788486",
+        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707"
+    };
+    firebase.initializeApp(firebaseConfig);
+
     let questions = [];
     let currentQuestionIndex = 0;
     let userAnswers = {};
+    let userRole = '';
 
     // Load questions and answers from perguntas.txt
     fetch('perguntas.txt')
@@ -164,6 +183,19 @@
         });
 
     function initializeActivity() {
+        firebase.auth().onAuthStateChanged(user => {
+            if (user) {
+                const userId = user.uid;
+                firebase.database().ref(`usuarios/${userId}/role`).once('value')
+                    .then(snapshot => {
+                        userRole = snapshot.val();
+                        if (userRole === 'professor' || userRole === 'proprietário') {
+                            document.getElementById('generate-pdf-btn').style.display = 'block';
+                        }
+                    });
+            }
+        });
+
         const words = questions.map(q => q.answer).sort(() => Math.random() - 0.5);
         words.forEach(word => createClickableWord(word));
         loadQuestion();
@@ -180,35 +212,29 @@
 
     function selectAnswer(wordElem, word) {
         const answerArea = document.getElementById('answer-area');
-
-        // Move word to the answer area if it's empty
         if (!answerArea.textContent) {
             answerArea.textContent = word;
             userAnswers[currentQuestionIndex] = word;
-            wordElem.remove(); // Remove from words container
+            wordElem.remove();
         }
     }
 
     function removeAnswer() {
         const answerArea = document.getElementById('answer-area');
         const wordsContainer = document.getElementById('words-container');
-
-        // If there is an answer in the answer area, return it to the words container
         if (answerArea.textContent) {
             const word = answerArea.textContent;
             answerArea.textContent = '';
             delete userAnswers[currentQuestionIndex];
-            wordsContainer.appendChild(createClickableWord(word)); // Return word to words container
+            wordsContainer.appendChild(createClickableWord(word));
         }
     }
 
     function loadQuestion() {
         const questionObj = questions[currentQuestionIndex];
         document.getElementById('question-text').textContent = questionObj.question;
-
         const answerArea = document.getElementById('answer-area');
         answerArea.textContent = '';
-
         if (userAnswers[currentQuestionIndex]) {
             answerArea.textContent = userAnswers[currentQuestionIndex];
         }
@@ -240,6 +266,7 @@
         }
         if (allCorrect) {
             showModal("Congratulations! You have completed the phase.");
+            updateProgressInDatabase();
         } else {
             showModal("Some answers were incorrect. Try again!");
             currentQuestionIndex = 0;
@@ -260,6 +287,43 @@
 
     function closeModal() {
         document.getElementById("modal").style.display = "none";
+    }
+
+    function updateProgressInDatabase() {
+        const url = new URL(window.location.href);
+        const params = new URLSearchParams(url.search);
+        const fase = params.get('fase');
+        const userId = firebase.auth().currentUser.uid;
+        const level = url.pathname.split('/')[3];  // Adjust path based on actual URL structure
+        const unit = url.pathname.split('/')[4];
+
+        let path = `usuarios/${userId}/progresso/${level}/${unit}`;
+
+        if (fase === 'end') {
+            path += `/nextLevel/Unit1/fase1`;
+        } else if (fase === 'last') {
+            path += `/nextUnit/fase1`;
+        } else {
+            path += `/fase${parseInt(fase) + 1}`;
+        }
+        firebase.database().ref(path).set(true);
+    }
+
+    function generatePDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const img = new Image();
+        img.src = '../../../../imagens/hannah_logo.png';
+        img.onload = () => {
+            doc.addImage(img, 'PNG', 10, 10, 20, 20);
+            doc.text("Name:__________________________ Date:______________", 40, 20);
+            doc.text("Life Lessons from the Bible", 10, 40);
+            questions.forEach((q, i) => {
+                doc.text(`${i + 1}. ${q.question}`, 10, 50 + (i * 10));
+                doc.text(userAnswers[i] || "", 120, 50 + (i * 10));
+            });
+            doc.save("activity.pdf");
+        };
     }
 
     function goBack() {
