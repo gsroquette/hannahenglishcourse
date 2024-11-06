@@ -348,35 +348,39 @@ function removeAnswer() {
         document.getElementById("modal").style.display = "none";
     }
 
-   function updateProgressInDatabase() {
+ function updateProgressInDatabase() {
     const url = new URL(window.location.href);
     const params = new URLSearchParams(url.search);
     const fase = params.get('fase');
     const userId = firebase.auth().currentUser ? firebase.auth().currentUser.uid : null;
-    const level = url.pathname.split('/')[3];  // Ajuste conforme a estrutura do URL
-    const unit = url.pathname.split('/')[4];
+    const level = url.pathname.split('/')[3]; // Extrai o nível a partir do caminho da URL
+    const unit = url.pathname.split('/')[4];  // Extrai a unidade a partir do caminho da URL
 
     if (!userId) {
         console.error("Usuário não autenticado.");
         return;
     }
 
-    let path = `usuarios/${userId}/progresso/${level}/${unit}`;
+    let path = `usuarios/${userId}/progresso/${level}`;
 
-    let nextPath;
     if (fase === 'end') {
-        nextPath = `${path}/nextLevel/Unit1/fase1`;
+        // Caso `fase="end"`: Cria um novo Level com Unit1/fase1 liberados
+        const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+        path = `usuarios/${userId}/progresso/${nextLevel}/Unit1/fase1`;
     } else if (fase === 'last') {
-        nextPath = `${path}/nextUnit/fase1`;
+        // Caso `fase="last"`: Cria uma nova unidade no mesmo Level com fase1 liberada
+        const nextUnit = parseInt(unit.replace('Unit', '')) + 1;
+        path = `${path}/Unit${nextUnit}/fase1`;
     } else {
+        // Caso Numérico: Incrementa a fase e libera na mesma unidade
         const nextFase = parseInt(fase) + 1;
-        nextPath = `${path}/fase${nextFase}`;
+        path = `${path}/${unit}/fase${nextFase}`;
     }
 
-    // Libera a próxima fase no banco de dados
-    firebase.database().ref(nextPath).set(true)
+    // Atualiza o Firebase para liberar a próxima fase
+    firebase.database().ref(path).set(true)
         .then(() => {
-            console.log("Próxima fase liberada:", nextPath);
+            console.log("Próxima fase liberada:", path);
         })
         .catch(error => {
             console.error("Erro ao atualizar o progresso no banco de dados:", error);
