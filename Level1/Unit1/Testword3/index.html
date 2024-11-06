@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Missing Word Test</title>
+    <style>
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            margin: 0;
+            padding: 20px;
+            background-image: url('../../../imagens/fundo.png');
+            background-repeat: repeat;
+            background-size: contain;
+            background-position: center;
+        }
+        h1 {
+            text-align: center;
+            color: #ff4500;
+            font-size: 3rem;
+            margin-bottom: 20px;
+        }
+        .activity-container {
+            margin-top: 20px;
+        }
+        .activity {
+            display: flex;
+            align-items: center;
+            position: relative;
+            padding: 20px;
+            background-color: #ffdab9;
+            border-radius: 15px;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+        .activity img {
+            max-width: 150px;
+            max-height: 150px;
+            border-radius: 12px;
+            margin-right: 20px;
+        }
+        .missing-word {
+            font-size: 36px;
+            font-weight: bold;
+            color: #ff4500;
+        }
+        .word-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        /* Estilo do botão Finish Test */
+        #finishButton {
+            display: block;
+            margin: 20px auto;
+            padding: 15px 25px;
+            background-color: #32CD32;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        #finishButton:hover {
+            background-color: #28a428;
+        }
+
+        /* Estilos do modal de conclusão */
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            z-index: 1000;
+        }
+        #completion-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            display: none;
+            z-index: 1001;
+        }
+        #completion-modal h2 {
+            margin-top: 0;
+            font-size: 2rem;
+            color: #32CD32;
+        }
+        #completion-modal p {
+            font-size: 1.2rem;
+            margin: 10px 0;
+        }
+        #completion-modal button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 1rem;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #32CD32;
+            color: white;
+            transition: background-color 0.3s ease;
+        }
+        #completion-modal button:hover {
+            background-color: #28a428;
+        }
+        
+        @media (max-width: 600px) {
+            .activity {
+                flex-direction: column;
+                align-items: center;
+            }
+            .activity img {
+                margin: 0 0 15px 0;
+            }
+            .missing-word {
+                font-size: 28px;
+            }
+        }
+
+.word-input {
+    width: 300px;
+    height: 50px;
+    padding: 10px;
+    font-size: 20px;
+    border: 2px solid #ff4500; /* Cor da borda constante */
+    border-radius: 10px;
+    background-color: #fff;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.3s ease, border-width 0.3s ease;
+}
+.word-input:focus {
+    border-width: 3px; /* Borda mais grossa ao focar */
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.2); /* Efeito esfumaçado ao focar */
+    outline: none;
+}
+   </style>
+</head>
+<body>
+<button onclick="history.back()" style="padding: 15px 25px; background-color: black; color: white; border: none; border-radius: 10px; font-size: 1.5rem; cursor: pointer; transition: background-color 0.3s ease;">
+    Back
+</button>
+<button id="pdfButton" onclick="generatePDF()" style="display: none; padding: 15px 25px; background-color: #32CD32; color: white; border: none; border-radius: 10px; font-size: 1.5rem; cursor: pointer; transition: background-color 0.3s ease; margin-top: 10px;">
+    Generate PDF
+</button>
+
+<h1>Missing Word Test</h1>
+
+<div id="grade-display" style="display: none; text-align: center; font-size: 1.4em; color: #4CAF50; font-weight: bold; margin-bottom: 20px;"></div>
+<div id="activity-container" class="activity-container"></div>
+
+<!-- Botão Finish Test -->
+<button id="finishButton" onclick="checkCompletion()">Finish Test</button>
+
+<!-- Modal de conclusão -->
+<div id="overlay"></div>
+<div id="completion-modal">
+    <h2>Test Completed!</h2>
+    <p>Congratulations! You have completed this test.</p>
+    <button onclick="closeModal()">Close</button>
+</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+
+<script>
+    // Configuração do Firebase
+    const firebaseConfig = {
+        apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+        authDomain: "hannahenglishcourse.firebaseapp.com",
+        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "hannahenglishcourse",
+        storageBucket: "hannahenglishcourse.appspot.com",
+        messagingSenderId: "449818788486",
+        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707"
+    };
+
+    // Inicialização do Firebase
+    firebase.initializeApp(firebaseConfig);
+
+// Função para verificar o role e exibir o botão se necessário
+    firebase.auth().onAuthStateChanged((user) => {
+    if (user) {
+        const userId = user.uid;
+        const userRoleRef = firebase.database().ref(`usuarios/${userId}/role`);
+
+        userRoleRef.once('value').then((snapshot) => {
+            const role = snapshot.val();
+            // Exibe o botão apenas se o role for "professor" ou "proprietário"
+            if (role === 'professor' || role === 'proprietário') {
+                document.getElementById("pdfButton").style.display = "inline-block";
+            }
+        }).catch((error) => {
+            console.error("Erro ao buscar o role do usuário:", error);
+        });
+    } else {
+        console.log("Nenhum usuário autenticado.");
+    }
+});
+
+    async function generatePDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    // Carrega a logo e gera o PDF
+    const logo = new Image();
+    logo.src = 'Logo.png'; // Ajuste o nome do arquivo conforme necessário
+
+    // Garante que a logo seja carregada em Base64
+    logo.onload = function() {
+        // Adiciona a logo ao PDF
+        doc.addImage(logo, 'PNG', 10, 10, 30, 30);
+        doc.setFontSize(12);
+        doc.text("Name: __________________________________________ Date: ____________", 50, 20);
+
+        // Adiciona o título
+        doc.setFontSize(16);
+        doc.text("Hannah Missing Word", 10, 50);
+
+        // Adiciona as atividades
+        let yOffset = 60; // Posição inicial
+        document.querySelectorAll('.activity').forEach((activity, index) => {
+            if (yOffset > 270) { // Se ultrapassar o limite da página
+                doc.addPage();
+                yOffset = 20;
+            }
+
+            const imgElement = activity.querySelector('img');
+            if (imgElement) {
+                // Converte imagem para Base64 e adiciona ao PDF
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = imgElement.width;
+                canvas.height = imgElement.height;
+                ctx.drawImage(imgElement, 0, 0, imgElement.width, imgElement.height);
+                const imgData = canvas.toDataURL('image/jpeg');
+                doc.addImage(imgData, 'JPEG', 10, yOffset, 30, 30);
+            }
+
+            const wordContainer = activity.querySelector('.word-container');
+            if (wordContainer) {
+                doc.setFontSize(14);
+                let xPos = 50;
+                wordContainer.querySelectorAll('.missing-letter-input').forEach(() => {
+                    doc.text("_____", xPos, yOffset + 10);
+                    xPos += 15;
+                });
+                yOffset += 40;
+            }
+        });
+
+        // Salva o PDF
+        doc.save("Hannah_Missing_Word.pdf");
+    };
+
+    // Caso a logo não carregue, salva o PDF sem a imagem
+    logo.onerror = function() {
+        doc.setFontSize(12);
+        doc.text("Name: __________________________________________ Date: ____________", 50, 20);
+        doc.setFontSize(16);
+        doc.text("Hannah Missing Word", 10, 50);
+        doc.save("Hannah_Missing_Word.pdf");
+    };
+}
+
+    let activities = [];
+    let completedWords = 0; // Contador de palavras concluídas
+
+   // Função para ler a palavra em voz alta
+function speakText(text) {
+    if ('speechSynthesis' in window) {
+        const synth = window.speechSynthesis;
+        const utterThis = new SpeechSynthesisUtterance(text);
+        utterThis.lang = 'en-US';
+        synth.cancel(); // Cancela qualquer fala anterior antes de iniciar a nova
+        synth.speak(utterThis);
+    } else {
+        console.error("Speech synthesis não é suportado neste navegador.");
+    }
+}
+
+// Função para reproduzir o som da palavra ao clicar no botão
+function playSound(word) {
+    speakText(word); // Chama a função de leitura com a palavra
+}
+
+function createActivity(imageUrl, word) {
+    const activityContainer = document.getElementById('activity-container');
+    const activityDiv = document.createElement('div');
+    activityDiv.classList.add('activity');
+
+    // Elemento da imagem
+    const imgElement = document.createElement('img');
+    imgElement.src = imageUrl;
+    imgElement.onerror = function() {
+        console.error(`Erro ao carregar a imagem: ${imageUrl}`);
+    };
+    activityDiv.appendChild(imgElement);
+
+    // Botão de som (ícone de alto-falante)
+    const soundButton = document.createElement('button');
+    soundButton.innerHTML = '🔊'; // Ícone de som
+    soundButton.style.fontSize = '24px';
+    soundButton.style.border = 'none';
+    soundButton.style.background = 'transparent';
+    soundButton.style.cursor = 'pointer';
+    soundButton.style.marginLeft = '10px';
+
+    // Adiciona evento de clique ao botão de som
+    soundButton.addEventListener('click', function() {
+        playSound(word);
+    });
+    
+    activityDiv.appendChild(soundButton); // Adiciona o botão ao lado da imagem
+
+    const wordContainer = document.createElement('div');
+    wordContainer.classList.add('word-container');
+
+    // Campo de texto único para o aluno escrever a palavra
+    const wordInput = document.createElement('input');
+    wordInput.classList.add('word-input');
+    wordInput.type = 'text';
+    wordInput.placeholder = "Type the word here";
+    wordContainer.appendChild(wordInput);
+
+    activityDiv.appendChild(wordContainer);
+    activityContainer.appendChild(activityDiv);
+}
+
+// Função para carregar atividades a partir do arquivo words.txt
+async function loadActivities() {
+    try {
+        const response = await fetch('../data3/words.txt');
+        const text = await response.text();
+        const words = text.trim().split('\n');
+
+        words.forEach((word, index) => {
+            const imageName = `imagem${index + 1}.jpeg`;
+            const imageUrl = `../data3/imagens/${imageName}`;
+            createActivity(imageUrl, word);
+        });
+
+        activities = words; // Preenche `activities` com as palavras carregadas
+    } catch (error) {
+        console.error('Erro ao carregar palavras:', error);
+    }
+}
+ 
+   function showCompletionModal(message, grade) {
+    document.getElementById('overlay').style.display = 'block';
+    const modal = document.getElementById('completion-modal');
+    modal.style.display = 'block';
+    modal.querySelector('p').innerText = `${message} Your Grade: ${grade}%.`; // Define a mensagem com a nota
+}
+
+function calculateGrade() {
+    const totalActivities = document.querySelectorAll('.activity').length;
+    const completedWords = document.querySelectorAll('.word-input.correct').length;
+    const grade = Math.round((completedWords / totalActivities) * 100);
+
+    // Exibe a nota e mensagem abaixo do título
+    displayGrade(grade);
+
+    // Salva a nota no banco de dados independentemente do valor
+    saveGradeToDatabase(grade);
+
+    // Define a mensagem de conclusão com base na nota
+    let message = "";
+    if (grade >= 70) {
+        message = "Congratulations! You have completed this phase.";
+        showCompletionModal(message, grade); // Exibe o modal com a nota e a mensagem de conclusão
+
+        // Libera a próxima fase
+        firebase.auth().onAuthStateChanged((user) => {
+            if (user) {
+                const userId = user.uid;
+                const { level, unit } = getLevelAndUnitFromURL();
+                liberarProximaFase(userId, level, unit);
+            }
+        });
+    } else {
+        // Nota insuficiente; verifica se o aluno está vinculado a um professor
+        firebase.auth().onAuthStateChanged((user) => {
+            if (user) {
+                const userId = user.uid;
+                isStudentLinkedToProfessor(userId).then(isLinked => {
+                    if (isLinked) {
+                        message = "Insufficient score. Please contact your teacher to update your grade.";
+                    } else {
+                        message = "Insufficient score. Please retake the test to achieve a minimum score of 70%.";
+                    }
+                    showCompletionModal(message, grade); // Exibe o modal com a nota e a mensagem de insuficiência
+                });
+            }
+        });
+    }
+}
+
+function saveGradeToDatabase(grade) {
+    firebase.auth().onAuthStateChanged((user) => {
+        if (user) {
+            const userId = user.uid;
+            const { level, unit } = getLevelAndUnitFromURL();
+            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+            // Atualiza a nota, independente de já existir uma
+            dbRef.update({ nota4: grade })
+                .then(() => console.log("Nota salva com sucesso."))
+                .catch(error => console.error("Erro ao salvar a nota4:", error));
+        } else {
+            console.error("Usuário não autenticado.");
+        }
+    });
+}
+
+// Função para buscar a nota ao carregar a página
+function loadExistingGrade() {
+    firebase.auth().onAuthStateChanged((user) => {
+        if (user) {
+            const userId = user.uid;
+            const { level, unit } = getLevelAndUnitFromURL();
+            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/nota4`);
+
+            dbRef.once('value').then((snapshot) => {
+                const existingGrade = snapshot.val();
+                if (existingGrade !== null) {
+                    displayGrade(existingGrade); // Exibe a nota carregada do banco de dados
+                } else {
+                    console.log("Nenhuma nota encontrada.");
+                }
+            }).catch((error) => {
+                console.error("Erro ao buscar a nota:", error);
+            });
+        } else {
+            console.error("Usuário não autenticado.");
+        }
+    });
+}
+
+function displayGrade(grade) {
+    const gradeDisplay = document.getElementById('grade-display');
+    gradeDisplay.style.display = 'block';
+
+    // Define a cor e a mensagem com base na nota
+    if (grade >= 70) {
+        gradeDisplay.innerHTML = `Your Grade: ${grade}% - Congratulations on passing!`;
+        gradeDisplay.style.color = '#4CAF50';
+    } else {
+        firebase.auth().onAuthStateChanged((user) => {
+            if (user) {
+                const userId = user.uid;
+                isStudentLinkedToProfessor(userId).then(isLinked => {
+                    if (isLinked) {
+                        gradeDisplay.innerHTML = `Your Grade: ${grade}% - Insufficient score. Please contact your teacher to update your grade.`;
+                    } else {
+                        gradeDisplay.innerHTML = `Your Grade: ${grade}% - Insufficient score. Please retake the test to achieve at least 70%.`;
+                    }
+                    gradeDisplay.style.color = '#FF0000';
+                });
+            }
+        });
+    }
+}
+
+function isStudentLinkedToProfessor(userId) {
+    return firebase.database().ref("usuarios").once("value").then(snapshot => {
+        let isLinked = false;
+        snapshot.forEach(professorSnapshot => {
+            const professorData = professorSnapshot.val();
+            if (professorData.turmas) {
+                Object.keys(professorData.turmas).forEach(turmaId => {
+                    const turma = professorData.turmas[turmaId];
+                    if (turma.students && turma.students[userId]) {
+                        isLinked = true;
+                    }
+                });
+            }
+        });
+        return isLinked;
+    }).catch(error => {
+        console.error("Erro ao verificar vínculo com professor:", error);
+        return false;
+    });
+}
+
+    function closeModal() {
+        document.getElementById('overlay').style.display = 'none';
+        document.getElementById('completion-modal').style.display = 'none';
+    }
+    
+    function getPhaseFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('fase');
+    }
+
+    function getLevelAndUnitFromURL() {
+        const url = window.location.pathname;
+        const parts = url.split('/');
+        return { level: parts[1], unit: parts[2] };
+    }
+
+function checkCompletion() {
+    const wordInputs = document.querySelectorAll('.word-input');
+    completedWords = 0; // Reinicia o contador de respostas corretas antes de verificar
+    let allFilled = true; // Marca se todos os campos estão preenchidos
+
+    wordInputs.forEach((input, index) => {
+        const userAnswer = input.value.trim().toLowerCase(); 
+        const correctAnswer = activities[index].trim().toLowerCase(); // Garante que a resposta correta ignore maiúsculas e minúsculas
+
+        if (userAnswer === "") {
+            allFilled = false; 
+        } else if (userAnswer === correctAnswer) {
+            completedWords++; 
+            input.classList.add('correct'); // Adiciona uma classe para palavras corretas
+        } else {
+            input.classList.remove('correct');
+        }
+    });
+
+    if (allFilled) {
+        calculateGrade(); 
+    } else {
+        alert("Please fill in all the fields before finishing the test."); 
+    }
+}
+ 
+function liberarProximaFase(userId, level, unit) {
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+    const faseAtual = getPhaseFromURL();
+
+    if (faseAtual === 'end') {
+        // Inicia o próximo nível na primeira unidade e fase1
+        const proximoLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+        const novaUnit = 'Unit1';
+
+        firebase.database().ref(`usuarios/${userId}/progresso/${proximoLevel}/${novaUnit}`)
+            .update({ fase1: true })
+            .then(() => console.log(`Primeira fase do ${proximoLevel} liberada.`))
+            .catch(error => console.error("Erro ao liberar nova fase:", error));
+
+    } else if (faseAtual === 'last') {
+        // Avança para a próxima unidade no mesmo nível
+        const novaUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+
+        firebase.database().ref(`usuarios/${userId}/progresso/${level}/${novaUnit}`)
+            .update({ fase1: true })
+            .then(() => console.log(`Primeira fase do ${level}, ${novaUnit} liberada.`))
+            .catch(error => console.error("Erro ao liberar nova fase:", error));
+    } else {
+        // Se faseAtual for um número, libera a próxima fase na mesma unidade
+        const proximaFase = `fase${parseInt(faseAtual) + 1}`;
+
+        dbRef.update({ [proximaFase]: true })
+            .then(() => console.log(`Fase ${proximaFase} liberada.`))
+            .catch(error => console.error("Erro ao liberar próxima fase:", error));
+    }
+}
+
+// Função para obter a fase atual do parâmetro na URL
+function getPhaseFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('fase');
+}
+  
+document.addEventListener('DOMContentLoaded', () => {
+    loadActivities();
+    loadExistingGrade(); // Adiciona esta linha para carregar a nota ao iniciar
+});
+</script>
+
+</body>
+</html>
