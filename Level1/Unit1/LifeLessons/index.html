@@ -349,36 +349,35 @@ function removeAnswer() {
         document.getElementById("modal").style.display = "none";
     }
 
- function updateProgressInDatabase() {
+function updateProgressInDatabase() {
     const url = new URL(window.location.href);
     const params = new URLSearchParams(url.search);
-    const fase = params.get('fase');
+    const fase = params.get('fase'); // Captura a fase a partir da URL
     const userId = firebase.auth().currentUser ? firebase.auth().currentUser.uid : null;
-    const level = url.pathname.split('/')[3]; // Extrai o nível a partir do caminho da URL
-    const unit = url.pathname.split('/')[4];  // Extrai a unidade a partir do caminho da URL
+    const level = url.pathname.split('/')[3]; // Extrai o nível da URL
+    const unit = url.pathname.split('/')[4];  // Extrai a unidade da URL
 
     if (!userId) {
         console.error("Usuário não autenticado.");
         return;
     }
 
-    let path = `usuarios/${userId}/progresso/${level}`;
+    let path;
 
+    // Lógica para determinar o próximo caminho a ser atualizado
     if (fase === 'end') {
-        // Caso `fase="end"`: Cria um novo Level com Unit1/fase1 liberados
         const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
         path = `usuarios/${userId}/progresso/${nextLevel}/Unit1/fase1`;
     } else if (fase === 'last') {
-        // Caso `fase="last"`: Cria uma nova unidade no mesmo Level com fase1 liberada
         const nextUnit = parseInt(unit.replace('Unit', '')) + 1;
-        path = `${path}/Unit${nextUnit}/fase1`;
+        path = `usuarios/${userId}/progresso/${level}/Unit${nextUnit}/fase1`;
     } else {
-        // Caso Numérico: Incrementa a fase e libera na mesma unidade
         const nextFase = parseInt(fase) + 1;
-        path = `${path}/${unit}/fase${nextFase}`;
+        path = `usuarios/${userId}/progresso/${level}/${unit}/fase${nextFase}`;
     }
 
-    // Atualiza o Firebase para liberar a próxima fase
+    // Atualização do Firebase
+    console.log("Atualizando progresso para:", path);
     firebase.database().ref(path).set(true)
         .then(() => {
             console.log("Próxima fase liberada:", path);
