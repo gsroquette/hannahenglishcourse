@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hannah Test</title>
+    <style>
+        /* Estilos existentes mantidos */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-image: url('../../../imagens/fundo.png');
+            background-repeat: repeat;
+            background-size: auto;
+            background-color: white;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2.5em;
+            color: #333;
+            margin-bottom: 20px;
+        }
+ 
+/* Estilos de nota simplificados */
+    .grade-style, .grade-style-red {
+        text-align: center;
+        font-size: 1.4em;
+        color: #FF0000; /* Cor vermelha para nota baixa */
+        font-weight: bold;
+        margin-bottom: 20px;
+    }
+
+    /* Cor verde para notas altas */
+    .grade-style {
+        color: #4CAF50;
+    }
+
+    /* Mensagem do professor */
+    .grade-style span {
+        color: red;
+        font-size: 0.9em;
+        display: block;
+        margin-top: 5px;
+    }
+      
+        .question-container {
+            display: flex;
+            justify-content: center;
+        }
+
+        .question {
+            margin-bottom: 10px;
+            font-size: 1.2em;
+            padding: 20px;
+            text-align: left;
+            border: none;
+        }
+
+        label {
+            display: block;
+            font-size: 1em;
+            margin-bottom: 10px;
+        }
+
+        .btn-group {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 5px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 1em;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .prev-btn, .next-btn {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .prev-btn:hover, .next-btn:hover {
+            background-color: #45a049;
+        }
+
+        .read-btn {
+            background-color: #FF9800;
+            color: white;
+        }
+
+        .read-btn:hover {
+            background-color: #FB8C00;
+        }
+
+        .pdf-btn {
+            background-color: #03A9F4;
+            color: white;
+        }
+
+        .pdf-btn:hover {
+            background-color: #0288D1;
+        }
+      
+        /* Modal de conclusão */
+        #completion-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border: 2px solid #333;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            text-align: center;
+        }
+
+        #completion-modal button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #333;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        #completion-modal button:hover {
+            background-color: #555;
+        }
+
+        #overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+    </style>
+</head>
+<body>
+<button onclick="window.history.back()" style="padding: 10px 20px; font-size: 1em; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; transition: background-color 0.3s ease;">
+    Back
+</button>
+
+<h1>Hannah Test</h1>
+
+<div id="grade-display" class="grade-style"></div>
+
+<div class="btn-group">
+    <button class="read-btn" id="read-btn" onclick="readQuestion()">Read</button>
+    <button class="prev-btn" id="prev-btn" onclick="stopReading(); showPreviousQuestion()">Previous</button>
+    <button class="next-btn" id="next-btn" onclick="stopReading(); showNextQuestion()">Next</button>
+</div>
+
+<div id="quiz-container" class="question-container"></div>
+
+<!-- Modal de conclusão -->
+<div id="overlay"></div>
+<div id="completion-modal">
+    <h2>Phase Completed!</h2>
+    <p>Congratulations! You have completed this phase.</p>
+    <button onclick="closeModal()">Close</button>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<script>
+    // Configuração do Firebase
+    const firebaseConfig = {
+        apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+        authDomain: "hannahenglishcourse.firebaseapp.com",
+        projectId: "hannahenglishcourse",
+        storageBucket: "hannahenglishcourse.appspot.com",
+        messagingSenderId: "449818788486",
+        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+        measurementId: "G-07VVJG9LRS",
+        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+    };
+
+    // Inicializa o Firebase
+    firebase.initializeApp(firebaseConfig);
+
+// Declaração global para gradeRef
+let gradeRef;
+
+// Função para exibir a nota e a mensagem acima do título
+function displayGradeAndMessage(userId) {
+    if (gradeRef) gradeRef.off(); // Remove qualquer listener anterior
+
+    gradeRef = firebase.database().ref(`usuarios/${userId}/progresso/Level1/Unit1/nota6`);
+
+    gradeRef.on("value", (snapshot) => {
+        const grade = snapshot.val();
+        const gradeDisplay = document.getElementById("grade-display");
+
+        if (grade !== null) {
+            // Define o conteúdo da nota
+            gradeDisplay.style.display = "block"; // Exibe o quadro de notas
+            gradeDisplay.innerHTML = `Your Grade: ${grade}%`;
+
+            // Aplica a classe vermelha se a nota for menor que 70, caso contrário, aplica a padrão
+            if (grade < 70) {
+                gradeDisplay.classList.add("grade-style-red");
+                gradeDisplay.classList.remove("grade-style");
+            } else {
+                gradeDisplay.classList.add("grade-style");
+                gradeDisplay.classList.remove("grade-style-red");
+            }
+
+            // Verifica se o aluno está vinculado a um professor
+            isStudentLinkedToProfessor(userId).then(isLinked => {
+                if (isLinked) {
+                    gradeDisplay.innerHTML += "<br><span style='color: red;'>Only your teacher can cancel this grade</span>";
+                }
+            });
+        } else {
+            // Oculta o quadro de notas se a variável nota não existir
+            gradeDisplay.style.display = "none";
+        }
+    }, (error) => {
+        console.error("Error retrieving grade:", error);
+        document.getElementById("grade-display").style.display = "none";
+    });
+}
+
+// Autenticação do usuário e exibição da nota
+firebase.auth().onAuthStateChanged(function(user) {
+    if (user) {
+        displayGradeAndMessage(user.uid);
+    }
+});
+
+function isStudentLinkedToProfessor(userId) {
+    const dbRef = firebase.database().ref("usuarios"); // Referência a todos os usuários (onde estão os professores)
+    
+    return new Promise((resolve) => { // Usamos uma Promise para lidar com o resultado da pesquisa
+        dbRef.once("value").then(snapshot => { // Carrega todos os usuários do banco de dados
+            let isLinked = false; // Variável para saber se o aluno está vinculado a um professor
+            
+            snapshot.forEach(professorSnapshot => { // Percorre cada usuário (professor)
+                const professorData = professorSnapshot.val(); // Dados do professor
+                
+                // Verifica se o professor tem turmas
+                if (professorData.turmas) {
+                    // Percorre cada turma do professor
+                    Object.keys(professorData.turmas).forEach(turmaId => {
+                        const turma = professorData.turmas[turmaId];
+                        
+                        // Verifica se a turma tem o aluno com o userId fornecido
+                        if (turma.students && turma.students[userId]) {
+                            isLinked = true; // Se o aluno está em uma turma, marca como vinculado
+                        }
+                    });
+                }
+            });
+            
+            resolve(isLinked); // Retorna true se o aluno estiver vinculado, ou false caso contrário
+        }).catch(error => {
+            console.error("Error checking if student is linked to a professor:", error);
+            resolve(false); // Em caso de erro, resolve como false (não vinculado)
+        });
+    });
+}
+
+firebase.auth().onAuthStateChanged(function(user) {
+    if (user) {
+        displayGradeAndMessage(user.uid);
+    }
+});
+
+// Função para exibir o botão PDF se o papel for 'professor' ou 'proprietario'
+function displayPdfButton(role) {
+    if (role === 'professor' || role === 'proprietario') {
+        const pdfButton = document.createElement('button');
+        pdfButton.className = 'pdf-btn';
+        pdfButton.id = 'pdf-btn';
+        pdfButton.textContent = 'Generate PDF';
+        pdfButton.onclick = generatePDF;
+        document.querySelector('.btn-group').appendChild(pdfButton);
+    }
+}
+
+// Obter o papel do usuário e exibir o botão condicionalmente
+firebase.auth().onAuthStateChanged(function(user) {
+    if (user) {
+        // Substitua o caminho abaixo conforme necessário para buscar o papel do usuário
+        firebase.database().ref('usuarios/' + user.uid + '/role').once('value').then((snapshot) => {
+            const role = snapshot.val();
+            displayPdfButton(role);
+        });
+    }
+});
+
+    let correctAnswers = 0; // Contador de acertos
+    let totalQuestions = 0; // Total de questões
+    let currentQuestionIndex = 0;
+    let questions = [];
+    let answeredQuestions = [];
+    let speechSynthesisUtterance = null;
+
+  async function loadQuestions() {
+    try {
+        const response = await fetch('questions.txt');
+        if (!response.ok) throw new Error('Failed to load questions');
+        
+        const text = await response.text();
+        const lines = text.split('\n');
+        let currentQuestion = null;
+
+        lines.forEach(line => {
+            line = line.trim();
+            if (line.startsWith('Q:')) {
+                if (currentQuestion) questions.push(currentQuestion);
+                currentQuestion = { question: line.substring(2).trim(), answers: [], correct: '' };
+            } else if (/^[A-D]\./.test(line)) {  
+                currentQuestion.answers.push(line);
+            } else if (line.startsWith('Correct:')) {
+                if (currentQuestion) {
+                    currentQuestion.correct = line.split(':')[1].trim();
+                }
+            }
+        });
+
+        if (currentQuestion) questions.push(currentQuestion);
+
+        answeredQuestions = new Array(questions.length).fill(false);
+        totalQuestions = questions.length;
+
+        // Exibe a primeira pergunta
+        displayQuestion();
+    } catch (error) {
+        console.error('Error loading questions:', error);
+    }
+}
+   
+    function displayQuestion() {
+        const container = document.getElementById('quiz-container');
+        container.innerHTML = '';
+
+        const q = questions[currentQuestionIndex];
+        const questionDiv = document.createElement('div');
+        questionDiv.classList.add('question');
+
+        // Cria e adiciona a imagem correspondente à questão
+        const questionImage = document.createElement('img');
+        questionImage.src = `../StoryCards/images/imagem${currentQuestionIndex + 1}.jpeg`;
+        questionImage.alt = `Imagem para a questão ${currentQuestionIndex + 1}`;
+        questionImage.style.width = '100%';  // Ajusta a largura para o contêiner
+        questionImage.style.maxHeight = '300px'; // Limita a altura para evitar imagens grandes
+        questionDiv.appendChild(questionImage);
+
+        // Adiciona o botão de áudio para ler a pergunta
+        const audioButton = document.createElement('button');
+        audioButton.innerHTML = 'Play Audio <span style="font-size: 1.2em;">🔊</span>';
+        audioButton.classList.add('read-btn');
+        audioButton.style.marginBottom = '20px';
+        audioButton.onclick = () => readQuestion(q.question);
+        questionDiv.appendChild(audioButton);
+
+        // Adiciona as opções de resposta
+        q.answers.forEach((answer) => {
+            const answerLabel = document.createElement('label');
+            answerLabel.innerHTML = `<input type="radio" name="question${currentQuestionIndex}" value="${answer[0]}" onclick="checkAnswer(this, '${answer[0]}')"> ${answer}`;
+            questionDiv.appendChild(answerLabel);
+        });
+
+        container.appendChild(questionDiv);
+        updateNavigationButtons();
+
+        // Adiciona o botão "Finalizar" na última pergunta
+        const btnGroup = document.querySelector('.btn-group');
+        if (currentQuestionIndex === questions.length - 1) {
+            if (!document.getElementById('finish-btn')) {
+                const finishButton = document.createElement('button');
+                finishButton.id = 'finish-btn';
+                finishButton.className = 'next-btn';
+                finishButton.innerText = 'Finish';
+                finishButton.onclick = checkCompletion;
+                btnGroup.appendChild(finishButton);
+            }
+        } else {
+            const finishButton = document.getElementById('finish-btn');
+            if (finishButton) {
+                finishButton.remove();
+            }
+        }
+    }
+
+    function updateNavigationButtons() {
+        document.getElementById('prev-btn').disabled = currentQuestionIndex === 0;
+        document.getElementById('next-btn').disabled = currentQuestionIndex === questions.length - 1;
+    }
+
+    function showNextQuestion() {
+            if (currentQuestionIndex < questions.length - 1) {
+            currentQuestionIndex++;
+            displayQuestion();
+        }
+    }
+
+    function showPreviousQuestion() {
+           if (currentQuestionIndex > 0) {
+            currentQuestionIndex--;
+            displayQuestion();
+        }
+    }
+
+  function checkAnswer(radioElement, selectedAnswer) {
+    const q = questions[currentQuestionIndex];
+
+    // Verifica se a resposta está correta e atualiza o contador
+    if (selectedAnswer === q.correct && !answeredQuestions[currentQuestionIndex]) {
+        answeredQuestions[currentQuestionIndex] = true; // Marca como correta
+        correctAnswers++; // Incrementa acertos apenas se for a primeira vez que acertou a questão
+    } else if (selectedAnswer !== q.correct && answeredQuestions[currentQuestionIndex]) {
+        answeredQuestions[currentQuestionIndex] = false; // Marca como incorreta
+        correctAnswers--; // Decrementa acertos se a resposta correta for alterada
+    }
+
+    // Permite que o aluno altere a resposta
+    radioElement.checked = true; // A resposta marcada permanece
+}
+    
+   function readQuestion(text) {
+    stopReading(); // Cancela qualquer leitura anterior
+    speechSynthesisUtterance = new SpeechSynthesisUtterance(text); // Usa o texto passado como parâmetro
+    speechSynthesisUtterance.lang = 'en-US';
+    speechSynthesis.speak(speechSynthesisUtterance);
+}
+
+    function stopReading() {
+        if (speechSynthesisUtterance) {
+            speechSynthesis.cancel();
+        }
+    }
+
+function checkCompletion() {
+    console.log("checkCompletion chamado."); // Verificação de depuração
+    
+    // Calcula a nota como uma porcentagem de acertos
+    const grade = Math.round((correctAnswers / totalQuestions) * 100);
+    const gradeDisplay = document.getElementById('grade-display');
+
+    // Exibe a nota no modal de conclusão
+    document.getElementById('completion-modal').innerHTML = `
+        <h2>Test Completed!</h2>
+        <p>Your score: ${grade}%</p>
+        <button onclick="closeModal()">Close</button>
+    `;
+
+    // Salva sempre a nota no banco de dados
+    ensureUserIsAuthenticated((userId) => {
+        saveGrade(userId, grade);
+
+        // Verifica se o aluno está vinculado a um professor
+        isStudentLinkedToProfessor(userId).then(isLinked => {
+            if (grade >= 70) {
+                // Aplica o estilo padrão (verde) para notas >= 70%
+                gradeDisplay.classList.remove('grade-style-red');
+                gradeDisplay.classList.add('grade-style');
+                showModal(); // Exibe o modal de conclusão
+
+                // Avança a fase apenas se o aproveitamento for suficiente
+                updateNextPhase(userId);
+            } else {
+                // Aplica o estilo de nota baixa (vermelho)
+                gradeDisplay.classList.remove('grade-style');
+                gradeDisplay.classList.add('grade-style-red');
+                gradeDisplay.innerHTML = `Your Grade: ${grade}% - Minimum 70% required to pass.`;
+
+                if (isLinked) {
+                    gradeDisplay.innerHTML += "<br><span style='color: red;'>Please contact your teacher to allow you to retake the test.</span>";
+                } else {
+                    gradeDisplay.innerHTML += "<br><span style='color: red;'>You need to score at least 70% to pass. Please try again.</span>";
+                }
+            }
+        });
+    });
+}
+
+function saveGrade(userId, grade) {
+    const { level, unit } = getLevelAndUnitFromURL(); // Obtém o Level e Unit da URL
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+    // Verifica a nota existente e se o aluno está vinculado a um professor
+    dbRef.child('nota6').once('value').then(snapshot => {
+        const existingGrade = snapshot.val();
+
+        // Chama a função para verificar se o aluno está vinculado a um professor
+        isStudentLinkedToProfessor(userId).then(isLinked => {
+            // Se o aluno não estiver vinculado ou a nota for zero/nula, permite a atualização
+            if (!isLinked || !existingGrade || existingGrade === 0) {
+                dbRef.update({ nota6: grade })
+                    .then(() => console.log("Nota salva com sucesso."))
+                    .catch(error => console.error("Erro ao salvar a nota6:", error));
+            } else {
+                console.log("Nota já registrada. Somente o professor pode modificar.");
+            }
+        });
+    });
+}
+
+    function showModal() {
+        document.getElementById('completion-modal').style.display = 'block';
+        document.getElementById('overlay').style.display = 'block';
+    }
+
+    function closeModal() {
+        document.getElementById('completion-modal').style.display = 'none';
+        document.getElementById('overlay').style.display = 'none';
+    }
+
+    function ensureUserIsAuthenticated(callback) {
+        firebase.auth().onAuthStateChanged(function(user) {
+            if (user) {
+                callback(user.uid);
+            } else {
+                console.error("Usuário não autenticado");
+            }
+        });
+    }
+
+   async function updateNextPhase(userId) {
+    const currentPhase = getPhaseFromURL();
+    const { level, unit } = getLevelAndUnitFromURL();
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso`);
+
+    try {
+        if (currentPhase === "end") {
+            // Caso "end": cria um novo Level e define Unit1/fase1 como true
+            const nextLevelNumber = parseInt(level.replace('Level', '')) + 1;
+            const nextLevel = `Level${nextLevelNumber}`;
+            await dbRef.child(nextLevel).set({
+                Unit1: { fase1: true }
+            });
+            console.log(`Novo Level criado: ${nextLevel} com Unit1/fase1 liberada.`);
+
+        } else if (currentPhase === "last") {
+            // Caso "last": cria a próxima Unit e libera fase1
+            const nextUnitNumber = parseInt(unit.replace('Unit', '')) + 1;
+            const nextUnit = `Unit${nextUnitNumber}`;
+            await dbRef.child(`${level}/${nextUnit}`).set({
+                fase1: true
+            });
+            console.log(`Nova Unidade criada dentro de ${level}: ${nextUnit} com fase1 liberada.`);
+
+        } else {
+            // Caso fase intermediária: libera a próxima fase
+            const nextPhase = parseInt(currentPhase) + 1;
+            await dbRef.child(`${level}/${unit}`).update({
+                [`fase${currentPhase}`]: true, // Marca a fase atual como concluída
+                [`fase${nextPhase}`]: true     // Libera a próxima fase
+            });
+            console.log(`Fase atual concluída: ${level}/${unit}/fase${currentPhase}`);
+            console.log(`Próxima fase liberada: ${level}/${unit}/fase${nextPhase}`);
+        }
+    } catch (error) {
+        console.error("Erro ao atualizar o progresso da fase:", error);
+    }
+}
+
+    function getPhaseFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('fase'); 
+    }
+
+    function getLevelAndUnitFromURL() {
+        const url = window.location.pathname;
+        const parts = url.split('/');
+        const level = parts[1];
+        const unit = parts[2];
+        return { level, unit };
+    }
+
+    function generatePDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        const logo = new Image();
+        logo.src = 'Logo.png'; 
+
+        doc.addImage(logo, 'PNG', 90, 10, 30, 30); 
+
+        doc.setFontSize(20);
+        doc.text('Hannah Quiz', 105, 50, null, null, 'center');
+
+        doc.setFontSize(12);
+        doc.text('Name: ____________________________________', 20, 70);
+        doc.text('Date: _______________', 150, 70);
+
+        let yPosition = 90;
+
+        questions.forEach((q, index) => {
+            doc.setFontSize(14);
+            let questionText = `${index + 1}. ${q.question}`;
+            let textLines = doc.splitTextToSize(questionText, 180);  
+            let questionHeight = textLines.length * 10; 
+
+            if (yPosition + questionHeight > 280) {
+                doc.addPage();
+                yPosition = 20;
+            }
+
+            doc.text(textLines, 20, yPosition);
+            yPosition += questionHeight;
+
+            q.answers.forEach(answer => {
+                doc.setFontSize(12);
+                let answerText = answer;
+                let answerLines = doc.splitTextToSize(answerText, 180);
+                let answerHeight = answerLines.length * 10;
+
+                if (yPosition + answerHeight > 280) {
+                    doc.addPage();
+                    yPosition = 20;
+                }
+
+                doc.text(answerLines, 30, yPosition);
+                yPosition += answerHeight;
+            });
+
+            yPosition += 10; 
+        });
+
+        doc.save('QuizQuestionsWithLogo.pdf');
+    }
+
+    window.onload = loadQuestions;
+
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</body>
+</html>
