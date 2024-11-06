@@ -240,6 +240,9 @@ function selectAnswer(wordElem, word) {
 
     // Remove a nova escolha da área de opções
     wordElem.remove();
+
+    // Define sempre a borda padrão para garantir que não fique verde prematuramente
+    answerArea.style.border = "2px dashed #333";
 }
 
     // Função para remover uma resposta incorreta do campo de resposta e colocá-la de volta na área de opções
@@ -249,18 +252,13 @@ function removeAnswer() {
     if (answerArea.textContent) {
         const word = answerArea.textContent;
 
-        // Verifica se a resposta no campo está incorreta antes de movê-la de volta
-        if (userAnswers[currentQuestionIndex] !== questions[currentQuestionIndex].answer) {
-            answerArea.textContent = '';
-            delete userAnswers[currentQuestionIndex];
-            
-            // Adiciona de volta à área de opções apenas se não for uma resposta correta
-            if (!document.getElementById(`word-${word}`)) {
-                const wordElem = createClickableWord(word);
-                wordsContainer.appendChild(wordElem);
-            }
-        } else {
-            answerArea.style.border = "2px solid green"; // Mantém borda verde para respostas corretas
+        // Remove a resposta do campo de resposta e adiciona de volta ao contêiner de opções
+        answerArea.textContent = '';
+        delete userAnswers[currentQuestionIndex];
+        
+        if (!document.getElementById(`word-${word}`)) {
+            const wordElem = createClickableWord(word);
+            wordsContainer.appendChild(wordElem);
         }
     }
 }
@@ -307,10 +305,7 @@ function removeAnswer() {
     questions.forEach((q, index) => {
         // Verifica a resposta para cada pergunta
         if (userAnswers[index] === q.answer) {
-            // Mantém a borda verde para respostas corretas após a verificação
-            if (index === currentQuestionIndex) {
-                document.getElementById('answer-area').style.border = "2px solid green";
-            }
+            // Mantém a borda verde para respostas corretas após a verificação final
         } else {
             // Adiciona respostas incorretas de volta à área de opções
             allCorrect = false;
@@ -324,18 +319,31 @@ function removeAnswer() {
     if (allCorrect) {
         showModal("Congratulations! You have completed the phase.");
         console.log("Todas as respostas estão corretas. Atualizando progresso.");
-        updateProgressInDatabase(); // Verifique se esta linha está sendo chamada corretamente
+        updateProgressInDatabase(); // Atualiza progresso após todas as respostas estarem corretas
     } else {
         showModal("Some answers were incorrect. Try again!");
-        currentQuestionIndex = 0;
-        loadQuestion();
+        resetIncorrectAnswers(); // Limpa as respostas incorretas e reinicia a área de respostas
+        loadQuestion(); // Recarrega a questão para garantir que as respostas erradas foram removidas
     }
 }
 
-    function resetIncorrectAnswers() {
-        document.getElementById('words-container').innerHTML = '';
-        initializeActivity();
+function resetIncorrectAnswers() {
+    const answerArea = document.getElementById('answer-area');
+    const wordsContainer = document.getElementById('words-container');
+    
+    if (answerArea.textContent) {
+        const word = answerArea.textContent;
+
+        // Retorna a palavra para o contêiner de opções se for incorreta
+        if (userAnswers[currentQuestionIndex] !== questions[currentQuestionIndex].answer) {
+            if (!document.getElementById(`word-${word}`)) {
+                const wordElem = createClickableWord(word);
+                wordsContainer.appendChild(wordElem);
+            }
+            answerArea.textContent = '';
+        }
     }
+}
 
     function showModal(message) {
         document.getElementById("modal-message").textContent = message;
