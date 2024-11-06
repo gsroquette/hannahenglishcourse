@@ -308,6 +308,7 @@ firebase.auth().onAuthStateChanged(function(user) {
     let questions = [];
     let answeredQuestions = [];
     let speechSynthesisUtterance = null;
+    let selectedAnswers = [];
 
   async function loadQuestions() {
     try {
@@ -345,55 +346,63 @@ firebase.auth().onAuthStateChanged(function(user) {
 }
 
     function displayQuestion() {
-        const container = document.getElementById('quiz-container');
-        container.innerHTML = '';
+    const container = document.getElementById('quiz-container');
+    container.innerHTML = '';
 
-        const q = questions[currentQuestionIndex];
-        const questionDiv = document.createElement('div');
-        questionDiv.classList.add('question');
+    const q = questions[currentQuestionIndex];
+    const questionDiv = document.createElement('div');
+    questionDiv.classList.add('question');
 
-        // Cria e adiciona a imagem correspondente à questão
-        const questionImage = document.createElement('img');
-        questionImage.src = `../StoryCards/images/imagem${currentQuestionIndex + 1}.jpeg`;
-        questionImage.alt = `Imagem para a questão ${currentQuestionIndex + 1}`;
-        questionImage.style.width = '100%';  // Ajusta o tamanho conforme necessário
-        questionImage.style.maxHeight = '300px'; // Limite de altura opcional para evitar imagens muito grandes
-        questionDiv.appendChild(questionImage);
+    // Cria e adiciona a imagem correspondente à questão
+    const questionImage = document.createElement('img');
+    questionImage.src = `../StoryCards/images/imagem${currentQuestionIndex + 1}.jpeg`;
+    questionImage.alt = `Imagem para a questão ${currentQuestionIndex + 1}`;
+    questionImage.style.width = '100%';
+    questionImage.style.maxHeight = '300px';
+    questionDiv.appendChild(questionImage);
 
-        // Cria e adiciona o texto da pergunta
-        const questionText = document.createElement('p');
-        questionText.id = 'question-text';
-        questionText.innerText = `${currentQuestionIndex + 1}. ${q.question}`;
-        questionDiv.appendChild(questionText);
+    // Cria e adiciona o texto da pergunta
+    const questionText = document.createElement('p');
+    questionText.id = 'question-text';
+    questionText.innerText = `${currentQuestionIndex + 1}. ${q.question}`;
+    questionDiv.appendChild(questionText);
 
-        // Adiciona as opções de resposta
-        q.answers.forEach((answer) => {
-            const answerLabel = document.createElement('label');
-            answerLabel.innerHTML = `<input type="radio" name="question${currentQuestionIndex}" value="${answer[0]}" onclick="checkAnswer(this, '${answer[0]}')"> ${answer}`;
-            questionDiv.appendChild(answerLabel);
-        });
+    // Adiciona as opções de resposta e verifica se há uma seleção anterior
+    q.answers.forEach((answer) => {
+        const answerLabel = document.createElement('label');
+        // Verifica se esta opção foi selecionada anteriormente
+        const isChecked = selectedAnswers[currentQuestionIndex] === answer[0];
+        answerLabel.innerHTML = `<input type="radio" name="question${currentQuestionIndex}" value="${answer[0]}" onclick="selectAnswer('${answer[0]}')" ${isChecked ? 'checked' : ''}> ${answer}`;
+        questionDiv.appendChild(answerLabel);
+    });
 
-        container.appendChild(questionDiv);
-        updateNavigationButtons();
+    container.appendChild(questionDiv);
+    updateNavigationButtons();
 
-        // Adiciona o botão "Finalizar" na última pergunta
-        const btnGroup = document.querySelector('.btn-group');
-        if (currentQuestionIndex === questions.length - 1) {
-            if (!document.getElementById('finish-btn')) {
-                const finishButton = document.createElement('button');
-                finishButton.id = 'finish-btn';
-                finishButton.className = 'next-btn';
-                finishButton.innerText = 'Finish';
-                finishButton.onclick = checkCompletion;
-                btnGroup.appendChild(finishButton);
-            }
-        } else {
-            const finishButton = document.getElementById('finish-btn');
-            if (finishButton) {
-                finishButton.remove();
-            }
+    // Adiciona o botão "Finalizar" na última pergunta
+    const btnGroup = document.querySelector('.btn-group');
+    if (currentQuestionIndex === questions.length - 1) {
+        if (!document.getElementById('finish-btn')) {
+            const finishButton = document.createElement('button');
+            finishButton.id = 'finish-btn';
+            finishButton.className = 'next-btn';
+            finishButton.innerText = 'Finish';
+            finishButton.onclick = checkCompletion;
+            btnGroup.appendChild(finishButton);
+        }
+    } else {
+        const finishButton = document.getElementById('finish-btn');
+        if (finishButton) {
+            finishButton.remove();
         }
     }
+}
+
+// Função para registrar a resposta selecionada
+function selectAnswer(answer) {
+    selectedAnswers[currentQuestionIndex] = answer; // Armazena a resposta selecionada
+    checkAnswer(null, answer); // Verifica se a resposta está correta
+}
 
     function updateNavigationButtons() {
         document.getElementById('prev-btn').disabled = currentQuestionIndex === 0;
