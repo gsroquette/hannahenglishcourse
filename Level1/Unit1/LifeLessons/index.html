@@ -201,14 +201,15 @@
         loadQuestion();
     }
 
-    function createClickableWord(word) {
-        const wordElem = document.createElement('div');
-        wordElem.classList.add('clickable-word');
-        wordElem.textContent = word;
-        wordElem.onclick = () => selectAnswer(wordElem, word);
-        wordElem.id = `word-${word}`;
-        document.getElementById('words-container').appendChild(wordElem);
-    }
+   // Função que cria um elemento clicável para cada palavra
+function createClickableWord(word) {
+    const wordElem = document.createElement('div');
+    wordElem.classList.add('clickable-word');
+    wordElem.textContent = word;
+    wordElem.id = `word-${word}`;
+    wordElem.onclick = () => selectAnswer(wordElem, word);
+    return wordElem;
+}
 
   function selectAnswer(wordElem, word) {
     const answerArea = document.getElementById('answer-area');
@@ -239,17 +240,23 @@
     wordElem.remove(); // Remove a nova escolha da área de opções
 }
 
-    function removeAnswer() {
+    // Função para remover uma resposta incorreta do campo de resposta e colocá-la de volta na área de opções
+function removeAnswer() {
     const answerArea = document.getElementById('answer-area');
     const wordsContainer = document.getElementById('words-container');
     if (answerArea.textContent) {
         const word = answerArea.textContent;
-        
-        // Checa se a palavra está correta
+
+        // Verifica se a resposta no campo está incorreta antes de movê-la de volta
         if (userAnswers[currentQuestionIndex] !== questions[currentQuestionIndex].answer) {
             answerArea.textContent = '';
             delete userAnswers[currentQuestionIndex];
-            wordsContainer.appendChild(createClickableWord(word)); // Adiciona de volta apenas incorretas
+            
+            // Adiciona de volta à área de opções apenas se não for uma resposta correta
+            if (!document.getElementById(`word-${word}`)) {
+                const wordElem = createClickableWord(word);
+                wordsContainer.appendChild(wordElem);
+            }
         } else {
             answerArea.style.border = "2px solid green"; // Mantém borda verde para respostas corretas
         }
@@ -290,18 +297,28 @@
         }
     }
 
-    function checkAnswers() {
+   function checkAnswers() {
     let allCorrect = true;
-    for (let i = 0; i < questions.length; i++) {
+    const wordsContainer = document.getElementById('words-container');
+    wordsContainer.innerHTML = ""; // Limpa a área de opções para reconstruir apenas as incorretas.
+
+    questions.forEach((q, index) => {
         const answerArea = document.getElementById('answer-area');
-        if (userAnswers[i] === questions[i].answer) {
+        
+        // Se a resposta está correta, mantém a borda verde e não a adiciona de volta.
+        if (userAnswers[index] === q.answer) {
             answerArea.style.border = "2px solid green"; // Borda verde para resposta correta
         } else {
+            // Se a resposta está incorreta, redefine borda e adiciona de volta ao wordsContainer
             allCorrect = false;
-            delete userAnswers[i];
             answerArea.style.border = "2px dashed #333"; // Borda padrão para incorretas
+            if (!document.getElementById(`word-${q.answer}`)) {
+                const wordElem = createClickableWord(q.answer);
+                wordsContainer.appendChild(wordElem); // Recria elemento de opção para respostas incorretas
+            }
         }
-    }
+    });
+
     if (allCorrect) {
         showModal("Congratulations! You have completed the phase.");
         updateProgressInDatabase();
@@ -309,7 +326,6 @@
         showModal("Some answers were incorrect. Try again!");
         currentQuestionIndex = 0;
         loadQuestion();
-        resetIncorrectAnswers();
     }
 }
 
