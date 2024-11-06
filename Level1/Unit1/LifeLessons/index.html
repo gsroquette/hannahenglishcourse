@@ -223,25 +223,23 @@ function selectAnswer(wordElem, word) {
     const answerArea = document.getElementById('answer-area');
     const wordsContainer = document.getElementById('words-container');
 
-    // Verifica se já há uma resposta no campo de resposta
+    // Se já houver uma resposta no campo, devolve-a para a área de opções
     if (answerArea.textContent) {
         const currentAnswer = answerArea.textContent;
-
-        // Adiciona a resposta antiga de volta à área de opções
         if (!document.getElementById(`word-${currentAnswer}`)) {
             const previousAnswerElem = createClickableWord(currentAnswer);
             wordsContainer.appendChild(previousAnswerElem);
         }
     }
 
-    // Atualiza o campo de resposta com a nova escolha
+    // Atualiza o campo de resposta com a nova escolha e armazena
     answerArea.textContent = word;
     userAnswers[currentQuestionIndex] = word;
 
     // Remove a nova escolha da área de opções
     wordElem.remove();
 
-    // Define sempre a borda padrão para garantir que não fique verde prematuramente
+    // Sempre define a borda padrão após uma nova escolha
     answerArea.style.border = "2px dashed #333";
 }
 
@@ -249,13 +247,15 @@ function selectAnswer(wordElem, word) {
 function removeAnswer() {
     const answerArea = document.getElementById('answer-area');
     const wordsContainer = document.getElementById('words-container');
+
     if (answerArea.textContent) {
         const word = answerArea.textContent;
 
-        // Remove a resposta do campo de resposta e adiciona de volta ao contêiner de opções
+        // Remove a resposta do campo e adiciona de volta ao contêiner de opções
         answerArea.textContent = '';
         delete userAnswers[currentQuestionIndex];
-        
+
+        // Adiciona de volta se a resposta foi removida
         if (!document.getElementById(`word-${word}`)) {
             const wordElem = createClickableWord(word);
             wordsContainer.appendChild(wordElem);
@@ -263,19 +263,16 @@ function removeAnswer() {
     }
 }
 
-   function loadQuestion() {
+  function loadQuestion() {
     const questionObj = questions[currentQuestionIndex];
     document.getElementById('question-text').textContent = questionObj.question;
     const answerArea = document.getElementById('answer-area');
     answerArea.textContent = '';
-    
+
+    // Carrega a resposta do usuário, se existir, sem aplicar borda verde prematuramente
     if (userAnswers[currentQuestionIndex]) {
         answerArea.textContent = userAnswers[currentQuestionIndex];
-        if (userAnswers[currentQuestionIndex] === questionObj.answer) {
-            answerArea.style.border = "2px solid green"; // Borda verde para resposta correta
-        } else {
-            answerArea.style.border = "2px dashed #333"; // Borda padrão
-        }
+        answerArea.style.border = "2px dashed #333"; // Mantém a borda padrão até que todas as respostas estejam corretas
     } else {
         answerArea.style.border = "2px dashed #333"; // Borda padrão
     }
@@ -297,18 +294,17 @@ function removeAnswer() {
         }
     }
 
- function checkAnswers() {
+function checkAnswers() {
     let allCorrect = true;
     const wordsContainer = document.getElementById('words-container');
     wordsContainer.innerHTML = ""; // Limpa a área de opções para reconstruir apenas as incorretas
 
     questions.forEach((q, index) => {
-        // Verifica a resposta para cada pergunta
-        if (userAnswers[index] === q.answer) {
-            // Mantém a borda verde para respostas corretas após a verificação final
-        } else {
-            // Adiciona respostas incorretas de volta à área de opções
+        // Verifica se a resposta está correta
+        if (userAnswers[index] !== q.answer) {
             allCorrect = false;
+
+            // Adiciona as respostas incorretas de volta à área de opções
             if (!document.getElementById(`word-${q.answer}`)) {
                 const wordElem = createClickableWord(q.answer);
                 wordsContainer.appendChild(wordElem);
@@ -317,24 +313,26 @@ function removeAnswer() {
     });
 
     if (allCorrect) {
+        // Exibe borda verde apenas após todas as respostas estarem corretas
+        document.getElementById('answer-area').style.border = "2px solid green";
         showModal("Congratulations! You have completed the phase.");
-        console.log("Todas as respostas estão corretas. Atualizando progresso.");
-        updateProgressInDatabase(); // Atualiza progresso após todas as respostas estarem corretas
+        updateProgressInDatabase(); // Atualiza progresso após conclusão
     } else {
         showModal("Some answers were incorrect. Try again!");
-        resetIncorrectAnswers(); // Limpa as respostas incorretas e reinicia a área de respostas
-        loadQuestion(); // Recarrega a questão para garantir que as respostas erradas foram removidas
+        resetIncorrectAnswers(); // Reseta respostas incorretas e atualiza a área de respostas
+        currentQuestionIndex = 0; // Reinicia para a primeira questão
+        loadQuestion(); // Recarrega a primeira questão
     }
 }
 
 function resetIncorrectAnswers() {
     const answerArea = document.getElementById('answer-area');
     const wordsContainer = document.getElementById('words-container');
-    
+
     if (answerArea.textContent) {
         const word = answerArea.textContent;
 
-        // Retorna a palavra para o contêiner de opções se for incorreta
+        // Retorna a palavra ao contêiner se a resposta estiver incorreta
         if (userAnswers[currentQuestionIndex] !== questions[currentQuestionIndex].answer) {
             if (!document.getElementById(`word-${word}`)) {
                 const wordElem = createClickableWord(word);
@@ -343,6 +341,13 @@ function resetIncorrectAnswers() {
             answerArea.textContent = '';
         }
     }
+
+    // Remove todas as respostas incorretas armazenadas
+    Object.keys(userAnswers).forEach(index => {
+        if (userAnswers[index] !== questions[index].answer) {
+            delete userAnswers[index];
+        }
+    });
 }
 
     function showModal(message) {
