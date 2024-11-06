@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Life Lessons from the Bible</title>
+    <style>
+        body {
+            background-image: url('../../imagens/hanna_fundo.png');
+            background-repeat: repeat;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            min-height: 100vh;
+            margin: 0;
+        }
+        h1 {
+            margin-top: 20px;
+            text-align: center;
+        }
+        #questions-container {
+            width: 80%;
+            max-width: 600px;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        .draggable-word {
+            display: inline-block;
+            padding: 8px 12px;
+            background-color: #ddd;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            user-select: none;
+        }
+        #answer-area {
+            width: 100%;
+            min-height: 40px;
+            border: 2px dashed #333;
+            margin-top: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+        }
+        #nav-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+        }
+        #back-btn {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: #000;
+            color: #fff;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<button id="back-btn" onclick="goBack()">Back</button>
+
+<h1>Life Lessons from the Bible</h1>
+
+<div id="questions-container">
+    <div id="words-container"></div>
+    <p id="question-text">Loading...</p>
+    <div id="answer-area" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
+    
+    <div id="nav-buttons">
+        <button onclick="prevQuestion()">Previous</button>
+        <button onclick="nextQuestion()">Next</button>
+    </div>
+</div>
+
+<script>
+    let questions = [];
+    let currentQuestionIndex = 0;
+    let userAnswers = {};
+
+    // Load questions and answers from perguntas.txt
+    fetch('perguntas.txt')
+        .then(response => response.text())
+        .then(text => {
+            questions = text.trim().split('\n').map(line => {
+                const [question, answer] = line.split(';');
+                return { question: question.trim(), answer: answer.trim() };
+            });
+            initializeActivity();
+        });
+
+    function initializeActivity() {
+        const words = questions.map(q => q.answer).sort(() => Math.random() - 0.5);
+        words.forEach(word => createDraggableWord(word));
+        loadQuestion();
+    }
+
+    function createDraggableWord(word) {
+        const wordElem = document.createElement('div');
+        wordElem.classList.add('draggable-word');
+        wordElem.textContent = word;
+        wordElem.setAttribute('draggable', 'true');
+        wordElem.ondragstart = event => event.dataTransfer.setData('text', word);
+        document.getElementById('words-container').appendChild(wordElem);
+    }
+
+    function loadQuestion() {
+        const questionObj = questions[currentQuestionIndex];
+        document.getElementById('question-text').textContent = questionObj.question;
+
+        const answerArea = document.getElementById('answer-area');
+        answerArea.innerHTML = '';
+
+        if (userAnswers[currentQuestionIndex]) {
+            const answerElem = createAnswerElem(userAnswers[currentQuestionIndex]);
+            answerArea.appendChild(answerElem);
+        }
+    }
+
+    function createAnswerElem(text) {
+        const answerElem = document.createElement('div');
+        answerElem.classList.add('draggable-word');
+        answerElem.textContent = text;
+        answerElem.setAttribute('draggable', 'true');
+        answerElem.ondragstart = event => event.dataTransfer.setData('text', text);
+        return answerElem;
+    }
+
+    function allowDrop(event) {
+        event.preventDefault();
+    }
+
+    function drop(event) {
+        event.preventDefault();
+        const word = event.dataTransfer.getData('text');
+        const answerArea = document.getElementById('answer-area');
+
+        if (answerArea.children.length === 0) {
+            answerArea.appendChild(createAnswerElem(word));
+            userAnswers[currentQuestionIndex] = word;
+        } else {
+            document.getElementById('words-container').appendChild(answerArea.children[0]);
+            answerArea.appendChild(createAnswerElem(word));
+            userAnswers[currentQuestionIndex] = word;
+        }
+    }
+
+    function nextQuestion() {
+        if (currentQuestionIndex < questions.length - 1) {
+            currentQuestionIndex++;
+            loadQuestion();
+        } else {
+            checkAnswers();
+        }
+    }
+
+    function prevQuestion() {
+        if (currentQuestionIndex > 0) {
+            currentQuestionIndex--;
+            loadQuestion();
+        }
+    }
+
+    function checkAnswers() {
+        let allCorrect = true;
+        for (let i = 0; i < questions.length; i++) {
+            if (userAnswers[i] !== questions[i].answer) {
+                allCorrect = false;
+                delete userAnswers[i];
+            }
+        }
+        if (allCorrect) {
+            alert("Congratulations! You have completed the phase.");
+        } else {
+            alert("Some answers were incorrect. Try again!");
+            currentQuestionIndex = 0;
+            loadQuestion();
+            resetIncorrectAnswers();
+        }
+    }
+
+    function resetIncorrectAnswers() {
+        document.getElementById('words-container').innerHTML = '';
+        initializeActivity();
+    }
+
+    function goBack() {
+        window.history.back();
+    }
+</script>
+
+</body>
+</html>

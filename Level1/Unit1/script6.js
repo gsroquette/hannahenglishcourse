@@ -11,13 +11,13 @@ document.addEventListener('DOMContentLoaded', function() {
     let lastUnlockedIndex = -1;
 
     const activities = [
-        { id: 24, name: "Test", path: "../Unit1/Test/index.html?fase=24", img: "../../imagens/test.png", unlocked: false },
-        { id: 25, name: "Test1", path: "../Unit1/Testlistening/index.html?fase=25", img: "../../imagens/test.png", unlocked: false },   
-        { id: 26, name: "Test2", path: "../Unit1/Testword/index.html?fase=26", img: "../../imagens/test.png", unlocked: false },  
-        { id: 27, name: "Test3", path: "../Unit1/Testword1/index.html?fase=27", img: "../../imagens/test.png", unlocked: false },             
-        { id: 28, name: "Test4", path: "../Unit1/Testword2/index.html?fase=28", img: "../../imagens/test.png", unlocked: false },   
-        { id: 29, name: "Test5", path: "../Unit1/Testimagem/index.html?fase=29", img: "../../imagens/test.png", unlocked: false },     
-        { id: 30, name: "Test6", path: "../Unit1/Testlisteningimagem/index.html?fase=last", img: "../../imagens/test.png", unlocked: false },                 
+        { id: 25, name: "Test", path: "../Unit1/Test/index.html?fase=25", img: "../../imagens/test.png", unlocked: false },
+        { id: 26, name: "Test1", path: "../Unit1/Testlistening/index.html?fase=26", img: "../../imagens/test.png", unlocked: false },   
+        { id: 27, name: "Test2", path: "../Unit1/Testword/index.html?fase=27", img: "../../imagens/test.png", unlocked: false },  
+        { id: 28, name: "Test3", path: "../Unit1/Testword1/index.html?fase=28", img: "../../imagens/test.png", unlocked: false },             
+        { id: 29, name: "Test4", path: "../Unit1/Testword2/index.html?fase=29", img: "../../imagens/test.png", unlocked: false },   
+        { id: 30, name: "Test5", path: "../Unit1/Testimagem/index.html?fase=30", img: "../../imagens/test.png", unlocked: false },     
+        { id: 31, name: "Test6", path: "../Unit1/Testlisteningimagem/index.html?fase=last", img: "../../imagens/test.png", unlocked: false },                 
     ];
 
      // Fechar o dropdown ao clicar fora dele
