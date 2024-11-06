@@ -348,25 +348,40 @@ function removeAnswer() {
         document.getElementById("modal").style.display = "none";
     }
 
-    function updateProgressInDatabase() {
-        const url = new URL(window.location.href);
-        const params = new URLSearchParams(url.search);
-        const fase = params.get('fase');
-        const userId = firebase.auth().currentUser.uid;
-        const level = url.pathname.split('/')[3];  // Adjust path based on actual URL structure
-        const unit = url.pathname.split('/')[4];
+   function updateProgressInDatabase() {
+    const url = new URL(window.location.href);
+    const params = new URLSearchParams(url.search);
+    const fase = params.get('fase');
+    const userId = firebase.auth().currentUser ? firebase.auth().currentUser.uid : null;
+    const level = url.pathname.split('/')[3];  // Ajuste conforme a estrutura do URL
+    const unit = url.pathname.split('/')[4];
 
-        let path = `usuarios/${userId}/progresso/${level}/${unit}`;
-
-        if (fase === 'end') {
-            path += `/nextLevel/Unit1/fase1`;
-        } else if (fase === 'last') {
-            path += `/nextUnit/fase1`;
-        } else {
-            path += `/fase${parseInt(fase) + 1}`;
-        }
-        firebase.database().ref(path).set(true);
+    if (!userId) {
+        console.error("Usuário não autenticado.");
+        return;
     }
+
+    let path = `usuarios/${userId}/progresso/${level}/${unit}`;
+
+    let nextPath;
+    if (fase === 'end') {
+        nextPath = `${path}/nextLevel/Unit1/fase1`;
+    } else if (fase === 'last') {
+        nextPath = `${path}/nextUnit/fase1`;
+    } else {
+        const nextFase = parseInt(fase) + 1;
+        nextPath = `${path}/fase${nextFase}`;
+    }
+
+    // Libera a próxima fase no banco de dados
+    firebase.database().ref(nextPath).set(true)
+        .then(() => {
+            console.log("Próxima fase liberada:", nextPath);
+        })
+        .catch(error => {
+            console.error("Erro ao atualizar o progresso no banco de dados:", error);
+        });
+}
 
    function generatePDF() {
     const { jsPDF } = window.jspdf;
