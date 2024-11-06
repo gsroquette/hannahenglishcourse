@@ -210,25 +210,39 @@
         document.getElementById('words-container').appendChild(wordElem);
     }
 
-    function selectAnswer(wordElem, word) {
-        const answerArea = document.getElementById('answer-area');
-        if (!answerArea.textContent) {
-            answerArea.textContent = word;
-            userAnswers[currentQuestionIndex] = word;
-            wordElem.remove();
-        }
+   function selectAnswer(wordElem, word) {
+    const answerArea = document.getElementById('answer-area');
+    const wordsContainer = document.getElementById('words-container');
+
+    // Verifica se já há uma resposta no campo de resposta
+    if (answerArea.textContent) {
+        // Coloca a resposta atual de volta na área de opções
+        const currentAnswer = answerArea.textContent;
+        wordsContainer.appendChild(createClickableWord(currentAnswer));
     }
 
+    // Atualiza o campo de resposta com a nova escolha
+    answerArea.textContent = word;
+    userAnswers[currentQuestionIndex] = word;
+    wordElem.remove(); // Remove a nova escolha da área de opções
+}
+
     function removeAnswer() {
-        const answerArea = document.getElementById('answer-area');
-        const wordsContainer = document.getElementById('words-container');
-        if (answerArea.textContent) {
-            const word = answerArea.textContent;
+    const answerArea = document.getElementById('answer-area');
+    const wordsContainer = document.getElementById('words-container');
+    if (answerArea.textContent) {
+        const word = answerArea.textContent;
+        
+        // Checa se a palavra está correta
+        if (userAnswers[currentQuestionIndex] !== questions[currentQuestionIndex].answer) {
             answerArea.textContent = '';
             delete userAnswers[currentQuestionIndex];
-            wordsContainer.appendChild(createClickableWord(word));
+            wordsContainer.appendChild(createClickableWord(word)); // Adiciona de volta apenas incorretas
+        } else {
+            answerArea.style.border = "2px solid green"; // Mantém borda verde para respostas corretas
         }
     }
+}
 
     function loadQuestion() {
         const questionObj = questions[currentQuestionIndex];
@@ -257,23 +271,27 @@
     }
 
     function checkAnswers() {
-        let allCorrect = true;
-        for (let i = 0; i < questions.length; i++) {
-            if (userAnswers[i] !== questions[i].answer) {
-                allCorrect = false;
-                delete userAnswers[i];
-            }
-        }
-        if (allCorrect) {
-            showModal("Congratulations! You have completed the phase.");
-            updateProgressInDatabase();
+    let allCorrect = true;
+    for (let i = 0; i < questions.length; i++) {
+        const answerArea = document.getElementById('answer-area');
+        if (userAnswers[i] === questions[i].answer) {
+            answerArea.style.border = "2px solid green"; // Borda verde para resposta correta
         } else {
-            showModal("Some answers were incorrect. Try again!");
-            currentQuestionIndex = 0;
-            loadQuestion();
-            resetIncorrectAnswers();
+            allCorrect = false;
+            delete userAnswers[i];
+            answerArea.style.border = "2px dashed #333"; // Borda padrão para incorretas
         }
     }
+    if (allCorrect) {
+        showModal("Congratulations! You have completed the phase.");
+        updateProgressInDatabase();
+    } else {
+        showModal("Some answers were incorrect. Try again!");
+        currentQuestionIndex = 0;
+        loadQuestion();
+        resetIncorrectAnswers();
+    }
+}
 
     function resetIncorrectAnswers() {
         document.getElementById('words-container').innerHTML = '';
@@ -327,9 +345,13 @@
 
         // Adiciona um quadro com as opções de respostas no topo
         doc.setFontSize(12);
-        let answerOptions = questions.map(q => q.answer).join(", ");
-        let splitOptions = doc.splitTextToSize("Answer Options: " + answerOptions, 180);
-        doc.text(splitOptions, 10, 50);
+        // Embaralhar as opções de resposta antes de adicioná-las ao PDF
+          let answerOptions = questions.map(q => q.answer);
+          answerOptions = answerOptions.sort(() => Math.random() - 0.5); // Embaralha as opções
+          let shuffledOptions = answerOptions.join(", ");
+          let splitOptions = doc.splitTextToSize("Answer Options: " + shuffledOptions, 180);
+          doc.text(splitOptions, 10, 50);
+
 
         // Definições de layout e altura inicial
         let y = 60 + (splitOptions.length * 10); // Posiciona abaixo das opções de respostas
