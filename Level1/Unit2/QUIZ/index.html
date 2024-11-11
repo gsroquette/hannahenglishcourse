@@ -5,27 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hannah Quiz</title>
     <style>
+        /* Estilos existentes mantidos */
         body {
             font-family: Arial, sans-serif;
             margin: 20px;
-            background-color: white; /* Fundo branco */
+            background-image: url('../../../imagens/fundo.png');
+            background-repeat: repeat;
+            background-size: auto;
+            background-color: white;
         }
 
         h1 {
             text-align: center;
             font-size: 2.5em;
             color: #333;
-            margin-bottom: 20px; /* Diminui a margem inferior */
+            margin-bottom: 20px;
         }
 
         .gif-container {
-            display: none; /* Esconde o container inicialmente */
+            display: none;
             text-align: center;
-            margin-bottom: 20px; /* Aproxima o GIF das questões */
+            margin-bottom: 20px;
         }
 
         .gif-container img {
-            max-width: 500px; /* Aumenta o tamanho do GIF em 50% */
+            max-width: 500px;
         }
 
         .question-container {
@@ -34,11 +38,11 @@
         }
 
         .question {
-            margin-bottom: 10px; /* Aproxima ainda mais as questões dos botões */
+            margin-bottom: 10px;
             font-size: 1.2em;
             padding: 20px;
             text-align: left;
-            border: none; /* Retirando a borda branca ao redor */
+            border: none;
         }
 
         label {
@@ -51,7 +55,7 @@
             display: flex;
             justify-content: center;
             gap: 10px;
-            margin-top: 5px; /* Aproxima os botões das questões */
+            margin-top: 5px;
         }
 
         button {
@@ -96,20 +100,58 @@
         }
 
         audio {
-            display: none; /* Esconder a caixinha de execução do áudio */
+            display: none;
+        }
+
+        /* Modal de conclusão */
+        #completion-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border: 2px solid #333;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            text-align: center;
+        }
+
+        #completion-modal button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #333;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        #completion-modal button:hover {
+            background-color: #555;
+        }
+
+        #overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
         }
     </style>
 </head>
 <body>
-<button onclick="window.location.href='../index.html'" style="padding: 10px 20px; font-size: 1em; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; transition: background-color 0.3s ease;">
+<button onclick="window.history.back()" style="padding: 10px 20px; font-size: 1em; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; transition: background-color 0.3s ease;">
     Back
 </button>
-
 
 <h1>Hannah Quiz</h1>
 
 <div class="gif-container">
-    <img id="feedback-img" src="" alt="Feedback GIF"/> <!-- O GIF aparecerá aqui, aumentado em 50% -->
+    <img id="feedback-img" src="" alt="Feedback GIF"/>
 </div>
 
 <div class="question-container">
@@ -120,16 +162,66 @@
     <button class="read-btn" id="read-btn" onclick="readQuestion()">Read</button>
     <button class="prev-btn" id="prev-btn" onclick="stopReading(); showPreviousQuestion()">Previous</button>
     <button class="next-btn" id="next-btn" onclick="stopReading(); showNextQuestion()">Next</button>
-    <button class="pdf-btn" id="pdf-btn" onclick="generatePDF()">Generate PDF</button>
 </div>
 
 <div id="feedback" class="feedback">
-    <audio id="feedback-audio"></audio> <!-- O áudio ainda será reproduzido, mas não aparecerá na tela -->
+    <audio id="feedback-audio"></audio>
 </div>
 
+<!-- Modal de conclusão -->
+<div id="overlay"></div>
+<div id="completion-modal">
+    <h2>Phase Completed!</h2>
+    <p>Congratulations! You have completed this phase.</p>
+    <button onclick="closeModal()">Close</button>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
 <script>
+    // Configuração do Firebase
+    const firebaseConfig = {
+        apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+        authDomain: "hannahenglishcourse.firebaseapp.com",
+        projectId: "hannahenglishcourse",
+        storageBucket: "hannahenglishcourse.appspot.com",
+        messagingSenderId: "449818788486",
+        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+        measurementId: "G-07VVJG9LRS",
+        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+    };
+
+    // Inicializa o Firebase
+    firebase.initializeApp(firebaseConfig);
+
+// Função para exibir o botão PDF se o papel for 'professor' ou 'proprietario'
+function displayPdfButton(role) {
+    if (role === 'professor' || role === 'proprietario') {
+        const pdfButton = document.createElement('button');
+        pdfButton.className = 'pdf-btn';
+        pdfButton.id = 'pdf-btn';
+        pdfButton.textContent = 'Generate PDF';
+        pdfButton.onclick = generatePDF;
+        document.querySelector('.btn-group').appendChild(pdfButton);
+    }
+}
+
+// Obter o papel do usuário e exibir o botão condicionalmente
+firebase.auth().onAuthStateChanged(function(user) {
+    if (user) {
+        // Substitua o caminho abaixo conforme necessário para buscar o papel do usuário
+        firebase.database().ref('usuarios/' + user.uid + '/role').once('value').then((snapshot) => {
+            const role = snapshot.val();
+            displayPdfButton(role);
+        });
+    }
+});
+
     let currentQuestionIndex = 0;
     let questions = [];
+    let answeredQuestions = [];
     let speechSynthesisUtterance = null;
 
     async function loadQuestions() {
@@ -156,6 +248,7 @@
             questions.push(currentQuestion);
         }
 
+        answeredQuestions = new Array(questions.length).fill(false);
         displayQuestion();
     }
 
@@ -188,7 +281,7 @@
     }
 
     function showNextQuestion() {
-        hideGIF(); // Esconder o GIF ao mudar a pergunta
+        hideGIF();
         if (currentQuestionIndex < questions.length - 1) {
             currentQuestionIndex++;
             displayQuestion();
@@ -196,7 +289,7 @@
     }
 
     function showPreviousQuestion() {
-        hideGIF(); // Esconder o GIF ao mudar a pergunta
+        hideGIF();
         if (currentQuestionIndex > 0) {
             currentQuestionIndex--;
             displayQuestion();
@@ -211,38 +304,40 @@
         const gifContainer = document.querySelector('.gif-container');
 
         if (selectedAnswer === q.correct) {
-            feedbackImg.src = 'certo.gif';  // Certifique-se de que a imagem certa esteja correta
+            feedbackImg.src = 'certo.gif'; 
             feedbackAudio.src = 'certo.mp3';
-            feedbackAudio.play();  // O áudio será reproduzido sem aparecer na tela
+            feedbackAudio.play();
             feedbackDiv.style.display = 'block';
-            gifContainer.style.display = 'block';  // Exibir o GIF
+            gifContainer.style.display = 'block';
+            answeredQuestions[currentQuestionIndex] = true;
             setTimeout(() => {
                 hideGIF();
                 showNextQuestion();
-            }, 5000);
+                checkCompletion();
+            }, 2000);
         } else {
-            feedbackImg.src = 'errado.gif';  // Certifique-se de que a imagem errada esteja correta
+            feedbackImg.src = 'errado.gif'; 
             feedbackAudio.src = 'errado.mp3';
-            feedbackAudio.play();  // O áudio será reproduzido sem aparecer na tela
+            feedbackAudio.play();
             feedbackDiv.style.display = 'block';
-            gifContainer.style.display = 'block';  // Exibir o GIF
+            gifContainer.style.display = 'block';
             setTimeout(() => {
                 hideGIF();
                 radioElement.checked = false;
-            }, 5000);
+            }, 2000);
         }
     }
 
     function hideGIF() {
         const gifContainer = document.querySelector('.gif-container');
-        gifContainer.style.display = 'none';  // Esconder o GIF ao mudar a pergunta
+        gifContainer.style.display = 'none';
     }
 
     function readQuestion() {
         stopReading();
         const questionText = document.getElementById('question-text').innerText;
         speechSynthesisUtterance = new SpeechSynthesisUtterance(questionText);
-        speechSynthesisUtterance.lang = 'en-US'; // Configura o idioma para inglês
+        speechSynthesisUtterance.lang = 'en-US';
         speechSynthesis.speak(speechSynthesisUtterance);
     }
 
@@ -250,6 +345,83 @@
         if (speechSynthesisUtterance) {
             speechSynthesis.cancel();
         }
+    }
+
+    function checkCompletion() {
+        if (answeredQuestions.every((answered) => answered)) {
+            showModal();
+            ensureUserIsAuthenticated(updateNextPhase);
+        }
+    }
+
+    function showModal() {
+        document.getElementById('completion-modal').style.display = 'block';
+        document.getElementById('overlay').style.display = 'block';
+    }
+
+    function closeModal() {
+        document.getElementById('completion-modal').style.display = 'none';
+        document.getElementById('overlay').style.display = 'none';
+    }
+
+    function ensureUserIsAuthenticated(callback) {
+        firebase.auth().onAuthStateChanged(function(user) {
+            if (user) {
+                callback(user.uid);
+            } else {
+                console.error("Usuário não autenticado");
+            }
+        });
+    }
+
+    async function updateNextPhase(userId) {
+        const currentPhase = getPhaseFromURL(); 
+        const { level, unit } = getLevelAndUnitFromURL(); 
+        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso`);
+
+        try {
+            if (currentPhase === "end") {
+                // Criar nova Level
+                const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+                await dbRef.child(nextLevel).set({});
+                console.log(`Level ${nextLevel} criada.`);
+
+                // Criar Unit1/fase1 como true dentro da nova Level
+                await dbRef.child(`${nextLevel}/Unit1/fase1`).set(true);
+                console.log(`Unit1/fase1 criada como true dentro de ${nextLevel}.`);
+            } else if (currentPhase === "last") {
+                const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+                // Primeiro, cria a nova Unit
+                await dbRef.child(`${level}/${nextUnit}`).set({});
+                console.log(`Unit ${nextUnit} criada dentro de ${level}.`);
+
+                // Em seguida, adiciona a fase1 como true dentro da nova Unit
+                await dbRef.child(`${level}/${nextUnit}/fase1`).set(true);
+                console.log(`Fase1 marcada como true dentro de ${nextUnit}.`);
+            } else {
+                const nextPhase = parseInt(currentPhase) + 1;
+                await dbRef.child(`${level}/${unit}`).update({ 
+                    [`fase${currentPhase}`]: true, 
+                    [`fase${nextPhase}`]: true 
+                });
+                console.log(`Fase ${currentPhase} marcada como concluída e fase ${nextPhase} liberada.`);
+            }
+        } catch (error) {
+            console.error("Erro ao atualizar o progresso da fase:", error);
+        }
+    }
+
+    function getPhaseFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('fase'); 
+    }
+
+    function getLevelAndUnitFromURL() {
+        const url = window.location.pathname;
+        const parts = url.split('/');
+        const level = parts[1];
+        const unit = parts[2];
+        return { level, unit };
     }
 
     function generatePDF() {
@@ -306,10 +478,9 @@
     }
 
     window.onload = loadQuestions;
+
 </script>
 
-<!-- Including jsPDF library to handle PDF generation -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
 </body>
 </html>

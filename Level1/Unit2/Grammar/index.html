@@ -11,6 +11,8 @@
             margin: 0;
             padding: 20px;
             line-height: 1.6;
+            background-image: url('../../../imagens/fundo.png');
+            background-repeat: repeat;
         }
         .container {
             max-width: 800px;
@@ -40,7 +42,7 @@
             text-align: center;
             color: #333;
             font-size: 2rem;
-            margin-top: 70px; /* Ajuste para evitar sobreposição */
+            margin-top: 70px;
         }
         h2 {
             background-color: #28a745;
@@ -60,12 +62,6 @@
             margin: 0;
             padding: 10px 0;
             font-size: 1.2rem;
-        }
-        .section ul {
-            padding-left: 20px;
-        }
-        .section ul li {
-            margin: 5px 0;
         }
         .btn-download {
             display: block;
@@ -134,50 +130,6 @@
             background-color: #f0f0f0;
             box-shadow: 3px 3px 7px rgba(0, 0, 0, 0.2);
         }
-        @media (max-width: 768px) {
-            .container {
-                padding: 15px;
-            }
-            .back-button {
-                top: 10px;
-                left: 10px;
-            }
-            h1 {
-                font-size: 1.5rem;
-                margin-top: 90px; /* Ajuste para evitar sobreposição */
-            }
-            h2 {
-                font-size: 1.25rem;
-            }
-            .button-container img {
-                max-width: 80px;
-                max-height: 80px;
-            }
-        }
-        @media (max-width: 480px) {
-            .container {
-                padding: 10px;
-            }
-            .back-button {
-                top: 5px;
-                left: 5px;
-            }
-            h1 {
-                font-size: 1.25rem;
-                margin-top: 100px; /* Ajuste para evitar sobreposição */
-            }
-            h2 {
-                font-size: 1.1rem;
-            }
-            .btn-download {
-                font-size: 1rem;
-                padding: 12px;
-            }
-            .button-container img {
-                max-width: 60px;
-                max-height: 60px;
-            }
-        }
     </style>
 </head>
 <body>
@@ -202,7 +154,29 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
 <script>
+    // Configuração do Firebase
+    const firebaseConfig = {
+        apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+        authDomain: "hannahenglishcourse.firebaseapp.com",
+        projectId: "hannahenglishcourse",
+        storageBucket: "hannahenglishcourse.appspot.com",
+        messagingSenderId: "449818788486",
+        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+        measurementId: "G-07VVJG9LRS",
+        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+    };
+
+    // Inicializa o Firebase
+    firebase.initializeApp(firebaseConfig);
+
+    let totalAnswers = 0;
+    let clickedAnswers = 0;
+
     function loadTextFile() {
         fetch('texto.txt')
             .then(response => response.text())
@@ -221,14 +195,11 @@
                         }
                         currentSection = line.replace('# ', '');
                         htmlContent += `<div class="section"><h2>${currentSection}</h2>`;
-                    } else if (line.startsWith('Subtitle: ')) {
-                        htmlContent += `<h2>${line.replace('Subtitle: ', '')}</h2>`;
-                    } else if (line.startsWith('Text: ')) {
-                        htmlContent += `<p>${line.replace('Text: ', '')}</p>`;
                     } else if (line.includes('[Answer:')) {
                         const [question, answer] = line.split('[Answer:');
                         const cleanedAnswer = answer.replace(']', '').trim();
-                        htmlContent += `<p>${question.trim()} <button class="show-answer-btn" onclick="showAnswer(this.nextElementSibling)">Answer</button><span class="answer" style="display:none;">${cleanedAnswer}</span></p>`;
+                        htmlContent += `<p>${question.trim()} <button class="show-answer-btn" onclick="handleAnswerClick(this)">Answer</button><span class="answer" style="display:none;">${cleanedAnswer}</span></p>`;
+                        totalAnswers++;
                     } else {
                         htmlContent += `<p>${line}</p>`;
                     }
@@ -239,8 +210,64 @@
             .catch(error => console.error('Error loading the text file:', error));
     }
 
-    function showAnswer(answerElement) {
-        answerElement.style.display = 'inline';
+    function handleAnswerClick(button) {
+        const answerElement = button.nextElementSibling;
+        if (answerElement.style.display === 'none') {
+            answerElement.style.display = 'inline';
+            clickedAnswers++;
+
+            if (clickedAnswers === totalAnswers) {
+                markActivityAsCompleted();
+            }
+        }
+    }
+
+    function markActivityAsCompleted() {
+        console.log("Atividade concluída!");
+        ensureUserIsAuthenticated(updateNextPhase);
+    }
+
+    function ensureUserIsAuthenticated(callback) {
+        firebase.auth().onAuthStateChanged(function(user) {
+            if (user) {
+                callback(user.uid);
+            } else {
+                console.error("Usuário não autenticado");
+            }
+        });
+    }
+
+    async function updateNextPhase(userId) {
+        const currentPhase = getPhaseFromURL();
+        const { level, unit } = getLevelAndUnitFromURL();
+        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+        
+        try {
+            if (currentPhase === "last") {
+                const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+                await dbRef.child(nextUnit).set({ fase1: true });
+            } else if (currentPhase === "end") {
+                const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+                await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+            } else {
+                const nextPhase = parseInt(currentPhase) + 1;
+                await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
+            }
+        } catch (error) {
+            console.error("Erro ao atualizar o progresso da fase:", error);
+        }
+    }
+
+    function getPhaseFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('fase');
+    }
+
+    function getLevelAndUnitFromURL() {
+        const url = window.location.pathname.split('/');
+        const level = url[1];
+        const unit = url[2];
+        return { level, unit };
     }
 
     function generatePDF() {
@@ -252,45 +279,24 @@
                 const lines = data.split('\n');
                 let y = 20;
                 const margin = 20;
-                const maxWidth = 170; // Largura máxima para o texto
+                const maxWidth = 170;
 
-                doc.addImage('Logo.png', 'PNG', 90, y, 30, 30); // Logo reduzida
+                doc.addImage('Logo.png', 'PNG', 90, y, 30, 30);
                 y += 40;
                 doc.setFontSize(12);
                 doc.text("Name: ____________________________  Date: _______________", margin, y);
                 y += 20;
 
                 lines.forEach(line => {
-                    const textWithoutAnswer = line.replace(/\[Answer:.*?\]/g, '');  // Remover qualquer [Answer: ...]
+                    const textWithoutAnswer = line.replace(/\[Answer:.*?\]/g, '');
 
                     if (line.startsWith('Title: ')) {
                         doc.setFontSize(16);
                         doc.text(line.replace('Title: ', ''), margin, y);
                         y += 20;
-                    } else if (line.startsWith('# ')) {
-                        if (y > doc.internal.pageSize.height - margin) {
-                            doc.addPage();
-                            y = margin;
-                        }
-                        doc.setFontSize(14);
-                        doc.text(line.replace('# ', ''), margin, y);
-                        y += 10;
-                    } else if (line.startsWith('Subtitle: ')) {
-                        doc.setFontSize(14);
-                        doc.text(line.replace('Subtitle: ', ''), margin, y);
-                        y += 10;
-                    } else if (line.includes('_______')) {  // Linhas com espaços sublinhados
-                        doc.setFontSize(12);
-                        doc.text(textWithoutAnswer.trim(), margin, y);
-                        y += 10;
-                    } else if (line.startsWith('Text: ') || line.includes('→')) { // Outras linhas de exercícios
-                        doc.setFontSize(12);
-                        const textLines = doc.splitTextToSize(textWithoutAnswer.replace('Text: ', ''), maxWidth);
-                        doc.text(textLines, margin, y);
-                        y += textLines.length * 10; 
                     } else {
                         doc.setFontSize(12);
-                        const textLines = doc.splitTextToSize(textWithoutAnswer, maxWidth); 
+                        const textLines = doc.splitTextToSize(textWithoutAnswer, maxWidth);
                         doc.text(textLines, margin, y);
                         y += textLines.length * 10; 
                     }
@@ -308,7 +314,7 @@
 
     function loadProfessorButtons() {
         const buttonContainer = document.querySelector('.button-container');
-        const maxProfessors = 10; // Número máximo de imagens de professores
+        const maxProfessors = 10;
 
         for (let i = 1; i <= maxProfessors; i++) {
             const imgPath = `professores/professor${i}.png`;
@@ -319,7 +325,7 @@
                 img.alt = `Professor ${i}`;
                 button.appendChild(img);
                 button.onclick = function() {
-                    window.location.href = `aulas/aula${i}/index.html`; // Caminho para o HTML correspondente
+                    window.location.href = `aulas/aula${i}/index.html`;
                 };
                 buttonContainer.appendChild(button);
             };
@@ -334,7 +340,7 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         loadTextFile();
-        loadProfessorButtons(); // Chama a função para carregar os botões
+        loadProfessorButtons();
     });
 </script>
 

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hannah Matching Game</title>
     <style>
-        /* Estilo atualizado e adicionado para a exibição da imagem e texto */
+        /* Estilo completo, sem alterações */
         body {
             font-family: 'Times New Roman', Times, serif;
             background-color: #f3e5f5;
@@ -16,7 +16,7 @@
             align-items: center;
             justify-content: center;
             min-height: 100vh;
-            overflow-x: hidden; /* Evita rolagem lateral */
+            overflow-x: hidden;
         }
 
         h1 {
@@ -181,14 +181,80 @@
             background-color: #7b1fa2;
             transform: scale(1.05);
         }
+#overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: none;
+    z-index: 1000;
+}
+
+#completion-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    text-align: center;
+    display: none;
+    z-index: 1001;
+}
+
+#completion-modal h2 {
+    margin-top: 0;
+    font-size: 2rem;
+    color: #32CD32;
+}
+
+#completion-modal p {
+    font-size: 1.2rem;
+    margin: 10px 0;
+}
+
+#completion-modal button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    font-size: 1rem;
+    cursor: pointer;
+    border: none;
+    border-radius: 5px;
+    background-color: #32CD32;
+    color: white;
+    transition: background-color 0.3s ease;
+}
+
+#completion-modal button:hover {
+    background-color: #28a428;
+}
+#pdfButton {
+    padding: 10px 20px;
+    font-size: 1.2em;
+    background-color: #8e24aa;
+    color: #ffffff;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+    transition: background-color 0.3s ease, transform 0.3s ease;
+}
+
+#pdfButton:hover {
+    background-color: #7b1fa2;
+    transform: scale(1.05);
+}
     </style>
 </head>
 <body>
-
-<button onclick="window.location.href='../index.html'" class="back-btn">
-    Back
+<button onclick="window.history.back()" class="back-btn">Back</button>
 </button>
-
+<button id="pdfButton" class="pdf-btn" onclick="generatePDF()" style="display: none;">Generate PDF</button>
+     
 <h1>Hannah Matching Game</h1>
 
 <div class="container">
@@ -201,6 +267,12 @@
             <!-- Explanations will be loaded here dynamically -->
         </div>
     </div>
+<!-- Modal de conclusão -->
+<div id="overlay" style="display: none;"></div>
+<div id="completion-modal" style="display: none;">
+    <h2>Phase Completed!</h2>
+    <p>Congratulations! You have completed this phase.</p>
+    <button onclick="closeModal()">Close</button>
 </div>
 
 <!-- Container para mostrar a imagem e o texto -->
@@ -212,60 +284,101 @@
 </div>
 
 <button class="restart-btn" onclick="restartGame()">Restart Game</button>
-
 <div id="try-again" class="try-again" style="display:none;">Try Again!</div>
 
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+
 <script>
-    let lessonData = [];
-    let selectedLeftItem = null;
-    let currentAnimatedItem = null;
-    let currentUtterance = null;  // Para rastrear a leitura atual
+    // Configuração do Firebase
+    const firebaseConfig = {
+        apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+        authDomain: "hannahenglishcourse.firebaseapp.com",
+        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "hannahenglishcourse",
+        storageBucket: "hannahenglishcourse.appspot.com",
+        messagingSenderId: "449818788486",
+        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707"
+    };
 
-    // Carregar as lições e explicações dinamicamente do arquivo texto.txt
-    fetch('texto.txt')
-        .then(response => response.text())
-        .then(data => {
-            const lines = data.split('\n');
+    // Inicialização do Firebase
+    firebase.initializeApp(firebaseConfig);
 
-            // Montar o array de lições e explicações
-            lines.forEach((line, index) => {
-                const [type, lesson, explanation] = line.split('|');
-                if (type === 'lesson') {
-                    lessonData.push({
-                        img: `imagens/imagem${index + 1}.png`,
-                        title: lesson,
-                        text: explanation,
-                        matchIndex: index + 1 // Guarda o índice original
-                    });
+    // Exibir botão PDF para roles específicos
+    firebase.auth().onAuthStateChanged((user) => {
+        if (user) {
+            const userId = user.uid;
+            const userRoleRef = firebase.database().ref(`usuarios/${userId}/role`);
+
+            userRoleRef.once('value').then((snapshot) => {
+                const role = snapshot.val();
+                if (role === 'professor' || role === 'proprietário') {
+                    document.getElementById("pdfButton").style.display = "inline-block";
                 }
+            }).catch((error) => {
+                console.error("Erro ao buscar o role do usuário:", error);
             });
+        } else {
+            console.log("Nenhum usuário autenticado.");
+        }
+    });
 
-            // Embaralhar as lições e explicações independentemente
-            const shuffledLessons = shuffleArray([...lessonData]);
-            const shuffledExplanations = shuffleArray([...lessonData]);
+    // Carregar dados das lições
+    document.addEventListener("DOMContentLoaded", function() {
+        loadLessonData();
+    });
 
-            // Preencher as colunas com as lições e explicações embaralhadas
-            const lessonsContainer = document.getElementById('lessons');
-            const explanationsContainer = document.getElementById('explanations');
+    let lessonData = []; // Declaração única de lessonData
 
-            shuffledLessons.forEach(item => {
-                const lessonDiv = document.createElement('div');
-                lessonDiv.classList.add('list-item');
-                lessonDiv.textContent = item.title;
-                lessonDiv.dataset.match = item.matchIndex;
-                lessonDiv.onclick = () => selectLeftItem(lessonDiv);
-                lessonsContainer.appendChild(lessonDiv);
-            });
+    function loadLessonData() {
+        return fetch('https://hannahenglishcourse.vercel.app/Level1/Unit1/MatchingGame/texto.txt')
+            .then(response => response.text())
+            .then(data => {
+                const lines = data.split('\n').filter(line => line.trim() !== '');
+                lines.forEach((line, index) => {
+                    const [type, lesson, explanation] = line.split('|').map(item => item.trim());
+                    if (type === 'lesson' && lesson && explanation) {
+                        lessonData.push({
+                            img: `imagens/imagem${index + 1}.png`,
+                            title: lesson,
+                            text: explanation,
+                            matchIndex: index + 1
+                        });
+                    }
+                });
+                displayLessonsAndExplanations();
+            })
+            .catch(error => console.error("Erro ao carregar os dados:", error));
+    }
 
-            shuffledExplanations.forEach(item => {
-                const explanationDiv = document.createElement('div');
-                explanationDiv.classList.add('drop-zone');
-                explanationDiv.textContent = item.text;
-                explanationDiv.dataset.match = item.matchIndex;
-                explanationDiv.onclick = () => selectRightItem(explanationDiv);
-                explanationsContainer.appendChild(explanationDiv);
-            });
+    function displayLessonsAndExplanations() {
+        const shuffledLessons = shuffleArray([...lessonData]);
+        const shuffledExplanations = shuffleArray([...lessonData]);
+
+        const lessonsContainer = document.getElementById('lessons');
+        const explanationsContainer = document.getElementById('explanations');
+
+        shuffledLessons.forEach(item => {
+            const lessonDiv = document.createElement('div');
+            lessonDiv.classList.add('list-item');
+            lessonDiv.textContent = item.title;
+            lessonDiv.dataset.match = item.matchIndex;
+            lessonDiv.onclick = () => selectLeftItem(lessonDiv);
+            lessonsContainer.appendChild(lessonDiv);
         });
+
+        shuffledExplanations.forEach(item => {
+            const explanationDiv = document.createElement('div');
+            explanationDiv.classList.add('drop-zone');
+            explanationDiv.textContent = item.text;
+            explanationDiv.dataset.match = item.matchIndex;
+            explanationDiv.onclick = () => selectRightItem(explanationDiv);
+            explanationsContainer.appendChild(explanationDiv);
+        });
+    }
 
     function shuffleArray(array) {
         for (let i = array.length - 1; i > 0; i--) {
@@ -275,93 +388,224 @@
         return array;
     }
 
-    function removeCurrentAnimatedItem() {
-        if (currentAnimatedItem) {
-            currentAnimatedItem.classList.add('fade-out');
-            setTimeout(() => {
-                currentAnimatedItem.style.display = 'none';
-                currentAnimatedItem = null;
-            }, 500);
-        }
+  let selectedLeftItem = null;
+
+function selectLeftItem(element) {
+    if (selectedLeftItem) {
+        selectedLeftItem.classList.remove('selected');
     }
+    selectedLeftItem = element;
+    element.classList.add('selected');
+}
 
-    function selectLeftItem(element) {
-        removeCurrentAnimatedItem();
-        if (selectedLeftItem) {
-            selectedLeftItem.classList.remove('selected');
-        }
-        selectedLeftItem = element;
-        element.classList.add('selected');
-        resetWrongSelections();  // Reseta as seleções erradas
-        speakText(element.textContent);
-    }
+function selectRightItem(element) {
+    if (!selectedLeftItem) return;
 
-    function selectRightItem(element) {
-        removeCurrentAnimatedItem();
-        if (!selectedLeftItem) return;
-
-        if (selectedLeftItem.dataset.match === element.dataset.match) {
-            speakText(element.textContent);
-            animateCorrectMatch(element);
-            selectedLeftItem.classList.add('used');
-            selectedLeftItem.classList.remove('selected');
-            showLessonData(selectedLeftItem.dataset.match - 1);  // Mostrar imagem e texto correspondente
-            document.getElementById('try-again').style.display = 'none'; // Esconde "Try Again"
-        } else {
-            element.classList.add('wrong');
-            document.getElementById('try-again').style.display = 'block'; // Mostra "Try Again"
-            selectedLeftItem.classList.remove('selected');
-            selectedLeftItem = null;
-            speakText("Try Again");
-        }
-    }
-
-    function animateCorrectMatch(element) {
+    if (selectedLeftItem.dataset.match === element.dataset.match) {
+        // Correspondência correta
         element.classList.add('correct');
-        currentAnimatedItem = element;
-    }
+        selectedLeftItem.classList.add('used');
+        selectedLeftItem.classList.remove('selected');
+        
+        // Mostrar imagem e texto da lição correspondente
+        showLessonData(selectedLeftItem.dataset.match - 1);
 
-    function resetWrongSelections() {
-        const wrongElements = document.querySelectorAll('.wrong');
-        wrongElements.forEach(element => {
+        selectedLeftItem = null;
+        checkCompletion(); // Verifica se todas as correspondências foram feitas
+    } else {
+        // Correspondência incorreta
+        element.classList.add('wrong');
+        setTimeout(() => {
             element.classList.remove('wrong');
-        });
+        }, 1000);
     }
+}
 
-    function speakText(text) {
-        window.speechSynthesis.cancel();  // Interrompe qualquer leitura anterior
-        if (currentUtterance) {
-            currentUtterance.onend = null;  // Remove o listener anterior, se houver
-        }
-        currentUtterance = new SpeechSynthesisUtterance(text);
-        currentUtterance.lang = 'en-US';
-        window.speechSynthesis.speak(currentUtterance);
-    }
+// Função para exibir imagem e texto da lição
+function showLessonData(index) {
+    const data = lessonData[index];
+    const imageContainer = document.getElementById('image-container');
+    const lessonImage = document.getElementById('lesson-image');
+    const lessonTitle = document.getElementById('lesson-title');
+    const lessonText = document.getElementById('lesson-text');
 
-    function showLessonData(index) {
-        const data = lessonData[index];
-        const imageContainer = document.getElementById('image-container');
-        const lessonImage = document.getElementById('lesson-image');
-        const lessonTitle = document.getElementById('lesson-title');
-        const lessonText = document.getElementById('lesson-text');
+    lessonImage.src = data.img;
+    lessonTitle.textContent = data.title;
+    lessonText.textContent = data.text;
 
-        lessonImage.src = data.img;
-        lessonTitle.textContent = data.title;
-        lessonText.textContent = data.text;
+    imageContainer.style.display = 'flex';
+}
 
-        imageContainer.style.display = 'flex';
-
-        // Ler o texto em voz alta
-        speakText(data.text);
-    }
-
-    function closeImage() {
-        const imageContainer = document.getElementById('image-container');
-        imageContainer.style.display = 'none';
-    }
+// Função para fechar a imagem
+function closeImage() {
+    const imageContainer = document.getElementById('image-container');
+    imageContainer.style.display = 'none';
+}
 
     function restartGame() {
         window.location.reload();
+    }
+
+function generatePDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    // Caminho da logo
+    const logoPath = '../../../../imagens/hannah_logo.png';
+
+    const logo = new Image();
+    logo.src = logoPath;
+
+    logo.onload = function() {
+        // Adiciona a logo ao PDF
+        doc.addImage(logo, 'PNG', 10, 10, 30, 30);
+
+        // Adiciona o título e as linhas para "Name" e "Date"
+        doc.setFontSize(12);
+        doc.text("Name: ____________________________________________ Date: __________", 50, 20);
+
+        // Adiciona o título abaixo
+        doc.setFontSize(16);
+        doc.text("Hannah Matching Game", doc.internal.pageSize.width / 2, 50, { align: "center" });
+
+        let yOffset = 70; // Posição inicial vertical
+        const lineSpacing = 10; // Espaço entre linhas
+
+        const leftItems = Array.from(document.querySelectorAll('#lessons .list-item'));
+        const rightItems = Array.from(document.querySelectorAll('#explanations .drop-zone'));
+
+        // Primeira coluna: Perguntas com numeração
+        doc.setFontSize(12);
+        leftItems.forEach((leftItem, index) => {
+            if (yOffset > 270) { // Adiciona uma nova página se o conteúdo ultrapassar o limite da página
+                doc.addPage();
+                yOffset = 20;
+            }
+
+            // Adiciona o item da coluna da esquerda com numeração
+            doc.text(`${index + 1}. ${leftItem.textContent}`, 20, yOffset);
+            yOffset += lineSpacing; // Move para a próxima linha
+        });
+
+        yOffset = 70; // Reseta o Y para alinhar a segunda coluna no topo
+
+        // Segunda coluna: Respostas sem numeração e com quebras de linha automáticas
+        rightItems.forEach((rightItem) => {
+            if (yOffset > 270) {
+                doc.addPage();
+                yOffset = 20;
+            }
+
+            // Ajuste o valor de `x` para mover a coluna mais à direita
+            const lines = doc.splitTextToSize(`(____) ${rightItem.textContent}`, 90); // Ajusta o limite para 90 unidades de largura
+
+            lines.forEach((line) => {
+                doc.text(line, 110, yOffset); // Posição ajustada para a coluna da direita
+                yOffset += lineSpacing; // Espaçamento entre as linhas
+            });
+        });
+
+        doc.save("Hannah_Matching_Game.pdf");
+    };
+
+    logo.onerror = function() {
+        doc.setFontSize(12);
+        doc.text("Name: ____________________________________________ Date: __________", 50, 20);
+        doc.setFontSize(16);
+        doc.text("Hannah Matching Game", doc.internal.pageSize.width / 2, 50, { align: "center" });
+
+        let yOffset = 70;
+        const lineSpacing = 10;
+
+        const leftItems = Array.from(document.querySelectorAll('#lessons .list-item'));
+        const rightItems = Array.from(document.querySelectorAll('#explanations .drop-zone'));
+
+        doc.setFontSize(12);
+        leftItems.forEach((leftItem, index) => {
+            if (yOffset > 270) {
+                doc.addPage();
+                yOffset = 20;
+            }
+            doc.text(`${index + 1}. ${leftItem.textContent}`, 20, yOffset);
+            yOffset += lineSpacing;
+        });
+
+        yOffset = 70;
+
+        rightItems.forEach((rightItem) => {
+            if (yOffset > 270) {
+                doc.addPage();
+                yOffset = 20;
+            }
+            const lines = doc.splitTextToSize(`(____) ${rightItem.textContent}`, 90);
+            lines.forEach((line) => {
+                doc.text(line, 110, yOffset);
+                yOffset += lineSpacing;
+            });
+        });
+
+        doc.save("Hannah_Matching_Game.pdf");
+    };
+}
+
+    function checkCompletion() {
+        const allItems = document.querySelectorAll('.list-item.used');
+        const totalItems = document.querySelectorAll('.list-item').length;
+
+        if (allItems.length === totalItems) {
+            showCompletionModal();
+            updateProgressInDatabase();
+        }
+    }
+
+    function showCompletionModal() {
+        document.getElementById('overlay').style.display = 'block';
+        document.getElementById('completion-modal').style.display = 'block';
+    }
+
+    function closeModal() {
+        document.getElementById('overlay').style.display = 'none';
+        document.getElementById('completion-modal').style.display = 'none';
+    }
+
+    function getPhaseFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('fase');
+    }
+
+    function getLevelAndUnitFromURL() {
+        const url = window.location.pathname;
+        const parts = url.split('/');
+        return { level: parts[1], unit: parts[2] };
+    }
+
+    function updateProgressInDatabase() {
+        const currentPhase = getPhaseFromURL();
+        const { level, unit } = getLevelAndUnitFromURL();
+        
+        firebase.auth().onAuthStateChanged(function(user) {
+            if (user) {
+                const userId = user.uid;
+                const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+                if (currentPhase === "last") {
+                    const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+                    dbRef.parent.child(nextUnit).set({ fase1: true });
+                } else if (currentPhase === "end") {
+                    const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+                    firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+                } else {
+                    const phaseNumber = parseInt(currentPhase);
+                    if (!isNaN(phaseNumber)) {
+                        dbRef.update({ [`fase${currentPhase}`]: true });
+                        const nextPhase = phaseNumber + 1;
+                        dbRef.update({ [`fase${nextPhase}`]: true });
+                    }
+                }
+            } else {
+                console.error("Usuário não autenticado");
+            }
+        });
     }
 </script>
 </body>

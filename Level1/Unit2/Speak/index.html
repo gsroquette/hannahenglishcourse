@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -48,7 +48,7 @@
         }
         .word.enlarged {
             transform: scale(1.5);
-            color: #DAA520; /* Amarelo escuro */
+            color: #DAA520;
             font-weight: bold;
         }
         .result {
@@ -120,12 +120,48 @@
             margin-top: 20px;
             animation: fadeIn 2s ease-in-out;
         }
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            z-index: 999;
+        }
+        #completion-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            display: none;
+            z-index: 1000;
+            text-align: center;
+        }
+        #completion-modal h2 {
+            margin: 0 0 10px;
+        }
+        #completion-modal button {
+            padding: 10px 20px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        #completion-modal button:hover {
+            background: #2980b9;
+        }
         @keyframes fadeIn {
             0% { opacity: 0; }
             100% { opacity: 1; }
         }
-
-        /* Media Query for Small Screens */
         @media (max-width: 768px) {
             h1 {
                 font-size: 2em;
@@ -150,32 +186,52 @@
     </div>
     <div class="word" id="word"></div>
     <button id="startButton">
-        <img src="microfone.png" alt="Start Reading">
+        <img src="microfone.png" alt="Start Speaking">
     </button>
     <div class="result" id="result"></div>
-    
     <div class="navigation">
         <button id="prevButton" class="button nav-button">Previous</button>
         <button id="nextButton" class="button nav-button">Next</button>
     </div>
-    
     <div id="finalFeedback"></div>
     <button id="restartButton" class="button" style="display: none;">Restart</button>
-    
-    <div class="feedback" id="feedback">
-        <img id="correctGif" src="certo.gif" alt="Correct">
-        <audio id="correctAudio" src="certo.mp3"></audio>
+
+    <!-- Modal de conclusão -->
+    <div id="overlay"></div>
+    <div id="completion-modal">
+        <h2>Phase Completed!</h2>
+        <p>Congratulations! You have completed this phase.</p>
+        <button onclick="closeModal()">Close</button>
     </div>
 
+    <!-- Firebase App (SDK) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
     <script>
+        // Configuração do Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+            authDomain: "hannahenglishcourse.firebaseapp.com",
+            projectId: "hannahenglishcourse",
+            storageBucket: "hannahenglishcourse.appspot.com",
+            messagingSenderId: "449818788486",
+            appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+            measurementId: "G-07VVJG9LRS",
+            databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+
         const wordListUrl = '../data1/words.txt';
         const imageFolderUrl = '../data1/imagens/';
         let words = [];
         let currentWordIndex = 0;
+        let wordsTried = 0; 
         let recognitionTimeout;
-        let tryAgainInProgress = false; // Flag to prevent duplicate "Try Again"
+        let tryAgainInProgress = false;
 
-        // Fetch words from the words.txt file
         fetch(wordListUrl)
             .then(response => response.text())
             .then(data => {
@@ -188,7 +244,7 @@
             if (index < 0) {
                 currentWordIndex = 0;
             } else if (index >= words.length) {
-                return; // Prevent loading past the last word
+                return;
             } else {
                 currentWordIndex = index;
                 const currentWord = words[currentWordIndex];
@@ -196,9 +252,9 @@
 
                 document.getElementById("word").textContent = currentWord;
                 document.getElementById("image").src = imageFolderUrl + currentImage;
-                resetFeedback(); // Clear any feedback when navigating
-                tryAgainInProgress = false; // Reset flag
-                enableStartButton(); // Re-enable the start button
+                resetFeedback();
+                tryAgainInProgress = false;
+                enableStartButton();
             }
         }
 
@@ -210,19 +266,17 @@
         const wordDiv = document.getElementById("word");
         const imageElement = document.getElementById("image");
         const iconElement = document.getElementById("icon");
-        const feedbackDiv = document.getElementById("feedback");
-        const correctGif = document.getElementById("correctGif");
-        const correctAudio = document.getElementById("correctAudio");
-
         const finalFeedbackDiv = document.getElementById("finalFeedback");
         const restartButton = document.getElementById("restartButton");
 
         const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
         recognition.lang = 'en-US';
-        recognition.interimResults = false; // Only handle final results
+        recognition.interimResults = false;
         recognition.maxAlternatives = 1;
 
         startButton.addEventListener('click', () => {
+            wordsTried++;
+            checkCompletion();
             disableStartButton();
             startRecognition();
         });
@@ -238,11 +292,11 @@
         });
 
         backButton.addEventListener('click', () => {
-            window.history.back(); // Navigate back to the previous page
+            window.history.back();
         });
 
         restartButton.addEventListener('click', () => {
-            restartGame(); // Restart the game
+            restartGame();
         });
 
         recognition.onresult = (event) => {
@@ -282,56 +336,88 @@
         function handleCorrectAnswer() {
             resultDiv.textContent = "Correct!";
             resultDiv.style.color = "green";
-            playCorrectFeedback();
             setTimeout(() => {
-                stopCorrectFeedback();
                 if (currentWordIndex + 1 < words.length) {
                     loadWord(currentWordIndex + 1);
                 } else {
-                    showFinalFeedback(); // Only show the feedback after the last word is correctly read
+                    showFinalFeedback();
                 }
-            }, 3000); // 3 segundos para o feedback
+            }, 3000);
         }
 
         function handleIncorrectAttempt() {
             tryAgainInProgress = true;
-            const tryAgainMessage = "Try again. Listen to the correct pronunciation of this word.";
-            resultDiv.textContent = tryAgainMessage;
+            resultDiv.textContent = "Try again.";
             resultDiv.style.color = "red";
-            readMessage(tryAgainMessage, () => {
-                readWordWithHighlight(words[currentWordIndex], () => {
-                    enableStartButton();
-                    tryAgainInProgress = false;
-                });
+            readWordWithHighlight(words[currentWordIndex], () => {
+                enableStartButton();
+                tryAgainInProgress = false;
             });
         }
 
         function resetFeedback() {
             resultDiv.textContent = "";
-            feedbackDiv.style.display = "none";
-            correctGif.style.display = "none";
-            correctAudio.pause();
-            correctAudio.currentTime = 0;
         }
 
-        function playCorrectFeedback() {
-            feedbackDiv.style.display = "block";
-            correctGif.style.display = "block";
-            correctAudio.play();
+        function checkCompletion() {
+            if (wordsTried === words.length) {
+                markActivityAsCompleted();
+                ensureUserIsAuthenticated(updateNextPhase);
+            }
         }
 
-        function stopCorrectFeedback() {
-            feedbackDiv.style.display = "none";
-            correctGif.style.display = "none";
-            correctAudio.pause();
-            correctAudio.currentTime = 0;
+        function markActivityAsCompleted() {
+            document.getElementById('overlay').style.display = 'block';
+            document.getElementById('completion-modal').style.display = 'block';
         }
 
-        function readMessage(message, callback) {
-            const utterance = new SpeechSynthesisUtterance(message);
-            utterance.lang = 'en-US';
-            utterance.onend = callback;
-            speechSynthesis.speak(utterance);
+        function closeModal() {
+            document.getElementById('overlay').style.display = 'none';
+            document.getElementById('completion-modal').style.display = 'none';
+        }
+
+        function ensureUserIsAuthenticated(callback) {
+            firebase.auth().onAuthStateChanged(function(user) {
+                if (user) {
+                    callback(user.uid);
+                } else {
+                    console.error("Usuário não autenticado");
+                }
+            });
+        }
+
+        function updateNextPhase(userId) {
+            const currentPhase = getPhaseFromURL();
+            const { level, unit } = getLevelAndUnitFromURL();
+            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+            
+            try {
+                if (currentPhase === "last") {
+                    const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+                    dbRef.child(nextUnit).set({ fase1: true });
+                } else if (currentPhase === "end") {
+                    const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+                    firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+                } else {
+                    const nextPhase = parseInt(currentPhase) + 1;
+                    dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
+                }
+            } catch (error) {
+                console.error("Erro ao atualizar o progresso da fase:", error);
+            }
+        }
+
+        function getPhaseFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('fase');
+        }
+
+        function getLevelAndUnitFromURL() {
+            const url = window.location.pathname;
+            const parts = url.split('/');
+            const level = parts[1];
+            const unit = parts[2];
+            return { level, unit };
         }
 
         function readWordWithHighlight(word, callback) {
@@ -357,7 +443,7 @@
         function showFinalFeedback() {
             finalFeedbackDiv.textContent = "You've completed all words!";
             finalFeedbackDiv.style.display = "block";
-            restartButton.style.display = "inline-block"; // Show restart button at the end
+            restartButton.style.display = "inline-block";
             enableStartButton();
         }
 
@@ -365,8 +451,8 @@
             currentWordIndex = 0;
             finalFeedbackDiv.style.display = "none";
             restartButton.style.display = "none";
+            wordsTried = 0;
             loadWord(0);
-            enableStartButton();
         }
 
         function disableStartButton() {
