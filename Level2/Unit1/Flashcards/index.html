@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hannah FlashCards</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
+            min-height: 100vh;
+            background-image: url('../../../../imagens/fundo.png');
+            background-repeat: repeat;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .header-container {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            max-width: 1000px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 2em;
+            margin: 0;
+            text-align: center;
+            color: #333;
+            flex-grow: 1;
+        }
+
+        .back-button {
+            padding: 10px 20px;
+            background-color: #333;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-right: 20px;
+            align-self: flex-start;
+        }
+
+        .back-button:hover {
+            background-color: #555;
+        }
+
+        #flashcards-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            width: 100%;
+        }
+
+        .card {
+            width: 200px;
+            height: 300px;
+            perspective: 1000px;
+            margin: 20px;
+            position: relative;
+        }
+
+        .card-inner {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            text-align: center;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+
+        .card.rotated .card-inner {
+            transform: rotateY(180deg);
+        }
+
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+        }
+
+        .card-front {
+            background-color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 1px solid #ccc;
+        }
+
+        .card-front img {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        .card-back {
+            background-color: #f8f8f8;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transform: rotateY(180deg);
+            border: 1px solid #ccc;
+            font-size: 20px;
+            padding: 10px;
+        }
+
+        .play-sound {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+        }
+
+        #completion-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border: 2px solid #333;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            text-align: center;
+        }
+
+        #completion-modal button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #333;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        #completion-modal button:hover {
+            background-color: #555;
+        }
+
+        #overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+
+        @media (max-width: 600px) {
+            .header-container {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            h1 {
+                text-align: center;
+                margin-top: 10px;
+            }
+
+            .back-button {
+                margin-bottom: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header-container">
+        <button class="back-button" onclick="goBack()">Back</button>
+        <h1>Hannah FlashCards</h1>
+    </div>
+    <div id="flashcards-container"></div>
+
+    <div id="overlay"></div>
+    <div id="completion-modal">
+        <h2>Phase Completed!</h2>
+        <p>Congratulations! You have completed this phase.</p>
+        <button onclick="closeModal()">Close</button>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+            authDomain: "hannahenglishcourse.firebaseapp.com",
+            projectId: "hannahenglishcourse",
+            storageBucket: "hannahenglishcourse.appspot.com",
+            messagingSenderId: "449818788486",
+            appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+            measurementId: "G-07VVJG9LRS",
+            databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+
+        let totalCards = 0;
+        let interactedCards = [];
+        let soundPlayed = 0;
+
+        async function loadWords() {
+            try {
+                const response = await fetch('../data1/words.txt');
+                const text = await response.text();
+                return text.split('\n').filter(word => word.trim() !== '').map(word => word.trim());
+            } catch (error) {
+                console.error("Erro ao carregar o arquivo words.txt", error);
+                return [];
+            }
+        }
+
+        async function generateFlashcards() {
+            const words = await loadWords();
+            totalCards = words.length;
+            interactedCards = new Array(totalCards).fill(false);
+            const container = document.getElementById('flashcards-container');
+
+            if (words.length === 0) {
+                container.innerHTML = "Não foi possível carregar os flash cards.";
+                return;
+            }
+
+            words.forEach((word, index) => {
+                const card = document.createElement('div');
+                card.classList.add('card');
+
+                const cardInner = document.createElement('div');
+                cardInner.classList.add('card-inner');
+
+                const cardFront = document.createElement('div');
+                cardFront.classList.add('card-front');
+                const img = document.createElement('img');
+                img.src = `../data1/imagens/imagem${index + 1}.jpeg`;
+                img.onerror = function() {
+                    console.error(`Erro ao carregar a imagem: imagem${index + 1}.jpeg`);
+                };
+                cardFront.appendChild(img);
+
+                const cardBack = document.createElement('div');
+                cardBack.classList.add('card-back');
+                cardBack.textContent = word;
+
+                card.addEventListener('click', function() {
+                    card.classList.toggle('rotated');
+                    interactedCards[index] = true;
+                    checkCompletion();
+                });
+
+                const playSoundIcon = document.createElement('img');
+                playSoundIcon.classList.add('play-sound');
+                playSoundIcon.src = 'businessman.png';
+                playSoundIcon.alt = "Play Sound";
+                playSoundIcon.onclick = (event) => {
+                    event.stopPropagation();
+                    playSound(word);
+                    if (!playSoundIcon.classList.contains('played')) {
+                        playSoundIcon.classList.add('played');
+                        soundPlayed++;
+                        checkCompletion();
+                    }
+                };
+
+                cardInner.appendChild(cardFront);
+                cardInner.appendChild(cardBack);
+                card.appendChild(cardInner);
+                card.appendChild(playSoundIcon);
+                container.appendChild(card);
+            });
+        }
+
+        function playSound(word) {
+            const utterance = new SpeechSynthesisUtterance(word);
+            utterance.lang = 'en-US';
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function checkCompletion() {
+            const allCardsInteracted = interactedCards.every(interacted => interacted);
+            if (allCardsInteracted && soundPlayed === totalCards) {
+                showModal();
+                ensureUserIsAuthenticated(updateNextPhase);
+            }
+        }
+
+        function showModal() {
+            document.getElementById('completion-modal').style.display = 'block';
+            document.getElementById('overlay').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('completion-modal').style.display = 'none';
+            document.getElementById('overlay').style.display = 'none';
+        }
+
+        function ensureUserIsAuthenticated(callback) {
+            firebase.auth().onAuthStateChanged(function(user) {
+                if (user) {
+                    callback(user.uid);
+                } else {
+                    console.error("Usuário não autenticado");
+                }
+            });
+        }
+
+        async function updateNextPhase(userId) {
+            const currentPhase = getPhaseFromURL();
+            const { level, unit } = getLevelAndUnitFromURL();
+            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+            
+            try {
+                if (currentPhase === "last") {
+                    const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+                    await dbRef.child(nextUnit).set({ fase1: true });
+                } else if (currentPhase === "end") {
+                    const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+                    await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+                } else {
+                    const nextPhase = parseInt(currentPhase) + 1;
+                    await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
+                }
+            } catch (error) {
+                console.error("Erro ao atualizar o progresso da fase:", error);
+            }
+        }
+
+        function getPhaseFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('fase');
+        }
+
+        function getLevelAndUnitFromURL() {
+            const url = window.location.pathname;
+            const parts = url.split('/');
+            const level = parts[1];
+            const unit = parts[2];
+            return { level, unit };
+        }
+
+        function goBack() {
+            window.history.back();
+        }
+
+        generateFlashcards();
+    </script>
+</body>
+</html>

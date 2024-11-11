@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hannah StoryCard</title>
+
+    <!-- Scripts do Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-database.js"></script>
+
+    <script>
+      // Configuração do Firebase
+      var firebaseConfig = {
+        apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+        authDomain: "hannahenglishcourse.firebaseapp.com",
+        projectId: "hannahenglishcourse",
+        storageBucket: "hannahenglishcourse.appspot.com",
+        messagingSenderId: "449818788486",
+        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+        measurementId: "G-07VVJG9LRS",
+        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+      };
+      
+      // Inicializa o Firebase
+      firebase.initializeApp(firebaseConfig);
+
+      // Função para identificar Level, Unit e Fase pelo URL
+      function getParamsFromURL() {
+          const urlParams = new URLSearchParams(window.location.search);
+          const fase = urlParams.get('fase');
+          const pathParts = window.location.pathname.split('/');
+          const level = pathParts.find(part => part.startsWith('Level'));
+          const unit = pathParts.find(part => part.startsWith('Unit'));
+          return { level, unit, fase };
+      }
+
+      // Função para salvar progresso no Firebase
+      function salvarProgressoAluno(uid, fase) {
+          const { level, unit } = getParamsFromURL();
+
+          if (fase === '1' && level === 'Level1' && unit === 'Unit1') {
+              // Se for fase 1 da Unit1 do Level1, cria level1 e level2 como true
+              const firebasePath = `usuarios/${uid}/progresso/Level1/Unit1`;
+              firebase.database().ref(firebasePath).set({
+                  level1: true,
+                  level2: true
+              });
+          } else if (fase === 'last') {
+              // Se for a última fase (fase=last), criar Level e Unit subsequentes
+              const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+              const firebasePath = `usuarios/${uid}/progresso/${nextLevel}/Unit1/fase1`;
+              firebase.database().ref(firebasePath).set(true);
+          } else {
+              // Para qualquer outra fase, criar a próxima fase subsequente
+              const nextFase = `fase${parseInt(fase) + 1}`;
+              const firebasePath = `usuarios/${uid}/progresso/${level}/${unit}/${nextFase}`;
+              firebase.database().ref(firebasePath).set(true);
+          }
+      }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f9f9f9;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 900px;
+            width: 100%;
+            margin: 30px auto;
+            padding: 20px;
+            background-color: #fff;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        h1 {
+            font-size: 2.5em;
+            color: #4CAF50;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .title {
+            font-size: 2em;
+            color: #333;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .card {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            padding: 20px;
+            background-color: #f0f8ff;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+            cursor: pointer;
+            width: 100%;
+            max-width: 100%;
+            min-height: 100px;
+            position: relative;
+        }
+        .active {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+        }
+        .card img {
+            max-width: 100%;
+            max-height: calc(100vh - 150px);
+            width: auto;
+            height: auto;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            transition: transform 0.3s ease;
+        }
+        .card p {
+            font-size: 1.5em;
+            text-align: center;
+            color: #333;
+            margin: 0;
+            word-break: break-word;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100px;
+            width: 100%;
+            margin-top: 60px;
+        }
+        .businessman {
+            position: absolute;
+            top: 10px;
+            right: 30px;
+            width: 40px;
+            height: 40px;
+            object-fit: contain;
+            cursor: pointer;
+            z-index: 10;
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+        }
+        button {
+            margin: 20px;
+            padding: 15px 30px;
+            font-size: 18px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .navigation {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-top: 20px;
+        }
+        .button-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .pdf-button-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <button onclick="window.location.href='../index.html'">Back</button>
+
+    <div class="container">
+        <h1>Hannah StoryCard</h1>
+        <div class="button-container">
+            <button id="toggleButton" onclick="toggleView()">Read the story</button>
+        </div>
+        <div class="title" id="storyTitle"></div>
+        <div id="cardsContainer"></div>
+        <div class="navigation">
+            <button id="prevBtn" onclick="showPreviousCard()">Previous</button>
+            <button id="nextBtn" onclick="showNextCard()">Next</button>
+        </div>
+        <div class="pdf-button-container">
+            <button class="pdf-button" onclick="generatePDF()">Generate PDF</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script>
+        let showText = false;
+        let currentCardIndex = 0;
+        let cardsData = [];
+        let storyText = '';
+        let speechSynthesis = window.speechSynthesis;
+        let currentUtterance = null;
+
+        // Função para alternar entre texto e imagem
+        function toggleView() {
+            showText = !showText;
+            document.getElementById("toggleButton").innerText = showText ? "See the story" : "Read the story";
+            displayCard(currentCardIndex);
+        }
+
+        // Função para carregar o conteúdo do arquivo images.txt
+        async function loadContent() {
+            const response = await fetch('images.txt');
+            const text = await response.text();
+            const lines = text.split('\n');
+            let cards = [];
+            let currentImage = '';
+            let currentText = '';
+            storyText = '';
+
+            lines.forEach(line => {
+                if (line.startsWith('#title:')) {
+                    document.getElementById('storyTitle').innerText = line.replace('#title:', '').trim();
+                } else if (line.startsWith('#imagem')) {
+                    if (currentImage && currentText) {
+                        cards.push({ image: currentImage, text: currentText });
+                        storyText += currentText + '\n\n';
+                    }
+                    currentImage = line.replace('#', '').trim();
+                    currentText = '';
+                } else {
+                    currentText += line + ' ';
+                }
+            });
+
+            if (currentImage && currentText) {
+                cards.push({ image: currentImage, text: currentText });
+                storyText += currentText + '\n\n';
+            }
+
+            return cards;
+        }
+
+        // Função para exibir o card atual
+        function displayCard(index) {
+            const container = document.getElementById('cardsContainer');
+            container.innerHTML = '';
+            const cardData = cardsData[index];
+            const cardElement = document.createElement('div');
+            cardElement.className = 'card active';
+
+            if (showText) {
+                cardElement.innerHTML = `<div class="card-text"><p>${cardData.text}</p></div>`;
+            } else {
+                cardElement.innerHTML = `<img src="images/${cardData.image}.jpeg" alt="Image">`;
+            }
+
+            const businessmanImage = document.createElement('img');
+            businessmanImage.src = 'businessman.png';
+            businessmanImage.className = 'businessman';
+            businessmanImage.onclick = () => toggleSpeech(cardData.text);
+
+            cardElement.appendChild(businessmanImage);
+            container.appendChild(cardElement);
+
+            // Verifica se este é o último card
+            if (index === cardsData.length - 1) {
+                firebase.auth().onAuthStateChanged(function(user) {
+                    if (user) {
+                        salvarProgressoAluno(user.uid, 'fase2');
+                    } else {
+                        console.log("Nenhum usuário logado.");
+                    }
+                });
+            }
+
+            // Atualiza botões de navegação
+            const prevButton = document.getElementById('prevBtn');
+            const nextButton = document.getElementById('nextBtn');
+            prevButton.style.display = (index === 0) ? 'none' : 'block';
+            nextButton.style.display = (index === cardsData.length - 1) ? 'none' : 'block';
+        }
+
+        // Função para iniciar ou parar a leitura do texto
+        function toggleSpeech(text) {
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+            } else {
+                currentUtterance = new SpeechSynthesisUtterance(text);
+                currentUtterance.lang = 'en-US';
+                speechSynthesis.speak(currentUtterance);
+            }
+        }
+
+        // Função para exibir o próximo card
+        function showNextCard() {
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+            }
+            currentCardIndex = (currentCardIndex + 1) % cardsData.length;
+            displayCard(currentCardIndex);
+        }
+
+        // Função para exibir o card anterior
+        function showPreviousCard() {
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+            }
+            currentCardIndex = (currentCardIndex - 1 + cardsData.length) % cardsData.length;
+            displayCard(currentCardIndex);
+        }
+
+        // Função para gerar o PDF com o texto da história
+        function generatePDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            doc.addImage('Logo.png', 'PNG', 85, 10, 40, 40);
+            doc.setFontSize(12);
+            doc.text("Name:_______________________________________________________  Date:_______________", 10, 60);
+            doc.setFontSize(20);
+            doc.text("Hannah StoryCard", 105, 80, { align: "center" });
+            doc.setFontSize(12);
+            let y = 100;
+            const lineHeight = 10;
+            const lines = doc.splitTextToSize(storyText, 180);
+
+            lines.forEach(line => {
+                if (y > 280) {
+                    doc.addPage();
+                    y = 20;
+                }
+                doc.text(line, 10, y);
+                y += lineHeight;
+            });
+
+            doc.save('story.pdf');
+        }
+
+        // Função para inicializar a página com o primeiro card
+        async function init() {
+            cardsData = await loadContent();
+            displayCard(0);
+        }
+
+        init();
+    </script>
+</body>
+</html>
