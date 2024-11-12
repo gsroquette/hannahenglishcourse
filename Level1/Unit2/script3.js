@@ -11,13 +11,13 @@ document.addEventListener('DOMContentLoaded', function() {
     let lastUnlockedIndex = -1;
 
    const activities = [
-        { id: 9, name: "Speak", path: "../Unit1/Speak/index.html?fase=9", img: "../../imagens/botoes/speak_button.png", unlocked: false },
-        { id: 10, name: "Speak2", path: "../Unit1/Speak2/index.html?fase=10", img: "../../imagens/botoes/speak_button.png", unlocked: false },
-        { id: 11, name: "Speak3", path: "../Unit1/Speak3/index.html?fase=11", img: "../../imagens/botoes/speak_button.png", unlocked: false },
-        { id: 12, name: "MemoryGame", path: "../Unit1/MemoryGame/index.html?fase=12", img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
-        { id: 13, name: "MemoryGame2", path: "../Unit1/MemoryGame2/index.html?fase=13", img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
-        { id: 14, name: "MemoryGame3", path: "../Unit1/MemoryGame3/index.html?fase=14", img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
-        { id: 15, name: "WordSearch2", path: "../Unit1/WordSearch2/index.html?fase=15", img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
+        { id: 9, name: "Speak", path: "../Unit2/Speak/index.html?fase=9", img: "../../imagens/botoes/speak_button.png", unlocked: false },
+        { id: 10, name: "Speak2", path: "../Unit2/Speak2/index.html?fase=10", img: "../../imagens/botoes/speak_button.png", unlocked: false },
+        { id: 11, name: "Speak3", path: "../Unit2/Speak3/index.html?fase=11", img: "../../imagens/botoes/speak_button.png", unlocked: false },
+        { id: 12, name: "MemoryGame", path: "../Unit2/MemoryGame/index.html?fase=12", img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
+        { id: 13, name: "MemoryGame2", path: "../Unit2/MemoryGame2/index.html?fase=13", img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
+        { id: 14, name: "MemoryGame3", path: "../Unit2/MemoryGame3/index.html?fase=14", img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
+        { id: 15, name: "WordSearch2", path: "../Unit2/WordSearch2/index.html?fase=15", img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
     ];
 
     // Fechar o dropdown ao clicar fora dele
