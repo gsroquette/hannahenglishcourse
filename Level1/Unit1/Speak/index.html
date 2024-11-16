@@ -229,22 +229,23 @@
         let currentWordIndex = 0;
         let wordsTried = 0; 
         let recognitionTimeout;
-        let tryAgainInProgress = false;
+        let tryAgainInProgress = false;        
+        let attemptsPerWord = {}; // Registro de tentativas por palavra
 
-        fetch(wordListUrl)
-            .then(response => response.text())
-            .then(data => {
-                words = data.split('\n').map(word => word.trim()).filter(word => word);
-                loadWord(currentWordIndex);
-            })
- .catch(error => console.error('Error fetching words:', error));
+// Inicializa as palavras após carregá-las do arquivo
+fetch(wordListUrl)
+    .then(response => response.text())
+    .then(data => {
+        words = data.split('\n').map(word => word.trim()).filter(word => word);
 
-let attemptsPerWord = {}; // Registro de tentativas por palavra
+        // Inicializa todas as palavras com 0 tentativas
+        words.forEach((word, index) => {
+            attemptsPerWord[index] = 0;
+        });
 
-// Inicializa todas as palavras com 0 tentativas
-words.forEach((word, index) => {
-    attemptsPerWord[index] = 0;
-});
+        loadWord(currentWordIndex); // Carrega a primeira palavra
+    })
+    .catch(error => console.error('Error fetching words:', error));
            
         function loadWord(index) {
             if (index < 0) {
@@ -383,14 +384,19 @@ function enableNextWord() {
             resultDiv.textContent = "";
         }
 
-        function checkCompletion() {
+    function checkCompletion() {
     const allWordsCompleted = Object.values(attemptsPerWord).every(
         (attempts) => attempts >= 3 // Palavra foi acertada ou tentada 3 vezes
     );
 
     if (allWordsCompleted) {
+        // Exibe o modal de conclusão
         markActivityAsCompleted();
-        ensureUserIsAuthenticated(updateNextPhase);
+
+        // Aguarda a autenticação do usuário e atualiza o progresso
+        ensureUserIsAuthenticated((userId) => {
+            updateNextPhase(userId); // Atualiza o progresso no banco de dados
+        });
     }
 }
 
