@@ -232,6 +232,7 @@ firebase.auth().onAuthStateChanged(function(user) {
     let currentQuestionIndex = 0;
     let questions = [];
     let answeredQuestions = [];
+    let userAnswers = {}; // Objeto para armazenar as respostas do usuário
     let speechSynthesisUtterance = null;
 
     async function loadQuestions() {
@@ -262,28 +263,40 @@ firebase.auth().onAuthStateChanged(function(user) {
         displayQuestion();
     }
 
-    function displayQuestion() {
-        const container = document.getElementById('quiz-container');
-        container.innerHTML = '';
+   function displayQuestion() {
+    const container = document.getElementById('quiz-container');
+    container.innerHTML = '';
 
-        const q = questions[currentQuestionIndex];
-        const questionDiv = document.createElement('div');
-        questionDiv.classList.add('question');
+    const q = questions[currentQuestionIndex];
+    const questionDiv = document.createElement('div');
+    questionDiv.classList.add('question');
 
-        const questionText = document.createElement('p');
-        questionText.id = 'question-text';
-        questionText.innerText = `${currentQuestionIndex + 1}. ${q.question}`;
-        questionDiv.appendChild(questionText);
+    const questionText = document.createElement('p');
+    questionText.id = 'question-text';
+    questionText.innerText = `${currentQuestionIndex + 1}. ${q.question}`;
+    questionDiv.appendChild(questionText);
 
-        q.answers.forEach((answer) => {
-            const answerLabel = document.createElement('label');
-            answerLabel.innerHTML = `<input type="radio" name="question${currentQuestionIndex}" value="${answer[0]}" onclick="checkAnswer(this, '${answer[0]}')"> ${answer}`;
-            questionDiv.appendChild(answerLabel);
+    q.answers.forEach((answer) => {
+        const answerLabel = document.createElement('label');
+        answerLabel.innerHTML = `<input type="radio" name="question${currentQuestionIndex}" value="${answer[0]}" onclick="checkAnswer(this, '${answer[0]}')"> ${answer}`;
+        questionDiv.appendChild(answerLabel);
+    });
+
+    container.appendChild(questionDiv);
+
+    // Restaura a resposta do usuário, se houver
+    if (userAnswers[currentQuestionIndex]) {
+        const savedAnswer = userAnswers[currentQuestionIndex];
+        const radioButtons = document.getElementsByName(`question${currentQuestionIndex}`);
+        radioButtons.forEach((radio) => {
+            if (radio.value === savedAnswer) {
+                radio.checked = true;
+            }
         });
-
-        container.appendChild(questionDiv);
-        updateNavigationButtons();
     }
+
+    updateNavigationButtons();
+}
 
     function updateNavigationButtons() {
         document.getElementById('prev-btn').disabled = currentQuestionIndex === 0;
@@ -306,37 +319,40 @@ firebase.auth().onAuthStateChanged(function(user) {
         }
     }
 
-    function checkAnswer(radioElement, selectedAnswer) {
-        const q = questions[currentQuestionIndex];
-        const feedbackDiv = document.getElementById('feedback');
-        const feedbackImg = document.getElementById('feedback-img');
-        const feedbackAudio = document.getElementById('feedback-audio');
-        const gifContainer = document.querySelector('.gif-container');
+   function checkAnswer(radioElement, selectedAnswer) {
+    const q = questions[currentQuestionIndex];
+    const feedbackDiv = document.getElementById('feedback');
+    const feedbackImg = document.getElementById('feedback-img');
+    const feedbackAudio = document.getElementById('feedback-audio');
+    const gifContainer = document.querySelector('.gif-container');
 
-        if (selectedAnswer === q.correct) {
-            feedbackImg.src = 'certo.gif'; 
-            feedbackAudio.src = 'certo.mp3';
-            feedbackAudio.play();
-            feedbackDiv.style.display = 'block';
-            gifContainer.style.display = 'block';
-            answeredQuestions[currentQuestionIndex] = true;
-            setTimeout(() => {
-                hideGIF();
-                showNextQuestion();
-                checkCompletion();
-            }, 2000);
-        } else {
-            feedbackImg.src = 'errado.gif'; 
-            feedbackAudio.src = 'errado.mp3';
-            feedbackAudio.play();
-            feedbackDiv.style.display = 'block';
-            gifContainer.style.display = 'block';
-            setTimeout(() => {
-                hideGIF();
-                radioElement.checked = false;
-            }, 2000);
-        }
+    // Salva a resposta do usuário
+    userAnswers[currentQuestionIndex] = selectedAnswer;
+
+    if (selectedAnswer === q.correct) {
+        feedbackImg.src = 'certo.gif'; 
+        feedbackAudio.src = 'certo.mp3';
+        feedbackAudio.play();
+        feedbackDiv.style.display = 'block';
+        gifContainer.style.display = 'block';
+        answeredQuestions[currentQuestionIndex] = true;
+        setTimeout(() => {
+            hideGIF();
+            showNextQuestion();
+            checkCompletion();
+        }, 2000);
+    } else {
+        feedbackImg.src = 'errado.gif'; 
+        feedbackAudio.src = 'errado.mp3';
+        feedbackAudio.play();
+        feedbackDiv.style.display = 'block';
+        gifContainer.style.display = 'block';
+        setTimeout(() => {
+            hideGIF();
+            radioElement.checked = false;
+        }, 2000);
     }
+}
 
     function hideGIF() {
         const gifContainer = document.querySelector('.gif-container');

@@ -261,6 +261,7 @@
         let totalQuestions = 0;
         let answeredQuestions = 0;
         let synth = window.speechSynthesis;
+        let userAnswers = {}; // Objeto para armazenar as respostas do usuário
 
         async function loadQuestions() {
             try {
@@ -322,6 +323,15 @@
     // Atualiza o container com o texto e o botão
     questionsContainer.innerHTML = fullQuestionWithCheck;
 
+    // Restaura as respostas do usuário, se houver
+    const blanks = document.querySelectorAll('.blank');
+    blanks.forEach((blank, index) => {
+        const savedAnswer = userAnswers[questionNumber]?.[index];
+        if (savedAnswer) {
+            blank.textContent = savedAnswer;
+        }
+    });
+
     // Configura os botões de navegação
     document.getElementById('previousBtn').disabled = questionNumber === 1;
     document.getElementById('nextBtn').disabled = questionNumber === totalQuestions;
@@ -343,37 +353,46 @@
             tipsContainer.style.display = 'block';
         }
 
-        function checkAnswers() {
-            const blanks = document.querySelectorAll('.blank');
-            let allCorrect = true;
+    function checkAnswers() {
+    const blanks = document.querySelectorAll('.blank');
+    let allCorrect = true;
 
-            blanks.forEach((blank, index) => {
-                const userAnswer = blank.textContent.trim();
-                const correctAnswer = correctAnswers[currentQuestion - 1][index];
-                if (userAnswer === correctAnswer) {
-                    blank.classList.add('correct');
-                    blank.classList.remove('incorrect');
-                } else {
-                    blank.classList.add('incorrect');
-                    blank.classList.remove('correct');
-                    allCorrect = false;
-                }
-            });
+    // Inicializa o armazenamento das respostas da questão atual
+    if (!userAnswers[currentQuestion]) {
+        userAnswers[currentQuestion] = [];
+    }
 
-            if (allCorrect) {
-                answeredQuestions++;
-                checkCompletion();
-                document.getElementById('successContainer').style.display = 'block';
-                document.getElementById('successContainer').scrollIntoView({ behavior: 'smooth' });
-                const successSound = document.getElementById('successSound');
-                successSound.play();
+    blanks.forEach((blank, index) => {
+        const userAnswer = blank.textContent.trim();
+        const correctAnswer = correctAnswers[currentQuestion - 1][index];
 
-                setTimeout(() => {
-                    document.getElementById('successContainer').style.display = 'none';
-                    nextQuestion();
-                }, 5000);
-            }
+        // Salva a resposta do aluno
+        userAnswers[currentQuestion][index] = userAnswer;
+
+        if (userAnswer === correctAnswer) {
+            blank.classList.add('correct');
+            blank.classList.remove('incorrect');
+        } else {
+            blank.classList.add('incorrect');
+            blank.classList.remove('correct');
+            allCorrect = false;
         }
+    });
+
+    if (allCorrect) {
+        answeredQuestions++;
+        checkCompletion();
+        document.getElementById('successContainer').style.display = 'block';
+        document.getElementById('successContainer').scrollIntoView({ behavior: 'smooth' });
+        const successSound = document.getElementById('successSound');
+        successSound.play();
+
+        setTimeout(() => {
+            document.getElementById('successContainer').style.display = 'none';
+            nextQuestion();
+        }, 5000);
+    }
+}
 
         function checkCompletion() {
             if (answeredQuestions === totalQuestions) {
