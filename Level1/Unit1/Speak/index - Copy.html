@@ -237,12 +237,6 @@
                 words = data.split('\n').map(word => word.trim()).filter(word => word);
                 loadWord(currentWordIndex);
             })
-let attemptsPerWord = {}; // Registro de tentativas por palavra
-
-// Inicializa todas as palavras com 0 tentativas
-words.forEach((word, index) => {
-    attemptsPerWord[index] = 0;
-});
             .catch(error => console.error('Error fetching words:', error));
 
         function loadWord(index) {
@@ -304,25 +298,19 @@ words.forEach((word, index) => {
             restartGame();
         });
 
-       recognition.onresult = (event) => {
-    clearTimeout(recognitionTimeout);
-    const speechResult = event.results[0][0].transcript.toLowerCase();
-    const expectedWord = words[currentWordIndex].toLowerCase();
+        recognition.onresult = (event) => {
+            clearTimeout(recognitionTimeout);
+            const speechResult = event.results[0][0].transcript.toLowerCase();
+            const expectedWord = words[currentWordIndex].toLowerCase();
 
-    // Incrementa o número de tentativas da palavra atual
-    attemptsPerWord[currentWordIndex]++;
-
-    if (speechResult.includes(expectedWord)) {
-        handleCorrectAnswer(); // Marca como correta
-        attemptsPerWord[currentWordIndex] = 3; // Considera a palavra concluída
-    } else {
-        if (attemptsPerWord[currentWordIndex] < 3) {
-            handleIncorrectAttempt(); // Permite mais tentativas
-        } else {
-            enableNextWord(); // Avança automaticamente após 3 tentativas
-        }
-    }
-};
+            if (speechResult.includes(expectedWord)) {
+                handleCorrectAnswer();
+            } else {
+                if (!tryAgainInProgress) {
+                    handleIncorrectAttempt();
+                }
+            }
+        };
 
         recognition.onerror = (event) => {
             resultDiv.textContent = "Error occurred in recognition: " + event.error;
@@ -366,32 +354,16 @@ words.forEach((word, index) => {
             });
         }
 
-function enableNextWord() {
-    resultDiv.textContent = "Moving to the next word...";
-    resultDiv.style.color = "orange";
-    setTimeout(() => {
-        if (currentWordIndex + 1 < words.length) {
-            loadWord(currentWordIndex + 1); // Carrega a próxima palavra
-        } else {
-            checkCompletion(); // Verifica se todas as palavras foram concluídas
-        }
-    }, 2000); // Dá uma pausa antes de avançar
-}
-
         function resetFeedback() {
             resultDiv.textContent = "";
         }
 
         function checkCompletion() {
-    const allWordsCompleted = Object.values(attemptsPerWord).every(
-        (attempts) => attempts >= 3 // Palavra foi acertada ou tentada 3 vezes
-    );
-
-    if (allWordsCompleted) {
-        markActivityAsCompleted(); // Marca a fase como concluída
-        ensureUserIsAuthenticated(updateNextPhase); // Atualiza no banco de dados
-    }
-}
+            if (wordsTried === words.length) {
+                markActivityAsCompleted();
+                ensureUserIsAuthenticated(updateNextPhase);
+            }
+        }
 
         function markActivityAsCompleted() {
             document.getElementById('overlay').style.display = 'block';
