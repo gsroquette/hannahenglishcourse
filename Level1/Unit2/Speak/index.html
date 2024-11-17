@@ -33,14 +33,13 @@
             border-radius: 10px;
             box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
         }
-        .icon {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            width: 40px;
-            height: 40px;
-            cursor: pointer;
-        }
+     .icon {
+    display: block; /* Garante que o botão esteja separado da imagem */
+    margin: 20px auto; /* Centraliza o botão horizontalmente */
+    width: 40px;
+    height: 40px;
+    cursor: pointer;
+}
         .word {
             font-size: 2em;
             margin: 20px 0;
@@ -181,9 +180,9 @@
     <button id="backButton" class="button">Back</button>
     <h1>Word Reading Practice</h1>
     <div class="container">
-        <img id="image" class="image" src="" alt="Image">
-        <img id="icon" class="icon" src="businessman.png" alt="Icon">
+        <img id="image" class="image" src="" alt="Image">       
     </div>
+    <img id="icon" class="icon" src="businessman.png" alt="Icon">
     <div class="word" id="word"></div>
     <button id="startButton">
         <img src="microfone.png" alt="Start Speaking">
@@ -230,16 +229,27 @@
         let currentWordIndex = 0;
         let wordsTried = 0; 
         let recognitionTimeout;
-        let tryAgainInProgress = false;
+        let tryAgainInProgress = false;        
+        let attemptsPerWord = {}; // Registro de tentativas por palavra
 
-        fetch(wordListUrl)
-            .then(response => response.text())
-            .then(data => {
-                words = data.split('\n').map(word => word.trim()).filter(word => word);
-                loadWord(currentWordIndex);
-            })
-            .catch(error => console.error('Error fetching words:', error));
+// Inicializa as palavras após carregá-las do arquivo
+fetch(wordListUrl)
+    .then(response => response.text())
+    .then(data => {
+        words = data.split('\n').map(word => word.trim()).filter(word => word);
 
+        // Inicializa todas as palavras com 0 tentativas
+        words.forEach((word, index) => {
+            attemptsPerWord[index] = 0;
+        });
+
+        console.log("Palavras carregadas e tentativas inicializadas:", attemptsPerWord); // Log aqui
+
+        loadWord(currentWordIndex); // Carrega a primeira palavra
+    })
+    .catch(error => console.error('Error fetching words:', error));
+
+           
         function loadWord(index) {
             if (index < 0) {
                 currentWordIndex = 0;
@@ -275,11 +285,9 @@
         recognition.maxAlternatives = 1;
 
         startButton.addEventListener('click', () => {
-            wordsTried++;
-            checkCompletion();
-            disableStartButton();
-            startRecognition();
-        });
+    disableStartButton();
+    startRecognition();
+});
 
         prevButton.addEventListener('click', () => {
             disableStartButton();
@@ -299,19 +307,31 @@
             restartGame();
         });
 
-        recognition.onresult = (event) => {
-            clearTimeout(recognitionTimeout);
-            const speechResult = event.results[0][0].transcript.toLowerCase();
-            const expectedWord = words[currentWordIndex].toLowerCase();
+       recognition.onresult = (event) => {
+    clearTimeout(recognitionTimeout);
+    const speechResult = event.results[0][0].transcript.toLowerCase();
+    const expectedWord = words[currentWordIndex].toLowerCase();
 
-            if (speechResult.includes(expectedWord)) {
-                handleCorrectAnswer();
-            } else {
-                if (!tryAgainInProgress) {
-                    handleIncorrectAttempt();
-                }
-            }
-        };
+    // Incrementa o número de tentativas para a palavra atual
+    attemptsPerWord[currentWordIndex]++;
+    console.log(`Tentativa registrada. Palavra esperada: ${expectedWord}, Resultado reconhecido: ${speechResult}`); // Log aqui
+
+    if (speechResult.includes(expectedWord)) {
+        handleCorrectAnswer(); // Marca como correta
+        attemptsPerWord[currentWordIndex] = 3; // Considera a palavra concluída
+        console.log("Resposta correta. Palavra marcada como concluída."); // Log aqui
+    } else {
+        if (attemptsPerWord[currentWordIndex] < 3) {
+            handleIncorrectAttempt(); // Permite mais tentativas
+            console.log("Resposta incorreta. Tentativas restantes:", 3 - attemptsPerWord[currentWordIndex]); // Log aqui
+        } else {
+            enableNextWord(); // Avança automaticamente após 3 tentativas
+            console.log("Máximo de tentativas atingido. Avançando para a próxima palavra."); // Log aqui
+        }
+    }
+
+    checkCompletion(); // Verifica se todas as palavras foram concluídas
+};
 
         recognition.onerror = (event) => {
             resultDiv.textContent = "Error occurred in recognition: " + event.error;
@@ -355,57 +375,92 @@
             });
         }
 
+function enableNextWord() {
+    resultDiv.textContent = "Moving to the next word...";
+    resultDiv.style.color = "orange";
+    setTimeout(() => {
+        if (currentWordIndex + 1 < words.length) {
+            loadWord(currentWordIndex + 1); // Carrega a próxima palavra
+        } else {
+            checkCompletion(); // Verifica se todas as palavras foram concluídas
+        }
+    }, 2000); // Dá uma pausa antes de avançar
+}
+
         function resetFeedback() {
             resultDiv.textContent = "";
         }
 
-        function checkCompletion() {
-            if (wordsTried === words.length) {
-                markActivityAsCompleted();
-                ensureUserIsAuthenticated(updateNextPhase);
-            }
-        }
+    function checkCompletion() {
+    console.log("Verificando conclusão. Tentativas atuais:", attemptsPerWord); // Log aqui
+
+    const allWordsCompleted = Object.values(attemptsPerWord).every(
+        (attempts) => attempts >= 3 // Palavra foi acertada ou tentada 3 vezes
+    );
+
+    if (allWordsCompleted) {
+        console.log("Todas as palavras foram completadas ou tentadas 3 vezes."); // Log aqui
+
+        // Exibe o modal de conclusão
+        markActivityAsCompleted();
+
+        // Aguarda a autenticação do usuário e atualiza o progresso
+        ensureUserIsAuthenticated((userId) => {
+            console.log("Usuário autenticado. Atualizando progresso no banco de dados."); // Log aqui
+            updateNextPhase(userId); // Atualiza o progresso no banco de dados
+        });
+    } else {
+        console.log("Ainda há palavras incompletas."); // Log aqui
+    }
+}
 
         function markActivityAsCompleted() {
-            document.getElementById('overlay').style.display = 'block';
-            document.getElementById('completion-modal').style.display = 'block';
-        }
+    console.log("Exibindo modal de conclusão."); // Log aqui
+    document.getElementById('overlay').style.display = 'block';
+    document.getElementById('completion-modal').style.display = 'block';
+}
 
         function closeModal() {
             document.getElementById('overlay').style.display = 'none';
             document.getElementById('completion-modal').style.display = 'none';
         }
 
-        function ensureUserIsAuthenticated(callback) {
-            firebase.auth().onAuthStateChanged(function(user) {
-                if (user) {
-                    callback(user.uid);
-                } else {
-                    console.error("Usuário não autenticado");
-                }
-            });
+      function ensureUserIsAuthenticated(callback) {
+    firebase.auth().onAuthStateChanged(function(user) {
+        if (user) {
+            console.log("Usuário autenticado:", user.uid); // Log aqui
+            callback(user.uid);
+        } else {
+            console.error("Usuário não autenticado."); // Log aqui
         }
+    });
+}
 
-        function updateNextPhase(userId) {
-            const currentPhase = getPhaseFromURL();
-            const { level, unit } = getLevelAndUnitFromURL();
-            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-            
-            try {
-                if (currentPhase === "last") {
-                    const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-                    dbRef.child(nextUnit).set({ fase1: true });
-                } else if (currentPhase === "end") {
-                    const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
-                    firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
-                } else {
-                    const nextPhase = parseInt(currentPhase) + 1;
-                    dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
-                }
-            } catch (error) {
-                console.error("Erro ao atualizar o progresso da fase:", error);
-            }
+     function updateNextPhase(userId) {
+    const currentPhase = getPhaseFromURL();
+    const { level, unit } = getLevelAndUnitFromURL();
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+    console.log("Atualizando próximo progresso no banco de dados:", { userId, currentPhase, level, unit }); // Log aqui
+
+    try {
+        if (currentPhase === "last") {
+            const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+            console.log("Última fase da unidade. Criando próxima unidade:", nextUnit); // Log aqui
+            dbRef.child(nextUnit).set({ fase1: true });
+        } else if (currentPhase === "end") {
+            const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+            console.log("Última unidade do nível. Criando próximo nível:", nextLevel); // Log aqui
+            firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+        } else {
+            const nextPhase = parseInt(currentPhase) + 1;
+            console.log("Avançando para a próxima fase:", nextPhase); // Log aqui
+            dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
         }
+    } catch (error) {
+        console.error("Erro ao atualizar o progresso da fase:", error); // Log aqui
+    }
+}
 
         function getPhaseFromURL() {
             const params = new URLSearchParams(window.location.search);
@@ -436,9 +491,23 @@
             readWordWithHighlight(words[currentWordIndex]);
         });
 
-        iconElement.addEventListener('click', () => {
-            readWordWithHighlight(words[currentWordIndex]);
-        });
+      let voiceSpeed = 1; // Velocidade inicial do sintetizador de voz
+
+iconElement.addEventListener('click', () => {
+    // Chama a função de leitura com a velocidade atual
+    readWordWithSpeed(words[currentWordIndex], voiceSpeed);
+
+    // Alterna entre as velocidades 1 e 0.5
+    voiceSpeed = (voiceSpeed === 1) ? 0.5 : 1;
+});
+
+// Função para ler a palavra com velocidade ajustável
+function readWordWithSpeed(word, speed) {
+    const utterance = new SpeechSynthesisUtterance(word);
+    utterance.lang = 'en-US'; // Idioma
+    utterance.rate = speed; // Configura a velocidade
+    speechSynthesis.speak(utterance); // Reproduz a palavra
+}
 
         function showFinalFeedback() {
             finalFeedbackDiv.textContent = "You've completed all words!";
