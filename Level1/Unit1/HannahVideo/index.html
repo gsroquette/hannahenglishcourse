@@ -81,6 +81,44 @@
         .video-cover.hidden {
             display: none; /* Esconde a capa ao clicar */
         }
+
+        #completion-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border: 2px solid #333;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            text-align: center;
+        }
+
+        #completion-modal button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #333;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        #completion-modal button:hover {
+            background-color: #555;
+        }
+
+        #overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
     </style>
 </head>
 <body>
@@ -94,7 +132,31 @@
         <div class="video-cover" id="videoCover" onclick="playVideo()"></div>
     </div>
 
+    <div id="overlay"></div>
+    <div id="completion-modal">
+        <h2>Phase Completed!</h2>
+        <p>Congratulations! You have completed this phase.</p>
+        <button onclick="closeModal()">Close</button>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
     <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+            authDomain: "hannahenglishcourse.firebaseapp.com",
+            projectId: "hannahenglishcourse",
+            storageBucket: "hannahenglishcourse.appspot.com",
+            messagingSenderId: "449818788486",
+            appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+            measurementId: "G-07VVJG9LRS",
+            databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+
         function goBack() {
             window.history.back();
         }
@@ -106,6 +168,66 @@
             // Reproduz o vídeo e esconde a capa
             video.play();
             cover.classList.add('hidden');
+        }
+
+        document.getElementById('video').addEventListener('ended', () => {
+            // Ao finalizar o vídeo, exibe o modal e atualiza o progresso no Firebase
+            showModal();
+            ensureUserIsAuthenticated(updateNextPhase);
+        });
+
+        function showModal() {
+            document.getElementById('completion-modal').style.display = 'block';
+            document.getElementById('overlay').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('completion-modal').style.display = 'none';
+            document.getElementById('overlay').style.display = 'none';
+        }
+
+        function ensureUserIsAuthenticated(callback) {
+            firebase.auth().onAuthStateChanged(function(user) {
+                if (user) {
+                    callback(user.uid);
+                } else {
+                    console.error("Usuário não autenticado");
+                }
+            });
+        }
+
+        async function updateNextPhase(userId) {
+            const currentPhase = getPhaseFromURL();
+            const { level, unit } = getLevelAndUnitFromURL();
+            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+            
+            try {
+                if (currentPhase === "last") {
+                    const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+                    await dbRef.child(nextUnit).set({ fase1: true });
+                } else if (currentPhase === "end") {
+                    const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+                    await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+                } else {
+                    const nextPhase = parseInt(currentPhase) + 1;
+                    await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
+                }
+            } catch (error) {
+                console.error("Erro ao atualizar o progresso da fase:", error);
+            }
+        }
+
+        function getPhaseFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('fase');
+        }
+
+        function getLevelAndUnitFromURL() {
+            const url = window.location.pathname;
+            const parts = url.split('/');
+            const level = parts[1];
+            const unit = parts[2];
+            return { level, unit };
         }
     </script>
 </body>
