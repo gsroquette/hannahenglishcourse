@@ -1,9 +1,9 @@
-const gridSize = 15;
+const gridSize = 8;
 const canvas = document.getElementById('word-search-canvas');
 const ctx = canvas.getContext('2d');
 
 // Calcula o tamanho das células dinamicamente com base no tamanho do canvas
-const cellSize = Math.min(canvas.clientWidth / gridSize, 30);
+const cellSize = Math.min(canvas.clientWidth / gridSize, 50);
 canvas.width = cellSize * gridSize;
 canvas.height = cellSize * gridSize;
 
