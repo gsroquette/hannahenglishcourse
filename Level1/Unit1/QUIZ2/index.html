@@ -149,8 +149,10 @@
             z-index: 999;
         }
 
-        h%;
-            height: auto; max-height: 300px;
+        .question-image {
+            max-width: 100%;
+            height: auto;
+            max-height: 250px;
             margin-bottom: 15px;
         }
     </style>
@@ -195,27 +197,83 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 <script>
     // Configuração do Firebase
-    const firebaseConfig = {
-        apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
-        authDomain: "hannahenglishcourse.firebaseapp.com",
-        projectId: "hannahenglishcourse",
-        storageBucket: "hannahenglishcourse.appspot.com",
-        messagingSenderId: "449818788486",
-        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
-        measurementId: "G-07VVJG9LRS",
-        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
-    };
+const firebaseConfig = {
+    apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+    authDomain: "hannahenglishcourse.firebaseapp.com",
+    projectId: "hannahenglishcourse",
+    storageBucket: "hannahenglishcourse.appspot.com",
+    messagingSenderId: "449818788486",
+    appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+    measurementId: "G-07VVJG9LRS",
+    databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+};
 
-    // Inicializa o Firebase
-    firebase.initializeApp(firebaseConfig);
+// Inicializa o Firebase
+firebase.initializeApp(firebaseConfig);
 
-    let currentQuestionIndex = 0;
-    let questions = [];
+    $1
+let answeredQuestions = [];
+let userAnswers = {};
+let speechSynthesisUtterance = null;
     let answeredQuestions = [];
     let userAnswers = {}; // Objeto para armazenar as respostas do usuário
     let speechSynthesisUtterance = null;
 
-    async function loadQuestions() {
+    async function generatePDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    const logo = new Image();
+    logo.src = 'Logo.png';
+
+    doc.addImage(logo, 'PNG', 90, 10, 30, 30);
+
+    doc.setFontSize(20);
+    doc.text('Hannah Quiz', 105, 50, null, null, 'center');
+
+    doc.setFontSize(12);
+    doc.text('Name: ____________________________________', 20, 70);
+    doc.text('Date: _______________', 150, 70);
+
+    let yPosition = 90;
+
+    questions.forEach((q, index) => {
+        doc.setFontSize(14);
+        let questionText = `${index + 1}. ${q.question}`;
+        let textLines = doc.splitTextToSize(questionText, 180);
+        let questionHeight = textLines.length * 10;
+
+        if (yPosition + questionHeight > 280) {
+            doc.addPage();
+            yPosition = 20;
+        }
+
+        doc.text(textLines, 20, yPosition);
+        yPosition += questionHeight;
+
+        q.answers.forEach(answer => {
+            doc.setFontSize(12);
+            let answerText = answer;
+            let answerLines = doc.splitTextToSize(answerText, 180);
+            let answerHeight = answerLines.length * 10;
+
+            if (yPosition + answerHeight > 280) {
+                doc.addPage();
+                yPosition = 20;
+            }
+
+            doc.text(answerLines, 30, yPosition);
+            yPosition += answerHeight;
+        });
+
+        yPosition += 10;
+    });
+
+    doc.save('QuizQuestionsWithLogo.pdf');
+}
+}
+
+$1
         const response = await fetch('questions.txt');
         const text = await response.text();
         const lines = text.split('\n');
@@ -243,33 +301,15 @@
         displayQuestion();
     }
 
-    function displayQuestion() {
-        const container = document.getElementById('quiz-container');
-        container.innerHTML = '';
+    $1
+    // Adiciona a imagem correspondente à questão
+    const questionImage = document.createElement('img');
+    questionImage.src = `imagens/imagem${currentQuestionIndex + 1}.jpeg`;
+    questionImage.alt = `Imagem para questão ${currentQuestionIndex + 1}`;
+    questionImage.classList.add('question-image');
+    questionDiv.appendChild(questionImage);
 
-        const q = questions[currentQuestionIndex];
-        const questionDiv = document.createElement('div');
-        questionDiv.classList.add('question');
-
-        // Adiciona a imagem correspondente à questão
-        const questionImage = document.createElement('img');
-        questionImage.src = `imagens/imagem${currentQuestionIndex + 1}.jpeg`;
-        questionImage.alt = `Imagem para questão ${currentQuestionIndex + 1}`;
-        questionImage.classList.add('question-image');
-        questionDiv.appendChild(questionImage);
-
-        const questionText = document.createElement('p');
-        questionText.id = 'question-text';
-        questionText.innerText = `${currentQuestionIndex + 1}. ${q.question}`;
-        questionDiv.appendChild(questionText);
-
-        q.answers.forEach((answer) => {
-            const answerLabel = document.createElement('label');
-            answerLabel.innerHTML = `<input type="radio" name="question${currentQuestionIndex}" value="${answer[0]}" onclick="checkAnswer(this, '${answer[0]}')"> ${answer}`;
-            questionDiv.appendChild(answerLabel);
-        });
-
-        container.appendChild(questionDiv);
+    container.appendChild(questionDiv);
 
         // Restaura a resposta do usuário, se houver
         if (userAnswers[currentQuestionIndex]) {
@@ -378,7 +418,32 @@
         document.getElementById('overlay').style.display = 'none';
     }
 
-    window.onload = loadQuestions;
+    // Função para exibir o botão PDF se o papel for 'professor' ou 'proprietario'
+function displayPdfButton(role) {
+    if (role === 'professor' || role === 'proprietario') {
+        const pdfButton = document.createElement('button');
+        pdfButton.className = 'pdf-btn';
+        pdfButton.id = 'pdf-btn';
+        pdfButton.textContent = 'Generate PDF';
+        pdfButton.onclick = generatePDF;
+        document.querySelector('.btn-group').appendChild(pdfButton);
+    }
+}
+
+// Obter o papel do usuário e exibir o botão condicionalmente
+firebase.auth().onAuthStateChanged(function(user) {
+    if (user) {
+        // Substitua o caminho abaixo conforme necessário para buscar o papel do usuário
+        firebase.database().ref('usuarios/' + user.uid + '/role').once('value').then((snapshot) => {
+            const role = snapshot.val();
+            displayPdfButton(role);
+        });
+    }
+});
+    }
+});
+
+$1
 </script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
