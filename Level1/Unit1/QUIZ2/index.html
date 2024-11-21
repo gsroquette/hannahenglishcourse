@@ -496,10 +496,19 @@ function toggleButtons(state) {
         doc.text('Name: ____________________________________', 20, 70);
         doc.text('Date: _______________', 150, 70);
 
-        let yPosition = 90; // Define a posição inicial para adicionar as perguntas e imagens
+        let yPosition = 90;
 
-        questions.forEach((q, index) => {
-            // Prepara o texto da pergunta
+        // Função que processa a próxima pergunta
+        const processQuestion = (index) => {
+            if (index >= questions.length) {
+                // Salva o PDF após processar todas as perguntas
+                doc.save('QuizQuestionsWithImages.pdf');
+                return;
+            }
+
+            const q = questions[index];
+
+            // Adiciona o texto da pergunta
             doc.setFontSize(14);
             let questionText = `${index + 1}. ${q.question}`;
             let textLines = doc.splitTextToSize(questionText, 180);
@@ -521,12 +530,12 @@ function toggleButtons(state) {
 
             // Adiciona o texto da pergunta
             doc.text(textLines, 20, yPosition);
-            yPosition += questionHeight;
+            yPosition += questionHeight + 10; // Adiciona um espaço entre o texto e a imagem
 
             // Adiciona a imagem correspondente à questão
             img.onload = function() {
                 doc.addImage(img, 'JPEG', 20, yPosition, 60, 40);
-                yPosition += imageHeight;
+                yPosition += imageHeight + 10;
 
                 // Adiciona as alternativas de resposta
                 q.answers.forEach(answer => {
@@ -541,27 +550,32 @@ function toggleButtons(state) {
                     }
 
                     doc.text(answerLines, 30, yPosition);
-                    yPosition += answerHeight;
+                    yPosition += answerHeight + 5; // Adiciona um espaço entre cada alternativa
                 });
 
                 yPosition += 10; // Espaçamento adicional entre perguntas
 
-                // Salva o PDF após a última imagem ser carregada e adicionada
-                if (index === questions.length - 1) {
-                    doc.save('QuizQuestionsWithImages.pdf');
-                }
+                // Processa a próxima pergunta
+                processQuestion(index + 1);
             };
 
             img.onerror = function() {
                 console.error('Erro ao carregar a imagem: ', img.src);
+                yPosition += imageHeight + 10; // Pula o espaço da imagem se não for carregada
+
+                // Processa a próxima pergunta mesmo sem a imagem
+                processQuestion(index + 1);
             };
-        });
+        };
+
+        // Inicia o processamento das perguntas
+        processQuestion(0);
     };
 
     logo.onerror = function() {
         console.error('Erro ao carregar a logo.');
     };
-}      
+}
 
     window.onload = loadQuestions;
 
