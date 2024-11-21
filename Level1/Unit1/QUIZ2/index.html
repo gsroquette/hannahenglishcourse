@@ -483,63 +483,78 @@ function toggleButtons(state) {
     // Adiciona a logo no topo do PDF
     const logo = new Image();
     logo.src = 'Logo.png'; 
-    doc.addImage(logo, 'PNG', 90, 10, 30, 30); 
 
-    // Adiciona o título do PDF
-    doc.setFontSize(20);
-    doc.text('Hannah Quiz', 105, 50, null, null, 'center');
+    logo.onload = function() {
+        doc.addImage(logo, 'PNG', 90, 10, 30, 30);
 
-    // Adiciona o espaço para nome e data
-    doc.setFontSize(12);
-    doc.text('Name: ____________________________________', 20, 70);
-    doc.text('Date: _______________', 150, 70);
+        // Adiciona o título do PDF
+        doc.setFontSize(20);
+        doc.text('Hannah Quiz', 105, 50, null, null, 'center');
 
-    let yPosition = 90; // Define a posição inicial para adicionar as perguntas e imagens
+        // Adiciona o espaço para nome e data
+        doc.setFontSize(12);
+        doc.text('Name: ____________________________________', 20, 70);
+        doc.text('Date: _______________', 150, 70);
 
-    questions.forEach((q, index) => {
-        // Adiciona o texto da pergunta ao PDF
-        doc.setFontSize(14);
-        let questionText = `${index + 1}. ${q.question}`;
-        let textLines = doc.splitTextToSize(questionText, 180);  
-        let questionHeight = textLines.length * 10; 
+        let yPosition = 90;
 
-        // Verifica se precisa adicionar uma nova página para caber a pergunta e a imagem
-        if (yPosition + questionHeight + 60 > 280) { // 60 para incluir a altura da imagem
-            doc.addPage();
-            yPosition = 20;
-        }
+        // Iterar pelas perguntas e adicionar ao PDF
+        questions.forEach((q, index) => {
+            // Adiciona o texto da pergunta ao PDF
+            doc.setFontSize(14);
+            let questionText = `${index + 1}. ${q.question}`;
+            let textLines = doc.splitTextToSize(questionText, 180);
+            let questionHeight = textLines.length * 10;
 
-        doc.text(textLines, 20, yPosition);
-        yPosition += questionHeight;
-
-        // Adiciona a imagem correspondente à questão
-        const img = new Image();
-        img.src = `imagens/imagem${index + 1}.jpeg`; // Define o caminho da imagem
-
-        doc.addImage(img, 'JPEG', 20, yPosition, 60, 40); // Adiciona a imagem no PDF
-        yPosition += 50; // Ajusta a posição vertical para a próxima pergunta
-
-        // Adiciona as opções de resposta ao PDF
-        q.answers.forEach(answer => {
-            doc.setFontSize(12);
-            let answerText = answer;
-            let answerLines = doc.splitTextToSize(answerText, 180);
-            let answerHeight = answerLines.length * 10;
-
-            if (yPosition + answerHeight > 280) {
+            if (yPosition + questionHeight + 50 > 280) {
                 doc.addPage();
                 yPosition = 20;
             }
 
-            doc.text(answerLines, 30, yPosition);
-            yPosition += answerHeight;
+            doc.text(textLines, 20, yPosition);
+            yPosition += questionHeight;
+
+            // Adiciona a imagem correspondente à questão
+            const img = new Image();
+            img.src = `../../../imagens/imagem${index + 1}.jpeg`;
+
+            img.onload = function() {
+                doc.addImage(img, 'JPEG', 20, yPosition, 60, 40);
+                yPosition += 50;
+
+                // Adiciona as opções de resposta ao PDF
+                q.answers.forEach(answer => {
+                    doc.setFontSize(12);
+                    let answerText = answer;
+                    let answerLines = doc.splitTextToSize(answerText, 180);
+                    let answerHeight = answerLines.length * 10;
+
+                    if (yPosition + answerHeight > 280) {
+                        doc.addPage();
+                        yPosition = 20;
+                    }
+
+                    doc.text(answerLines, 30, yPosition);
+                    yPosition += answerHeight;
+                });
+
+                yPosition += 10;
+
+                // Salva o PDF após a última imagem ser carregada e adicionada
+                if (index === questions.length - 1) {
+                    doc.save('QuizQuestionsWithImages.pdf');
+                }
+            };
+
+            img.onerror = function() {
+                console.error('Erro ao carregar a imagem: ', img.src);
+            };
         });
+    };
 
-        yPosition += 10; // Espaço adicional entre as perguntas
-    });
-
-    // Salva o PDF gerado
-    doc.save('QuizQuestionsWithImages.pdf');
+    logo.onerror = function() {
+        console.error('Erro ao carregar a logo.');
+    };
 }
 
     window.onload = loadQuestions;
