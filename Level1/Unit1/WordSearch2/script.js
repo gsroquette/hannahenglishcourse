@@ -32,8 +32,10 @@ async function loadWords() {
 function createWordSearchGrid() {
     grid = Array.from({ length: gridSize }, () => Array(gridSize).fill(''));
 
+    // Coloca as palavras no grid
     wordsToFind.forEach(word => placeWordInGrid(word));
 
+    // Preenche as células vazias com letras aleatórias
     for (let row = 0; row < gridSize; row++) {
         for (let col = 0; col < gridSize; col++) {
             if (grid[row][col] === '') {
@@ -116,7 +118,7 @@ function displayWordsList() {
 function markWordInList(word) {
     const listItems = wordsList.getElementsByTagName('li');
     for (let item of listItems) {
-        if (item.textContent === word) {
+        if (item.textContent.trim().toUpperCase() === word.trim().toUpperCase()) {
             item.style.textDecoration = 'line-through';
             break;
         }
