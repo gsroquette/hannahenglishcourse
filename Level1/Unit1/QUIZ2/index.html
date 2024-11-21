@@ -476,13 +476,13 @@ function toggleButtons(state) {
         return { level, unit };
     }
 
-    function generatePDF() {
+   function generatePDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
     // Adiciona a logo no topo do PDF
     const logo = new Image();
-    logo.src = 'Logo.png'; 
+    logo.src = 'Logo.png';
 
     logo.onload = function() {
         doc.addImage(logo, 'PNG', 90, 10, 30, 30);
@@ -496,33 +496,39 @@ function toggleButtons(state) {
         doc.text('Name: ____________________________________', 20, 70);
         doc.text('Date: _______________', 150, 70);
 
-        let yPosition = 90;
+        let yPosition = 90; // Define a posição inicial para adicionar as perguntas e imagens
 
-        // Iterar pelas perguntas e adicionar ao PDF
         questions.forEach((q, index) => {
-            // Adiciona o texto da pergunta ao PDF
+            // Prepara o texto da pergunta
             doc.setFontSize(14);
             let questionText = `${index + 1}. ${q.question}`;
             let textLines = doc.splitTextToSize(questionText, 180);
             let questionHeight = textLines.length * 10;
 
-            if (yPosition + questionHeight + 50 > 280) {
+            // Prepara a imagem
+            const img = new Image();
+            img.src = `imagens/imagem${index + 1}.jpeg`;
+            let imageHeight = 50;
+
+            // Calcula a altura necessária para a pergunta, imagem e respostas
+            let totalHeight = questionHeight + imageHeight + (q.answers.length * 10) + 20;
+
+            // Verifica se precisa adicionar uma nova página
+            if (yPosition + totalHeight > 280) {
                 doc.addPage();
                 yPosition = 20;
             }
 
+            // Adiciona o texto da pergunta
             doc.text(textLines, 20, yPosition);
             yPosition += questionHeight;
 
             // Adiciona a imagem correspondente à questão
-            const img = new Image();
-            img.src = `imagens/imagem${index + 1}.jpeg`;
-
             img.onload = function() {
                 doc.addImage(img, 'JPEG', 20, yPosition, 60, 40);
-                yPosition += 50;
+                yPosition += imageHeight;
 
-                // Adiciona as opções de resposta ao PDF
+                // Adiciona as alternativas de resposta
                 q.answers.forEach(answer => {
                     doc.setFontSize(12);
                     let answerText = answer;
@@ -538,13 +544,24 @@ function toggleButtons(state) {
                     yPosition += answerHeight;
                 });
 
-                yPosition += 10;
+                yPosition += 10; // Espaçamento adicional entre perguntas
 
                 // Salva o PDF após a última imagem ser carregada e adicionada
                 if (index === questions.length - 1) {
                     doc.save('QuizQuestionsWithImages.pdf');
                 }
             };
+
+            img.onerror = function() {
+                console.error('Erro ao carregar a imagem: ', img.src);
+            };
+        });
+    };
+
+    logo.onerror = function() {
+        console.error('Erro ao carregar a logo.');
+    };
+}
 
             img.onerror = function() {
                 console.error('Erro ao carregar a imagem: ', img.src);
