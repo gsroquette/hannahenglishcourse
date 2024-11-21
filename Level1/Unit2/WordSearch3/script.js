@@ -32,8 +32,10 @@ async function loadWords() {
 function createWordSearchGrid() {
     grid = Array.from({ length: gridSize }, () => Array(gridSize).fill(''));
 
+    // Coloca as palavras no grid
     wordsToFind.forEach(word => placeWordInGrid(word));
 
+    // Preenche as células vazias com letras aleatórias
     for (let row = 0; row < gridSize; row++) {
         for (let col = 0; col < gridSize; col++) {
             if (grid[row][col] === '') {
@@ -116,13 +118,14 @@ function displayWordsList() {
 function markWordInList(word) {
     const listItems = wordsList.getElementsByTagName('li');
     for (let item of listItems) {
-        if (item.textContent === word) {
+        if (item.textContent.trim().toUpperCase() === word.trim().toUpperCase()) {
             item.style.textDecoration = 'line-through';
             break;
         }
     }
 }
 
+// Função para lidar com o clique no canvas
 function handleCanvasClick(event) {
     const rect = canvas.getBoundingClientRect();
     const x = (event.clientX - rect.left) * (canvas.width / rect.width);
@@ -131,6 +134,12 @@ function handleCanvasClick(event) {
     const col = Math.floor(x / cellSize);
     const row = Math.floor(y / cellSize);
 
+    // Verifica se a célula já foi selecionada
+    if (selectedCells.some(cell => cell.row === row && cell.col === col)) {
+        return; // Se a célula já foi selecionada, não faz nada
+    }
+
+    // Adiciona lógica para verificar continuidade das células selecionadas
     if (selectedCells.length > 0) {
         const lastCell = selectedCells[selectedCells.length - 1];
 
@@ -141,19 +150,17 @@ function handleCanvasClick(event) {
 
         if (isHorizontal || isVertical || isDiagonal1 || isDiagonal2) {
             selectedCells.push({ row, col });
-            drawWordSearchGrid();
-            drawSelectedCells();
-            checkWord();
         } else {
+            // Reinicia a seleção se a célula não for contínua
             selectedCells = [{ row, col }];
-            drawWordSearchGrid();
-            drawSelectedCells();
         }
     } else {
         selectedCells.push({ row, col });
-        drawWordSearchGrid();
-        drawSelectedCells();
     }
+
+    drawWordSearchGrid();
+    drawSelectedCells();
+    checkWord();
 }
 
 function checkWord() {
