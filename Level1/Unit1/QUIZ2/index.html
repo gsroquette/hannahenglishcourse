@@ -83,9 +83,9 @@
         }
 
         .read-btn i {
-            font-size: 1.2em;
-            margin-right: 5px;
-            vertical-align: middle;
+            font-size: 1.2em; /* Ajusta o tamanho dos ícones */
+            margin-right: 5px; /* Espaço entre o ícone e o texto */
+            vertical-align: middle; /* Alinha o ícone ao texto */
         }
 
         .read-btn:hover {
@@ -110,6 +110,7 @@
             display: none;
         }
 
+        /* Modal de conclusão */
         #completion-modal {
             display: none;
             position: fixed;
@@ -182,6 +183,7 @@
     <audio id="feedback-audio"></audio>
 </div>
 
+<!-- Modal de conclusão -->
 <div id="overlay"></div>
 <div id="completion-modal">
     <h2>Phase Completed!</h2>
@@ -305,63 +307,76 @@
         }
     }
 
-    function generatePDF() {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
+    function checkAnswer(radioElement, selectedAnswer) {
+        const q = questions[currentQuestionIndex];
+        const feedbackDiv = document.getElementById('feedback');
+        const feedbackImg = document.getElementById('feedback-img');
+        const feedbackAudio = document.getElementById('feedback-audio');
+        const gifContainer = document.querySelector('.gif-container');
 
-        const logo = new Image();
-        logo.src = 'Logo.png';
+        // Salva a resposta do usuário
+        userAnswers[currentQuestionIndex] = selectedAnswer;
 
-        doc.addImage(logo, 'PNG', 90, 10, 30, 30);
+        if (selectedAnswer === q.correct) {
+            feedbackImg.src = 'certo.gif';
+            feedbackAudio.src = 'certo.mp3';
+            feedbackAudio.play();
+            feedbackDiv.style.display = 'block';
+            gifContainer.style.display = 'block';
+            answeredQuestions[currentQuestionIndex] = true;
 
-        doc.setFontSize(20);
-        doc.text('Hannah Quiz', 105, 50, null, null, 'center');
+            setTimeout(() => {
+                hideGIF();
+                showNextQuestion();
+                checkCompletion();
+            }, 2000);
+        } else {
+            feedbackImg.src = 'errado.gif';
+            feedbackAudio.src = 'errado.mp3';
+            feedbackAudio.play();
+            feedbackDiv.style.display = 'block';
+            gifContainer.style.display = 'block';
 
-        doc.setFontSize(12);
-        doc.text('Name: ____________________________________', 20, 70);
-        doc.text('Date: _______________', 150, 70);
+            setTimeout(() => {
+                hideGIF();
+                radioElement.checked = false;
+            }, 2000);
+        }
+    }
 
-        let yPosition = 90;
+    function hideGIF() {
+        const gifContainer = document.querySelector('.gif-container');
+        gifContainer.style.display = 'none';
+    }
 
-        questions.forEach((q, index) => {
-            doc.setFontSize(14);
-            let questionText = `${index + 1}. ${q.question}`;
-            let textLines = doc.splitTextToSize(questionText, 180);
-            let questionHeight = textLines.length * 10;
+    function readQuestion() {
+        stopReading();
+        const questionText = document.getElementById('question-text').innerText;
+        speechSynthesisUtterance = new SpeechSynthesisUtterance(questionText);
+        speechSynthesisUtterance.lang = 'en-US';
+        speechSynthesis.speak(speechSynthesisUtterance);
+    }
 
-            if (yPosition + questionHeight > 280) {
-                doc.addPage();
-                yPosition = 20;
-            }
+    function stopReading() {
+        if (speechSynthesisUtterance) {
+            speechSynthesis.cancel();
+        }
+    }
 
-            // Adiciona a imagem da questão ao PDF
-            const questionImage = new Image();
-            questionImage.src = `imagens/imagem${index + 1}.jpeg`;
-            doc.addImage(questionImage, 'JPEG', 20, yPosition, 50, 50);
-            yPosition += 60;
+    function checkCompletion() {
+        if (answeredQuestions.every((answered) => answered)) {
+            showModal();
+        }
+    }
 
-            doc.text(textLines, 20, yPosition);
-            yPosition += questionHeight;
+    function showModal() {
+        document.getElementById('completion-modal').style.display = 'block';
+        document.getElementById('overlay').style.display = 'block';
+    }
 
-            q.answers.forEach(answer => {
-                doc.setFontSize(12);
-                let answerText = answer;
-                let answerLines = doc.splitTextToSize(answerText, 180);
-                let answerHeight = answerLines.length * 10;
-
-                if (yPosition + answerHeight > 280) {
-                    doc.addPage();
-                    yPosition = 20;
-                }
-
-                doc.text(answerLines, 30, yPosition);
-                yPosition += answerHeight;
-            });
-
-            yPosition += 10;
-        });
-
-        doc.save('QuizQuestionsWithLogoAndImages.pdf');
+    function closeModal() {
+        document.getElementById('completion-modal').style.display = 'none';
+        document.getElementById('overlay').style.display = 'none';
     }
 
     window.onload = loadQuestions;
