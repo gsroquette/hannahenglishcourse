@@ -137,6 +137,11 @@ function handleCanvasClick(event) {
     const col = Math.floor(x / cellSize);
     const row = Math.floor(y / cellSize);
 
+    // Verifica se a célula já foi selecionada
+    if (selectedCells.some(cell => cell.row === row && cell.col === col)) {
+        return; // Se a célula já foi selecionada, não faz nada
+    }
+
     if (selectedCells.length > 0) {
         const lastCell = selectedCells[selectedCells.length - 1];
 
@@ -147,19 +152,16 @@ function handleCanvasClick(event) {
 
         if (isHorizontal || isVertical || isDiagonal1 || isDiagonal2) {
             selectedCells.push({ row, col });
-            drawWordSearchGrid();
-            drawSelectedCells();
-            checkWord();
         } else {
             selectedCells = [{ row, col }];
-            drawWordSearchGrid();
-            drawSelectedCells();
         }
     } else {
         selectedCells.push({ row, col });
-        drawWordSearchGrid();
-        drawSelectedCells();
     }
+
+    drawWordSearchGrid();
+    drawSelectedCells();
+    checkWord();
 }
 
 // Função para verificar se uma palavra foi encontrada
