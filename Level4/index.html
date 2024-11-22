@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Select a Unit - Level A</title>
+    <title>Select a Unit - Level D</title>
     <link rel="stylesheet" href="../CSS/styles.css">
     <style>
         .map-container {
@@ -14,6 +14,27 @@
             background-repeat: repeat;
             background-size: 200%;
             overflow-y: auto;
+        }
+
+        .header-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+        }
+
+        .header-container h1 {
+            margin: 0;
+            font-size: 36px;
+            color: #4CAF50;
+        }
+
+        .level-display {
+            margin-top: 5px;
+            font-family: Times, serif;
+            font-weight: bold;
+            color: black;
+            font-size: 24px;
         }
 
         .back-button {
@@ -35,10 +56,9 @@
             padding: 20px;
             max-width: 800px;
             margin: 0 auto;
-            justify-content: center; /* Centraliza os itens em telas menores */
+            justify-content: center;
         }
 
-        /* Estilo dos botões das unidades */
         .unit-button {
             text-align: center;
             padding: 10px 0;
@@ -48,49 +68,55 @@
             background-color: white;
             text-decoration: none;
             transition: background-color 0.3s ease, color 0.3s ease;
-            width: 100%; /* Preenche o espaço disponível */
+            width: 100%;
             max-width: 200px;
             box-sizing: border-box;
         }
 
-        /* Hover dos botões das unidades */
         .unit-button:hover {
             background-color: green;
             color: white;
         }
 
-        /* Botões desabilitados */
         .unit-button.disabled {
-            background-color: rgba(128, 128, 128, 0.3); /* Cinza translúcido */
-            border-color: rgba(128, 128, 128, 0.5); /* Cinza mais escuro */
-            color: rgba(128, 128, 128, 0.5); /* Cinza claro */
+            background-color: rgba(128, 128, 128, 0.3);
+            border-color: rgba(128, 128, 128, 0.5);
+            color: rgba(128, 128, 128, 0.5);
             pointer-events: none;
         }
     </style>
 </head>
 <body>
     <div class="map-container">
-        <header>
-            <h1 style="text-align: center;">Select a Unit</h1>
+        <!-- Cabeçalho -->
+        <header class="header-container">
+            <h1>Select a Unit</h1>
+            <div id="level-display" class="level-display"></div>
         </header>
+        
+        <!-- Botão de voltar -->
+        <div style="text-align: center;">
+            <button class="back-button" onclick="window.location.href='../index.html';">Back</button>
+        </div>
+
+        <!-- Unidades -->
         <main>
             <div class="units">
-                <a href="unidade1/index.html" id="unit1" class="unit-button">Unit 1</a>
-                <a href="unidade2/index.html" id="unit2" class="unit-button">Unit 2</a>
-                <a href="unidade3/index.html" id="unit3" class="unit-button">Unit 3</a>
-                <a href="unidade4/index.html" id="unit4" class="unit-button">Unit 4</a>
-                <a href="unidade5/index.html" id="unit5" class="unit-button">Unit 5</a>
-                <a href="unidade6/index.html" id="unit6" class="unit-button">Unit 6</a>
-                <a href="unidade7/index.html" id="unit7" class="unit-button">Unit 7</a>
-                <a href="unidade8/index.html" id="unit8" class="unit-button">Unit 8</a>
-                <a href="unidade9/index.html" id="unit9" class="unit-button">Unit 9</a>
-                <a href="unidade10/index.html" id="unit10" class="unit-button">Unit 10</a>
-            </div>
-            <button class="back-button" onclick="window.location.href='../index.html';">Back</button>
+                <a href="Unit1/index.html" id="unit1" class="unit-button">Unit 1</a>
+                <a href="Unit2/index.html" id="unit2" class="unit-button disabled">Unit 2</a>
+                <a href="Unit3/index.html" id="unit3" class="unit-button disabled">Unit 3</a>
+                <a href="Unit4/index.html" id="unit4" class="unit-button disabled">Unit 4</a>
+                <a href="Unit5/index.html" id="unit5" class="unit-button disabled">Unit 5</a>
+                <a href="Unit6/index.html" id="unit6" class="unit-button disabled">Unit 6</a>
+                <a href="Unit7/index.html" id="unit7" class="unit-button disabled">Unit 7</a>
+                <a href="Unit8/index.html" id="unit8" class="unit-button disabled">Unit 8</a>
+                <a href="Unit9/index.html" id="unit9" class="unit-button disabled">Unit 9</a>
+                <a href="Unit10/index.html" id="unit10" class="unit-button disabled">Unit 10</a>
+            </div>            
         </main>
     </div>
 
-    <!-- Firebase Configuration and Initialization (Namespaced SDK) -->
+    <!-- Firebase Configuration and Initialization -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
@@ -110,29 +136,27 @@
         const db = firebase.database();
         const auth = firebase.auth();
 
-        // Carregar o progresso do aluno quando ele está autenticado
-        auth.onAuthStateChanged(user => {
-            if (user) {
-                console.log("Usuário autenticado:", user.uid);
-                carregarProgresso(user.uid); 
+        // Função para desbloquear unidades
+        function desbloquearUnidades(userId, role) {
+            if (role === 'proprietario' || role === 'professor') {
+                desbloquearTodasUnidades();
             } else {
-                console.error("Erro: Usuário não autenticado");
+                carregarProgresso(userId);
             }
-        });
+        }
 
+        // Carregar o progresso do aluno
         function carregarProgresso(userId) {
-            db.ref(`usuarios/${userId}/progresso/Level4`).once('value')
+            db.ref(`usuarios/${userId}/progresso/Level1`).once('value')
                 .then(snapshot => {
                     const progresso = snapshot.val();
-                    console.log("Progresso do usuário:", progresso); // Log para verificar os dados recebidos
-
                     const units = document.querySelectorAll('.unit-button');
                     
                     units.forEach(unit => {
                         const unitId = unit.id.replace('unit', 'Unit');
-                        // Verifica se a unidade está no progresso e tem fase1 como true
-                        if (!progresso || !progresso[unitId] || progresso[unitId].fase1 !== true) {
-                            unit.classList.add('disabled');
+                        
+                        if (progresso && progresso[unitId] && progresso[unitId].fase1 === true) {
+                            unit.classList.remove('disabled');
                         }
                     });
                 })
@@ -140,6 +164,41 @@
                     console.error("Erro ao acessar o banco de dados:", error);
                 });
         }
+
+        // Desbloquear todas as unidades
+        function desbloquearTodasUnidades() {
+            const units = document.querySelectorAll('.unit-button');
+            units.forEach(unit => {
+                unit.classList.remove('disabled');
+            });
+        }
+
+        // Monitorar autenticação
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                db.ref(`usuarios/${user.uid}/role`).once('value')
+                    .then(snapshot => {
+                        const role = snapshot.val();
+                        desbloquearUnidades(user.uid, role);
+                    })
+                    .catch(error => {
+                        console.error("Erro ao acessar o banco de dados para verificar o papel:", error);
+                    });
+            } else {
+                console.error("Erro: Usuário não autenticado");
+            }
+        });
+
+        // Exibir o Level atual
+        document.addEventListener("DOMContentLoaded", function() {
+            const levelDisplay = document.getElementById('level-display');
+            const url = window.location.href;
+            const levelMatch = url.match(/Level\d+/);
+
+            if (levelMatch) {
+                levelDisplay.textContent = levelMatch[0]; // Exibe o Level encontrado
+            }
+        });
     </script>
 </body>
 </html>
