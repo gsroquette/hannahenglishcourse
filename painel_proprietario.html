@@ -301,46 +301,78 @@
         }
       });
 
-      document.getElementById('cadastroForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        const email = document.getElementById('email').value;
-        const senha = document.getElementById('senha').value;
-        const nome = document.getElementById('nome').value;
-        const telefone = document.getElementById('telefone').value;
-        const tipo = document.getElementById('tipo').value;
-        const dataHora = new Date().toLocaleString();
-        const feedback = document.getElementById('feedback');
-        feedback.textContent = '';
+    document.getElementById('cadastroForm').addEventListener('submit', function(e) {
+    e.preventDefault();
 
-        if (senha.length < 6) {
-          feedback.textContent = 'A senha deve ter pelo menos 6 caracteres.';
-          return;
-        }
+    const email = document.getElementById('email').value;
+    const senha = document.getElementById('senha').value;
+    const nome = document.getElementById('nome').value;
+    const telefone = document.getElementById('telefone').value;
+    const tipo = document.getElementById('tipo').value;
+    const dataHora = new Date().toLocaleString();
+    const feedback = document.getElementById('feedback');
+    feedback.textContent = '';
 
-        firebase.auth().createUserWithEmailAndPassword(email, senha)
-          .then(userCredential => {
+    if (senha.length < 6) {
+        feedback.textContent = 'A senha deve ter pelo menos 6 caracteres.';
+        return;
+    }
+
+    firebase.auth().createUserWithEmailAndPassword(email, senha)
+        .then(userCredential => {
             const userId = userCredential.user.uid;
+
+            // Criando a estrutura de progresso conforme solicitado
+            let progresso = {};
+            for (let level = 0; level <= 4; level++) {
+                const levelKey = `Level${level}`;
+                progresso[levelKey] = {};
+                
+                for (let unit = 1; unit <= 20; unit++) {
+                    const unitKey = `Unit${unit}`;
+                    progresso[levelKey][unitKey] = {};
+
+                    // Definindo a numeração das fases de acordo com o nível e unidade
+                    let faseInicio = level * 1000 + 1 + (unit - 1) * 30;
+                    
+                    for (let fase = faseInicio; fase < faseInicio + 30; fase++) {
+                        const faseKey = `fase${fase}`;
+                        progresso[levelKey][unitKey][faseKey] = false;
+                    }
+
+                    // Definindo a primeira fase de Level0/Unit1 como true
+                    if (level === 0 && unit === 1) {
+                        progresso[levelKey][unitKey]['fase1'] = true;
+                    }
+                    // Definindo a primeira fase de Level1/Unit1 como true
+                    if (level > 0 && unit === 1) {
+                        const faseInicial = `${level}001`;
+                        progresso[levelKey][unitKey][`fase${faseInicial}`] = true;
+                    }
+                }
+            }
+
             const userData = {
-              email: email,
-              nome: nome,
-              telefone: telefone,
-              role: tipo,
-              progresso: tipo === 'aluno' ? {} : null,
-              dataHoraCadastro: dataHora
+                email: email,
+                nome: nome,
+                telefone: telefone,
+                role: tipo,
+                progresso: tipo === 'aluno' ? progresso : null,
+                dataHoraCadastro: dataHora
             };
+
             return db.ref('usuarios/' + userId).set(userData);
-          })
-          .then(() => {
+        })
+        .then(() => {
             alert("Usuário cadastrado com sucesso!");
             document.getElementById('cadastroForm').reset();
             buscarUsuarios(true);
-          })
-          .catch(error => {
+        })
+        .catch(error => {
             console.error("Erro ao cadastrar usuário:", error);
             feedback.textContent = `Erro: ${error.message}`;
-          });
-      });
+        });
+});
 
       window.buscarUsuarios = buscarUsuarios;
       buscarUsuarios(true);
