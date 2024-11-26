@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hannah Word Search Game</title>
+    <style>
+        /* Estilos originais do arquivo */
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            box-sizing: border-box;
+            background-image: url('../../../imagens/fundo.png');
+            background-repeat: repeat;
+            background-size: contain;
+            background-position: center;
+        }
+        h1 {
+            font-size: 2.5em;
+            margin: 20px 0;
+            color: #4a90e2;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        #word-search-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+        #word-search-canvas {
+            width: 100%;
+            max-width: 600px;
+            height: auto;
+            border: 2px solid #4a90e2;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        #words-list {
+            text-align: left;
+            max-width: 100%;
+            margin-top: 20px;
+        }
+        #words-list ul {
+            list-style-type: none;
+            padding: 0;
+            text-align: center;
+        }
+        #words-list li {
+            margin: 5px 0;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+            display: inline-block;
+        }
+        #words-list li:hover {
+            background-color: #e1ecf4;
+        }
+        #reset-button {
+            margin: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #4a90e2;
+            color: white;
+            transition: background-color 0.3s ease;
+        }
+        #reset-button:hover {
+            background-color: #357ABD;
+        }
+        #back-button {
+            margin: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #4a90e2;
+            color: white;
+            transition: background-color 0.3s ease;
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+        }
+        #back-button:hover {
+            background-color: #357ab7;
+        }
+
+        /* Estilos do modal de conclusão */
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            z-index: 1000;
+        }
+        #completion-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            display: none;
+            z-index: 1001;
+        }
+        #completion-modal h2 {
+            margin-top: 0;
+            font-size: 2rem;
+            color: #4a90e2;
+        }
+        #completion-modal p {
+            font-size: 1.2rem;
+            margin: 10px 0;
+        }
+        #completion-modal button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 1rem;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #4a90e2;
+            color: white;
+            transition: background-color 0.3s ease;
+        }
+        #completion-modal button:hover {
+            background-color: #357ABD;
+        }
+    </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+    <button onclick="history.back()" id="back-button">Back</button>
+
+    <h1>Hannah Word Search Game</h1>
+    <button id="reset-button">Restart Game</button>
+    <button id="pdf-button" onclick="generatePDF()" style="display: none; margin: 20px; padding: 10px 20px; font-size: 16px; cursor: pointer; border: none; border-radius: 5px; background-color: #4a90e2; color: white; transition: background-color 0.3s ease;">Generate PDF</button>
+    <div id="word-search-container">
+        <canvas id="word-search-canvas"></canvas>
+        <div id="words-list">
+            <h2>Words to Find</h2>
+            <ul id="words"></ul>
+        </div>
+    </div>
+
+    <!-- Modal de conclusão -->
+    <div id="overlay"></div>
+    <div id="completion-modal">
+        <h2>Phase Completed!</h2>
+        <p>Congratulations! You have completed this phase.</p>
+        <button onclick="closeModal()">Close</button>
+    </div>
+
+    <!-- Scripts do Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+    <!-- Configuração do Firebase -->
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+            authDomain: "hannahenglishcourse.firebaseapp.com",
+            projectId: "hannahenglishcourse",
+            storageBucket: "hannahenglishcourse.appspot.com",
+            messagingSenderId: "449818788486",
+            appId: "APP_ID",
+            measurementId: "G-07VVJG9LRS",
+            databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+        };
+        firebase.initializeApp(firebaseConfig);
+    </script>
+
+    <!-- Script do jogo -->
+    <script src="script.js"></script>
+<script>
+    function generatePDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        // Adicionar a logo e campos de nome e data
+        const img = new Image();
+        img.src = '../../../imagens/hannah_logo.png'; // Caminho da logo (3 níveis acima)
+
+        // Carregar a imagem e continuar com a criação do PDF
+        img.onload = () => {
+            doc.addImage(img, 'PNG', 10, 10, 30, 30); // Posiciona a logo no topo (10,10) com tamanho 3x3cm
+
+            // Adicionar campos de Nome e Data ao lado da logo
+            doc.setFontSize(12);
+            doc.text('Name: ___________________________________________  Date: __________', 50, 20);
+
+            // Adicionar título do PDF abaixo da logo e dos campos de nome/data
+            doc.setFontSize(18);
+            doc.text('Hannah Word Search Game', 105, 50, { align: 'center' });
+
+            // Lista de palavras
+            const wordsList = Array.from(document.querySelectorAll('#words-list li'))
+                .map(li => li.textContent)
+                .join(', ');
+
+            doc.setFontSize(12);
+            doc.text('Words to Find:', 10, 60);
+            doc.text(wordsList, 10, 70, { maxWidth: 180 });
+
+            // Grid do caça-palavras
+            const canvas = document.getElementById('word-search-canvas');
+            doc.addImage(canvas.toDataURL('image/png'), 'PNG', 10, 80, 180, 180); // Ajusta a posição e tamanho
+
+            // Gerar e baixar o PDF
+            doc.save('Hannah_Word_Search_Game.pdf');
+        };
+    }
+</script>
+
+<script>
+    // Função para verificar o role do usuário
+function checkUserRole() {
+    firebase.auth().onAuthStateChanged(async function(user) {
+        if (user) {
+            const uid = user.uid;
+            const roleRef = firebase.database().ref('usuarios/' + uid + '/role');
+            
+            // Obtenha o role do usuário no banco de dados
+            roleRef.once('value').then((snapshot) => {
+                const role = snapshot.val();
+                console.log("Role do usuário:", role); // Log para verificar o role
+                
+                // Exibe o botão somente se o role for 'professor' ou 'proprietario'
+                if (role === 'professor' || role === 'proprietario') {
+                    document.getElementById('pdf-button').style.display = 'block';
+                }
+            }).catch((error) => {
+                console.error("Erro ao obter o role:", error);
+            });
+        } else {
+            console.error("Usuário não autenticado");
+        }
+    });
+}
+
+    // Chama a função ao carregar a página
+    checkUserRole();
+</script>
+</body>
+</html>
