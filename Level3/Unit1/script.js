@@ -11,11 +11,11 @@ document.addEventListener('DOMContentLoaded', function() {
     let lastUnlockedIndex = -1;
 
     const activities = [
-        { id: 3001, name: "StoryCards", path: "../Unit1/StoryCards/index.html?fase=301", img: "../../imagens/botoes/storycards_button.png", unlocked: false },
-        { id: 3002, name: "Flashcards", path: "../Unit1/Flashcards/index.html?fase=302", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-        { id: 3003, name: "Flashcards2", path: "../Unit1/Flashcards2/index.html?fase=303", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-        { id: 3004, name: "Flashcards3", path: "../Unit1/Flashcards3/index.html?fase=304", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-        { id: 3005, name: "QUIZ", path: "../Unit1/QUIZ/index.html?fase=305", img: "../../imagens/botoes/quiz_button.png", unlocked: false }     
+        { id: 3001, name: "StoryCards", path: "../Unit1/StoryCards/index.html?fase=3001", img: "../../imagens/botoes/storycards_button.png", unlocked: false },
+        { id: 3002, name: "Flashcards", path: "../Unit1/Flashcards/index.html?fase=3002", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+        { id: 3003, name: "Flashcards2", path: "../Unit1/Flashcards2/index.html?fase=3003", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+        { id: 3004, name: "Flashcards3", path: "../Unit1/Flashcards3/index.html?fase=3004", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+        { id: 3005, name: "QUIZ", path: "../Unit1/QUIZ/index.html?fase=3005", img: "../../imagens/botoes/quiz_button.png", unlocked: false }     
     ];
 
      // Fechar o dropdown ao clicar fora dele
