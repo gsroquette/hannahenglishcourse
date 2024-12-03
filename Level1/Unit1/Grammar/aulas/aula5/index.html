@@ -136,7 +136,7 @@
     const lines = data.split('\n');
     const contentDiv = document.getElementById('content');
 
-    lines.forEach(line => {
+    lines.forEach((line, index) => {
         if (line.trim()) {
             const [type, lang, text] = line.split('|');
             if (type) {
@@ -163,31 +163,23 @@
                         break;
                     case 'spacer':
                         element = document.createElement('div');
-                        // Identifica separadores específicos
-                        if (lang === 'separator') {
-                            element.style.width = '100%';
-                            element.style.height = '5px';
-                            element.style.backgroundColor = '#4CAF50'; // Cor verde
-                            element.style.margin = '20px 0'; // Espaçamento
-                        } else {
-                            element.className = 'spacer';
-                        }
+                        element.className = 'spacer';
                         break;
                     default:
                         console.warn(`Tipo desconhecido: ${type}`);
                 }
 
                 if (element) {
-                    // Define texto apenas para elementos textuais
                     if (text && type !== 'spacer') {
                         element.innerText = text.trim();
                     }
-                    element.lang = lang || ''; // Define o idioma
+                    element.lang = lang || '';
+                    element.id = `line-${index}`; // Defina um ID único para cada elemento
                     contentDiv.appendChild(element);
 
                     // Adiciona elementos ao array de textos para o sintetizador
-                    if (type !== 'spacer' || lang === 'separator') {
-                        texts.push({ id: element.id || '', lang, text: text ? text.trim() : '' });
+                    if (type !== 'spacer') {
+                        texts.push({ id: element.id, lang, text: text ? text.trim() : '' });
                     }
                 }
             }
@@ -216,7 +208,7 @@
             button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi ${icon}" viewBox="0 0 16 16"></svg> ${isPlaying ? 'Pause' : 'Start'} Lesson`;
         }
 
-        function speakNext() {
+      function speakNext() {
     if (currentIndex < texts.length) {
         const { id, text, lang } = texts[currentIndex];
         if (!text.trim()) { // Ignora elementos sem texto
@@ -226,6 +218,13 @@
         }
 
         const element = document.getElementById(id);
+        if (!element) { // Verifica se o elemento existe antes de tentar usar
+            console.warn(`Elemento não encontrado: ${id}`);
+            currentIndex++;
+            speakNext();
+            return;
+        }
+
         element.classList.add('highlight');
 
         utterance = new SpeechSynthesisUtterance(text);
