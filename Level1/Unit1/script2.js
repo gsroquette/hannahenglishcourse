@@ -13,8 +13,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const activities = [
         { id: 6, name: "Grammar", path: "../Unit1/Grammar/index.html?fase=6", img: "../../imagens/botoes/grammar_button.png", unlocked: false },
         { id: 7, name: "QUIZ2", path: "../Unit1/QUIZ2/index.html?fase=7", img: "../../imagens/botoes/quiz_button.png", unlocked: false },
-        { id: 8, name: "WordSearch", path: "../Unit1/WordSearch/index.html?fase=8", img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },   
-        { id: 9, name: "HannahVideo", path: "../Unit1/HannahVideo/index.html?fase=9", img: "../../imagens/botoes/video_button.png", unlocked: false }  
+        { id: 8, name: "WordSearch", path: "../Unit1/WordSearch/index.html?fase=8", img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
+        { id: 9, name: "Grammar2", path: "../Unit1/Grammar2/index.html?fase=9", img: "../../imagens/botoes/grammar_button.png", unlocked: false },   
+        { id: 10, name: "HannahVideo", path: "../Unit1/HannahVideo/index.html?fase=10", img: "../../imagens/botoes/video_button.png", unlocked: false }  
     ];
 
     // Fechar o dropdown ao clicar fora dele
