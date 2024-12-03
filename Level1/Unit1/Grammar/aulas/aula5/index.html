@@ -30,9 +30,20 @@
             z-index: 1000;
         }
         h1 {
-            margin: 0;
-            font-size: 1.5em;
+            font-size: 2em;
+            color: #333;
             text-align: center;
+            margin-bottom: 10px;
+        }
+        h2 {
+            font-size: 1.5em;
+            color: #555;
+            margin-bottom: 5px;
+        }
+        p {
+            font-size: 1em;
+            line-height: 1.6;
+            margin-bottom: 10px;
         }
         .button-container {
             display: flex;
@@ -61,13 +72,13 @@
         .content-wrapper {
             width: 100%;
             max-width: 800px;
-            margin: 120px auto 20px auto; /* Ajusta o topo para evitar sobreposição com o cabeçalho fixo */
+            margin: 120px auto 20px auto;
             padding: 20px;
             background-color: white;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             border-radius: 8px;
             overflow-y: auto;
-            max-height: calc(100vh - 140px); /* Ajusta a altura máxima para garantir o scroll dentro da área visível */
+            max-height: calc(100vh - 140px);
         }
         .highlight {
             background-color: yellow;
@@ -76,37 +87,19 @@
             margin: 20px 0;
             border-top: 2px solid #4CAF50;
         }
-h1 {
-    font-size: 2em;
-    color: #333;
-    text-align: center;
-    margin-bottom: 10px;
-}
-
-h2 {
-    font-size: 1.5em;
-    color: #555;
-    margin-bottom: 5px;
-}
-
-p {
-    font-size: 1em;
-    line-height: 1.6;
-    margin-bottom: 10px;
-}
     </style>
 </head>
 <body>
     <header>
         <h1>Personal Pronouns</h1>
         <div class="button-container">
-            <button onclick="history.back()">
+            <button onclick="history.back()" aria-label="Voltar">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left" viewBox="0 0 16 16">
                     <path fill-rule="evenodd" d="M15 8a.5.5 0 0 1-.5.5H2.707l3.147 3.146a.5.5 0 0 1-.708.708l-4-4a.5.5 0 0 1 0-.708l4-4a.5.5 0 0 1 .708.708L2.707 7.5H14.5A.5.5 0 0 1 15 8z"/>
                 </svg>
                 Back
             </button>
-            <button id="toggleButton" class="start-lesson" onclick="toggleLesson()">
+            <button id="toggleButton" class="start-lesson" onclick="toggleLesson()" aria-label="Iniciar ou pausar a lição">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-play-fill" viewBox="0 0 16 16" id="toggleIcon">
                     <path d="M11.596 8.697l-6.363 3.692A.5.5 0 0 1 4.5 12.846V3.154a.5.5 0 0 1 .733-.442l6.363 3.692a.5.5 0 0 1 0 .884z"/>
                 </svg>
@@ -124,101 +117,86 @@ p {
         let currentIndex = 0;
         let utterance;
 
-        // Função para carregar o arquivo .txt
         async function loadTextFile() {
-            const response = await fetch('lesson.txt');
-            const data = await response.text();
-            processTextFile(data);
-        }
-
-        // Processa o arquivo .txt e cria os elementos HTML dinamicamente
-       function processTextFile(data) {
-    const lines = data.split('\n');
-    const contentDiv = document.getElementById('content');
-
-    lines.forEach(line => {
-        const [type, lang, text] = line.split('|');
-
-        if (type && lang && text) {
-            let element;
-
-            switch (type) {
-                case 'title':
-                    element = document.createElement('h1');
-                    break;
-                case 'subtitle':
-                    element = document.createElement('h2');
-                    break;
-                case 'text':
-                    element = document.createElement('p');
-                    break;
-                case 'text-bold':
-                    element = document.createElement('p');
-                    element.style.fontWeight = 'bold';
-                    break;
-                case 'spacer':
-                    element = document.createElement('div');
-                    element.className = 'spacer';
-                    break;
-                default:
-                    console.warn(`Tipo desconhecido: ${type}`);
-            }
-
-            if (element) {
-                element.innerText = text;
-                element.lang = lang; // Define o idioma, útil para sintetização
-                contentDiv.appendChild(element);
+            try {
+                const response = await fetch('lesson.txt');
+                if (!response.ok) throw new Error('Erro ao carregar o arquivo.');
+                const data = await response.text();
+                processTextFile(data);
+            } catch (error) {
+                console.error(error);
+                alert('Não foi possível carregar a lição. Por favor, verifique o arquivo.');
             }
         }
-    });
-}
 
+        function processTextFile(data) {
+            const lines = data.split('\n');
+            const contentDiv = document.getElementById('content');
+
+            lines.forEach(line => {
+                if (line.trim()) {
+                    const [type, lang, text] = line.split('|');
+                    if (type && lang && text) {
+                        let element;
+
+                        switch (type) {
+                            case 'title': element = document.createElement('h1'); break;
+                            case 'subtitle': element = document.createElement('h2'); break;
+                            case 'text': element = document.createElement('p'); break;
+                            case 'text-bold':
+                                element = document.createElement('p');
+                                element.style.fontWeight = 'bold';
+                                break;
+                            case 'spacer':
+                                element = document.createElement('div');
+                                element.className = 'spacer';
+                                break;
+                            default:
+                                console.warn(`Tipo desconhecido: ${type}`);
+                        }
+
+                        if (element) {
+                            element.id = `text-${texts.length}`;
+                            element.innerText = text.trim();
+                            element.lang = lang;
+                            contentDiv.appendChild(element);
+                            texts.push({ id: element.id, lang, text: text.trim() });
+                        }
+                    }
+                }
+            });
+        }
 
         function toggleLesson() {
-            if (isPlaying) {
-                pauseLesson();
-            } else {
-                startLesson();
-            }
+            isPlaying = !isPlaying;
+            updateButtonState();
+            isPlaying ? startLesson() : pauseLesson();
         }
 
         function startLesson() {
-            if (currentIndex >= texts.length) {
-                currentIndex = 0;
-            }
-            isPlaying = true;
-            updateButtonState();
+            if (currentIndex >= texts.length) currentIndex = 0;
             speakNext();
         }
 
         function pauseLesson() {
-            isPlaying = false;
-            updateButtonState();
-            if (utterance) {
-                speechSynthesis.cancel();
-            }
+            speechSynthesis.cancel();
         }
 
         function updateButtonState() {
             const button = document.getElementById('toggleButton');
-            const icon = document.getElementById('toggleIcon');
-            if (isPlaying) {
-                button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pause-fill" viewBox="0 0 16 16" id="toggleIcon"><path d="M5.5 3.5A.5.5 0 0 1 6 4v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5zM10 3.5A.5.5 0 0 1 10.5 4v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5z"/></svg> Pause Lesson';
-            } else {
-                button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-play-fill" viewBox="0 0 16 16" id="toggleIcon"><path d="M11.596 8.697l-6.363 3.692A.5.5 0 0 1 4.5 12.846V3.154a.5.5 0 0 1 .733-.442l6.363 3.692a.5.5 0 0 1 0 .884z"/></svg> Start Lesson';
-            }
+            const icon = isPlaying ? 'bi-pause-fill' : 'bi-play-fill';
+            button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi ${icon}" viewBox="0 0 16 16"></svg> ${isPlaying ? 'Pause' : 'Start'} Lesson`;
         }
 
         function speakNext() {
-            if (currentIndex < texts.length && isPlaying) {
-                const textObj = texts[currentIndex];
-                const element = document.getElementById(textObj.id);
+            if (currentIndex < texts.length) {
+                const { id, text, lang } = texts[currentIndex];
+                const element = document.getElementById(id);
                 element.classList.add('highlight');
 
-                utterance = new SpeechSynthesisUtterance(textObj.text);
-                utterance.lang = textObj.lang;
-
-                utterance.onend = function () {
+                utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = lang;
+                utterance.onend = () => {
                     element.classList.remove('highlight');
                     currentIndex++;
                     speakNext();
@@ -233,10 +211,8 @@ p {
 
         function scrollToElement(element) {
             const contentWrapper = document.getElementById('contentWrapper');
-            const elementPosition = element.offsetTop;
-            const wrapperHeight = contentWrapper.clientHeight;
-            const scrollPosition = elementPosition - (wrapperHeight / 2);
-            contentWrapper.scrollTo({ top: scrollPosition, behavior: 'smooth' });
+            const position = element.offsetTop - (contentWrapper.clientHeight / 2);
+            contentWrapper.scrollTo({ top: position, behavior: 'smooth' });
         }
 
         window.onload = loadTextFile;
