@@ -180,6 +180,11 @@
                     // Adiciona elementos ao array de textos para o sintetizador
                     if (type !== 'spacer') {
                         texts.push({ id: element.id, lang, text: text ? text.trim() : '' });
+
+                        // Adiciona evento de clique para leitura manual
+                        element.addEventListener('click', () => {
+                            handleTextClick(index);
+                        });
                     }
                 }
             }
@@ -187,11 +192,24 @@
     });
 }
 
+function handleTextClick(index) {
+    if (isPlaying && currentIndex === index) {
+        // Se estiver lendo e o usuário clicar no mesmo trecho, pausar
+        pauseLesson();
+    } else {
+        // Se o usuário clicar em um novo trecho, começar a ler a partir desse ponto
+        isPlaying = true;
+        currentIndex = index;
+        updateButtonState();
+        speakNext();
+    }
+}
+
         function toggleLesson() {
-            isPlaying = !isPlaying;
-            updateButtonState();
-            isPlaying ? startLesson() : pauseLesson();
-        }
+    isPlaying = !isPlaying;
+    updateButtonState();
+    isPlaying ? startLesson() : pauseLesson();
+}
 
         function startLesson() {
             if (currentIndex >= texts.length) currentIndex = 0;
@@ -208,7 +226,7 @@
             button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi ${icon}" viewBox="0 0 16 16"></svg> ${isPlaying ? 'Pause' : 'Start'} Lesson`;
         }
 
-      function speakNext() {
+     function speakNext() {
     if (currentIndex < texts.length) {
         const { id, text, lang } = texts[currentIndex];
         if (!text.trim()) { // Ignora elementos sem texto
@@ -225,6 +243,9 @@
             return;
         }
 
+        // Remove destaque de qualquer trecho anterior
+        document.querySelectorAll('.highlight').forEach(el => el.classList.remove('highlight'));
+
         element.classList.add('highlight');
 
         utterance = new SpeechSynthesisUtterance(text);
@@ -232,7 +253,9 @@
         utterance.onend = () => {
             element.classList.remove('highlight');
             currentIndex++;
-            speakNext();
+            if (isPlaying) {
+                speakNext(); // Continua a leitura automaticamente se estiver tocando
+            }
         };
 
         speechSynthesis.speak(utterance);
