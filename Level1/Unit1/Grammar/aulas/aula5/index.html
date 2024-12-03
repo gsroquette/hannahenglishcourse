@@ -132,7 +132,7 @@
             }
         }
 
-    function processTextFile(data) {
+  function processTextFile(data) {
     const lines = data.split('\n');
     const contentDiv = document.getElementById('content');
 
@@ -163,7 +163,7 @@
                         break;
                     case 'spacer':
                         element = document.createElement('div');
-                        if (text === 'separator') {
+                        if (lang === 'separator') { // Verifica se é o separador
                             element.style.width = '100%';
                             element.style.height = '5px';
                             element.style.backgroundColor = '#4CAF50'; // Cor verde
@@ -182,7 +182,11 @@
                     }
                     element.lang = lang || '';
                     contentDiv.appendChild(element);
-                    texts.push({ id: element.id || '', lang, text: text ? text.trim() : '' });
+
+                    // Adiciona ao array de textos, excluindo elementos sem texto válido
+                    if (type !== 'spacer' || lang === 'separator') {
+                        texts.push({ id: element.id || '', lang, text: text ? text.trim() : '' });
+                    }
                 }
             }
         }
@@ -211,25 +215,31 @@
         }
 
         function speakNext() {
-            if (currentIndex < texts.length) {
-                const { id, text, lang } = texts[currentIndex];
-                const element = document.getElementById(id);
-                element.classList.add('highlight');
-
-                utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = lang;
-                utterance.onend = () => {
-                    element.classList.remove('highlight');
-                    currentIndex++;
-                    speakNext();
-                };
-
-                speechSynthesis.speak(utterance);
-                scrollToElement(element);
-            } else {
-                pauseLesson();
-            }
+    if (currentIndex < texts.length) {
+        const { id, text, lang } = texts[currentIndex];
+        if (!text.trim()) { // Ignora elementos sem texto
+            currentIndex++;
+            speakNext();
+            return;
         }
+
+        const element = document.getElementById(id);
+        element.classList.add('highlight');
+
+        utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = lang;
+        utterance.onend = () => {
+            element.classList.remove('highlight');
+            currentIndex++;
+            speakNext();
+        };
+
+        speechSynthesis.speak(utterance);
+        scrollToElement(element);
+    } else {
+        pauseLesson();
+    }
+}
 
         function scrollToElement(element) {
             const contentWrapper = document.getElementById('contentWrapper');
