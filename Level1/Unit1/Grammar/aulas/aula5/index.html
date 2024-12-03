@@ -69,24 +69,27 @@
             background-color: #45a049;
             color: white;
         }
-        .content-wrapper {
-            width: 100%;
-            max-width: 800px;
-            margin: 120px auto 20px auto;
-            padding: 20px;
-            background-color: white;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            border-radius: 8px;
-            overflow-y: auto;
-            max-height: calc(100vh - 140px);
-        }
+       .content-wrapper {
+    margin: 120px auto 20px auto;
+    padding: 20px;
+    background-color: white;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    overflow-y: auto;
+    max-height: calc(100vh - 140px);
+    width: 90%; /* Garante ajuste em telas menores */
+    max-width: 800px; /* Limita o tamanho máximo */
+}
         .highlight {
             background-color: yellow;
         }
-        .spacer {
-            margin: 20px 0;
-            border-top: 2px solid #4CAF50;
-        }
+      .spacer {
+    margin: 20px 0;
+    border-top: 2px solid #4CAF50;
+    clear: both; /* Garante que o espaçamento não "flutue" */
+    width: 100%; /* Garante que a linha ocupe 100% do contêiner */
+    height: 2px; /* Limita a altura visível */
+}
     </style>
 </head>
 <body>
@@ -129,43 +132,50 @@
             }
         }
 
-        function processTextFile(data) {
-            const lines = data.split('\n');
-            const contentDiv = document.getElementById('content');
+      function processTextFile(data) {
+    const lines = data.split('\n');
+    const contentDiv = document.getElementById('content');
 
-            lines.forEach(line => {
-                if (line.trim()) {
-                    const [type, lang, text] = line.split('|');
-                    if (type && lang && text) {
-                        let element;
+    lines.forEach(line => {
+        if (line.trim()) {
+            const [type, lang, text] = line.split('|');
+            if (type && lang && text) {
+                let element;
 
-                        switch (type) {
-                            case 'title': element = document.createElement('h1'); break;
-                            case 'subtitle': element = document.createElement('h2'); break;
-                            case 'text': element = document.createElement('p'); break;
-                            case 'text-bold':
-                                element = document.createElement('p');
-                                element.style.fontWeight = 'bold';
-                                break;
-                            case 'spacer':
-                                element = document.createElement('div');
-                                element.className = 'spacer';
-                                break;
-                            default:
-                                console.warn(`Tipo desconhecido: ${type}`);
-                        }
-
-                        if (element) {
-                            element.id = `text-${texts.length}`;
-                            element.innerText = text.trim();
-                            element.lang = lang;
-                            contentDiv.appendChild(element);
-                            texts.push({ id: element.id, lang, text: text.trim() });
-                        }
-                    }
+                switch (type) {
+                    case 'title':
+                        element = document.createElement('h1');
+                        break;
+                    case 'subtitle':
+                        element = document.createElement('h2');
+                        break;
+                    case 'text':
+                        element = document.createElement('p');
+                        element.innerHTML = parseText(text); // Adiciona suporte para negrito
+                        break;
+                    case 'text-bold':
+                        element = document.createElement('p');
+                        element.style.fontWeight = 'bold';
+                        element.innerHTML = parseText(text); // Adiciona suporte para negrito
+                        break;
+                    case 'spacer':
+                        element = document.createElement('div');
+                        element.className = 'spacer';
+                        break;
+                    default:
+                        console.warn(`Tipo desconhecido: ${type}`);
                 }
-            });
+
+                if (element) {
+                    element.id = `text-${texts.length}`;
+                    element.lang = lang;
+                    contentDiv.appendChild(element);
+                    texts.push({ id: element.id, lang, text: stripAsterisks(text) }); // Remove asteriscos do texto para o sintetizador
+                }
+            }
         }
+    });
+}
 
         function toggleLesson() {
             isPlaying = !isPlaying;
@@ -214,6 +224,15 @@
             const position = element.offsetTop - (contentWrapper.clientHeight / 2);
             contentWrapper.scrollTo({ top: position, behavior: 'smooth' });
         }
+// Converte texto com ** para HTML com <strong>
+function parseText(text) {
+    return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+}
+
+// Remove os asteriscos para o sintetizador de voz
+function stripAsterisks(text) {
+    return text.replace(/\*\*/g, '');
+}
 
         window.onload = loadTextFile;
     </script>
