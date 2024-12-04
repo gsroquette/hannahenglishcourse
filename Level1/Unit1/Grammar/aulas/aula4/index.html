@@ -29,11 +29,18 @@
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
             z-index: 1000;
         }
-        h1 {
-            font-size: 2em;
-            color: #333;
-            text-align: center;
-            margin-bottom: 10px;
+        .header-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .header-content h1 {
+            margin: 0 10px;
+        }
+        .header-content img {
+            height: 120px;
+            width: auto;
+            margin-left: 10px;
         }
         h2 {
             font-size: 1.5em;
@@ -70,13 +77,13 @@
             color: white;
         }
         .content-wrapper {
-            margin: 120px auto 20px auto;
+            margin: 160px auto 20px auto;
             padding: 20px;
             background-color: white;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             border-radius: 8px;
             overflow-y: auto;
-            max-height: calc(100vh - 140px);
+            max-height: calc(100vh - 180px);
             width: 90%;
             max-width: 800px;
         }
@@ -94,7 +101,10 @@
 </head>
 <body>
     <header>
-        <h1>GRAMMAR</h1>
+        <div class="header-content">
+            <h1>GRAMMAR</h1>
+            <img id="robotImage" src="../../../../../imagens/robo1_static.png" alt="Robô Animado" class="robot">
+        </div>
         <div class="button-container">
             <button onclick="history.back()" aria-label="Voltar">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left" viewBox="0 0 16 16">
@@ -119,6 +129,8 @@
         let isPlaying = false;
         let currentIndex = 0;
         let utterance;
+        let isTransitioning = false;  // Flag para saber se está apenas mudando para o próximo texto
+        let pauseTimeout;  // Variável para armazenar o temporizador da pausa
 
         async function loadTextFile() {
             try {
@@ -199,6 +211,7 @@
             // Atualiza o índice para o trecho clicado
             currentIndex = texts.findIndex(item => item.id == index);
             isPlaying = true; // Marca como leitura ativa
+            clearTimeout(pauseTimeout); // Cancelar qualquer temporizador de pausa
             updateButtonState();
             speakSpecific(currentIndex); // Inicia a leitura do trecho específico clicado
         }
@@ -207,6 +220,7 @@
             isPlaying = !isPlaying;
             updateButtonState();
             if (isPlaying) {
+                clearTimeout(pauseTimeout); // Cancelar o temporizador se a leitura for retomada
                 startLesson();
             } else {
                 pauseLesson();
@@ -221,7 +235,17 @@
         function pauseLesson() {
             speechSynthesis.cancel();
             isPlaying = false;
+            isTransitioning = false;  // Não está em transição para o próximo trecho
             updateButtonState();
+
+            // Troca para a imagem estática imediatamente
+            const robotImage = document.getElementById('robotImage');
+            robotImage.src = '../../../../../imagens/robo1_static.png';
+
+            // Inicia o temporizador para mudar para o robo2.gif após 5 segundos
+            pauseTimeout = setTimeout(() => {
+                robotImage.src = '../../../../../imagens/robo2.gif';
+            }, 5000);
         }
 
         function updateButtonState() {
@@ -232,6 +256,7 @@
 
         function speakNext() {
             if (currentIndex < texts.length) {
+                isTransitioning = true;  // Marcando que a leitura está em transição
                 speakSpecific(currentIndex);
             } else {
                 pauseLesson();
@@ -261,11 +286,21 @@
 
             utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = lang;
+
+            // Troca a imagem para o GIF animado quando começar a leitura
+            const robotImage = document.getElementById('robotImage');
+            robotImage.src = '../../../../../imagens/robo1.gif';
+
             utterance.onend = () => {
                 element.classList.remove('highlight');
                 currentIndex++;
-                if (isPlaying) {
+                if (isPlaying && currentIndex < texts.length) {
+                    // Se ainda estiver lendo, continue para o próximo sem trocar a imagem
                     speakNext();
+                } else {
+                    // Se não houver mais texto ou estiver pausado, troque para a imagem estática
+                    isTransitioning = false;
+                    robotImage.src = '../../../../../imagens/robo1_static.png';
                 }
             };
 
