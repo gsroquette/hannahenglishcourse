@@ -130,7 +130,7 @@
         let currentIndex = 0;
         let utterance;
         let isTransitioning = false;  // Flag para saber se está apenas mudando para o próximo texto
-        let resumedAfterPause = false; // Flag para saber se a leitura foi retomada após uma pausa
+        let pauseTimeout;  // Variável para armazenar o temporizador da pausa
 
         async function loadTextFile() {
             try {
@@ -211,7 +211,7 @@
             // Atualiza o índice para o trecho clicado
             currentIndex = texts.findIndex(item => item.id == index);
             isPlaying = true; // Marca como leitura ativa
-            resumedAfterPause = false; // Resetar a flag pois foi clicado manualmente
+            clearTimeout(pauseTimeout); // Cancelar qualquer temporizador de pausa
             updateButtonState();
             speakSpecific(currentIndex); // Inicia a leitura do trecho específico clicado
         }
@@ -220,7 +220,7 @@
             isPlaying = !isPlaying;
             updateButtonState();
             if (isPlaying) {
-                resumedAfterPause = true; // Marca que foi retomado após pausa
+                clearTimeout(pauseTimeout); // Cancelar o temporizador se a leitura for retomada
                 startLesson();
             } else {
                 pauseLesson();
@@ -237,9 +237,15 @@
             isPlaying = false;
             isTransitioning = false;  // Não está em transição para o próximo trecho
             updateButtonState();
-            // Troca de volta para a imagem estática quando a leitura é pausada
+
+            // Troca para a imagem estática imediatamente
             const robotImage = document.getElementById('robotImage');
             robotImage.src = '../../../../../imagens/robo1_static.png';
+
+            // Inicia o temporizador para mudar para o robo2.gif após 5 segundos
+            pauseTimeout = setTimeout(() => {
+                robotImage.src = '../../../../../imagens/robo2.gif';
+            }, 5000);
         }
 
         function updateButtonState() {
@@ -281,14 +287,9 @@
             utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = lang;
 
-            // Escolher qual GIF será mostrado dependendo do estado da leitura
+            // Troca a imagem para o GIF animado quando começar a leitura
             const robotImage = document.getElementById('robotImage');
-            if (resumedAfterPause) {
-                robotImage.src = '../../../../../imagens/robo2.gif';
-                resumedAfterPause = false; // Reseta a flag após iniciar a leitura
-            } else {
-                robotImage.src = '../../../../../imagens/robo1.gif';
-            }
+            robotImage.src = '../../../../../imagens/robo1.gif';
 
             utterance.onend = () => {
                 element.classList.remove('highlight');
