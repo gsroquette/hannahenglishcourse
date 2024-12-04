@@ -129,6 +129,7 @@
         let isPlaying = false;
         let currentIndex = 0;
         let utterance;
+        let isTransitioning = false;  // Flag para saber se está apenas mudando para o próximo texto
 
         async function loadTextFile() {
             try {
@@ -231,6 +232,7 @@
         function pauseLesson() {
             speechSynthesis.cancel();
             isPlaying = false;
+            isTransitioning = false;  // Não está em transição para o próximo trecho
             updateButtonState();
             // Troca de volta para a imagem estática quando a leitura é pausada
             const robotImage = document.getElementById('robotImage');
@@ -245,6 +247,7 @@
 
         function speakNext() {
             if (currentIndex < texts.length) {
+                isTransitioning = true;  // Marcando que a leitura está em transição
                 speakSpecific(currentIndex);
             } else {
                 pauseLesson();
@@ -282,12 +285,14 @@
             utterance.onend = () => {
                 element.classList.remove('highlight');
                 currentIndex++;
-                if (isPlaying) {
+                if (isPlaying && currentIndex < texts.length) {
+                    // Se ainda estiver lendo, continue para o próximo sem trocar a imagem
                     speakNext();
+                } else {
+                    // Se não houver mais texto ou estiver pausado, troque para a imagem estática
+                    isTransitioning = false;
+                    robotImage.src = '../../../../../imagens/robo1_static.png';
                 }
-
-                // Troca de volta para a imagem estática quando terminar a leitura
-                robotImage.src = '../../../../../imagens/robo1_static.png';
             };
 
             // Cancelar qualquer fala anterior antes de iniciar a nova
