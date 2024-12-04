@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -32,16 +32,15 @@
         .header-content {
             display: flex;
             align-items: center;
+            justify-content: center;
+        }
+        .header-content h1 {
+            margin: 0 10px;
         }
         .header-content img {
-            width: 100px; /* Ajuste o tamanho do robô conforme necessário */
-            margin-left: 15px;
-        }
-        h1 {
-            font-size: 2em;
-            color: #333;
-            text-align: center;
-            margin-bottom: 10px;
+            height: 120px;
+            width: auto;
+            margin-left: 10px;
         }
         h2 {
             font-size: 1.5em;
@@ -78,13 +77,13 @@
             color: white;
         }
         .content-wrapper {
-            margin: 120px auto 20px auto;
+            margin: 160px auto 20px auto;
             padding: 20px;
             background-color: white;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             border-radius: 8px;
             overflow-y: auto;
-            max-height: calc(100vh - 140px);
+            max-height: calc(100vh - 180px);
             width: 90%;
             max-width: 800px;
         }
@@ -125,9 +124,174 @@
         <div id="content"></div>
     </div>
 
-    <!-- Código JavaScript permanece o mesmo -->
     <script>
-        // Seu código JavaScript existente...
+        let texts = [];
+        let isPlaying = false;
+        let currentIndex = 0;
+        let utterance;
+
+        async function loadTextFile() {
+            try {
+                const response = await fetch('lesson.txt');
+                if (!response.ok) throw new Error('Erro ao carregar o arquivo.');
+                const data = await response.text();
+                processTextFile(data);
+            } catch (error) {
+                console.error(error);
+                alert('Não foi possível carregar a lição. Por favor, verifique o arquivo.');
+            }
+        }
+
+        function processTextFile(data) {
+            const lines = data.split('\n');
+            const contentDiv = document.getElementById('content');
+
+            lines.forEach((line, index) => {
+                if (line.trim()) {
+                    const [type, lang, text] = line.split('|');
+                    if (type) {
+                        let element;
+
+                        switch (type) {
+                            case 'title':
+                                element = document.createElement('h1');
+                                break;
+                            case 'subtitle':
+                                element = document.createElement('h2');
+                                break;
+                            case 'text':
+                                element = document.createElement('p');
+                                break;
+                            case 'text-bold':
+                                element = document.createElement('p');
+                                element.style.fontWeight = 'bold';
+                                break;
+                            case 'text-bold-large':
+                                element = document.createElement('p');
+                                element.style.fontWeight = 'bold';
+                                element.style.fontSize = '1.5em';
+                                break;
+                            case 'spacer':
+                                element = document.createElement('div');
+                                element.className = 'spacer';
+                                break;
+                            default:
+                                console.warn(`Tipo desconhecido: ${type}`);
+                        }
+
+                        if (element) {
+                            if (text && type !== 'spacer') {
+                                element.innerText = text.trim();
+                            }
+                            element.lang = lang || '';
+                            element.dataset.index = index;
+                            contentDiv.appendChild(element);
+
+                            // Apenas adiciona elementos legíveis à lista de textos
+                            if (type !== 'spacer') {
+                                texts.push({ id: element.dataset.index, lang, text: text ? text.trim() : '' });
+
+                                // Adiciona evento de clique para leitura manual
+                                element.addEventListener('click', () => {
+                                    handleTextClick(parseInt(element.dataset.index));
+                                });
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function handleTextClick(index) {
+            // Cancelar a leitura atual antes de iniciar a nova
+            speechSynthesis.cancel();
+
+            // Atualiza o índice para o trecho clicado
+            currentIndex = texts.findIndex(item => item.id == index);
+            isPlaying = true; // Marca como leitura ativa
+            updateButtonState();
+            speakSpecific(currentIndex); // Inicia a leitura do trecho específico clicado
+        }
+
+        function toggleLesson() {
+            isPlaying = !isPlaying;
+            updateButtonState();
+            if (isPlaying) {
+                startLesson();
+            } else {
+                pauseLesson();
+            }
+        }
+
+        function startLesson() {
+            if (currentIndex >= texts.length) currentIndex = 0;
+            speakNext();
+        }
+
+        function pauseLesson() {
+            speechSynthesis.cancel();
+            isPlaying = false;
+            updateButtonState();
+        }
+
+        function updateButtonState() {
+            const button = document.getElementById('toggleButton');
+            const icon = isPlaying ? 'bi-pause-fill' : 'bi-play-fill';
+            button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi ${icon}" viewBox="0 0 16 16"></svg> ${isPlaying ? 'Pause' : 'Start'} Lesson`;
+        }
+
+        function speakNext() {
+            if (currentIndex < texts.length) {
+                speakSpecific(currentIndex);
+            } else {
+                pauseLesson();
+            }
+        }
+
+        function speakSpecific(index) {
+            const { text, lang } = texts[index];
+            const element = document.querySelector(`[data-index='${texts[index].id}']`);
+
+            if (!text.trim()) {
+                currentIndex++;
+                speakNext();
+                return;
+            }
+
+            if (!element) {
+                console.warn(`Elemento não encontrado: ${texts[index].id}`);
+                currentIndex++;
+                speakNext();
+                return;
+            }
+
+            // Remove destaque de qualquer trecho anterior
+            document.querySelectorAll('.highlight').forEach(el => el.classList.remove('highlight'));
+            element.classList.add('highlight');
+
+            utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = lang;
+            utterance.onend = () => {
+                element.classList.remove('highlight');
+                currentIndex++;
+                if (isPlaying) {
+                    speakNext();
+                }
+            };
+
+            // Cancelar qualquer fala anterior antes de iniciar a nova
+            speechSynthesis.cancel();
+            speechSynthesis.speak(utterance);
+            scrollToElement(element);
+        }
+
+        function scrollToElement(element) {
+            const contentWrapper = document.getElementById('contentWrapper');
+            const position = element.offsetTop - (contentWrapper.clientHeight / 2);
+            contentWrapper.scrollTo({ top: position, behavior: 'smooth' });
+        }
+
+        window.onload = loadTextFile;
     </script>
 </body>
 </html>
