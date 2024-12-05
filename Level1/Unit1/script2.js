@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 9, name: "WordSearch", path: "../Unit1/WordSearch/index.html?fase=9", img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
         { id: 10, name: "Grammar2", path: "../Unit1/Grammar2/index.html?fase=10", img: "../../imagens/botoes/grammar_button.png", unlocked: false },   
         { id: 11, name: "HannahVideo", path: "../Unit1/HannahVideo/index.html?fase=11", img: "../../imagens/botoes/video_button.png", unlocked: false }  
+        { id: 12, name: "Dialogo", path: "../Unit1/Dialogo/index.html?fase=11", img: "../../imagens/botoes/dialogo_button.png", unlocked: false }  
     ];
 
     // Fechar o dropdown ao clicar fora dele
