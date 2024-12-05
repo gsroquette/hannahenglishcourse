@@ -21,7 +21,7 @@ async function loadWords() {
             throw new Error('Network response was not ok');
         }
         const text = await response.text();
-        wordsToFind = text.split(/\r?\n/).filter(word => word.trim() !== '');
+        wordsToFind = text.split(/\r?\n/).filter(word => word.trim() !== '').slice(0, 5); // Seleciona apenas as 5 primeiras palavras
         init();
     } catch (error) {
         console.error('Error loading words:', error);
