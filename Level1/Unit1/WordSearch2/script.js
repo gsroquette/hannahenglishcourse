@@ -13,29 +13,33 @@ let foundCells = [];
 const wordsList = document.getElementById('words');
 let wordsToFind = [];
 
+// Função para carregar as palavras da fase
 async function loadWords() {
     try {
-        // Caminho atualizado para buscar o arquivo words.txt na pasta data2
         const response = await fetch('../data2/words.txt');
         if (!response.ok) {
             throw new Error('Network response was not ok');
         }
         const text = await response.text();
-        console.log('Loaded words:', text);
-        wordsToFind = text.split(/\r?\n/).filter(word => word.trim() !== '');
+        wordsToFind = text.split(/\r?\n/).filter(word => word.trim() !== '').slice(0, 5);
+        console.log('Palavras carregadas:', wordsToFind); // Log para verificar as palavras carregadas
         init();
     } catch (error) {
         console.error('Error loading words:', error);
     }
 }
 
+// Função para criar a grade do caça-palavras
 function createWordSearchGrid() {
     grid = Array.from({ length: gridSize }, () => Array(gridSize).fill(''));
 
-    // Coloca as palavras no grid
-    wordsToFind.forEach(word => placeWordInGrid(word));
+    wordsToFind.forEach(word => {
+        const placed = placeWordInGrid(word);
+        if (!placed) {
+            console.warn(`Não foi possível posicionar a palavra: ${word}`);
+        }
+    });
 
-    // Preenche as células vazias com letras aleatórias
     for (let row = 0; row < gridSize; row++) {
         for (let col = 0; col < gridSize; col++) {
             if (grid[row][col] === '') {
@@ -45,16 +49,16 @@ function createWordSearchGrid() {
     }
 }
 
+// Função para colocar uma palavra na grade
 function placeWordInGrid(word) {
     const directions = [
         { row: 0, col: 1 }, // Horizontal
         { row: 1, col: 0 }, // Vertical
-        { row: 1, col: 1 }, // Diagonal (principal)
-        { row: 1, col: -1 } // Diagonal (secundária)
+        { row: 1, col: 1 }, // Diagonal principal
+        { row: 1, col: -1 } // Diagonal secundária
     ];
 
     const direction = directions[Math.floor(Math.random() * directions.length)];
-
     let row, col;
 
     do {
@@ -67,6 +71,7 @@ function placeWordInGrid(word) {
     }
 }
 
+// Função para verificar se a palavra pode ser colocada na grade
 function canPlaceWord(grid, word, row, col, direction) {
     for (let i = 0; i < word.length; i++) {
         const newRow = row + i * direction.row;
@@ -79,11 +84,12 @@ function canPlaceWord(grid, word, row, col, direction) {
     return true;
 }
 
+// Função para desenhar a grade do caça-palavras
 function drawWordSearchGrid() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     ctx.font = `${cellSize * 0.6}px Arial`;
-    ctx.fillStyle = '#000'; // Cor preta para as letras
+    ctx.fillStyle = '#000';
 
     for (let row = 0; row < gridSize; row++) {
         for (let col = 0; col < gridSize; col++) {
@@ -98,6 +104,7 @@ function drawWordSearchGrid() {
     });
 }
 
+// Função para destacar as células selecionadas
 function drawSelectedCells() {
     ctx.fillStyle = 'rgba(0, 0, 255, 0.3)';
     selectedCells.forEach(({ row, col }) => {
@@ -105,6 +112,7 @@ function drawSelectedCells() {
     });
 }
 
+// Função para exibir a lista de palavras a serem encontradas
 function displayWordsList() {
     wordsList.innerHTML = '';
     wordsToFind.forEach(word => {
@@ -115,10 +123,11 @@ function displayWordsList() {
     });
 }
 
+// Função para marcar a palavra encontrada na lista
 function markWordInList(word) {
     const listItems = wordsList.getElementsByTagName('li');
     for (let item of listItems) {
-        if (item.textContent.trim().toUpperCase() === word.trim().toUpperCase()) {
+        if (item.textContent === word) {
             item.style.textDecoration = 'line-through';
             break;
         }
@@ -139,7 +148,6 @@ function handleCanvasClick(event) {
         return; // Se a célula já foi selecionada, não faz nada
     }
 
-    // Adiciona lógica para verificar continuidade das células selecionadas
     if (selectedCells.length > 0) {
         const lastCell = selectedCells[selectedCells.length - 1];
 
@@ -151,7 +159,6 @@ function handleCanvasClick(event) {
         if (isHorizontal || isVertical || isDiagonal1 || isDiagonal2) {
             selectedCells.push({ row, col });
         } else {
-            // Reinicia a seleção se a célula não for contínua
             selectedCells = [{ row, col }];
         }
     } else {
@@ -163,32 +170,115 @@ function handleCanvasClick(event) {
     checkWord();
 }
 
+// Função para verificar se uma palavra foi encontrada
 function checkWord() {
     const selectedCellsSorted = [...selectedCells].sort((a, b) => a.row - b.row || a.col - b.col);
     const selectedWord = selectedCellsSorted.map(cell => grid[cell.row][cell.col]).join('');
 
     if (wordsToFind.includes(selectedWord)) {
         markWordInList(selectedWord);
-        foundCells = foundCells.concat(selectedCells);
+        foundCells.push(...selectedCells.map(cell => ({ ...cell, word: selectedWord })));
         selectedCells = [];
         drawWordSearchGrid();
         drawSelectedCells();
+        checkCompletion(); // Verifica se a fase está completa
     }
 }
 
+// Função para verificar se a fase está completa
+function checkCompletion() {
+    const foundWords = [...new Set(foundCells.map(cell => cell.word))];
+    if (foundWords.length === wordsToFind.length) {
+        showCompletionModal();
+        completePhase(); // Chama a função de completar fase
+    }
+}
+
+// Função para iniciar o processo de atualização após a conclusão
+function completePhase() {
+    ensureUserIsAuthenticated(updateNextPhase);
+}
+
+// Função para capturar fase, level e unit do URL
+function getPhaseFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('fase');
+}
+
+function getLevelAndUnitFromURL() {
+    const url = window.location.pathname;
+    const parts = url.split('/');
+    const level = parts[1];
+    const unit = parts[2];
+    return { level, unit };
+}
+
+// Função para verificar autenticação do usuário
+function ensureUserIsAuthenticated(callback) {
+    firebase.auth().onAuthStateChanged(function(user) {
+        if (user) {
+            console.log("Usuário autenticado, UID:", user.uid);
+            callback(user.uid);
+        } else {
+            console.error("Usuário não autenticado");
+        }
+    });
+}
+
+// Função para atualizar o progresso no banco de dados
+async function updateNextPhase(userId) {
+    const currentPhase = getPhaseFromURL();
+    const { level, unit } = getLevelAndUnitFromURL();
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+    try {
+        if (currentPhase === "last") {
+            const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+            await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
+            console.log(`Nova unidade criada: ${nextUnit}, com fase1 desbloqueada.`);
+        } else if (currentPhase === "end") {
+            const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+            await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+            console.log(`Novo nível criado: ${nextLevel}, com Unit1 e fase1 desbloqueadas.`);
+        } else {
+            const nextPhase = parseInt(currentPhase) + 1;
+            await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
+            console.log(`Fase atual (${currentPhase}) e próxima fase (${nextPhase}) desbloqueadas.`);
+        }
+    } catch (error) {
+        console.error("Erro ao atualizar o progresso da fase:", error);
+    }
+}
+
+// Função para reiniciar o jogo
 function resetGame() {
     selectedCells = [];
     foundCells = [];
     init();
 }
 
+// Função para exibir o modal de conclusão
+function showCompletionModal() {
+    document.getElementById('overlay').style.display = 'block';
+    document.getElementById('completion-modal').style.display = 'block';
+}
+
+// Função para fechar o modal de conclusão
+function closeModal() {
+    document.getElementById('overlay').style.display = 'none';
+    document.getElementById('completion-modal').style.display = 'none';
+}
+
+// Função para inicializar o jogo
 function init() {
+    console.log('Inicializando o jogo...');
     createWordSearchGrid();
     drawWordSearchGrid();
     displayWordsList();
+    console.log('Grade:', grid); // Log para verificar a grade
     canvas.addEventListener('click', handleCanvasClick);
 }
 
+// Inicializa o jogo e carrega as palavras
 document.getElementById('reset-button').addEventListener('click', resetGame);
-
 loadWords();
