@@ -15,8 +15,8 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 18, name: "QUIZ2", path: "../Unit1/QUIZ2/index.html?fase=18", img: "../../imagens/botoes/quiz_button.png", unlocked: false },
         { id: 19, name: "Dialogo", path: "../Unit1/Dialogo/index.html?fase=19", img: "../../imagens/botoes/dialogo_button.png", unlocked: false },
         { id: 20, name: "MemoryGame3", path: "../Unit1/MemoryGame3/index.html?fase=20", img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
-        { id: 21, name: "Mixed Letters FIXO2", path: "../Unit1/MixedLettersFIXO2/index.html?fase=21", img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
-        { id: 22, name: "Missing Word2", path: "../Unit1/MissingWord2/index.html?fase=22", img: "../../imagens/botoes/missing_word_button.png", unlocked: false },       
+        { id: 21, name: "Mixed Letters FIXO2", path: "../Unit1/Mixed LettersFIXO2/index.html?fase=21", img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
+        { id: 22, name: "Missing Word2", path: "../Unit1/Missing Word2/index.html?fase=22", img: "../../imagens/botoes/missing_word_button.png", unlocked: false },       
     ];
 
     // Fechar o dropdown ao clicar fora dele
