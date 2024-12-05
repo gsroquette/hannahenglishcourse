@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 2, name: "QUIZ", path: "../Unit1/QUIZ/index.html?fase=2", img: "../../imagens/botoes/quiz_button.png", unlocked: false },
         { id: 3, name: "Flashcards", path: "../Unit1/Flashcards/index.html?fase=3", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
         { id: 4, name: "Grammar", path: "../Unit1/Grammar/index.html?fase=4", img: "../../imagens/botoes/grammar_button.png", unlocked: false },
-        { id: 5, name: "Fill in the Blanks", path: "../Unit1/FillInTheBlanks/index.html?fase=5", img: "../../imagens/botoes/fillintheblanks_button.png", unlocked: false },
+        { id: 5, name: "Fill in the Blanks", path: "../Unit1/Fill in the Blanks/index.html?fase=5", img: "../../imagens/botoes/fillintheblanks_button.png", unlocked: false },
     ];
 
      // Fechar o dropdown ao clicar fora dele
