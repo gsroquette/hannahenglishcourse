@@ -21,7 +21,8 @@ async function loadWords() {
             throw new Error('Network response was not ok');
         }
         const text = await response.text();
-        wordsToFind = text.split(/\r?\n/).filter(word => word.trim() !== '').slice(0, 5); // Seleciona apenas as 5 primeiras palavras
+        wordsToFind = text.split(/\r?\n/).filter(word => word.trim() !== '').slice(0, 5);
+        console.log('Palavras carregadas:', wordsToFind); // Log para verificar as palavras carregadas
         init();
     } catch (error) {
         console.error('Error loading words:', error);
@@ -32,7 +33,12 @@ async function loadWords() {
 function createWordSearchGrid() {
     grid = Array.from({ length: gridSize }, () => Array(gridSize).fill(''));
 
-    wordsToFind.forEach(word => placeWordInGrid(word));
+    wordsToFind.forEach(word => {
+        const placed = placeWordInGrid(word);
+        if (!placed) {
+            console.warn(`Não foi possível posicionar a palavra: ${word}`);
+        }
+    });
 
     for (let row = 0; row < gridSize; row++) {
         for (let col = 0; col < gridSize; col++) {
@@ -265,9 +271,11 @@ function closeModal() {
 
 // Função para inicializar o jogo
 function init() {
+    console.log('Inicializando o jogo...');
     createWordSearchGrid();
     drawWordSearchGrid();
     displayWordsList();
+    console.log('Grade:', grid); // Log para verificar a grade
     canvas.addEventListener('click', handleCanvasClick);
 }
 
