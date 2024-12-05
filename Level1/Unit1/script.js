@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let lastUnlockedIndex = -1;
 
     const activities = [
-        { id: 1, name: "StoryCards", path: "../Unit1/StoryCards/index.html?fase=1", img: "../../imagens/botoes/story_sards_button.png", unlocked: false },
+        { id: 1, name: "StoryCards", path: "../Unit1/StoryCards/index.html?fase=1", img: "../../imagens/botoes/storycards_button.png", unlocked: false },
         { id: 2, name: "Dialogo", path: "../Unit1/Dialogo/index.html?fase=2", img: "../../imagens/botoes/dialogo_button.png", unlocked: false },
         { id: 3, name: "Flashcards", path: "../Unit1/Flashcards/index.html?fase=3", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
         { id: 4, name: "Flashcards2", path: "../Unit1/Flashcards2/index.html?fase=4", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },       
