@@ -60,16 +60,16 @@
             border-radius: 50%;
         }
 
-       .character-text {
-    font-size: 20px;
-    font-weight: bold;
-    background-color: #ffffff;
-    padding: 15px;
-    border-radius: 10px;
-    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
-    max-width: 90%;
-    position: relative;
-}
+        .character-text {
+            font-size: 20px;
+            font-weight: bold;
+            background-color: #ffffff;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+            max-width: 90%;
+            position: relative;
+        }
 
         .audio-button-container {
             margin-top: 10px;
@@ -126,33 +126,6 @@
                 flex-wrap: wrap;
             }
         }
-
-        .nav-button {
-            font-size: 14px;
-            padding: 8px 16px;
-        }
-
-        .character {
-            flex: 1 1 100%;
-            margin: 10px 0;
-        }
-
-        .character-text {
-            font-size: 14px;
-        }
-
-        #dialogue-container {
-            flex-wrap: wrap;
-        }
-
-        .nav-button {
-            font-size: 14px;
-            padding: 8px 16px;
-        }
-
-        .character-text {
-            font-size: 14px;
-        }
     </style>
 </head>
 <body>
@@ -184,9 +157,24 @@
         <button class="nav-button" onclick="nextDialogue()">Forward &gt;&gt;</button>
     </div>
 
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
     <script>
+        // Configuração do Firebase
+        const firebaseConfig = {
+            apiKey: "...",
+            authDomain: "hannahenglishcourse.firebaseapp.com",
+            databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
+            // demais configurações...
+        };
+        firebase.initializeApp(firebaseConfig);
+
         let idleTimer;
         let robotImg = document.getElementById('robot-img');
+        let totalDialogues;
+        let dialoguesRead = 0;
 
         function goBack() {
             window.history.back();
@@ -204,6 +192,8 @@
                 if (callback) {
                     callback();
                 }
+                dialoguesRead++;
+                checkCompletion();
                 startIdleTimer();
             };
             window.speechSynthesis.speak(utterance);
@@ -214,6 +204,7 @@
             .then(response => response.text())
             .then(text => {
                 dialogues = text.split('\n\n');
+                totalDialogues = dialogues.length * 2; // Duas falas por diálogo (robô e aluno)
                 updateDialogue(0);
             });
 
@@ -260,6 +251,43 @@
                     robotImg.src = '../../../../../imagens/robo1_static.png';
                 }, 10000);
             }, 15000);
+        }
+
+        function checkCompletion() {
+            if (dialoguesRead === totalDialogues) {
+                ensureUserIsAuthenticated(updateNextPhase);
+            }
+        }
+
+        function ensureUserIsAuthenticated(callback) {
+            firebase.auth().onAuthStateChanged(function(user) {
+                if (user) {
+                    callback(user.uid);
+                } else {
+                    console.error("Usuário não autenticado");
+                }
+            });
+        }
+
+        async function updateNextPhase(userId) {
+            const { level, unit } = getLevelAndUnitFromURL();
+            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+            try {
+                const nextPhase = currentDialogueIndex + 1;
+                await dbRef.update({ [`fase${nextPhase}`]: true });
+                alert("Congratulations! You have completed this phase.");
+            } catch (error) {
+                console.error("Erro ao atualizar o progresso da fase:", error);
+            }
+        }
+
+        function getLevelAndUnitFromURL() {
+            const url = window.location.pathname;
+            const parts = url.split('/');
+            const level = parts[1];
+            const unit = parts[2];
+            return { level, unit };
         }
 
         startIdleTimer();
