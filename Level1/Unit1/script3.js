@@ -11,9 +11,9 @@ document.addEventListener('DOMContentLoaded', function() {
     let lastUnlockedIndex = -1;
 
    const activities = [
-        { id: 11, name: "Mixed Letters FIXO", path: "../Unit1/MixedLettersFIXO/index.html?fase=11", img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
+        { id: 11, name: "Mixed Letters FIXO", path: "../Unit1/Mixed Letters FIXO/index.html?fase=11", img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
         { id: 12, name: "WordSearch", path: "../Unit1/WordSearch/index.html?fase=12", img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
-        { id: 13, name: "Missing Word", path: "../Unit1/MissingWord/index.html?fase=13", img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
+        { id: 13, name: "Missing Word", path: "../Unit1/Missing Word/index.html?fase=13", img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
         { id: 14, name: "Flashcards3", path: "../Unit1/Flashcards3/index.html?fase=14", img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
         { id: 15, name: "WordSearch2", path: "../Unit1/WordSearch2/index.html?fase=15", img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
         { id: 16, name: "Speak3", path: "../Unit1/Speak3/index.html?fase=16", img: "../../imagens/botoes/speak_button.png", unlocked: false },       
