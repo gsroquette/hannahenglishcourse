@@ -11,8 +11,12 @@ document.addEventListener('DOMContentLoaded', function() {
     let lastUnlockedIndex = -1;
 
     const activities = [
-          { id: 23, name: "MatchingGame", path: "../Unit1/MatchingGame/index.html?fase=23", img: "../../imagens/botoes/matching_game_button.png", unlocked: false },
-          { id: 24, name: "LifeLessons", path: "../Unit1/LifeLessons/index.html?fase=24", img: "../../imagens/botoes/life_lessons_button.png", unlocked: false },
+        { id: 23, name: "WordSearch3", path: "../Unit1/WordSearch3/index.html?fase=23", img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
+        { id: 24, name: "Mixed Letters FIXO3", path: "../Unit1/MixedLettersFIXO3/index.html?fase=24", img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
+        { id: 25, name: "Missing Word3", path: "../Unit1/MissingWord3/index.html?fase=25", img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
+        { id: 26, name: "Hannah Video", path: "../Unit1/HannahVideo/index.html?fase=26", img: "../../imagens/botoes/video_button.png", unlocked: false },
+        { id: 27, name: "MatchingGame", path: "../Unit1/MatchingGame/index.html?fase=27", img: "../../imagens/botoes/matching_game_button.png", unlocked: false },
+        { id: 28, name: "LifeLessons", path: "../Unit1/LifeLessons/index.html?fase=28", img: "../../imagens/botoes/life_lessons_button.png", unlocked: false },       
     ];
 
      // Fechar o dropdown ao clicar fora dele
