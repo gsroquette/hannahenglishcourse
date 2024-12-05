@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Personal Pronouns Lesson</title>
+    <title>GRAMMAR</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -29,10 +29,28 @@
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
             z-index: 1000;
         }
-        h1 {
-            margin: 0;
+        .header-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .header-content h1 {
+            margin: 0 10px;
+        }
+        .header-content img {
+            height: 120px;
+            width: auto;
+            margin-left: 10px;
+        }
+        h2 {
             font-size: 1.5em;
-            text-align: center;
+            color: #555;
+            margin-bottom: 5px;
+        }
+        p {
+            font-size: 1em;
+            line-height: 1.6;
+            margin-bottom: 10px;
         }
         .button-container {
             display: flex;
@@ -59,15 +77,15 @@
             color: white;
         }
         .content-wrapper {
-            width: 100%;
-            max-width: 800px;
-            margin: 120px auto 20px auto; /* Ajusta o topo para evitar sobreposição com o cabeçalho fixo */
+            margin: 160px auto 20px auto;
             padding: 20px;
             background-color: white;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             border-radius: 8px;
             overflow-y: auto;
-            max-height: calc(100vh - 140px); /* Ajusta a altura máxima para garantir o scroll dentro da área visível */
+            max-height: calc(100vh - 180px);
+            width: 90%;
+            max-width: 800px;
         }
         .highlight {
             background-color: yellow;
@@ -75,20 +93,26 @@
         .spacer {
             margin: 20px 0;
             border-top: 2px solid #4CAF50;
+            clear: both;
+            width: 100%;
+            height: 2px;
         }
     </style>
 </head>
 <body>
     <header>
-        <h1>Personal Pronouns</h1>
+        <div class="header-content">
+            <h1>GRAMMAR</h1>
+            <img id="robotImage" src="../../../../../imagens/robo1_static.png" alt="Robô Animado" class="robot">
+        </div>
         <div class="button-container">
-            <button onclick="history.back()">
+            <button onclick="history.back()" aria-label="Voltar">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left" viewBox="0 0 16 16">
                     <path fill-rule="evenodd" d="M15 8a.5.5 0 0 1-.5.5H2.707l3.147 3.146a.5.5 0 0 1-.708.708l-4-4a.5.5 0 0 1 0-.708l4-4a.5.5 0 0 1 .708.708L2.707 7.5H14.5A.5.5 0 0 1 15 8z"/>
                 </svg>
                 Back
             </button>
-            <button id="toggleButton" class="start-lesson" onclick="toggleLesson()">
+            <button id="toggleButton" class="start-lesson" onclick="toggleLesson()" aria-label="Iniciar ou pausar a lição">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-play-fill" viewBox="0 0 16 16" id="toggleIcon">
                     <path d="M11.596 8.697l-6.363 3.692A.5.5 0 0 1 4.5 12.846V3.154a.5.5 0 0 1 .733-.442l6.363 3.692a.5.5 0 0 1 0 .884z"/>
                 </svg>
@@ -105,102 +129,191 @@
         let isPlaying = false;
         let currentIndex = 0;
         let utterance;
+        let isTransitioning = false;  // Flag para saber se está apenas mudando para o próximo texto
+        let pauseTimeout;  // Variável para armazenar o temporizador da pausa
 
-        // Função para carregar o arquivo .txt
         async function loadTextFile() {
-            const response = await fetch('lesson.txt');
-            const data = await response.text();
-            processTextFile(data);
+            try {
+                const response = await fetch('lesson.txt');
+                if (!response.ok) throw new Error('Erro ao carregar o arquivo.');
+                const data = await response.text();
+                processTextFile(data);
+            } catch (error) {
+                console.error(error);
+                alert('Não foi possível carregar a lição. Por favor, verifique o arquivo.');
+            }
         }
 
-        // Processa o arquivo .txt e cria os elementos HTML dinamicamente
         function processTextFile(data) {
             const lines = data.split('\n');
             const contentDiv = document.getElementById('content');
 
-            lines.forEach(line => {
-                const [id, lang, text] = line.split('|');
-                
-                if (id && lang && text) {
-                    if (id === 'spacer') {
-                        const hr = document.createElement('div');
-                        hr.className = 'spacer';
-                        contentDiv.appendChild(hr);
-                    } else {
-                        texts.push({ id, lang, text });
+            lines.forEach((line, index) => {
+                if (line.trim()) {
+                    const [type, lang, text] = line.split('|');
+                    if (type) {
+                        let element;
 
-                        const p = document.createElement('p');
-                        p.id = id;
-                        p.innerText = text;
-                        contentDiv.appendChild(p);
+                        switch (type) {
+                            case 'title':
+                                element = document.createElement('h1');
+                                break;
+                            case 'subtitle':
+                                element = document.createElement('h2');
+                                break;
+                            case 'text':
+                                element = document.createElement('p');
+                                break;
+                            case 'text-bold':
+                                element = document.createElement('p');
+                                element.style.fontWeight = 'bold';
+                                break;
+                            case 'text-bold-large':
+                                element = document.createElement('p');
+                                element.style.fontWeight = 'bold';
+                                element.style.fontSize = '1.5em';
+                                break;
+                            case 'spacer':
+                                element = document.createElement('div');
+                                element.className = 'spacer';
+                                break;
+                            default:
+                                console.warn(`Tipo desconhecido: ${type}`);
+                        }
+
+                        if (element) {
+                            if (text && type !== 'spacer') {
+                                element.innerText = text.trim();
+                            }
+                            element.lang = lang || '';
+                            element.dataset.index = index;
+                            contentDiv.appendChild(element);
+
+                            // Apenas adiciona elementos legíveis à lista de textos
+                            if (type !== 'spacer') {
+                                texts.push({ id: element.dataset.index, lang, text: text ? text.trim() : '' });
+
+                                // Adiciona evento de clique para leitura manual
+                                element.addEventListener('click', () => {
+                                    handleTextClick(parseInt(element.dataset.index));
+                                });
+                            }
+                        }
                     }
                 }
             });
         }
 
+        function handleTextClick(index) {
+            // Cancelar a leitura atual antes de iniciar a nova
+            speechSynthesis.cancel();
+
+            // Atualiza o índice para o trecho clicado
+            currentIndex = texts.findIndex(item => item.id == index);
+            isPlaying = true; // Marca como leitura ativa
+            clearTimeout(pauseTimeout); // Cancelar qualquer temporizador de pausa
+            updateButtonState();
+            speakSpecific(currentIndex); // Inicia a leitura do trecho específico clicado
+        }
+
         function toggleLesson() {
+            isPlaying = !isPlaying;
+            updateButtonState();
             if (isPlaying) {
-                pauseLesson();
-            } else {
+                clearTimeout(pauseTimeout); // Cancelar o temporizador se a leitura for retomada
                 startLesson();
+            } else {
+                pauseLesson();
             }
         }
 
         function startLesson() {
-            if (currentIndex >= texts.length) {
-                currentIndex = 0;
-            }
-            isPlaying = true;
-            updateButtonState();
+            if (currentIndex >= texts.length) currentIndex = 0;
             speakNext();
         }
 
         function pauseLesson() {
+            speechSynthesis.cancel();
             isPlaying = false;
+            isTransitioning = false;  // Não está em transição para o próximo trecho
             updateButtonState();
-            if (utterance) {
-                speechSynthesis.cancel();
-            }
+
+            // Troca para a imagem estática imediatamente
+            const robotImage = document.getElementById('robotImage');
+            robotImage.src = '../../../../../imagens/robo1_static.png';
+
+            // Inicia o temporizador para mudar para o robo2.gif após 5 segundos
+            pauseTimeout = setTimeout(() => {
+                robotImage.src = '../../../../../imagens/robo2.gif';
+            }, 5000);
         }
 
         function updateButtonState() {
             const button = document.getElementById('toggleButton');
-            const icon = document.getElementById('toggleIcon');
-            if (isPlaying) {
-                button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pause-fill" viewBox="0 0 16 16" id="toggleIcon"><path d="M5.5 3.5A.5.5 0 0 1 6 4v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5zM10 3.5A.5.5 0 0 1 10.5 4v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5z"/></svg> Pause Lesson';
-            } else {
-                button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-play-fill" viewBox="0 0 16 16" id="toggleIcon"><path d="M11.596 8.697l-6.363 3.692A.5.5 0 0 1 4.5 12.846V3.154a.5.5 0 0 1 .733-.442l6.363 3.692a.5.5 0 0 1 0 .884z"/></svg> Start Lesson';
-            }
+            const icon = isPlaying ? 'bi-pause-fill' : 'bi-play-fill';
+            button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi ${icon}" viewBox="0 0 16 16"></svg> ${isPlaying ? 'Pause' : 'Start'} Lesson`;
         }
 
         function speakNext() {
-            if (currentIndex < texts.length && isPlaying) {
-                const textObj = texts[currentIndex];
-                const element = document.getElementById(textObj.id);
-                element.classList.add('highlight');
-
-                utterance = new SpeechSynthesisUtterance(textObj.text);
-                utterance.lang = textObj.lang;
-
-                utterance.onend = function () {
-                    element.classList.remove('highlight');
-                    currentIndex++;
-                    speakNext();
-                };
-
-                speechSynthesis.speak(utterance);
-                scrollToElement(element);
+            if (currentIndex < texts.length) {
+                isTransitioning = true;  // Marcando que a leitura está em transição
+                speakSpecific(currentIndex);
             } else {
                 pauseLesson();
             }
         }
 
+        function speakSpecific(index) {
+            const { text, lang } = texts[index];
+            const element = document.querySelector(`[data-index='${texts[index].id}']`);
+
+            if (!text.trim()) {
+                currentIndex++;
+                speakNext();
+                return;
+            }
+
+            if (!element) {
+                console.warn(`Elemento não encontrado: ${texts[index].id}`);
+                currentIndex++;
+                speakNext();
+                return;
+            }
+
+            // Remove destaque de qualquer trecho anterior
+            document.querySelectorAll('.highlight').forEach(el => el.classList.remove('highlight'));
+            element.classList.add('highlight');
+
+            utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = lang;
+
+            // Troca a imagem para o GIF animado quando começar a leitura
+            const robotImage = document.getElementById('robotImage');
+            robotImage.src = '../../../../../imagens/robo1.gif';
+
+            utterance.onend = () => {
+                element.classList.remove('highlight');
+                currentIndex++;
+                if (isPlaying && currentIndex < texts.length) {
+                    // Se ainda estiver lendo, continue para o próximo sem trocar a imagem
+                    speakNext();
+                } else {
+                    // Se não houver mais texto ou estiver pausado, troque para a imagem estática
+                    isTransitioning = false;
+                    robotImage.src = '../../../../../imagens/robo1_static.png';
+                }
+            };
+
+            // Cancelar qualquer fala anterior antes de iniciar a nova
+            speechSynthesis.cancel();
+            speechSynthesis.speak(utterance);
+            scrollToElement(element);
+        }
+
         function scrollToElement(element) {
             const contentWrapper = document.getElementById('contentWrapper');
-            const elementPosition = element.offsetTop;
-            const wrapperHeight = contentWrapper.clientHeight;
-            const scrollPosition = elementPosition - (wrapperHeight / 2);
-            contentWrapper.scrollTo({ top: scrollPosition, behavior: 'smooth' });
+            const position = element.offsetTop - (contentWrapper.clientHeight / 2);
+            contentWrapper.scrollTo({ top: position, behavior: 'smooth' });
         }
 
         window.onload = loadTextFile;
