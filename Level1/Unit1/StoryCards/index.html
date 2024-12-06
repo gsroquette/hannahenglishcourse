@@ -17,7 +17,7 @@
             apiKey: "API_KEY_HERE",
             authDomain: "hannahenglishcourse.firebaseapp.com",
             projectId: "hannahenglishcourse",
-            storageBucket: "hannahenglishcourse.appspot.com",
+            storageBucket: "hannahenglishcourse",
             messagingSenderId: "449818788486",
             appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
             measurementId: "G-07VVJG9LRS",
@@ -32,6 +32,7 @@
         let storyText = ""; // Variável que irá conter o texto da história
         let phaseCompleted = false; // Variável para verificar se a fase foi concluída
         let alertShown = false; // Variável para garantir que a mensagem seja mostrada apenas uma vez
+        let showText = false; // Variável para alternar entre imagem e texto
 
         // Função para verificar o role e exibir o botão PDF se o usuário for "professor" ou "proprietário"
         function checkUserRole() {
@@ -208,7 +209,7 @@
                     }
                     console.log("English voice not found in synthesizer.");
                 }
-                buttonElement.src = 'pausa.png';
+                buttonElement.src = 'pause.png';
             }
         }
 
@@ -223,42 +224,78 @@
             };
         }
 
-        // Função para interceptar a tentativa de sair da página
-        function confirmExit() {
-            console.log("Phase completed status: ", phaseCompleted);
-            if (!phaseCompleted) {
-                const userConfirmed = confirm("To complete the phase, you need to listen to the entire story. Do you want to leave without completing the phase?");
-                console.log("User confirmed exit: ", userConfirmed);
-                return userConfirmed;
-            }
-            return true;
+        // Função para alternar entre texto e imagem no card ao clicar nele
+        function toggleView() {
+            showText = !showText;
+            document.getElementById("toggleButton").innerText = showText ? "See the story" : "Read the story";
+            displayCard(currentCardIndex);
         }
 
-        // Adiciona o evento para interceptar o fechamento ou recarregamento da página
-        window.addEventListener("beforeunload", function (event) {
-            console.log("beforeunload event triggered. Phase completed: ", phaseCompleted);
-            if (!phaseCompleted) {
-                event.preventDefault();
-                event.returnValue = "";
-            }
-        });
+        // Função para exibir o card atual
+        function displayCard(index) {
+            const container = document.getElementById('cardsContainer');
+            container.innerHTML = '';
+            const cardData = cardsData[index];
+            const cardElement = document.createElement('div');
+            cardElement.className = 'card active';
+            cardElement.onclick = () => toggleView(); // Adiciona o evento de clique para alternar entre imagem e texto
 
-        // Adiciona o evento de clique no botão Back
-        document.addEventListener("DOMContentLoaded", () => {
-            const backButton = document.querySelector("button#backButton");
-            if (backButton) {
-                backButton.addEventListener("click", (event) => {
-                    event.preventDefault();
-                    console.log("Back button clicked. Phase completed: ", phaseCompleted);
-                    if (confirmExit()) {
-                        console.log("Navigating back.");
-                        window.history.back();
+            if (showText) {
+                cardElement.innerHTML = `<div class="card-text"><p>${cardData.text}</p></div>`;
+            } else {
+                cardElement.innerHTML = `<img src="images/${cardData.image}.png" alt="Image">`;
+            }
+
+            const businessmanImage = document.createElement('img');
+            businessmanImage.src = 'businessman.png';
+            businessmanImage.className = 'businessman';
+            businessmanImage.onclick = (event) => {
+                event.stopPropagation(); // Impede o clique no card de acionar o evento de alternar imagem/texto
+                toggleSpeech(cardData.text, businessmanImage);
+            };
+
+            cardElement.appendChild(businessmanImage);
+            container.appendChild(cardElement);
+
+            // Verifica se é o último card
+            if (index === cardsData.length - 1) {
+                firebase.auth().onAuthStateChanged(function(user) {
+                    if (user) {
+                        const { fase } = getParamsFromURL();
+                        salvarProgressoAluno(user.uid, fase);
                     } else {
-                        console.log("User chose to stay on the page.");
+                        console.log("No user is logged in.");
                     }
                 });
             }
-        });
+
+            // Atualiza botões de navegação
+            document.getElementById('prevBtn').style.display = (index === 0) ? 'none' : 'block';
+            document.getElementById('nextBtn').style.display = (index === cardsData.length - 1) ? 'none' : 'block';
+        }
+
+        // Função para exibir o próximo card
+        function showNextCard() {
+            currentCardIndex = (currentCardIndex + 1) % cardsData.length;
+            console.log("Showing next card. Current index: ", currentCardIndex);
+            displayCard(currentCardIndex);
+        }
+
+        // Função para exibir o card anterior
+        function showPreviousCard() {
+            currentCardIndex = (currentCardIndex - 1 + cardsData.length) % cardsData.length;
+            console.log("Showing previous card. Current index: ", currentCardIndex);
+            displayCard(currentCardIndex);
+        }
+
+        // Função para inicializar a página com o primeiro card
+        async function init() {
+            cardsData = await loadContent();
+            console.log("Cards data loaded: ", cardsData);
+            displayCard(0);
+        }
+
+        init();
     </script>
 
     <style>
@@ -337,7 +374,7 @@
             width: 90px;
             height: 90px;
             cursor: pointer;
-            background-color: rgba(255, 255, 255, 0);
+            background-color: transparent;
             border-radius: 50%;
             z-index: 10;
         }
@@ -388,78 +425,8 @@
     </div>
 
     <script>
-        let showText = false;
         let currentCardIndex = 0;
         let cardsData = [];
-
-        // Função para alternar entre texto e imagem
-        function toggleView() {
-            showText = !showText;
-            document.getElementById("toggleButton").innerText = showText ? "See the story" : "Read the story";
-            displayCard(currentCardIndex);
-        }
-
-        // Função para exibir o card atual
-        function displayCard(index) {
-            const container = document.getElementById('cardsContainer');
-            container.innerHTML = '';
-            const cardData = cardsData[index];
-            const cardElement = document.createElement('div');
-            cardElement.className = 'card active';
-
-            if (showText) {
-                cardElement.innerHTML = `<div class="card-text"><p>${cardData.text}</p></div>`;
-            } else {
-                cardElement.innerHTML = `<img src="images/${cardData.image}.png" alt="Image">`;
-            }
-
-            const businessmanImage = document.createElement('img');
-            businessmanImage.src = 'businessman.png';
-            businessmanImage.className = 'businessman';
-            businessmanImage.onclick = () => toggleSpeech(cardData.text, businessmanImage);
-
-            cardElement.appendChild(businessmanImage);
-            container.appendChild(cardElement);
-
-            // Verifica se é o último card
-            if (index === cardsData.length - 1) {
-                firebase.auth().onAuthStateChanged(function(user) {
-                    if (user) {
-                        const { fase } = getParamsFromURL();
-                        salvarProgressoAluno(user.uid, fase);
-                    } else {
-                        console.log("No user is logged in.");
-                    }
-                });
-            }
-
-            // Atualiza botões de navegação
-            document.getElementById('prevBtn').style.display = (index === 0) ? 'none' : 'block';
-            document.getElementById('nextBtn').style.display = (index === cardsData.length - 1) ? 'none' : 'block';
-        }
-
-        // Função para exibir o próximo card
-        function showNextCard() {
-            currentCardIndex = (currentCardIndex + 1) % cardsData.length;
-            console.log("Showing next card. Current index: ", currentCardIndex);
-            displayCard(currentCardIndex);
-        }
-
-        // Função para exibir o card anterior
-        function showPreviousCard() {
-            currentCardIndex = (currentCardIndex - 1 + cardsData.length) % cardsData.length;
-            console.log("Showing previous card. Current index: ", currentCardIndex);
-            displayCard(currentCardIndex);
-        }
-
-        // Função para inicializar a página com o primeiro card
-        async function init() {
-            cardsData = await loadContent();
-            console.log("Cards data loaded: ", cardsData);
-            displayCard(0);
-        }
-
-        init();
     </script>
 </body>
 </html>
