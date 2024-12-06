@@ -309,7 +309,7 @@
         document.addEventListener("DOMContentLoaded", () => {
             const backButton = document.querySelector("button#backButton");
             if (backButton) {
-                backButton.addEventListener("click", () => {
+                backButton.addEventListener("click", async () => {
                     const pathParts = window.location.pathname.split('/');
                     const baseUrl = window.location.origin;
 
@@ -317,12 +317,24 @@
                     const level = pathParts.find(part => part.toLowerCase().startsWith('level'));
                     const unit = pathParts.find(part => part.toLowerCase().startsWith('unit'));
 
-                    // Redireciona para a página listening.html da unidade correspondente
-                    if (level && unit) {
-                        window.location.href = `${baseUrl}/${level}/${unit}/listening.html`;
-                    } else {
-                        console.error("Nível ou unidade não identificados no URL.");
-                    }
+                    // Verifica se a próxima fase está concluída no banco de dados
+                    firebase.auth().onAuthStateChanged(async function(user) {
+                        if (user && level && unit) {
+                            const uid = user.uid;
+                            const dbRef = firebase.database().ref(`usuarios/${uid}/progresso/${level}/${unit}/fase2`);
+                            const snapshot = await dbRef.once('value');
+                            const isPhaseCompleted = snapshot.val();
+
+                            if (isPhaseCompleted) {
+                                // Redireciona para a página listening.html da unidade correspondente
+                                window.location.href = `${baseUrl}/${level}/${unit}/listening.html`;
+                            } else {
+                                alert("A próxima fase ainda não está concluída. Complete a fase atual antes de prosseguir.");
+                            }
+                        } else {
+                            console.error("Nível ou unidade não identificados no URL ou usuário não está logado.");
+                        }
+                    });
                 });
             }
         });
