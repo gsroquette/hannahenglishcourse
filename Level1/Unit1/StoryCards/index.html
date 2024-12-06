@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -53,11 +53,11 @@
 
         // Verifica o role do usuário ao carregar a página
         document.addEventListener("DOMContentLoaded", async () => {
-    checkUserRole();
-    cardsData = await loadContent();
-    console.log("Cards data loaded: ", cardsData);
-    displayCard(0);
-});
+            checkUserRole();
+            cardsData = await loadContent();
+            console.log("Cards data loaded: ", cardsData);
+            displayCard(0);
+        });
 
         // Função para identificar Level, Unit e fase atual pelo URL
         function getParamsFromURL() {
@@ -135,8 +135,6 @@
             doc.save("story.pdf");  // Salva o PDF com o nome 'story.pdf'
         }
 
-        
-
         async function loadContent() {
             const response = await fetch('images.txt');
             const text = await response.text();
@@ -177,39 +175,38 @@
                 window.speechSynthesis.cancel();
                 console.log("Speech synthesis stopped.");
             } else {
+                // Tenta buscar vozes. Pode ser que as vozes ainda não estejam carregadas.
                 let voices = window.speechSynthesis.getVoices();
                 let usVoice = voices.find(voice => voice.lang === 'en-US');
 
-                if (usVoice) {
-                    let utterance = new SpeechSynthesisUtterance(text);
-                    utterance.voice = usVoice;
-                    utterance.lang = 'en-US';
-                    console.log("Speaking with voice: ", usVoice.name);
-                    window.speechSynthesis.speak(utterance);
+                if (!usVoice && voices.length === 0) {
+                    // Se nenhuma voz for carregada, adiciona um listener para tentar novamente quando as vozes estiverem prontas
+                    window.speechSynthesis.onvoiceschanged = () => {
+                        voices = window.speechSynthesis.getVoices();
+                        usVoice = voices.find(voice => voice.lang === 'en-US');
+
+                        if (usVoice) {
+                            speakText(text, usVoice);
+                        } else {
+                            alert("To complete the activity, you must enable an English voice in your speech synthesizer.");
+                            console.log("English voice not found in synthesizer.");
+                        }
+                    };
+                } else if (usVoice) {
+                    speakText(text, usVoice);
                 } else {
                     alert("To complete the activity, you must enable an English voice in your speech synthesizer.");
                     console.log("English voice not found in synthesizer.");
                 }
-
-                // Se as vozes ainda não estiverem carregadas, adicionar um listener para carregá-las
-                if (voices.length === 0) {
-                    window.speechSynthesis.onvoiceschanged = () => {
-    let voices = window.speechSynthesis.getVoices();
-    let usVoice = voices.find(voice => voice.lang === 'en-US');
-
-    if (usVoice) {
-        let utterance = new SpeechSynthesisUtterance(storyText);
-        utterance.voice = usVoice;
-        utterance.lang = 'en-US';
-        console.log("Speaking with voice after loading: ", usVoice.name);
-        window.speechSynthesis.speak(utterance);
-    } else {
-        alert("Please enable an English voice in your speech synthesizer.");
-        console.log("English voice not found after voices changed.");
-    }
-};
-                }
             }
+        }
+
+        function speakText(text, voice) {
+            let utterance = new SpeechSynthesisUtterance(text);
+            utterance.voice = voice;
+            utterance.lang = 'en-US';
+            console.log("Speaking with voice: ", voice.name);
+            window.speechSynthesis.speak(utterance);
         }
 
         // Função para interceptar a tentativa de sair da página
@@ -225,12 +222,12 @@
 
         // Adiciona o evento para interceptar o fechamento ou recarregamento da página
         window.addEventListener("beforeunload", function (event) {
-    console.log("beforeunload event triggered. Phase completed: ", phaseCompleted);
-    if (!phaseCompleted) {
-        event.preventDefault();
-        event.returnValue = "";
-    }
-});
+            console.log("beforeunload event triggered. Phase completed: ", phaseCompleted);
+            if (!phaseCompleted) {
+                event.preventDefault();
+                event.returnValue = "";
+            }
+        });
 
         // Adiciona o evento de clique no botão Back
         document.addEventListener("DOMContentLoaded", () => {
