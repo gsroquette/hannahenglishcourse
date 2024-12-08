@@ -33,6 +33,8 @@
         let phaseCompleted = false; // Variável para verificar se a fase foi concluída
         let alertShown = false; // Variável para garantir que a mensagem seja mostrada apenas uma vez
         let showText = false; // Variável para alternar entre imagem e texto
+        let viewedCards = new Set(); // Rastreador de cartões visualizados
+        let spokenCards = new Set(); // Rastreador de cartões ouvidos
 
         // Função para verificar o role e exibir o botão PDF se o usuário for "professor" ou "proprietário"
         function checkUserRole() {
@@ -157,34 +159,38 @@
 }
 
         function displayCard(index) {
-            const container = document.getElementById('cardsContainer');
-            container.innerHTML = '';
-            const cardData = cardsData[index];
-            const cardElement = document.createElement('div');
-            cardElement.className = 'card active';
-            cardElement.onclick = () => toggleView(); // Alternar entre texto e imagem
+    const container = document.getElementById('cardsContainer');
+    container.innerHTML = '';
+    const cardData = cardsData[index];
+    const cardElement = document.createElement('div');
+    cardElement.className = 'card active';
+    cardElement.onclick = () => toggleView(); // Alternar entre texto e imagem
 
-            if (showText) {
-                cardElement.innerHTML = `<div class="card-text"><p>${cardData.text}</p></div>`;
-            } else {
-                cardElement.innerHTML = `<img src="${cardData.image}" alt="Image">`;
-            }
+    if (showText) {
+        cardElement.innerHTML = `<div class="card-text"><p>${cardData.text}</p></div>`;
+    } else {
+        cardElement.innerHTML = `<img src="${cardData.image}" alt="Image">`;
+    }
 
-            const businessmanImage = document.createElement('img');
-            businessmanImage.src = 'businessman.png';
-            businessmanImage.className = 'businessman';
-            businessmanImage.onclick = (event) => {
-                event.stopPropagation(); // Impede o clique no card de alternar
-                toggleSpeech(cardData.text, businessmanImage);
-            };
+    const businessmanImage = document.createElement('img');
+    businessmanImage.src = 'businessman.png';
+    businessmanImage.className = 'businessman';
+    businessmanImage.onclick = (event) => {
+        event.stopPropagation(); // Impede o clique no card de alternar
+        toggleSpeech(cardData.text, businessmanImage, index);
+    };
 
-            cardElement.appendChild(businessmanImage);
-            container.appendChild(cardElement);
+    cardElement.appendChild(businessmanImage);
+    container.appendChild(cardElement);
 
-            // Atualiza botões de navegação
-            document.getElementById('prevBtn').style.display = (index === 0) ? 'none' : 'block';
-            document.getElementById('nextBtn').style.display = (index === cardsData.length - 1) ? 'none' : 'block';
-        }
+    // Marcar o cartão como visualizado
+    viewedCards.add(index);
+    checkCompletion();
+
+    // Atualiza botões de navegação
+    document.getElementById('prevBtn').style.display = (index === 0) ? 'none' : 'block';
+    document.getElementById('nextBtn').style.display = (index === cardsData.length - 1) ? 'none' : 'block';
+}
 
         function toggleView() {
             showText = !showText;
@@ -416,7 +422,7 @@ async function checkPhaseProgress(uid, level, unit) {
             doc.save("story.pdf"); // Salva o PDF com o nome 'story.pdf'
         }
 
-      function toggleSpeech(text, buttonElement) {
+     function toggleSpeech(text, buttonElement, index) {
     if (!('speechSynthesis' in window)) {
         alert("Your browser does not support speech synthesis. Please enable it or use a compatible browser.");
         return;
@@ -436,28 +442,31 @@ async function checkPhaseProgress(uid, level, unit) {
                 usVoice = voices.find(voice => voice.lang === 'en-US');
 
                 if (usVoice) {
-                    speakText(text, usVoice, buttonElement);
+                    speakText(text, usVoice, buttonElement, index);
                 } else {
-                    speakText(text, voices[0], buttonElement);
-                    if (!alertShown) {
-                        alert("To complete the activity, you must enable an English voice in your speech synthesizer.");
-                        alertShown = true;
-                    }
-                    console.log("English voice not found in synthesizer.");
+                    speakText(text, voices[0], buttonElement, index);
                 }
             };
         } else if (usVoice) {
-            speakText(text, usVoice, buttonElement);
+            speakText(text, usVoice, buttonElement, index);
         } else {
-            speakText(text, voices[0], buttonElement);
-            if (!alertShown) {
-                alert("To complete the activity, you must enable an English voice in your speech synthesizer.");
-                alertShown = true;
-            }
-            console.log("English voice not found in synthesizer.");
+            speakText(text, voices[0], buttonElement, index);
         }
         buttonElement.src = 'pause.png';
     }
+}
+
+function speakText(text, voice, buttonElement, index) {
+    let utterance = new SpeechSynthesisUtterance(text);
+    utterance.voice = voice;
+    utterance.lang = 'en-US';
+    console.log("Speaking with voice: ", voice.name);
+    window.speechSynthesis.speak(utterance);
+    utterance.onend = () => {
+        buttonElement.src = 'businessman.png';
+        spokenCards.add(index); // Marca o cartão como ouvido
+        checkCompletion();
+    };
 }
 
 function speakText(text, voice, buttonElement) {
@@ -469,6 +478,24 @@ function speakText(text, voice, buttonElement) {
     utterance.onend = () => {
         buttonElement.src = 'businessman.png';
     };
+}
+
+function checkCompletion() {
+    if (viewedCards.size === cardsData.length && spokenCards.size === cardsData.length) {
+        if (!phaseCompleted) {
+            phaseCompleted = true;
+            console.log("All cards viewed and heard. Phase completed.");
+            firebase.auth().onAuthStateChanged(function(user) {
+                if (user) {
+                    const { fase } = getParamsFromURL();
+                    salvarProgressoAluno(user.uid, fase);
+                    alert("Congratulations! You have completed this phase.");
+                } else {
+                    console.log("User not logged in. Progress not saved.");
+                }
+            });
+        }
+    }
 }
     </script>
 
