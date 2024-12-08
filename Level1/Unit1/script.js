@@ -107,11 +107,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Resto do código permanece inalterado (mapa, avatar, etc.)
-    // ...
-});
-
-    // Funções para desenhar o mapa, linhas e posicionar o avatar
+    // Função para inicializar o mapa
     function initializeMap(userAvatar) {
         window.scrollTo(0, 0);
         activities.forEach((activity, index) => {
