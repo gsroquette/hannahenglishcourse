@@ -100,49 +100,59 @@
         }
 
         async function loadContent() {
-            // Obtém os parâmetros level e unit da URL
-            const { level, unit } = getParamsFromURL();
+    const { level, unit } = getParamsFromURL();
 
-            // Caminho dinâmico para a pasta DataStory
-            const dataStoryPath = `../../../../${level}/${unit}/DataStory/`;
+    if (!level || !unit) {
+        console.error("Level or Unit is missing in the URL parameters.");
+        return [];
+    }
 
-            // Carrega o arquivo images.txt da pasta DataStory
-            const response = await fetch(`${dataStoryPath}images.txt`);
-            const text = await response.text();
-            const lines = text.split('\n');
+    // Subir dois níveis e acessar a pasta DataStory dinamicamente
+    const dataStoryPath = `../../${level}/${unit}/DataStory/`;
 
-            let cards = [];
-            let currentImage = '';
-            let currentText = '';
+    try {
+        // Busca o arquivo images.txt
+        const response = await fetch(`${dataStoryPath}images.txt`);
+        if (!response.ok) throw new Error(`Failed to fetch images.txt from ${dataStoryPath}`);
+        
+        const text = await response.text();
+        const lines = text.split('\n');
 
-            // Processa o arquivo images.txt
-            lines.forEach(line => {
-                if (line.startsWith('#imagem')) {
-                    if (currentImage && currentText) {
-                        cards.push({ image: currentImage, text: currentText });
-                    }
-                    currentImage = line.replace('#', '').trim(); // Extrai o nome da imagem
-                    currentText = '';
-                } else {
-                    currentText += line + ' '; // Acumula o texto associado
+        let cards = [];
+        let currentImage = '';
+        let currentText = '';
+
+        lines.forEach(line => {
+            if (line.startsWith('#imagem')) {
+                if (currentImage && currentText) {
+                    cards.push({ image: currentImage, text: currentText });
                 }
-            });
-
-            if (currentImage && currentText) {
-                cards.push({ image: currentImage, text: currentText });
+                currentImage = line.replace('#', '').trim();
+                currentText = '';
+            } else {
+                currentText += line + ' ';
             }
+        });
 
-            // Preenche a variável global storyText com o conteúdo da história para o PDF
-            storyText = cards.map(card => card.text).join('\n\n');
-
-            // Atualiza os caminhos das imagens para incluir o diretório correto
-            cards = cards.map(card => ({
-                ...card,
-                image: `${dataStoryPath}${card.image}.png` // Caminho completo da imagem
-            }));
-
-            return cards;
+        if (currentImage && currentText) {
+            cards.push({ image: currentImage, text: currentText });
         }
+
+        storyText = cards.map(card => card.text).join('\n\n');
+
+        // Atualiza os caminhos das imagens para incluir o diretório correto
+        cards = cards.map(card => ({
+            ...card,
+            image: `${dataStoryPath}${card.image}.png`
+        }));
+
+        return cards;
+    } catch (error) {
+        console.error("Error loading content:", error);
+        return [];
+    }
+}
+
 
         function displayCard(index) {
             const container = document.getElementById('cardsContainer');
