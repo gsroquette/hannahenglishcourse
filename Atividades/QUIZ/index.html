@@ -193,8 +193,6 @@
 
     let currentQuestionIndex = 0;
     let questions = [];
-    let userAnswers = {};
-    let viewedQuestions = new Set();
 
     async function loadQuestions() {
         const { level, unit } = getLevelAndUnitFromURL();
@@ -236,18 +234,18 @@
         questionText.textContent = `${currentQuestionIndex + 1}. ${q.question}`;
         container.appendChild(questionText);
 
-        
-
         q.answers.forEach(answer => {
             const label = document.createElement('label');
             label.innerHTML = `<input type="radio" name="question" value="${answer[0]}"> ${answer}`;
             container.appendChild(label);
         });
+
+        updateNavigationButtons();
     }
 
     function readQuestion() {
         if (!('speechSynthesis' in window)) {
-            alert("Your browser does not support speech synthesis. Please use a compatible browser or enable the feature.");
+            alert("Your browser does not support speech synthesis. Please use a compatible browser.");
             return;
         }
 
@@ -255,57 +253,12 @@
         const utterance = new SpeechSynthesisUtterance(questionText);
         utterance.lang = 'en-US';
 
-        const loadVoices = () => {
-            const voices = window.speechSynthesis.getVoices();
-            const usVoice = voices.find(voice => voice.lang === 'en-US');
+        const voices = window.speechSynthesis.getVoices();
+        const usVoice = voices.find(voice => voice.lang === 'en-US');
+        if (usVoice) utterance.voice = usVoice;
 
-            if (usVoice) {
-                utterance.voice = usVoice;
-                speechSynthesis.speak(utterance);
-            } else {
-                alert("No 'en-US' voice found in your speech synthesizer. Please enable English language in your browser's speech synthesizer. The default voice will be used, which may cause issues.");
-                speechSynthesis.speak(utterance);
-            }
-        };
-
-        if (window.speechSynthesis.getVoices().length === 0) {
-            window.speechSynthesis.onvoiceschanged = loadVoices;
-        } else {
-            loadVoices();
-        }
+        speechSynthesis.speak(utterance);
     }
-    }
-
-    document.getElementById('backButton').addEventListener('click', () => {
-        const { level, unit } = getLevelAndUnitFromURL();
-        const { fase } = getFaseFromURL();
-        const nextFase = `fase${parseInt(fase) + 1}`;
-        const dbRef = firebase.database().ref(`usuarios/progresso/${level}/${unit}/${nextFase}`);
-
-        dbRef.once('value').then(snapshot => {
-            if (snapshot.val()) {
-                window.history.back();
-            } else {
-                if (confirm('You have not completed this phase. Do you want to go back anyway?')) {
-                    window.history.back();
-                }
-            }
-        });
-    });
-    });
-
-    function getLevelAndUnitFromURL() {
-        const params = new URLSearchParams(window.location.search);
-        const level = params.get('level');
-        const unit = params.get('unit');
-        return { level, unit };
-    }
-
-    function getFaseFromURL() {
-        const params = new URLSearchParams(window.location.search);
-        return { fase: params.get('fase') };
-    };
-    };
 
     function updateNavigationButtons() {
         document.getElementById('prev-btn').disabled = currentQuestionIndex === 0;
@@ -325,6 +278,33 @@
             displayQuestion();
         }
     }
+
+    function getLevelAndUnitFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        return { level: params.get('level'), unit: params.get('unit') };
+    }
+
+    function getFaseFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        return { fase: params.get('fase') };
+    }
+
+    document.getElementById('backButton').addEventListener('click', () => {
+        const { level, unit } = getLevelAndUnitFromURL();
+        const { fase } = getFaseFromURL();
+        const nextFase = `fase${parseInt(fase) + 1}`;
+        const dbRef = firebase.database().ref(`usuarios/progresso/${level}/${unit}/${nextFase}`);
+
+        dbRef.once('value').then(snapshot => {
+            if (snapshot.val()) {
+                window.history.back();
+            } else {
+                if (confirm('You have not completed this phase. Do you want to go back anyway?')) {
+                    window.history.back();
+                }
+            }
+        });
+    });
 
     window.onload = loadQuestions;
 </script>
