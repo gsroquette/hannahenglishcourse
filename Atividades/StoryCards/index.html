@@ -207,17 +207,48 @@
         document.addEventListener("DOMContentLoaded", () => {
     const backButton = document.querySelector("button#backButton");
     if (backButton) {
-        backButton.addEventListener("click", () => {
+        backButton.addEventListener("click", async () => {
             const { level, unit } = getParamsFromURL();
             const baseUrl = window.location.origin;
 
-            if (level && unit) {
-                const destination = `${baseUrl}/${level}/${unit}/index.html`;
-                console.log("Navigating to:", destination); // Debug
-                window.location.href = destination;
-            } else {
-                console.error("Nível ou unidade não identificados.");
+            if (!level || !unit) {
+                console.error("Nível ou unidade não identificados no URL.");
+                alert("Level or Unit not identified in the URL.");
+                return;
             }
+
+            // Verifica se o usuário está logado
+            firebase.auth().onAuthStateChanged(async (user) => {
+                if (user) {
+                    const uid = user.uid;
+
+                    try {
+                        // Verifica se a próxima fase está concluída
+                        const dbRef = firebase.database().ref(`usuarios/${uid}/progresso/${level}/${unit}/fase2`);
+                        const snapshot = await dbRef.once('value');
+                        const isPhaseCompleted = snapshot.val();
+
+                        if (isPhaseCompleted) {
+                            // Redireciona para a página listening.html
+                            window.location.href = `${baseUrl}/${level}/${unit}/listening.html`;
+                        } else {
+                            // Exibe mensagem de confirmação
+                            const confirmExit = confirm(
+                                "The next phase is not completed. Do you wish to leave anyway?"
+                            );
+                            if (confirmExit) {
+                                window.location.href = `${baseUrl}/${level}/${unit}/listening.html`;
+                            }
+                        }
+                    } catch (error) {
+                        console.error("Erro ao verificar a próxima fase:", error);
+                        alert("An error occurred while checking your progress. Please try again.");
+                    }
+                } else {
+                    console.error("Usuário não está logado.");
+                    alert("You need to be logged in to proceed.");
+                }
+            });
         });
     }
 });
