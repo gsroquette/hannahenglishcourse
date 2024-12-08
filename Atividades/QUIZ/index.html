@@ -6,7 +6,6 @@
     <title>Hannah Quiz</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
     <style>
-        /* Estilos existentes mantidos */
         body {
             font-family: Arial, sans-serif;
             margin: 20px;
@@ -82,13 +81,6 @@
             color: white;
         }
 
-        .read-btn i {
-            font-size: 1.2em; /* Ajusta o tamanho dos ícones */
-            margin-right: 5px; /* Espaço entre o ícone e o texto */
-            vertical-align: middle; /* Alinha o ícone ao texto */
-           
-}
-
         .read-btn:hover {
             background-color: #FB8C00;
         }
@@ -111,7 +103,6 @@
             display: none;
         }
 
-        /* Modal de conclusão */
         #completion-modal {
             display: none;
             position: fixed;
@@ -152,7 +143,7 @@
     </style>
 </head>
 <body>
-<button onclick="window.history.back()" style="padding: 10px 20px; font-size: 1em; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; transition: background-color 0.3s ease;">
+<button id="backButton" style="padding: 10px 20px; font-size: 1em; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; transition: background-color 0.3s ease;">
     Back
 </button>
 
@@ -168,8 +159,8 @@
 
 <div class="btn-group">
     <button class="read-btn" id="read-btn" onclick="readQuestion()">
-    <i class="fas fa-file-alt"></i> <i class="fas fa-volume-up"></i> Read
-</button>
+        <i class="fas fa-volume-up"></i> Read
+    </button>
     <button class="prev-btn" id="prev-btn" onclick="stopReading(); showPreviousQuestion()">❮❮ Previous</button>
     <button class="next-btn" id="next-btn" onclick="stopReading(); showNextQuestion()">Next ❯❯</button>
 </div>
@@ -178,7 +169,6 @@
     <audio id="feedback-audio"></audio>
 </div>
 
-<!-- Modal de conclusão -->
 <div id="overlay"></div>
 <div id="completion-modal">
     <h2>Phase Completed!</h2>
@@ -189,54 +179,25 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-
 <script>
-    // Configuração do Firebase
     const firebaseConfig = {
         apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
         authDomain: "hannahenglishcourse.firebaseapp.com",
+        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
         projectId: "hannahenglishcourse",
         storageBucket: "hannahenglishcourse.appspot.com",
         messagingSenderId: "449818788486",
-        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
-        measurementId: "G-07VVJG9LRS",
-        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707"
     };
-
-    // Inicializa o Firebase
     firebase.initializeApp(firebaseConfig);
-
-// Função para exibir o botão PDF se o papel for 'professor' ou 'proprietario'
-function displayPdfButton(role) {
-    if (role === 'professor' || role === 'proprietario') {
-        const pdfButton = document.createElement('button');
-        pdfButton.className = 'pdf-btn';
-        pdfButton.id = 'pdf-btn';
-        pdfButton.textContent = 'Generate PDF';
-        pdfButton.onclick = generatePDF;
-        document.querySelector('.btn-group').appendChild(pdfButton);
-    }
-}
-
-// Obter o papel do usuário e exibir o botão condicionalmente
-firebase.auth().onAuthStateChanged(function(user) {
-    if (user) {
-        // Substitua o caminho abaixo conforme necessário para buscar o papel do usuário
-        firebase.database().ref('usuarios/' + user.uid + '/role').once('value').then((snapshot) => {
-            const role = snapshot.val();
-            displayPdfButton(role);
-        });
-    }
-});
 
     let currentQuestionIndex = 0;
     let questions = [];
-    let answeredQuestions = [];
-    let userAnswers = {}; // Objeto para armazenar as respostas do usuário
-    let speechSynthesisUtterance = null;
+    let userAnswers = {};
+    let viewedQuestions = new Set();
 
     async function loadQuestions() {
-        const response = await fetch('questions.txt');
+        const response = await fetch('../../DataQuiz/questions.txt');
         const text = await response.text();
         const lines = text.split('\n');
         let currentQuestion = null;
@@ -244,284 +205,79 @@ firebase.auth().onAuthStateChanged(function(user) {
         lines.forEach(line => {
             line = line.trim();
             if (line.startsWith('Q:')) {
-                if (currentQuestion) {
-                    questions.push(currentQuestion);
-                }
-                currentQuestion = { question: line.substring(2).trim(), answers: [], correct: '' };
-            } else if (/^[A-Z]\./.test(line)) {  
+                if (currentQuestion) questions.push(currentQuestion);
+                currentQuestion = { question: line.substring(2), answers: [], correct: '' };
+            } else if (/^[A-Z]\./.test(line)) {
                 currentQuestion.answers.push(line);
             } else if (line.startsWith('Correct:')) {
                 currentQuestion.correct = line.split(':')[1].trim();
             }
         });
 
-        if (currentQuestion) {
-            questions.push(currentQuestion);
-        }
-
-        answeredQuestions = new Array(questions.length).fill(false);
+        if (currentQuestion) questions.push(currentQuestion);
         displayQuestion();
     }
 
-   function displayQuestion() {
-    const container = document.getElementById('quiz-container');
-    container.innerHTML = '';
+    function displayQuestion() {
+        const container = document.getElementById('quiz-container');
+        container.innerHTML = '';
 
-    const q = questions[currentQuestionIndex];
-    const questionDiv = document.createElement('div');
-    questionDiv.classList.add('question');
+        const q = questions[currentQuestionIndex];
+        const questionText = document.createElement('p');
+        questionText.id = 'question-text';
+        questionText.textContent = `${currentQuestionIndex + 1}. ${q.question}`;
+        container.appendChild(questionText);
 
-    const questionText = document.createElement('p');
-    questionText.id = 'question-text';
-    questionText.innerText = `${currentQuestionIndex + 1}. ${q.question}`;
-    questionDiv.appendChild(questionText);
-
-    q.answers.forEach((answer) => {
-        const answerLabel = document.createElement('label');
-        answerLabel.innerHTML = `<input type="radio" name="question${currentQuestionIndex}" value="${answer[0]}" onclick="checkAnswer(this, '${answer[0]}')"> ${answer}`;
-        questionDiv.appendChild(answerLabel);
-    });
-
-    container.appendChild(questionDiv);
-
-    // Restaura a resposta do usuário, se houver
-    if (userAnswers[currentQuestionIndex]) {
-        const savedAnswer = userAnswers[currentQuestionIndex];
-        const radioButtons = document.getElementsByName(`question${currentQuestionIndex}`);
-        radioButtons.forEach((radio) => {
-            if (radio.value === savedAnswer) {
-                radio.checked = true;
-            }
+        q.answers.forEach(answer => {
+            const label = document.createElement('label');
+            label.innerHTML = `<input type="radio" name="question" value="${answer[0]}"> ${answer}`;
+            container.appendChild(label);
         });
-    }
-
-    updateNavigationButtons();
-}
-
-    function updateNavigationButtons() {
-        document.getElementById('prev-btn').disabled = currentQuestionIndex === 0;
-        document.getElementById('next-btn').disabled = currentQuestionIndex === questions.length - 1;
-    }
-
-    function showNextQuestion() {
-        hideGIF();
-        if (currentQuestionIndex < questions.length - 1) {
-            currentQuestionIndex++;
-            displayQuestion();
-        }
-    }
-
-    function showPreviousQuestion() {
-        hideGIF();
-        if (currentQuestionIndex > 0) {
-            currentQuestionIndex--;
-            displayQuestion();
-        }
-    }
-
-function toggleButtons(state) {
-    document.getElementById('prev-btn').disabled = !state;
-    document.getElementById('next-btn').disabled = !state;
-    document.getElementById('read-btn').disabled = !state;
-
-    const radios = document.querySelectorAll('input[type="radio"]');
-    radios.forEach(radio => radio.disabled = !state);
-}
-
-   function checkAnswer(radioElement, selectedAnswer) {
-    const q = questions[currentQuestionIndex];
-    const feedbackDiv = document.getElementById('feedback');
-    const feedbackImg = document.getElementById('feedback-img');
-    const feedbackAudio = document.getElementById('feedback-audio');
-    const gifContainer = document.querySelector('.gif-container');
-
-    // Salva a resposta do usuário
-    userAnswers[currentQuestionIndex] = selectedAnswer;
-
-    toggleButtons(false); // Bloqueia os botões
-
-    if (selectedAnswer === q.correct) {
-        feedbackImg.src = 'certo.gif';
-        feedbackAudio.src = 'certo.mp3';
-        feedbackAudio.play();
-        feedbackDiv.style.display = 'block';
-        gifContainer.style.display = 'block';
-        answeredQuestions[currentQuestionIndex] = true;
-
-        setTimeout(() => {
-            hideGIF();
-            toggleButtons(true); // Desbloqueia os botões
-            showNextQuestion();
-            checkCompletion();
-        }, 2000);
-    } else {
-        feedbackImg.src = 'errado.gif';
-        feedbackAudio.src = 'errado.mp3';
-        feedbackAudio.play();
-        feedbackDiv.style.display = 'block';
-        gifContainer.style.display = 'block';
-
-        setTimeout(() => {
-            hideGIF();
-            toggleButtons(true); // Desbloqueia os botões
-            radioElement.checked = false;
-        }, 2000);
-    }
-}
-
-    function hideGIF() {
-        const gifContainer = document.querySelector('.gif-container');
-        gifContainer.style.display = 'none';
     }
 
     function readQuestion() {
-        stopReading();
-        const questionText = document.getElementById('question-text').innerText;
-        speechSynthesisUtterance = new SpeechSynthesisUtterance(questionText);
-        speechSynthesisUtterance.lang = 'en-US';
-        speechSynthesis.speak(speechSynthesisUtterance);
-    }
-
-    function stopReading() {
-        if (speechSynthesisUtterance) {
-            speechSynthesis.cancel();
+        if (!('speechSynthesis' in window)) {
+            alert('Speech synthesis not supported in this browser.');
+            return;
         }
-    }
 
-    function checkCompletion() {
-        if (answeredQuestions.every((answered) => answered)) {
-            showModal();
-            ensureUserIsAuthenticated(updateNextPhase);
+        const questionText = document.getElementById('question-text').textContent;
+        const utterance = new SpeechSynthesisUtterance(questionText);
+        utterance.lang = 'en-US';
+
+        const voices = window.speechSynthesis.getVoices();
+        const usVoice = voices.find(voice => voice.lang === 'en-US');
+
+        if (usVoice) {
+            utterance.voice = usVoice;
+        } else {
+            alert('No English (US) voice found. Default voice will be used.');
         }
+
+        speechSynthesis.speak(utterance);
     }
 
-    function showModal() {
-        document.getElementById('completion-modal').style.display = 'block';
-        document.getElementById('overlay').style.display = 'block';
-    }
+    document.getElementById('backButton').addEventListener('click', () => {
+        const { level, unit } = getLevelAndUnitFromURL();
+        const dbRef = firebase.database().ref(`usuarios/progresso/${level}/${unit}/fase2`);
 
-    function closeModal() {
-        document.getElementById('completion-modal').style.display = 'none';
-        document.getElementById('overlay').style.display = 'none';
-    }
-
-    function ensureUserIsAuthenticated(callback) {
-        firebase.auth().onAuthStateChanged(function(user) {
-            if (user) {
-                callback(user.uid);
+        dbRef.once('value').then(snapshot => {
+            if (snapshot.val()) {
+                window.history.back();
             } else {
-                console.error("Usuário não autenticado");
+                if (confirm('You have not completed this phase. Do you want to go back anyway?')) {
+                    window.history.back();
+                }
             }
         });
-    }
-
-    async function updateNextPhase(userId) {
-        const currentPhase = getPhaseFromURL(); 
-        const { level, unit } = getLevelAndUnitFromURL(); 
-        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso`);
-
-        try {
-            if (currentPhase === "end") {
-                // Criar nova Level
-                const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
-                await dbRef.child(nextLevel).set({});
-                console.log(`Level ${nextLevel} criada.`);
-
-                // Criar Unit1/fase1 como true dentro da nova Level
-                await dbRef.child(`${nextLevel}/Unit1/fase1`).set(true);
-                console.log(`Unit1/fase1 criada como true dentro de ${nextLevel}.`);
-            } else if (currentPhase === "last") {
-                const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-                // Primeiro, cria a nova Unit
-                await dbRef.child(`${level}/${nextUnit}`).set({});
-                console.log(`Unit ${nextUnit} criada dentro de ${level}.`);
-
-                // Em seguida, adiciona a fase1 como true dentro da nova Unit
-                await dbRef.child(`${level}/${nextUnit}/fase1`).set(true);
-                console.log(`Fase1 marcada como true dentro de ${nextUnit}.`);
-            } else {
-                const nextPhase = parseInt(currentPhase) + 1;
-                await dbRef.child(`${level}/${unit}`).update({ 
-                    [`fase${currentPhase}`]: true, 
-                    [`fase${nextPhase}`]: true 
-                });
-                console.log(`Fase ${currentPhase} marcada como concluída e fase ${nextPhase} liberada.`);
-            }
-        } catch (error) {
-            console.error("Erro ao atualizar o progresso da fase:", error);
-        }
-    }
-
-    function getPhaseFromURL() {
-        const params = new URLSearchParams(window.location.search);
-        return params.get('fase'); 
-    }
+    });
 
     function getLevelAndUnitFromURL() {
-        const url = window.location.pathname;
-        const parts = url.split('/');
-        const level = parts[1];
-        const unit = parts[2];
-        return { level, unit };
-    }
-
-    function generatePDF() {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-
-        const logo = new Image();
-        logo.src = 'Logo.png'; 
-
-        doc.addImage(logo, 'PNG', 90, 10, 30, 30); 
-
-        doc.setFontSize(20);
-        doc.text('Hannah Quiz', 105, 50, null, null, 'center');
-
-        doc.setFontSize(12);
-        doc.text('Name: ____________________________________', 20, 70);
-        doc.text('Date: _______________', 150, 70);
-
-        let yPosition = 90;
-
-        questions.forEach((q, index) => {
-            doc.setFontSize(14);
-            let questionText = `${index + 1}. ${q.question}`;
-            let textLines = doc.splitTextToSize(questionText, 180);  
-            let questionHeight = textLines.length * 10; 
-
-            if (yPosition + questionHeight > 280) {
-                doc.addPage();
-                yPosition = 20;
-            }
-
-            doc.text(textLines, 20, yPosition);
-            yPosition += questionHeight;
-
-            q.answers.forEach(answer => {
-                doc.setFontSize(12);
-                let answerText = answer;
-                let answerLines = doc.splitTextToSize(answerText, 180);
-                let answerHeight = answerLines.length * 10;
-
-                if (yPosition + answerHeight > 280) {
-                    doc.addPage();
-                    yPosition = 20;
-                }
-
-                doc.text(answerLines, 30, yPosition);
-                yPosition += answerHeight;
-            });
-
-            yPosition += 10; 
-        });
-
-        doc.save('QuizQuestionsWithLogo.pdf');
+        const urlParts = window.location.pathname.split('/');
+        return { level: urlParts[1], unit: urlParts[2] };
     }
 
     window.onload = loadQuestions;
-
 </script>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </body>
 </html>
