@@ -22,35 +22,6 @@
             margin-bottom: 20px;
         }
 
-        .gif-container {
-            display: none;
-            text-align: center;
-            margin-bottom: 20px;
-        }
-
-        .gif-container img {
-            max-width: 500px;
-        }
-
-        .question-container {
-            display: flex;
-            justify-content: center;
-        }
-
-        .question {
-            margin-bottom: 10px;
-            font-size: 1.2em;
-            padding: 20px;
-            text-align: left;
-            border: none;
-        }
-
-        label {
-            display: block;
-            font-size: 1em;
-            margin-bottom: 10px;
-        }
-
         .btn-group {
             display: flex;
             justify-content: center;
@@ -81,6 +52,12 @@
             color: white;
         }
 
+        .read-btn i {
+            font-size: 1.2em;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+
         .read-btn:hover {
             background-color: #FB8C00;
         }
@@ -93,117 +70,49 @@
         .pdf-btn:hover {
             background-color: #0288D1;
         }
-
-        .feedback {
-            display: none;
-            margin-top: 20px;
-        }
-
-        audio {
-            display: none;
-        }
-
-        #completion-modal {
-            display: none;
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: white;
-            padding: 20px;
-            border: 2px solid #333;
-            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
-            z-index: 1000;
-            text-align: center;
-        }
-
-        #completion-modal button {
-            margin-top: 20px;
-            padding: 10px 20px;
-            background-color: #333;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-
-        #completion-modal button:hover {
-            background-color: #555;
-        }
-
-        #overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 999;
-        }
     </style>
 </head>
 <body>
-<button id="backButton" style="padding: 10px 20px; font-size: 1em; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; transition: background-color 0.3s ease;">
+<button onclick="handleBackButtonClick()" style="padding: 10px 20px; font-size: 1em; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; transition: background-color 0.3s ease;">
     Back
 </button>
 
 <h1>Hannah Quiz</h1>
 
-<div class="gif-container">
-    <img id="feedback-img" src="" alt="Feedback GIF"/>
-</div>
-
-<div class="question-container">
-    <div id="quiz-container" class="question"></div>
-</div>
-
 <div class="btn-group">
     <button class="read-btn" id="read-btn" onclick="readQuestion()">
-        <i class="fas fa-volume-up"></i> Read
+        <i class="fas fa-file-alt"></i> <i class="fas fa-volume-up"></i> Read
     </button>
     <button class="prev-btn" id="prev-btn" onclick="stopReading(); showPreviousQuestion()">❮❮ Previous</button>
     <button class="next-btn" id="next-btn" onclick="stopReading(); showNextQuestion()">Next ❯❯</button>
+    <button class="pdf-btn" id="pdf-btn" onclick="generatePDF()">Generate PDF</button>
 </div>
 
-<div id="feedback" class="feedback">
-    <audio id="feedback-audio"></audio>
-</div>
-
-<div id="overlay"></div>
-<div id="completion-modal">
-    <h2>Phase Completed!</h2>
-    <p>Congratulations! You have completed this phase.</p>
-    <button onclick="closeModal()">Close</button>
-</div>
+<div id="quiz-container"></div>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
     const firebaseConfig = {
         apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
         authDomain: "hannahenglishcourse.firebaseapp.com",
-        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
         projectId: "hannahenglishcourse",
         storageBucket: "hannahenglishcourse.appspot.com",
         messagingSenderId: "449818788486",
-        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707"
+        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+        measurementId: "G-07VVJG9LRS",
+        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
     };
+
     firebase.initializeApp(firebaseConfig);
 
-    let currentQuestionIndex = 0;
     let questions = [];
 
     async function loadQuestions() {
-        const { level, unit } = getLevelAndUnitFromURL();
-        const path = `../../${level}/${unit}/DataQuiz/questions.txt`;
-        console.log(`Fetching questions from: ${path}`);
-
-        const response = await fetch(path);
-        if (!response.ok) {
-            console.error(`Failed to fetch questions: ${response.status} - ${response.statusText}`);
-            return;
-        }
+        const { level, unit } = getParamsFromURL();
+        const response = await fetch(`../../${level}/${unit}/questions.txt`);
         const text = await response.text();
         const lines = text.split('\n');
         let currentQuestion = null;
@@ -211,8 +120,10 @@
         lines.forEach(line => {
             line = line.trim();
             if (line.startsWith('Q:')) {
-                if (currentQuestion) questions.push(currentQuestion);
-                currentQuestion = { question: line.substring(2), answers: [], correct: '' };
+                if (currentQuestion) {
+                    questions.push(currentQuestion);
+                }
+                currentQuestion = { question: line.substring(2).trim(), answers: [], correct: '' };
             } else if (/^[A-Z]\./.test(line)) {
                 currentQuestion.answers.push(line);
             } else if (line.startsWith('Correct:')) {
@@ -220,91 +131,115 @@
             }
         });
 
-        if (currentQuestion) questions.push(currentQuestion);
-        displayQuestion();
+        if (currentQuestion) {
+            questions.push(currentQuestion);
+        }
+
+        displayQuestion(0);
     }
 
-    function displayQuestion() {
+    function displayQuestion(index) {
         const container = document.getElementById('quiz-container');
         container.innerHTML = '';
 
-        const q = questions[currentQuestionIndex];
+        const question = questions[index];
+        const questionDiv = document.createElement('div');
+        questionDiv.className = 'question';
+
         const questionText = document.createElement('p');
         questionText.id = 'question-text';
-        questionText.textContent = `${currentQuestionIndex + 1}. ${q.question}`;
-        container.appendChild(questionText);
+        questionText.textContent = `${index + 1}. ${question.question}`;
+        questionDiv.appendChild(questionText);
 
-        q.answers.forEach(answer => {
-            const label = document.createElement('label');
-            label.innerHTML = `<input type="radio" name="question" value="${answer[0]}"> ${answer}`;
-            container.appendChild(label);
+        question.answers.forEach(answer => {
+            const answerLabel = document.createElement('label');
+            answerLabel.innerHTML = `<input type="radio" name="question${index}" value="${answer}"> ${answer}`;
+            questionDiv.appendChild(answerLabel);
         });
 
-        updateNavigationButtons();
+        container.appendChild(questionDiv);
     }
 
-    function readQuestion() {
-        if (!('speechSynthesis' in window)) {
-            alert("Your browser does not support speech synthesis. Please use a compatible browser.");
-            return;
-        }
-
-        const questionText = document.getElementById('question-text').textContent;
-        const utterance = new SpeechSynthesisUtterance(questionText);
-        utterance.lang = 'en-US';
-
-        const voices = window.speechSynthesis.getVoices();
-        const usVoice = voices.find(voice => voice.lang === 'en-US');
-        if (usVoice) utterance.voice = usVoice;
-
-        speechSynthesis.speak(utterance);
-    }
-
-    function updateNavigationButtons() {
-        document.getElementById('prev-btn').disabled = currentQuestionIndex === 0;
-        document.getElementById('next-btn').disabled = currentQuestionIndex === questions.length - 1;
-    }
-
-    function showPreviousQuestion() {
-        if (currentQuestionIndex > 0) {
-            currentQuestionIndex--;
-            displayQuestion();
-        }
-    }
-
-    function showNextQuestion() {
-        if (currentQuestionIndex < questions.length - 1) {
-            currentQuestionIndex++;
-            displayQuestion();
-        }
-    }
-
-    function getLevelAndUnitFromURL() {
+    function getParamsFromURL() {
         const params = new URLSearchParams(window.location.search);
         return { level: params.get('level'), unit: params.get('unit') };
     }
 
-    function getFaseFromURL() {
-        const params = new URLSearchParams(window.location.search);
-        return { fase: params.get('fase') };
-    }
+    function handleBackButtonClick() {
+        firebase.auth().onAuthStateChanged(async user => {
+            if (user) {
+                const { level, unit } = getParamsFromURL();
+                const progressRef = firebase.database().ref(`usuarios/${user.uid}/progresso/${level}/${unit}/fase2`);
+                const progressSnapshot = await progressRef.once('value');
 
-    document.getElementById('backButton').addEventListener('click', () => {
-        const { level, unit } = getLevelAndUnitFromURL();
-        const { fase } = getFaseFromURL();
-        const nextFase = `fase${parseInt(fase) + 1}`;
-        const dbRef = firebase.database().ref(`usuarios/progresso/${level}/${unit}/${nextFase}`);
-
-        dbRef.once('value').then(snapshot => {
-            if (snapshot.val()) {
-                window.history.back();
-            } else {
-                if (confirm('You have not completed this phase. Do you want to go back anyway?')) {
+                if (progressSnapshot.val()) {
                     window.history.back();
+                } else {
+                    const confirmExit = confirm("You have not completed this phase. Do you want to go back anyway?");
+                    if (confirmExit) {
+                        window.history.back();
+                    }
                 }
             }
         });
-    });
+    }
+
+    function readQuestion() {
+        if (!('speechSynthesis' in window)) {
+            alert("Your browser does not support speech synthesis. Please use a compatible browser or enable the feature.");
+            return;
+        }
+
+        const questionText = document.getElementById('question-text').innerText;
+        const utterance = new SpeechSynthesisUtterance(questionText);
+        utterance.lang = 'en-US';
+        const voices = window.speechSynthesis.getVoices();
+        const usVoice = voices.find(voice => voice.lang === 'en-US');
+
+        if (!usVoice) {
+            alert("No 'en-US' voice found in your speech synthesizer. Please enable English language in your browser's speech synthesizer. The default voice will be used, which may cause issues.");
+        }
+
+        utterance.voice = usVoice || voices[0];
+        window.speechSynthesis.speak(utterance);
+    }
+
+    function generatePDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        doc.setFontSize(20);
+        doc.text('Hannah Quiz', 105, 20, null, null, 'center');
+
+        doc.setFontSize(12);
+        doc.text('Name: ___________________________', 20, 40);
+        doc.text('Date: ___________________', 150, 40);
+
+        let y = 60;
+
+        questions.forEach((q, i) => {
+            if (y > 280) {
+                doc.addPage();
+                y = 20;
+            }
+
+            doc.setFontSize(14);
+            doc.text(`${i + 1}. ${q.question}`, 20, y);
+            y += 10;
+
+            q.answers.forEach(answer => {
+                if (y > 280) {
+                    doc.addPage();
+                    y = 20;
+                }
+                doc.setFontSize(12);
+                doc.text(`- ${answer}`, 30, y);
+                y += 10;
+            });
+        });
+
+        doc.save('Hannah_Quiz.pdf');
+    }
 
     window.onload = loadQuestions;
 </script>
