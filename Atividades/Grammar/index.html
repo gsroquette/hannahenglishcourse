@@ -131,7 +131,7 @@
             box-shadow: 3px 3px 7px rgba(0, 0, 0, 0.2);
         }
 
- /* Estilo do Modal */
+        /* Estilo do Modal */
         .modal {
             display: none;
             position: fixed;
@@ -167,6 +167,7 @@
             text-decoration: none;
             cursor: pointer;
         }
+
     </style>
 </head>
 <body>
@@ -224,127 +225,56 @@
     let clickedAnswers = 0;
     let alertDisplayed = false;
 
-   function loadTextFile() {
-    const { level, unit } = getLevelAndUnitFromURL();
+    function loadTextFile() {
+        const { level, unit } = getLevelAndUnitFromURL();
+        const filePath = `../../${level}/${unit}/DataGrammar/texto.txt`;
 
-    // Verificando a URL completa
-    console.log("Parâmetros da URL - Level:", level, "Unit:", unit);
-
-    // Construindo o caminho correto com base no level e unit
-    const filePath = `../../${level}/${unit}/DataGrammar/texto.txt`;
-
-    // Log para o caminho gerado
-    console.log("Caminho gerado para o arquivo texto.txt:", filePath);
-
-    // Verificando o caminho absoluto em relação à URL atual
-    const absolutePath = new URL(filePath, window.location.href).href;
-    console.log("Caminho absoluto gerado:", absolutePath); // Log para caminho absoluto
-
-    // Tentando carregar o arquivo
-    fetch(filePath)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Erro ao carregar o arquivo: ${response.statusText}`);
-            }
-            return response.text();
-        })
-        .then(data => {
-            const contentDiv = document.getElementById('content');
-            const lines = data.split('\n');
-            let currentSection = '';
-            let htmlContent = '';
-
-            lines.forEach(line => {
-                if (line.startsWith('Title: ')) {
-                    document.getElementById('title').innerText = line.replace('Title: ', '');
-                } else if (line.startsWith('# ')) {
-                    if (currentSection) {
-                        htmlContent += '</div>';
-                    }
-                    currentSection = line.replace('# ', '');
-                    htmlContent += `<div class="section"><h2>${currentSection}</h2>`;
-                } else if (line.includes('[Answer:')) {
-                    const [question, answer] = line.split('[Answer:');
-                    const cleanedAnswer = answer.replace(']', '').trim();
-                    htmlContent += `<p>${question.trim()} <button class="show-answer-btn" onclick="handleAnswerClick(this)">Answer</button><span class="answer" style="display:none;">${cleanedAnswer}</span></p>`;
-                    totalAnswers++;
-                } else {
-                    htmlContent += `<p>${line}</p>`;
+        fetch(filePath)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Erro ao carregar o arquivo: ${response.statusText}`);
                 }
+                return response.text();
+            })
+            .then(data => {
+                const contentDiv = document.getElementById('content');
+                const lines = data.split('\n');
+                let currentSection = '';
+                let htmlContent = '';
+
+                lines.forEach(line => {
+                    if (line.startsWith('Title: ')) {
+                        document.getElementById('title').innerText = line.replace('Title: ', '');
+                    } else if (line.startsWith('# ')) {
+                        if (currentSection) {
+                            htmlContent += '</div>';
+                        }
+                        currentSection = line.replace('# ', '');
+                        htmlContent += `<div class="section"><h2>${currentSection}</h2>`;
+                    } else if (line.includes('[Answer:')) {
+                        const [question, answer] = line.split('[Answer:');
+                        const cleanedAnswer = answer.replace(']', '').trim();
+                        htmlContent += `<p>${question.trim()} <button class="show-answer-btn" onclick="handleAnswerClick(this)">Answer</button><span class="answer" style="display:none;">${cleanedAnswer}</span></p>`;
+                        totalAnswers++;
+                    } else {
+                        htmlContent += `<p>${line}</p>`;
+                    }
+                });
+
+                contentDiv.innerHTML = htmlContent + '</div>';
+            })
+            .catch(error => {
+                console.error('Error loading the text file:', error);
             });
-
-            contentDiv.innerHTML = htmlContent + '</div>';
-        })
-        .catch(error => {
-            console.error('Error loading the text file:', error);
-            alert("Erro ao carregar o arquivo. Verifique a URL ou a estrutura dos diretórios.");
-        });
-}
-
-    function handleAnswerClick(button) {
-        const answerElement = button.nextElementSibling;
-        if (answerElement.style.display === 'none') {
-            answerElement.style.display = 'inline';
-            clickedAnswers++;
-
-            // Se todas as respostas foram clicadas, marca a atividade como concluída
-            if (clickedAnswers === totalAnswers) {
-                markActivityAsCompleted();
-            }
-
-            // Chama a função para ler o texto em voz alta
-            readText(answerElement.innerText);
-        }
     }
 
-    function readText(text) {
-        if (!window.speechSynthesis) {
-            console.error("Sintetizador de fala não suportado neste navegador.");
-            return;
+    function handleAnswerClick(button) {
+        const answerSpan = button.nextElementSibling;
+        answerSpan.style.display = 'inline';
+        clickedAnswers++;
+        if (clickedAnswers === totalAnswers) {
+            markActivityAsCompleted();
         }
-
-        const synth = window.speechSynthesis;
-        synth.cancel(); // Cancela qualquer síntese de voz anterior
-
-        let voices = synth.getVoices();
-
-        function findVoice() {
-            let enUSVoice = voices.find(voice => voice.lang === 'en-US');
-            
-            if (!enUSVoice) {
-                if (voices.length === 0) {
-                    window.speechSynthesis.onvoiceschanged = function() {
-                        voices = synth.getVoices();
-                        enUSVoice = voices.find(voice => voice.lang === 'en-US');
-                        if (enUSVoice) {
-                            speakText(text, enUSVoice);
-                        } else {
-                            showAlert("No 'en-US' voice found. Using default voice instead.");
-                        }
-                    };
-                } else {
-                                        showAlert("No 'en-US' voice found in your speech synthesizer. Please enable English language in your browser's speech synthesizer. For now, the default voice will be used.");
-                    speakText(text, synth.getVoices()[0]);
-                }
-            } else {
-                speakText(text, enUSVoice);
-            }
-        }
-
-        function speakText(text, voice) {
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.voice = voice;
-            synth.speak(utterance);
-        }
-
-        function showAlert(message) {
-            if (!alertDisplayed) {
-                alert(message);
-                alertDisplayed = true;
-            }
-        }
-
-        findVoice();
     }
 
     function markActivityAsCompleted() {
@@ -355,105 +285,35 @@
         }
     }
 
-    function ensureUserIsAuthenticated(callback) {
-        firebase.auth().onAuthStateChanged(function(user) {
-            if (user) {
-                callback(user.uid);
-            } else {
-                console.error("Usuário não autenticado");
-            }
-        });
-    }
-
-function showCompletionModal() {
+    function showCompletionModal() {
         const modal = document.getElementById("completionModal");
         modal.style.display = "block";
-
-// Função de navegação com verificação da próxima fase
-function goBack() {
-    const { level, unit } = getLevelAndUnitFromURL(); // Obtém o nível e unidade da URL
-    const currentPhase = getPhaseFromURL(); // Obtém a fase atual
-
-    // Verifica a próxima fase
-    let nextPhase;
-    if (currentPhase === "2") {
-        nextPhase = "3";
-    } else {
-        nextPhase = String(parseInt(currentPhase) + 1); // Incrementa a fase
     }
 
-    // Consulta ao Firebase para verificar se a próxima fase está desbloqueada
-    ensureUserIsAuthenticated(async function(userId) {
-        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-        
-        try {
-            const snapshot = await dbRef.once('value');
-            const progress = snapshot.val();
-            const isNextPhaseUnlocked = progress && progress[`fase${nextPhase}`];
-
-            if (!isNextPhaseUnlocked) {
-                alert(`The next phase (${nextPhase}) is not unlocked yet. Please complete the current phase to proceed.`);
-            } else {
-                history.back(); // Volta para a página anterior se a próxima fase estiver desbloqueada
-            }
-        } catch (error) {
-            console.error("Erro ao verificar o progresso do usuário:", error);
-            alert("An error occurred while checking the progress.");
-        }
-    });
-}
-
-function closeModal() {
+    function closeModal() {
         const modal = document.getElementById("completionModal");
         modal.style.display = "none";
         updateNextPhase();
     }
 
-    async function updateNextPhase(userId) {
-        const currentPhase = getPhaseFromURL();
-        const { level, unit } = getLevelAndUnitFromURL();
-        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-        
-        try {
-            if (currentPhase === "last") {
-                const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-                await dbRef.child(nextUnit).set({ fase1: true });
-            } else if (currentPhase === "end") {
-                const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
-                await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
-            } else {
-                const nextPhase = parseInt(currentPhase) + 1;
-                await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
-            }
-        } catch (error) {
-            console.error("Erro ao atualizar o progresso da fase:", error);
-        }
-    }
-
-    function getPhaseFromURL() {
-        const params = new URLSearchParams(window.location.search);
-        return params.get('fase');
-    }
-
-  function updateNextPhase() {
+    function updateNextPhase() {
         const userId = firebase.auth().currentUser ? firebase.auth().currentUser.uid : null;
         if (userId) {
             const dbRef = firebase.database().ref(`users/${userId}/progress`);
-            dbRef.update({ phase: "next" });        
+            dbRef.update({ phase: "next" });
+        }
     }
 
     function getLevelAndUnitFromURL() {
-    const params = new URLSearchParams(window.location.search);
-    const level = params.get('level');
-    const unit = params.get('unit');
-    
-    console.log("getLevelAndUnitFromURL - Level:", level, "Unit:", unit); // Log para verificar se os parâmetros estão corretos
-
-    return { level, unit };
-}
+        const urlParams = new URLSearchParams(window.location.search);
+        const level = urlParams.get('level') || 'defaultLevel';
+        const unit = urlParams.get('unit') || 'defaultUnit';
+        return { level, unit };
+    }
 
     function generatePDF() {
-        fetch(`../../${getLevelAndUnitFromURL().level}/${getLevelAndUnitFromURL().unit}/DataGrammar/texto.txt`)
+        const { level, unit } = getLevelAndUnitFromURL();
+        fetch(`../../${level}/${unit}/DataGrammar/texto.txt`)
             .then(response => response.text())
             .then(data => {
                 const { jsPDF } = window.jspdf;
@@ -463,14 +323,14 @@ function closeModal() {
                 const margin = 20;
                 const maxWidth = 170;
 
-                doc.addImage('Logo.png', 'PNG', 90, y, 30, 30);
+                doc.addImage('Logo.png', 'PNG', 90, y, 30, 30);  // Logo no início
                 y += 40;
                 doc.setFontSize(12);
                 doc.text("Name: ____________________________  Date: _______________", margin, y);
                 y += 20;
 
                 lines.forEach(line => {
-                    const textWithoutAnswer = line.replace(/\[Answer:.*?\]/g, '');
+                    const textWithoutAnswer = line.replace(/\[Answer:.*?\]/g, '');  // Remove as respostas de dentro de [Answer:]
 
                     if (line.startsWith('Title: ')) {
                         doc.setFontSize(16);
@@ -480,62 +340,41 @@ function closeModal() {
                         doc.setFontSize(12);
                         const textLines = doc.splitTextToSize(textWithoutAnswer, maxWidth);
                         doc.text(textLines, margin, y);
-                        y += textLines.length * 10; 
+                        y += textLines.length * 10;
                     }
 
+                    // Verifica se precisa adicionar uma nova página no PDF
                     if (y > doc.internal.pageSize.height - margin) {
                         doc.addPage();
                         y = margin;
                     }
                 });
 
+                // Salva o PDF com o nome gerado
                 doc.save("grammar_lesson_creation.pdf");
             })
             .catch(error => console.error('Error generating the PDF:', error));
     }
 
-   function loadProfessorButtons() {
-    const buttonContainer = document.querySelector('.button-container');
-    const maxProfessors = 10;
-
-    // Gerar os botões dos professores
-    for (let i = 1; i <= maxProfessors; i++) {
-        const imgPath = `professores/professor${i}.png`;
-        const img = new Image();
-        
-        img.onload = function() {
-            const button = document.createElement('button');
-            img.alt = `Professor ${i}`;
-            button.appendChild(img);
-
-            // Caminho dinâmico para a aula
-            const { level, unit } = getLevelAndUnitFromURL();
-            const lessonPath = `../../${level}/${unit}/DataGrammar/aulas/aula${i}/index.html`;
-
-            // Log para verificar o caminho gerado
-            console.log(`Caminho gerado para a aula ${i}: ${lessonPath}`);
-
-            button.onclick = function() {
-                window.location.href = lessonPath;
-            };
-
-            buttonContainer.appendChild(button);
-        };
-
-        img.onerror = function() {
-            console.log(`Imagem professor${i}.png não encontrada, pulando.`);
-        };
-
-        img.src = imgPath;
+    // Função para garantir que o usuário esteja autenticado
+    function ensureUserIsAuthenticated(callback) {
+        firebase.auth().onAuthStateChanged(user => {
+            if (user) {
+                callback(user);
+            } else {
+                console.log("User not authenticated");
+            }
+        });
     }
-}
 
-    document.addEventListener('DOMContentLoaded', function() {
+    // Inicializar a página e carregar conteúdo
+    window.onload = function() {
         loadTextFile();
-        loadProfessorButtons();
-    });
+        ensureUserIsAuthenticated(user => {
+            console.log("User authenticated:", user);
+        });
+    };
 </script>
 
 </body>
 </html>
-
