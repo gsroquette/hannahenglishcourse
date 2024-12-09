@@ -296,32 +296,55 @@
     updateNextPhase();  // Atualiza a fase antes de qualquer outra navegação
 }
 
-    function updateNextPhase() {
-    const userId = firebase.auth().currentUser ? firebase.auth().currentUser.uid : null;
-    if (userId) {
-        const dbRef = firebase.database().ref(`users/${userId}/progress`);
-        dbRef.once('value')
-            .then(snapshot => {
-                const currentProgress = snapshot.val();
-                let nextPhase = "1"; // Default, caso não exista fase
-                if (currentProgress && currentProgress.phase) {
-                    nextPhase = getNextPhase(currentProgress.phase);
-                }
+   async function updateNextPhase(userId) {
+    const { level, unit } = getLevelAndUnitFromURL();  // Obtém o nível e a unidade a partir da URL
+    const currentPhase = getCurrentPhaseFromFirebase(userId, level, unit);  // Obtém a fase atual do Firebase
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
 
-                dbRef.update({ phase: nextPhase })
-                    .then(() => {
-                        console.log(`Phase updated to: ${nextPhase}`);
-                    })
-                    .catch(error => {
-                        console.error('Error updating phase:', error);
-                    });
-            })
-            .catch(error => {
-                console.error('Error retrieving user progress:', error);
-            });
-    } else {
-        console.log("User is not authenticated");
+    console.log("Atualizando progresso no banco de dados...");
+    console.log(`Level: ${level}, Unit: ${unit}, Current Phase: ${currentPhase}`);
+
+    try {
+        if (currentPhase === "last") {
+            // Se a fase atual for a última da unidade, passa para a próxima unidade
+            const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+            await dbRef.child(nextUnit).set({ fase1: true });
+            console.log(`Progresso atualizado para a próxima unidade: ${nextUnit}`);
+        } else if (currentPhase === "end") {
+            // Se for o fim do nível, passa para o próximo nível
+            const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+            await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+            console.log(`Progresso atualizado para o próximo nível: ${nextLevel}`);
+        } else {
+            // Caso contrário, apenas avança para a próxima fase na unidade atual
+            const nextPhase = `fase${parseInt(currentPhase.replace('fase', '')) + 1}`;
+            await dbRef.update({ [`fase${currentPhase}`]: true, [nextPhase]: true });
+            console.log(`Progresso atualizado para a fase: ${nextPhase}`);
+        }
+    } catch (error) {
+        console.error("Erro ao atualizar o progresso da fase:", error);
     }
+}
+
+function getCurrentPhaseFromFirebase(userId, level, unit) {
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+    return dbRef.once('value')
+        .then(snapshot => {
+            const progress = snapshot.val();
+            let currentPhase = 'fase1';  // Fase inicial
+            if (progress) {
+                for (const phase in progress) {
+                    if (progress[phase] === true) {
+                        currentPhase = phase;  // Obtém a última fase desbloqueada
+                    }
+                }
+            }
+            return currentPhase;
+        })
+        .catch(error => {
+            console.error("Erro ao obter a fase atual:", error);
+            return 'fase1';  // Caso haja erro, considera a fase inicial
+        });
 }
 
     function getLevelAndUnitFromURL() {
@@ -334,7 +357,8 @@
 function goBack() {
     const userId = firebase.auth().currentUser ? firebase.auth().currentUser.uid : null;
     if (userId) {
-        const dbRef = firebase.database().ref(`users/${userId}/progress`);
+        const { level, unit } = getLevelAndUnitFromURL();
+        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
         dbRef.once('value')
             .then(snapshot => {
                 const currentProgress = snapshot.val();
