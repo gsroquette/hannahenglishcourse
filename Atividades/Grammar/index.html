@@ -291,18 +291,38 @@
     }
 
     function closeModal() {
-        const modal = document.getElementById("completionModal");
-        modal.style.display = "none";
-        updateNextPhase();
-    }
+    const modal = document.getElementById("completionModal");
+    modal.style.display = "none";
+    updateNextPhase();  // Atualiza a fase antes de qualquer outra navegação
+}
 
     function updateNextPhase() {
-        const userId = firebase.auth().currentUser ? firebase.auth().currentUser.uid : null;
-        if (userId) {
-            const dbRef = firebase.database().ref(`users/${userId}/progress`);
-            dbRef.update({ phase: "next" });
-        }
+    const userId = firebase.auth().currentUser ? firebase.auth().currentUser.uid : null;
+    if (userId) {
+        const dbRef = firebase.database().ref(`users/${userId}/progress`);
+        dbRef.once('value')
+            .then(snapshot => {
+                const currentProgress = snapshot.val();
+                let nextPhase = "1"; // Default, caso não exista fase
+                if (currentProgress && currentProgress.phase) {
+                    nextPhase = getNextPhase(currentProgress.phase);
+                }
+
+                dbRef.update({ phase: nextPhase })
+                    .then(() => {
+                        console.log(`Phase updated to: ${nextPhase}`);
+                    })
+                    .catch(error => {
+                        console.error('Error updating phase:', error);
+                    });
+            })
+            .catch(error => {
+                console.error('Error retrieving user progress:', error);
+            });
+    } else {
+        console.log("User is not authenticated");
     }
+}
 
     function getLevelAndUnitFromURL() {
         const urlParams = new URLSearchParams(window.location.search);
@@ -310,6 +330,51 @@
         const unit = urlParams.get('unit') || 'defaultUnit';
         return { level, unit };
     }
+
+function goBack() {
+    const userId = firebase.auth().currentUser ? firebase.auth().currentUser.uid : null;
+    if (userId) {
+        const dbRef = firebase.database().ref(`users/${userId}/progress`);
+        dbRef.once('value')
+            .then(snapshot => {
+                const currentProgress = snapshot.val();
+                const currentPhase = currentProgress ? currentProgress.phase : null;
+                const nextPhase = getNextPhase(currentPhase);
+
+                // Verifica se a próxima fase está desbloqueada
+                if (nextPhase && !isPhaseUnlocked(nextPhase)) {
+                    const confirmationMessage = `The next phase (${nextPhase}) is not unlocked yet. Do you want to go back to the previous page?`;
+                    const userConfirmed = confirm(confirmationMessage);
+                    if (userConfirmed) {
+                        window.history.back();  // Volta para a página anterior
+                    }
+                } else {
+                    window.history.back();  // Volta para a página anterior
+                }
+            })
+            .catch(error => {
+                console.error('Error retrieving user progress:', error);
+                window.history.back();  // Caso haja erro, ainda assim tenta voltar à página anterior
+            });
+    } else {
+        console.log("User is not authenticated");
+        window.history.back();  // Caso o usuário não esteja autenticado, volta à página anterior
+    }
+}
+
+function getNextPhase(currentPhase) {
+    const phases = ['1', '2', '3', '4'];  // Exemplo de fases
+    const currentIndex = phases.indexOf(currentPhase);
+    if (currentIndex === -1 || currentIndex === phases.length - 1) {
+        return null;  // Se a fase não existir ou for a última, não há próxima fase
+    }
+    return phases[currentIndex + 1];
+}
+
+function isPhaseUnlocked(phase) {
+    const unlockedPhases = ['1', '2', '3'];  // Defina suas fases desbloqueadas reais
+    return unlockedPhases.includes(phase);
+}
 
     function generatePDF() {
         const { level, unit } = getLevelAndUnitFromURL();
