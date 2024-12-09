@@ -383,28 +383,40 @@ function checkCompletion() {
         }
 
         async function updateNextPhase(userId) {
+    const currentPhase = getPhaseFromURL(); // Obtém a fase atual a partir da URL
+    const { level, unit } = getLevelAndUnitFromURL(); // Obtém o nível e a unidade a partir da URL
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+    console.log("Atualizando progresso no banco de dados...");
+    console.log(`Level: ${level}, Unit: ${unit}, Current Phase: ${currentPhase}`);
+
     try {
-        const { level, unit } = getLevelAndUnitFromURL();
-        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-        
         if (currentPhase === "last") {
             const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
             await dbRef.child(nextUnit).set({ fase1: true });
             console.log(`Progresso atualizado para a próxima unidade: ${nextUnit}`);
+        } else if (currentPhase === "end") {
+            const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+            await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+            console.log(`Progresso atualizado para o próximo nível: ${nextLevel}`);
         } else {
-            const nextPhase = parseInt(getPhaseFromURL()) + 1;
-            await dbRef.update({ [`fase${nextPhase}`]: true });
-            console.log(`Progresso atualizado para a fase ${nextPhase}`);
+            const nextPhase = `fase${parseInt(currentPhase) + 1}`;
+            await dbRef.update({ [`fase${currentPhase}`]: true, [nextPhase]: true });
+            console.log(`Progresso atualizado para a fase: ${nextPhase}`);
         }
     } catch (error) {
-        console.error("Erro ao atualizar o progresso:", error);
+        console.error("Erro ao atualizar o progresso da fase:", error);
     }
 }
 
         function getPhaseFromURL() {
-            const params = new URLSearchParams(window.location.search);
-            return params.get('fase');
-        }
+    const params = new URLSearchParams(window.location.search);
+    const phase = params.get('fase'); // Obtém o parâmetro 'fase' da URL
+    if (!phase) {
+        console.error("Fase não encontrada na URL.");
+    }
+    return phase;
+}
 
        function getLevelAndUnitFromURL() {
     const params = new URLSearchParams(window.location.search);
