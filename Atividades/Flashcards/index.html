@@ -206,7 +206,75 @@
 
         firebase.initializeApp(firebaseConfig);
 
-        let alertDisplayed = false;
+        let totalCards = 0;
+        let interactedCards = [];
+        let soundPlayed = 0;
+        let alertDisplayed = false; // Nova variável para controle de alertas
+
+        async function loadWords() {
+            try {
+                const response = await fetch('../data1/words.txt');
+                const text = await response.text();
+                return text.split('\n').filter(word => word.trim() !== '').map(word => word.trim());
+            } catch (error) {
+                console.error("Erro ao carregar o arquivo words.txt", error);
+                return [];
+            }
+        }
+
+        async function generateFlashcards() {
+            const words = await loadWords();
+            totalCards = words.length;
+            interactedCards = new Array(totalCards).fill(false);
+            const container = document.getElementById('flashcards-container');
+
+            if (words.length === 0) {
+                container.innerHTML = "Não foi possível carregar os flash cards.";
+                return;
+            }
+
+            words.forEach((word, index) => {
+                const card = document.createElement('div');
+                card.classList.add('card');
+
+                const cardInner = document.createElement('div');
+                cardInner.classList.add('card-inner');
+
+                const cardFront = document.createElement('div');
+                cardFront.classList.add('card-front');
+                const img = document.createElement('img');
+                img.src = `../data1/imagens/imagem${index + 1}.png`;
+                img.onerror = function() {
+                    console.error(`Erro ao carregar a imagem: imagem${index + 1}.png`);
+                };
+                cardFront.appendChild(img);
+
+                const cardBack = document.createElement('div');
+                cardBack.classList.add('card-back');
+                cardBack.textContent = word;
+
+                card.addEventListener('click', function() {
+                    card.classList.toggle('rotated');
+                    interactedCards[index] = true;
+                    checkCompletion();
+                });
+
+                const playSoundIcon = document.createElement('img');
+                playSoundIcon.classList.add('play-sound');
+                playSoundIcon.src = 'businessman.png';
+                playSoundIcon.alt = "Play Sound";
+                playSoundIcon.onclick = (event) => {
+                    event.stopPropagation();
+                    toggleSpeech(word, playSoundIcon, index);
+                };
+
+                cardInner.appendChild(cardFront);
+                cardInner.appendChild(cardBack);
+                card.appendChild(cardInner);
+                card.appendChild(playSoundIcon);
+                container.appendChild(card);
+            });
+        }
 
         function toggleSpeech(text, buttonElement, index) {
             if (!('speechSynthesis' in window)) {
@@ -216,6 +284,7 @@
 
             if (window.speechSynthesis.speaking) {
                 window.speechSynthesis.cancel();
+                console.log("Speech synthesis stopped.");
                 buttonElement.src = 'businessman.png';
             } else {
                 let voices = window.speechSynthesis.getVoices();
@@ -227,7 +296,7 @@
                         usVoice = voices.find(voice => voice.lang === 'en-US');
 
                         if (!usVoice && !alertDisplayed) {
-                            alert("No 'en-US' voice found in your speech synthesizer. Please enable English language in your browser's speech synthesizer.");
+                            alert("No 'en-US' voice found in your speech synthesizer. Please enable English language in your browser's speech synthesizer. For now, the default voice will be used, which may cause problems.");
                             alertDisplayed = true;
                         }
 
@@ -248,16 +317,77 @@
 
         function speakText(text, voice, buttonElement, index) {
             const utterance = new SpeechSynthesisUtterance(text);
-            utterance.voice = voice;
             utterance.lang = 'en-US';
-            utterance.onend = () => {
-                buttonElement.src = 'businessman.png';
-            };
+            utterance.voice = voice;
             window.speechSynthesis.speak(utterance);
+        }
+
+        function checkCompletion() {
+            const allCardsInteracted = interactedCards.every(interacted => interacted);
+            if (allCardsInteracted && soundPlayed === totalCards) {
+                showModal();
+                ensureUserIsAuthenticated(updateNextPhase);
+            }
+        }
+
+        function showModal() {
+            document.getElementById('completion-modal').style.display = 'block';
+            document.getElementById('overlay').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('completion-modal').style.display = 'none';
+            document.getElementById('overlay').style.display = 'none';
+        }
+
+        function ensureUserIsAuthenticated(callback) {
+            firebase.auth().onAuthStateChanged(function(user) {
+                if (user) {
+                    callback(user.uid);
+                } else {
+                    console.error("Usuário não autenticado");
+                }
+            });
+        }
+
+        async function updateNextPhase(userId) {
+            const currentPhase = getPhaseFromURL();
+            const { level, unit } = getLevelAndUnitFromURL();
+            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+            
+            try {
+                if (currentPhase === "last") {
+                    const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+                    await dbRef.child(nextUnit).set({ fase1: true });
+                } else if (currentPhase === "end") {
+                    const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+                    await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+                } else {
+                    const nextPhase = parseInt(currentPhase) + 1;
+                    await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
+                }
+            } catch (error) {
+                console.error("Erro ao atualizar o progresso da fase:", error);
+            }
+        }
+
+        function getPhaseFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('fase');
+        }
+
+        function getLevelAndUnitFromURL() {
+            const url = window.location.pathname;
+            const parts = url.split('/');
+            const level = parts[1];
+            const unit = parts[2];
+            return { level, unit };
         }
 
         async function handleBackButtonClick() {
             const { level, unit } = getLevelAndUnitFromURL();
+
+            console.log("Checking progress for level:", level, "unit:", unit);
 
             if (!level || !unit) {
                 alert("Level or Unit not identified in the URL.");
@@ -289,88 +419,19 @@
             try {
                 const currentPhase = parseInt(getPhaseFromURL());
                 const nextPhase = `fase${currentPhase + 1}`;
+                console.log("Checking progress for next phase:", nextPhase);
+
                 const dbRef = firebase.database().ref(`usuarios/${uid}/progresso/${level}/${unit}/${nextPhase}`);
                 const snapshot = await dbRef.once("value");
-                return snapshot.val() === true;
+                
+                const isUnlocked = snapshot.val() === true;
+                console.log(`Next phase (${nextPhase}) unlocked:`, isUnlocked);
+
+                return isUnlocked;
             } catch (error) {
                 console.error("Error checking phase progress:", error);
                 return false;
             }
-        }
-
-        function getPhaseFromURL() {
-            const params = new URLSearchParams(window.location.search);
-            return params.get('fase');
-        }
-
-        function getLevelAndUnitFromURL() {
-            const url = window.location.pathname;
-            const parts = url.split('/');
-            return { level: parts[1], unit: parts[2] };
-        }
-
-        async function loadWords() {
-            const { level, unit } = getLevelAndUnitFromURL();
-            const wordsPath = `../../${level}/${unit}/data1/words.txt`;
-            try {
-                const response = await fetch(wordsPath);
-                if (!response.ok) throw new Error(`Failed to fetch words from ${wordsPath}`);
-                const text = await response.text();
-                return text.split('\n').filter(word => word.trim() !== '').map(word => word.trim());
-            } catch (error) {
-                console.error("Error loading words:", error);
-                return [];
-            }
-        }
-
-        async function generateFlashcards() {
-            const words = await loadWords();
-            const container = document.getElementById('flashcards-container');
-
-            if (words.length === 0) {
-                container.innerHTML = "Could not load flashcards.";
-                return;
-            }
-
-            words.forEach((word, index) => {
-                const card = document.createElement('div');
-                card.classList.add('card');
-
-                const cardInner = document.createElement('div');
-                cardInner.classList.add('card-inner');
-
-                const cardFront = document.createElement('div');
-                cardFront.classList.add('card-front');
-                const img = document.createElement('img');
-                img.src = `../../${getLevelAndUnitFromURL().level}/${getLevelAndUnitFromURL().unit}/data1/imagens/imagem${index + 1}.png`;
-                img.onerror = function () {
-                    console.error(`Error loading image: imagem${index + 1}.png`);
-                };
-                cardFront.appendChild(img);
-
-                const cardBack = document.createElement('div');
-                cardBack.classList.add('card-back');
-                cardBack.textContent = word;
-
-                card.addEventListener('click', function () {
-                    card.classList.toggle('rotated');
-                });
-
-                const playSoundIcon = document.createElement('img');
-                playSoundIcon.classList.add('play-sound');
-                playSoundIcon.src = 'businessman.png';
-                playSoundIcon.alt = "Play Sound";
-                playSoundIcon.onclick = (event) => {
-                    event.stopPropagation();
-                    toggleSpeech(word, playSoundIcon, index);
-                };
-
-                cardInner.appendChild(cardFront);
-                cardInner.appendChild(cardBack);
-                card.appendChild(cardInner);
-                card.appendChild(playSoundIcon);
-                container.appendChild(card);
-            });
         }
 
         generateFlashcards();
