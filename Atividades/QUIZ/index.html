@@ -236,7 +236,19 @@ firebase.auth().onAuthStateChanged(function(user) {
     let speechSynthesisUtterance = null;
 
     async function loadQuestions() {
-        const response = await fetch('questions.txt');
+    const { level, unit } = getLevelAndUnitFromURL();
+
+    if (!level || !unit) {
+        console.error("Level or Unit not identified in the URL.");
+        return;
+    }
+
+    const questionsPath = `../../${level}/${unit}/DataQuiz/questions.txt`;
+
+    try {
+        const response = await fetch(questionsPath);
+        if (!response.ok) throw new Error(`Failed to fetch questions from ${questionsPath}`);
+
         const text = await response.text();
         const lines = text.split('\n');
         let currentQuestion = null;
@@ -248,7 +260,7 @@ firebase.auth().onAuthStateChanged(function(user) {
                     questions.push(currentQuestion);
                 }
                 currentQuestion = { question: line.substring(2).trim(), answers: [], correct: '' };
-            } else if (/^[A-Z]\./.test(line)) {  
+            } else if (/^[A-Z]\./.test(line)) {
                 currentQuestion.answers.push(line);
             } else if (line.startsWith('Correct:')) {
                 currentQuestion.correct = line.split(':')[1].trim();
@@ -261,7 +273,10 @@ firebase.auth().onAuthStateChanged(function(user) {
 
         answeredQuestions = new Array(questions.length).fill(false);
         displayQuestion();
+    } catch (error) {
+        console.error("Error loading questions:", error);
     }
+}
 
    function displayQuestion() {
     const container = document.getElementById('quiz-container');
