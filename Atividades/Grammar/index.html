@@ -298,7 +298,7 @@
 
    async function updateNextPhase(userId) {
     const { level, unit } = getLevelAndUnitFromURL();  // Obtém o nível e a unidade a partir da URL
-    const currentPhase = await getCurrentPhaseFromFirebase(userId, level, unit);  // Obtém a fase atual do Firebase
+    const currentPhase = getPhaseFromURL();  // Obtém a fase atual da URL
 
     console.log("Atualizando progresso no banco de dados...");
     console.log(`Level: ${level}, Unit: ${unit}, Current Phase: ${currentPhase}`);
@@ -320,14 +320,21 @@
             await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
             console.log(`Progresso atualizado para o próximo nível: ${nextLevel}`);
         } else {
-            // Caso contrário, apenas avança para a próxima fase na unidade atual
+            // Avança para a próxima fase com base no valor da fase atual da URL
             const nextPhase = `fase${parseInt(currentPhase.replace('fase', '')) + 1}`;
-            await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`).update({ [`fase${currentPhase}`]: true, [nextPhase]: true });
+            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+            await dbRef.update({ [`fase${currentPhase}`]: true, [nextPhase]: true });
             console.log(`Progresso atualizado para a fase: ${nextPhase}`);
         }
     } catch (error) {
         console.error("Erro ao atualizar o progresso da fase:", error);
     }
+}
+
+function getPhaseFromURL() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const phase = urlParams.get('fase') || 'fase1';  // Pega o valor da fase na URL (caso não exista, assume 'fase1')
+    return `fase${phase}`;  // Garante que o valor esteja no formato correto, como 'fase1', 'fase2', etc.
 }
 
 function getCurrentPhaseFromFirebase(userId, level, unit) {
