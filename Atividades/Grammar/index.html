@@ -135,7 +135,7 @@
 <body>
 
 <div class="container">
-    <a href="javascript:history.back()" class="back-button">Back</a>
+  <a href="javascript:void(0);" class="back-button" onclick="goBack()">Back</a>
     <h1 id="title">Loading title...</h1>
     
     <div class="image-container">
@@ -315,6 +315,40 @@
             }
         });
     }
+
+// Função de navegação com verificação da próxima fase
+function goBack() {
+    const { level, unit } = getLevelAndUnitFromURL(); // Obtém o nível e unidade da URL
+    const currentPhase = getPhaseFromURL(); // Obtém a fase atual
+
+    // Verifica a próxima fase
+    let nextPhase;
+    if (currentPhase === "2") {
+        nextPhase = "3";
+    } else {
+        nextPhase = String(parseInt(currentPhase) + 1); // Incrementa a fase
+    }
+
+    // Consulta ao Firebase para verificar se a próxima fase está desbloqueada
+    ensureUserIsAuthenticated(async function(userId) {
+        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+        
+        try {
+            const snapshot = await dbRef.once('value');
+            const progress = snapshot.val();
+            const isNextPhaseUnlocked = progress && progress[`fase${nextPhase}`];
+
+            if (!isNextPhaseUnlocked) {
+                alert(`The next phase (${nextPhase}) is not unlocked yet. Please complete the current phase to proceed.`);
+            } else {
+                history.back(); // Volta para a página anterior se a próxima fase estiver desbloqueada
+            }
+        } catch (error) {
+            console.error("Erro ao verificar o progresso do usuário:", error);
+            alert("An error occurred while checking the progress.");
+        }
+    });
+}
 
     async function updateNextPhase(userId) {
         const currentPhase = getPhaseFromURL();
