@@ -282,50 +282,57 @@
 }
 
         function toggleSpeech(text, buttonElement, index) {
-            if (!('speechSynthesis' in window)) {
-                alert("Your browser does not support speech synthesis. Please enable it or use a compatible browser.");
-                return;
-            }
+    if (!('speechSynthesis' in window)) {
+        alert("Your browser does not support speech synthesis. Please enable it or use a compatible browser.");
+        return;
+    }
 
-            if (window.speechSynthesis.speaking) {
-                window.speechSynthesis.cancel();
-                console.log("Speech synthesis stopped.");
-                buttonElement.src = 'businessman.png';
-            } else {
-                let voices = window.speechSynthesis.getVoices();
-                let usVoice = voices.find(voice => voice.lang === 'en-US');
+    if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+        console.log("Speech synthesis stopped.");
+        buttonElement.src = 'businessman.png'; // Restaura o ícone
+    } else {
+        let voices = window.speechSynthesis.getVoices();
+        let usVoice = voices.find(voice => voice.lang === 'en-US');
 
-                if (!usVoice && voices.length === 0) {
-                    window.speechSynthesis.onvoiceschanged = () => {
-                        voices = window.speechSynthesis.getVoices();
-                        usVoice = voices.find(voice => voice.lang === 'en-US');
+        if (!usVoice && voices.length === 0) {
+            window.speechSynthesis.onvoiceschanged = () => {
+                voices = window.speechSynthesis.getVoices();
+                usVoice = voices.find(voice => voice.lang === 'en-US');
 
-                        if (!usVoice && !alertDisplayed) {
-                            alert("No 'en-US' voice found in your speech synthesizer. Please enable English language in your browser's speech synthesizer. For now, the default voice will be used, which may cause problems.");
-                            alertDisplayed = true;
-                        }
-
-                        speakText(text, usVoice || voices[0], buttonElement, index);
-                    };
-                } else {
-                    if (!usVoice && !alertDisplayed) {
-                        alert("No 'en-US' voice found. Using default voice instead.");
-                        alertDisplayed = true;
-                    }
-
-                    speakText(text, usVoice || voices[0], buttonElement, index);
+                if (!usVoice && !alertDisplayed) {
+                    alert("No 'en-US' voice found in your speech synthesizer. Please enable English language in your browser's speech synthesizer. For now, the default voice will be used, which may cause problems.");
+                    alertDisplayed = true;
                 }
 
-                buttonElement.src = 'pause.png';
+                speakText(text, usVoice || voices[0], buttonElement);
+            };
+        } else {
+            if (!usVoice && !alertDisplayed) {
+                alert("No 'en-US' voice found. Using default voice instead.");
+                alertDisplayed = true;
             }
+
+            speakText(text, usVoice || voices[0], buttonElement);
         }
 
-        function speakText(text, voice, buttonElement, index) {
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'en-US';
-            utterance.voice = voice;
-            window.speechSynthesis.speak(utterance);
-        }
+        buttonElement.src = 'pause.png'; // Muda o ícone enquanto o áudio está sendo reproduzido
+    }
+}
+
+function speakText(text, voice, buttonElement) {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    utterance.voice = voice;
+
+    // Adiciona um evento para restaurar o ícone após o áudio terminar
+    utterance.onend = () => {
+        buttonElement.src = 'businessman.png'; // Restaura o ícone ao final do áudio
+        console.log("Speech synthesis completed.");
+    };
+
+    window.speechSynthesis.speak(utterance);
+}
 
         function checkCompletion() {
             const allCardsInteracted = interactedCards.every(interacted => interacted);
