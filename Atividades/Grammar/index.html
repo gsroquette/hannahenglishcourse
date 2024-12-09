@@ -298,17 +298,21 @@
 
    async function updateNextPhase(userId) {
     const { level, unit } = getLevelAndUnitFromURL();  // Obtém o nível e a unidade a partir da URL
-    const currentPhase = getCurrentPhaseFromFirebase(userId, level, unit);  // Obtém a fase atual do Firebase
-    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+    const currentPhase = await getCurrentPhaseFromFirebase(userId, level, unit);  // Obtém a fase atual do Firebase
 
     console.log("Atualizando progresso no banco de dados...");
     console.log(`Level: ${level}, Unit: ${unit}, Current Phase: ${currentPhase}`);
+
+    if (typeof currentPhase !== 'string') {
+        console.error("Fase atual não é uma string:", currentPhase);
+        return;  // Se currentPhase não for uma string, não tenta continuar a atualização
+    }
 
     try {
         if (currentPhase === "last") {
             // Se a fase atual for a última da unidade, passa para a próxima unidade
             const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-            await dbRef.child(nextUnit).set({ fase1: true });
+            await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`).child(nextUnit).set({ fase1: true });
             console.log(`Progresso atualizado para a próxima unidade: ${nextUnit}`);
         } else if (currentPhase === "end") {
             // Se for o fim do nível, passa para o próximo nível
@@ -318,7 +322,7 @@
         } else {
             // Caso contrário, apenas avança para a próxima fase na unidade atual
             const nextPhase = `fase${parseInt(currentPhase.replace('fase', '')) + 1}`;
-            await dbRef.update({ [`fase${currentPhase}`]: true, [nextPhase]: true });
+            await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`).update({ [`fase${currentPhase}`]: true, [nextPhase]: true });
             console.log(`Progresso atualizado para a fase: ${nextPhase}`);
         }
     } catch (error) {
