@@ -181,7 +181,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 </head>
 <body>
-<button id="backBtn" onclick="window.history.back()">Back</button>
+<button id="backBtn" onclick="handleBackButtonClick()">Back</button>
 
     <h1>Hannah Fill in the Blanks</h1>
 
@@ -262,50 +262,66 @@
         let answeredQuestions = 0;
         let synth = window.speechSynthesis;
         let userAnswers = {}; // Objeto para armazenar as respostas do usuário
+        let alertDisplayed = false; // Nova variável para controlar exibição de alertas
 
         async function loadQuestions() {
-            try {
-                const response = await fetch('questions.txt');
-                const content = await response.text();
-                processFile(content);
-            } catch (error) {
-                console.error('Erro ao carregar o arquivo:', error);
-            }
-        }
+    const { level, unit } = getLevelAndUnitFromURL(); // Obtém o nível e unidade da URL
+    console.log("Level:", level);
+    console.log("Unit:", unit);
 
-        function processFile(content) {
-            const lines = content.split('\n');
-            questionsData = [];
-            correctAnswers = [];
-            let currentQuestion = { text: '' };
-            let currentAnswers = [];
+    if (!level || !unit) {
+        alert("Level or Unit not identified in the URL.");
+        return;
+    }
 
-            lines.forEach(line => {
-                if (line.trim() !== '' && line.match(/^\d+:/)) {
-                    if (currentQuestion.text !== '') {
-                        questionsData.push(currentQuestion);
-                        correctAnswers.push(currentAnswers);
-                    }
-                    currentQuestion = { text: line.replace(/^\d+:\s*/, '') };
-                    currentAnswers = [];
-                } else if (line.trim().startsWith('[')) {
-                    const answer = line.match(/\[([0-9]+)\]\s(.+)/);
-                    if (answer) {
-                        currentAnswers.push(answer[2].trim());
-                    }
-                } else {
-                    currentQuestion.text += ' ' + line.trim();
-                }
-            });
+    const questionsPath = `../../${level}/${unit}/DataFillintheBlanks/questions.txt`; // Caminho dinâmico para as questões
+    console.log("Generated Path:", questionsPath);
 
+    try {
+        const response = await fetch(questionsPath);
+        if (!response.ok) throw new Error(`Failed to fetch questions from ${questionsPath}`);
+
+        const text = await response.text();
+        const lines = text.split('\n');
+        processFile(lines); // Chama a função para processar as questões
+    } catch (error) {
+        console.error("Error loading questions:", error);
+        alert("There was an error loading the questions. Please try again later.");
+    }
+}
+
+        function processFile(lines) {
+    questionsData = [];
+    correctAnswers = [];
+    let currentQuestion = { text: '' };
+    let currentAnswers = [];
+
+    lines.forEach(line => {
+        if (line.trim() !== '' && line.match(/^\d+:/)) {
             if (currentQuestion.text !== '') {
                 questionsData.push(currentQuestion);
                 correctAnswers.push(currentAnswers);
             }
-
-            totalQuestions = questionsData.length;
-            showQuestion(1);
+            currentQuestion = { text: line.replace(/^\d+:\s*/, '') };
+            currentAnswers = [];
+        } else if (line.trim().startsWith('[')) {
+            const answer = line.match(/\[([0-9]+)\]\s(.+)/);
+            if (answer) {
+                currentAnswers.push(answer[2].trim());
+            }
+        } else {
+            currentQuestion.text += ' ' + line.trim();
         }
+    });
+
+    if (currentQuestion.text !== '') {
+        questionsData.push(currentQuestion);
+        correctAnswers.push(currentAnswers);
+    }
+
+    totalQuestions = questionsData.length;
+    showQuestion(1); // Exibe a primeira questão
+}
 
        function showQuestion(questionNumber) {
     const questionsContainer = document.getElementById('questionsContainer');
@@ -453,18 +469,50 @@
             const unit = url[2];
             return { level, unit };
         }
+      
+function readText() {
+    synth.cancel(); // Cancela qualquer leitura em andamento
+    let textToRead = questionsData[currentQuestion - 1].text;
 
-        function readText() {
-            synth.cancel();
-            let textToRead = questionsData[currentQuestion - 1].text;
-            correctAnswers[currentQuestion - 1].forEach(answer => {
-                textToRead = textToRead.replace('___', answer);
-            });
+    // Substitui os espaços em branco pela linha de preenchimento
+    correctAnswers[currentQuestion - 1].forEach(answer => {
+        textToRead = textToRead.replace('___', answer);
+    });
 
-            const utterance = new SpeechSynthesisUtterance(textToRead);
-            utterance.lang = 'en-US';
+    // Cria a instância da fala
+    const utterance = new SpeechSynthesisUtterance(textToRead);
+    let voices = synth.getVoices();
+    let usVoice = voices.find(voice => voice.lang === 'en-US'); // Verifica se há a voz em inglês americano
+
+    // Caso a voz 'en-US' não esteja disponível
+    if (!usVoice && voices.length === 0) {
+        // Se as vozes ainda não foram carregadas, aguarda a mudança de vozes
+        window.speechSynthesis.onvoiceschanged = () => {
+            voices = synth.getVoices();
+            usVoice = voices.find(voice => voice.lang === 'en-US');
+
+            // Se ainda não encontrar a voz 'en-US', exibe um alerta
+            if (!usVoice && !alertDisplayed) {
+                alert("No 'en-US' voice found in your speech synthesizer. Please enable English language in your browser's speech synthesizer. For now, the default voice will be used, which may cause problems.");
+                alertDisplayed = true; // Evita múltiplos alertas
+            }
+
+            // Usa a voz 'en-US' ou a voz padrão, caso não tenha a 'en-US'
+            utterance.voice = usVoice || voices[0];
             synth.speak(utterance);
+        };
+    } else {
+        // Se a voz 'en-US' estiver disponível
+        if (!usVoice && !alertDisplayed) {
+            alert("No 'en-US' voice found. Using default voice instead.");
+            alertDisplayed = true; // Evita múltiplos alertas
         }
+
+        // Se a voz 'en-US' foi encontrada ou usará a voz padrão
+        utterance.voice = usVoice || voices[0];
+        synth.speak(utterance);
+    }
+}
 
         function generatePDF() {
             const { jsPDF } = window.jspdf;
@@ -508,6 +556,64 @@
                 showQuestion(currentQuestion);
             }
         }
+
+async function handleBackButtonClick() {
+    const { level, unit } = getLevelAndUnitFromURL(); // Obtém o nível e a unidade da URL
+
+    console.log("Checking progress for level:", level, "unit:", unit);
+
+    if (!level || !unit) {
+        alert("Level or Unit not identified in the URL.");
+        return;
+    }
+
+    // Verifica o status de autenticação do usuário
+    firebase.auth().onAuthStateChanged(async (user) => {
+        if (user) {
+            const uid = user.uid; // Obtém o UID do usuário autenticado
+
+            // Verifica se a próxima fase está desbloqueada
+            const isNextPhaseUnlocked = await checkPhaseProgress(uid, level, unit);
+
+            if (isNextPhaseUnlocked) {
+                // Se a próxima fase estiver desbloqueada, volta normalmente
+                window.history.back();
+            } else {
+                // Se a próxima fase não estiver desbloqueada, exibe uma mensagem de confirmação
+                const confirmExit = confirm(
+                    "You have not completed this phase. Do you want to go back anyway?"
+                );
+                if (confirmExit) {
+                    window.history.back();
+                }
+            }
+        } else {
+            // Caso o usuário não esteja autenticado
+            alert("Please log in to save your progress and continue.");
+        }
+    });
+}
+
+async function checkPhaseProgress(uid, level, unit) {
+    try {
+        const currentPhase = parseInt(getPhaseFromURL()); // Obtém a fase atual da URL
+        const nextPhase = `fase${currentPhase + 1}`; // Determina a próxima fase
+
+        console.log("Checking progress for next phase:", nextPhase);
+
+        // Acessa o banco de dados para verificar o status da próxima fase
+        const dbRef = firebase.database().ref(`usuarios/${uid}/progresso/${level}/${unit}/${nextPhase}`);
+        const snapshot = await dbRef.once("value");
+        
+        const isUnlocked = snapshot.val() === true; // Verifica se a próxima fase está desbloqueada
+        console.log(`Next phase (${nextPhase}) unlocked:`, isUnlocked);
+
+        return isUnlocked; // Retorna true se a próxima fase estiver desbloqueada
+    } catch (error) {
+        console.error("Error checking phase progress:", error);
+        return false; // Retorna false em caso de erro
+    }
+}
 
         function previousQuestion() {
             if (currentQuestion > 1) {
