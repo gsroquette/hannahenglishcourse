@@ -614,24 +614,31 @@ async function checkPhaseProgress(uid, level, unit) {
     }
 }
 
-// Função para marcar a fase como completada
-function markPhaseAsCompleted() {
-    phaseCompleted = true; // Marca a fase como completada
-}
-
 // Detecta a tentativa de sair da página
-window.addEventListener("beforeunload", function (event) {
-    // Verifica se a fase não foi completada
-    if (!phaseCompleted) {  
-        // A mensagem será a padrão do navegador
-        const message = "You have not completed this phase. Are you sure you want to leave?";
+window.addEventListener("beforeunload", async function (event) {
+    const { level, unit } = getLevelAndUnitFromURL(); // Obtém o nível e a unidade da URL
 
-        // Para navegadores modernos, o evento "beforeunload" apenas deve usar `event.returnValue`
-        event.returnValue = message; // Isso ativará o alerta padrão do navegador
-
-        // Para navegadores mais antigos, a linha abaixo ajuda a exibir a mensagem
-        return message;
+    if (!level || !unit) {
+        alert("Level or Unit not identified in the URL.");
+        return;
     }
+
+    // Verifica o status de autenticação do usuário
+    firebase.auth().onAuthStateChanged(async (user) => {
+        if (user) {
+            const uid = user.uid; // Obtém o UID do usuário autenticado
+
+            // Verifica se a próxima fase está desbloqueada
+            const isNextPhaseUnlocked = await checkPhaseProgress(uid, level, unit);
+
+            if (!isNextPhaseUnlocked) {
+                // Verifica se a fase não foi completada
+                const message = "You have not completed this phase. Are you sure you want to leave?";
+                event.returnValue = message; // Para navegadores modernos
+                return message; // Para navegadores mais antigos
+            }
+        }
+    });
 });
 
         function previousQuestion() {
