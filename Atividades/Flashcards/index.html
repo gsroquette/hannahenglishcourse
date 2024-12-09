@@ -224,10 +224,12 @@
         }
 
       async function generateFlashcards() {
-    const { level, unit } = getLevelAndUnitFromURL(); // Certifique-se de extrair level e unit aqui
+    const { level, unit } = getLevelAndUnitFromURL();
     const words = await loadWords();
     totalCards = words.length;
     interactedCards = new Array(totalCards).fill(false);
+    soundPlayed = new Array(totalCards).fill(false); // Inicializa o controle de áudios
+
     const container = document.getElementById('flashcards-container');
 
     if (words.length === 0) {
@@ -246,7 +248,6 @@
         cardFront.classList.add('card-front');
         const img = document.createElement('img');
 
-        // Use level e unit aqui
         img.src = `../../${level}/${unit}/data1/imagens/imagem${index + 1}.png`;
         console.log(`Tentando carregar imagem em: ${img.src}`);
         img.onerror = function() {
@@ -258,41 +259,33 @@
         cardBack.classList.add('card-back');
         cardBack.textContent = word;
 
-        card.addEventListener('click', function() {
+        // Evento para virar o cartão
+        card.addEventListener('click', function () {
             card.classList.toggle('rotated');
-            interactedCards[index] = true;
-            checkCompletion();
+            interactedCards[index] = true; // Marca o cartão como interagido
+            console.log(`Card ${index + 1} virado. Estado: ${interactedCards}`);
+            checkCompletion(); // Verifica a conclusão
         });
 
+        // Ícone de reprodução de áudio
         const playSoundIcon = document.createElement('img');
         playSoundIcon.classList.add('play-sound');
         playSoundIcon.src = 'businessman.png';
         playSoundIcon.alt = "Play Sound";
-       // Adicione esta lógica na função de evento onclick do botão playSoundIcon
-playSoundIcon.onclick = (event) => {
-    event.stopPropagation();
 
-    // Incrementa o contador de som apenas na primeira reprodução do som
-    if (!interactedCards[index] || !soundPlayed.includes(index)) {
-        soundPlayed++;
-        interactedCards[index] = true; // Marca como interagido
-        console.log(`Áudio reproduzido para o card ${index + 1}. Total de áudios: ${soundPlayed}`);
-    }
+        // Evento de reprodução de áudio
+        playSoundIcon.onclick = (event) => {
+            event.stopPropagation();
 
-    toggleSpeech(word, playSoundIcon, index);
-    checkCompletion(); // Verifica a conclusão após a reprodução do som
-};
+            // Marca o áudio como reproduzido, se ainda não foi
+            if (!soundPlayed[index]) {
+                soundPlayed[index] = true;
+                console.log(`Áudio reproduzido para o card ${index + 1}. Total de áudios: ${soundPlayed}`);
+            }
 
-// No evento de clique no cartão:
-card.addEventListener('click', function () {
-    card.classList.toggle('rotated');
-
-    // Marca o cartão como interagido, mas mantém a contagem de som separada
-    interactedCards[index] = true;
-    console.log(`Card ${index + 1} virado. Estado de interação: ${interactedCards}`);
-
-    checkCompletion(); // Verifica a conclusão após virar o cartão
-});
+            toggleSpeech(word, playSoundIcon, index);
+            checkCompletion(); // Verifica a conclusão após o som
+        };
 
         cardInner.appendChild(cardFront);
         cardInner.appendChild(cardBack);
@@ -346,20 +339,23 @@ function speakText(text, voice, buttonElement) {
     utterance.lang = 'en-US';
     utterance.voice = voice;
 
-    // Adiciona um evento para restaurar o ícone após o áudio terminar
+    // Restaura o ícone após o áudio terminar
     utterance.onend = () => {
-        buttonElement.src = 'businessman.png'; // Restaura o ícone ao final do áudio
+        buttonElement.src = 'businessman.png';
         console.log("Speech synthesis completed.");
     };
 
     window.speechSynthesis.speak(utterance);
 }
-function checkCompletion() {
-    const allCardsInteracted = interactedCards.every(interacted => interacted);
-    console.log(`Interações: ${interactedCards}`);
-    console.log(`Áudios reproduzidos: ${soundPlayed}, Total de cartões: ${totalCards}`);
 
-    if (allCardsInteracted && soundPlayed === totalCards) {
+function checkCompletion() {
+    const allCardsInteracted = interactedCards.every(interacted => interacted); // Todos os cartões virados
+    const allSoundsPlayed = soundPlayed.every(sound => sound); // Todos os áudios reproduzidos
+
+    console.log(`Interações: ${interactedCards}`);
+    console.log(`Áudios reproduzidos: ${soundPlayed}`);
+
+    if (allCardsInteracted && allSoundsPlayed) {
         console.log("Todos os cartões foram virados e os áudios reproduzidos.");
         showModal();
         ensureUserIsAuthenticated(updateNextPhase);
