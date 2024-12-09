@@ -130,50 +130,12 @@
             background-color: #f0f0f0;
             box-shadow: 3px 3px 7px rgba(0, 0, 0, 0.2);
         }
-
-        /* Estilo do Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0, 0, 0, 0.5);
-            padding-top: 60px;
-        }
-
-        .modal-content {
-            background-color: white;
-            margin: 5% auto;
-            padding: 20px;
-            border-radius: 5px;
-            width: 80%;
-            text-align: center;
-        }
-
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-        }
-
-        .close:hover,
-        .close:focus {
-            color: black;
-            text-decoration: none;
-            cursor: pointer;
-        }
-
     </style>
 </head>
 <body>
 
 <div class="container">
-    <a href="javascript:void(0);" class="back-button" onclick="goBack()">Back</a>
+    <a href="javascript:history.back()" class="back-button">Back</a>
     <h1 id="title">Loading title...</h1>
     
     <div class="image-container">
@@ -185,19 +147,10 @@
     </div>
 
     <div id="content">
-        <!-- Conteúdo dinâmico será carregado aqui -->
+        <!-- Dynamic content will be loaded here -->
     </div>
 
     <button class="btn-download" onclick="generatePDF()">Download as PDF</button>
-</div>
-
-<!-- Modal de Conclusão -->
-<div id="completionModal" class="modal">
-    <div class="modal-content">
-        <span class="close" onclick="closeModal()">&times;</span>
-        <h2>Congratulations!</h2>
-        <p>You have successfully completed this activity. Well done!</p>
-    </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
@@ -223,197 +176,138 @@
 
     let totalAnswers = 0;
     let clickedAnswers = 0;
-    let alertDisplayed = false;
 
     function loadTextFile() {
-        const { level, unit } = getLevelAndUnitFromURL();
-        const filePath = `../../${level}/${unit}/DataGrammar/texto.txt`;
+    const { level, unit } = getLevelAndUnitFromURL();
+    const filePath = `../../${level}/${unit}/DataGrammar/texto.txt`;
 
-        fetch(filePath)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Erro ao carregar o arquivo: ${response.statusText}`);
-                }
-                return response.text();
-            })
-            .then(data => {
-                const contentDiv = document.getElementById('content');
-                const lines = data.split('\n');
-                let currentSection = '';
-                let htmlContent = '';
+    fetch(filePath)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Erro ao carregar o arquivo: ${response.statusText}`);
+            }
+            return response.text();
+        })
+        .then(data => {
+            const contentDiv = document.getElementById('content');
+            const lines = data.split('\n');
+            let currentSection = '';
+            let htmlContent = '';
 
-                lines.forEach(line => {
-                    if (line.startsWith('Title: ')) {
-                        document.getElementById('title').innerText = line.replace('Title: ', '');
-                    } else if (line.startsWith('# ')) {
-                        if (currentSection) {
-                            htmlContent += '</div>';
-                        }
-                        currentSection = line.replace('# ', '');
-                        htmlContent += `<div class="section"><h2>${currentSection}</h2>`;
-                    } else if (line.includes('[Answer:')) {
-                        const [question, answer] = line.split('[Answer:');
-                        const cleanedAnswer = answer.replace(']', '').trim();
-                        htmlContent += `<p>${question.trim()} <button class="show-answer-btn" onclick="handleAnswerClick(this)">Answer</button><span class="answer" style="display:none;">${cleanedAnswer}</span></p>`;
-                        totalAnswers++;
-                    } else {
-                        htmlContent += `<p>${line}</p>`;
+            lines.forEach(line => {
+                if (line.startsWith('Title: ')) {
+                    document.getElementById('title').innerText = line.replace('Title: ', '');
+                } else if (line.startsWith('# ')) {
+                    if (currentSection) {
+                        htmlContent += '</div>';
                     }
-                });
-
-                contentDiv.innerHTML = htmlContent + '</div>';
-            })
-            .catch(error => {
-                console.error('Error loading the text file:', error);
+                    currentSection = line.replace('# ', '');
+                    htmlContent += `<div class="section"><h2>${currentSection}</h2>`;
+                } else if (line.includes('[Answer:')) {
+                    const [question, answer] = line.split('[Answer:');
+                    const cleanedAnswer = answer.replace(']', '').trim();
+                    htmlContent += `<p>${question.trim()} <button class="show-answer-btn" onclick="handleAnswerClick(this)">Answer</button><span class="answer" style="display:none;">${cleanedAnswer}</span></p>`;
+                    totalAnswers++;
+                } else {
+                    htmlContent += `<p>${line}</p>`;
+                }
             });
-    }
+
+            contentDiv.innerHTML = htmlContent + '</div>';
+        })
+        .catch(error => {
+            console.error('Erro ao carregar o arquivo de texto:', error);
+        });
+}
+
+function loadLessonContent() {
+    const { level, unit } = getLevelAndUnitFromURL();
+    const currentPhase = getPhaseFromURL(); // Pega a fase da URL
+    const lessonPath = `../../${level}/${unit}/DataGrammar/aulas/aula${currentPhase}/lesson.txt`;
+    
+    fetch(lessonPath)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Erro ao carregar a lição: ${response.statusText}`);
+            }
+            return response.text();
+        })
+        .then(data => {
+            const lessonDiv = document.getElementById('lesson');
+            lessonDiv.innerHTML = data;
+        })
+        .catch(error => {
+            console.error('Erro ao carregar o arquivo da lição:', error);
+        });
+}
 
     function handleAnswerClick(button) {
-        const answerSpan = button.nextElementSibling;
-        answerSpan.style.display = 'inline';
-        clickedAnswers++;
-        if (clickedAnswers === totalAnswers) {
-            markActivityAsCompleted();
+        const answerElement = button.nextElementSibling;
+        if (answerElement.style.display === 'none') {
+            answerElement.style.display = 'inline';
+            clickedAnswers++;
+
+            if (clickedAnswers === totalAnswers) {
+                markActivityAsCompleted();
+            }
         }
     }
 
     function markActivityAsCompleted() {
-        if (!alertDisplayed) {
-            alert('Congratulations! You have completed the activity.');
-            alertDisplayed = true;
-            showCompletionModal(); // Show modal after completion
-        }
+        console.log("Atividade concluída!");
+        ensureUserIsAuthenticated(updateNextPhase);
     }
 
-    function showCompletionModal() {
-        const modal = document.getElementById("completionModal");
-        modal.style.display = "block";
-    }
-
-    function closeModal() {
-    const modal = document.getElementById("completionModal");
-    modal.style.display = "none";
-    updateNextPhase();  // Atualiza a fase antes de qualquer outra navegação
-}
-
-   async function updateNextPhase(userId) {
-    const { level, unit } = getLevelAndUnitFromURL();  // Obtém o nível e a unidade a partir da URL
-    const currentPhase = getPhaseFromURL();  // Obtém a fase atual da URL
-
-    console.log("Atualizando progresso no banco de dados...");
-    console.log(`Level: ${level}, Unit: ${unit}, Current Phase: ${currentPhase}`);
-
-    if (typeof currentPhase !== 'string') {
-        console.error("Fase atual não é uma string:", currentPhase);
-        return;  // Se currentPhase não for uma string, não tenta continuar a atualização
-    }
-
-    try {
-        if (currentPhase === "last") {
-            // Se a fase atual for a última da unidade, passa para a próxima unidade
-            const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-            await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`).child(nextUnit).set({ fase1: true });
-            console.log(`Progresso atualizado para a próxima unidade: ${nextUnit}`);
-        } else if (currentPhase === "end") {
-            // Se for o fim do nível, passa para o próximo nível
-            const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
-            await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
-            console.log(`Progresso atualizado para o próximo nível: ${nextLevel}`);
-        } else {
-            // Avança para a próxima fase com base no valor da fase atual da URL
-            const nextPhase = `fase${parseInt(currentPhase.replace('fase', '')) + 1}`;
-            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-            await dbRef.update({ [`fase${currentPhase}`]: true, [nextPhase]: true });
-            console.log(`Progresso atualizado para a fase: ${nextPhase}`);
-        }
-    } catch (error) {
-        console.error("Erro ao atualizar o progresso da fase:", error);
-    }
-}
-
-function getPhaseFromURL() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const phase = urlParams.get('fase') || 'fase1';  // Pega o valor da fase na URL (caso não exista, assume 'fase1')
-    return `fase${phase}`;  // Garante que o valor esteja no formato correto, como 'fase1', 'fase2', etc.
-}
-
-function getCurrentPhaseFromFirebase(userId, level, unit) {
-    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-    return dbRef.once('value')
-        .then(snapshot => {
-            const progress = snapshot.val();
-            let currentPhase = 'fase1';  // Fase inicial
-            if (progress) {
-                for (const phase in progress) {
-                    if (progress[phase] === true) {
-                        currentPhase = phase;  // Obtém a última fase desbloqueada
-                    }
-                }
+    function ensureUserIsAuthenticated(callback) {
+        firebase.auth().onAuthStateChanged(function(user) {
+            if (user) {
+                callback(user.uid);
+            } else {
+                console.error("Usuário não autenticado");
             }
-            return currentPhase;
-        })
-        .catch(error => {
-            console.error("Erro ao obter a fase atual:", error);
-            return 'fase1';  // Caso haja erro, considera a fase inicial
         });
-}
-
-    function getLevelAndUnitFromURL() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const level = urlParams.get('level') || 'defaultLevel';
-        const unit = urlParams.get('unit') || 'defaultUnit';
-        return { level, unit };
     }
 
-function goBack() {
-    const userId = firebase.auth().currentUser ? firebase.auth().currentUser.uid : null;
-    if (userId) {
+    async function updateNextPhase(userId) {
+        const currentPhase = getPhaseFromURL();
         const { level, unit } = getLevelAndUnitFromURL();
         const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-        dbRef.once('value')
-            .then(snapshot => {
-                const currentProgress = snapshot.val();
-                const currentPhase = currentProgress ? currentProgress.phase : null;
-                const nextPhase = getNextPhase(currentPhase);
-
-                // Verifica se a próxima fase está desbloqueada
-                if (nextPhase && !isPhaseUnlocked(nextPhase)) {
-                    const confirmationMessage = `The next phase (${nextPhase}) is not unlocked yet. Do you want to go back to the previous page?`;
-                    const userConfirmed = confirm(confirmationMessage);
-                    if (userConfirmed) {
-                        window.history.back();  // Volta para a página anterior
-                    }
-                } else {
-                    window.history.back();  // Volta para a página anterior
-                }
-            })
-            .catch(error => {
-                console.error('Error retrieving user progress:', error);
-                window.history.back();  // Caso haja erro, ainda assim tenta voltar à página anterior
-            });
-    } else {
-        console.log("User is not authenticated");
-        window.history.back();  // Caso o usuário não esteja autenticado, volta à página anterior
+        
+        try {
+            if (currentPhase === "last") {
+                const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+                await dbRef.child(nextUnit).set({ fase1: true });
+            } else if (currentPhase === "end") {
+                const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+                await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+            } else {
+                const nextPhase = parseInt(currentPhase) + 1;
+                await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
+            }
+        } catch (error) {
+            console.error("Erro ao atualizar o progresso da fase:", error);
+        }
     }
+
+    function getPhaseFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('fase');  // Pega o parâmetro 'fase' da URL
 }
 
-function getNextPhase(currentPhase) {
-    const phases = ['1', '2', '3', '4'];  // Exemplo de fases
-    const currentIndex = phases.indexOf(currentPhase);
-    if (currentIndex === -1 || currentIndex === phases.length - 1) {
-        return null;  // Se a fase não existir ou for a última, não há próxima fase
-    }
-    return phases[currentIndex + 1];
-}
+document.addEventListener('DOMContentLoaded', function() {
+    loadTextFile();
+    loadLessonContent();
+});
 
-function isPhaseUnlocked(phase) {
-    const unlockedPhases = ['1', '2', '3'];  // Defina suas fases desbloqueadas reais
-    return unlockedPhases.includes(phase);
+    function getLevelAndUnitFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    const level = params.get('level');
+    const unit = params.get('unit');
+    return { level, unit };
 }
 
     function generatePDF() {
-        const { level, unit } = getLevelAndUnitFromURL();
-        fetch(`../../${level}/${unit}/DataGrammar/texto.txt`)
+        fetch('texto.txt')
             .then(response => response.text())
             .then(data => {
                 const { jsPDF } = window.jspdf;
@@ -423,14 +317,14 @@ function isPhaseUnlocked(phase) {
                 const margin = 20;
                 const maxWidth = 170;
 
-                doc.addImage('Logo.png', 'PNG', 90, y, 30, 30);  // Logo no início
+                doc.addImage('Logo.png', 'PNG', 90, y, 30, 30);
                 y += 40;
                 doc.setFontSize(12);
                 doc.text("Name: ____________________________  Date: _______________", margin, y);
                 y += 20;
 
                 lines.forEach(line => {
-                    const textWithoutAnswer = line.replace(/\[Answer:.*?\]/g, '');  // Remove as respostas de dentro de [Answer:]
+                    const textWithoutAnswer = line.replace(/\[Answer:.*?\]/g, '');
 
                     if (line.startsWith('Title: ')) {
                         doc.setFontSize(16);
@@ -440,40 +334,50 @@ function isPhaseUnlocked(phase) {
                         doc.setFontSize(12);
                         const textLines = doc.splitTextToSize(textWithoutAnswer, maxWidth);
                         doc.text(textLines, margin, y);
-                        y += textLines.length * 10;
+                        y += textLines.length * 10; 
                     }
 
-                    // Verifica se precisa adicionar uma nova página no PDF
                     if (y > doc.internal.pageSize.height - margin) {
                         doc.addPage();
                         y = margin;
                     }
                 });
 
-                // Salva o PDF com o nome gerado
                 doc.save("grammar_lesson_creation.pdf");
             })
             .catch(error => console.error('Error generating the PDF:', error));
     }
 
-    // Função para garantir que o usuário esteja autenticado
-    function ensureUserIsAuthenticated(callback) {
-        firebase.auth().onAuthStateChanged(user => {
-            if (user) {
-                callback(user);
-            } else {
-                console.log("User not authenticated");
-            }
-        });
+    function loadProfessorButtons() {
+        const buttonContainer = document.querySelector('.button-container');
+        const maxProfessors = 10;
+
+        for (let i = 1; i <= maxProfessors; i++) {
+            const imgPath = `professores/professor${i}.png`;
+            const img = new Image();
+            
+            img.onload = function() {
+                const button = document.createElement('button');
+                img.alt = `Professor ${i}`;
+                button.appendChild(img);
+                button.onclick = function() {
+                    window.location.href = `aulas/aula${i}/index.html`;
+                };
+                buttonContainer.appendChild(button);
+            };
+
+            img.onerror = function() {
+                console.log(`Imagem professor${i}.png não encontrada, pulando.`);
+            };
+
+            img.src = imgPath;
+        }
     }
 
-    // Inicializar a página e carregar conteúdo
-    window.onload = function() {
+    document.addEventListener('DOMContentLoaded', function() {
         loadTextFile();
-        ensureUserIsAuthenticated(user => {
-            console.log("User authenticated:", user);
-        });
-    };
+        loadProfessorButtons();
+    });
 </script>
 
 </body>
