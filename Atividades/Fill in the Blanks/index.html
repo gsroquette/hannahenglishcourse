@@ -263,7 +263,6 @@
         let synth = window.speechSynthesis;
         let userAnswers = {}; // Objeto para armazenar as respostas do usuário
         let alertDisplayed = false; // Nova variável para controlar exibição de alertas
-        let phaseCompleted = false; // Variável para controlar se a fase foi completada
 
         async function loadQuestions() {
     const { level, unit } = getLevelAndUnitFromURL(); // Obtém o nível e unidade da URL
@@ -376,10 +375,16 @@
     const blanks = document.querySelectorAll('.blank');
     let allCorrect = true;
 
+    // Inicializa o armazenamento das respostas da questão atual
+    if (!userAnswers[currentQuestion]) {
+        userAnswers[currentQuestion] = [];
+    }
+
     blanks.forEach((blank, index) => {
         const userAnswer = blank.textContent.trim();
         const correctAnswer = correctAnswers[currentQuestion - 1][index];
 
+        // Salva a resposta do aluno
         userAnswers[currentQuestion][index] = userAnswer;
 
         if (userAnswer === correctAnswer) {
@@ -404,8 +409,6 @@
             document.getElementById('successContainer').style.display = 'none';
             nextQuestion();
         }, 5000);
-
-        markPhaseAsCompleted(); // Marca a fase como completada
     }
 }
 
@@ -603,7 +606,7 @@ async function checkPhaseProgress(uid, level, unit) {
         // Acessa o banco de dados para verificar o status da próxima fase
         const dbRef = firebase.database().ref(`usuarios/${uid}/progresso/${level}/${unit}/${nextPhase}`);
         const snapshot = await dbRef.once("value");
-
+        
         const isUnlocked = snapshot.val() === true; // Verifica se a próxima fase está desbloqueada
         console.log(`Next phase (${nextPhase}) unlocked:`, isUnlocked);
 
@@ -613,33 +616,6 @@ async function checkPhaseProgress(uid, level, unit) {
         return false; // Retorna false em caso de erro
     }
 }
-
-
-// Detecta a tentativa de sair da página
-window.addEventListener("beforeunload", function (event) {
-    const { level, unit } = getLevelAndUnitFromURL(); // Obtém o nível e a unidade da URL
-
-    if (!level || !unit) {
-        alert("Level or Unit not identified in the URL.");
-        return;
-    }
-
-    // Espera o retorno de `checkPhaseProgress`
-    firebase.auth().onAuthStateChanged(function (user) {
-        if (user) {
-            const uid = user.uid; // Obtém o UID do usuário autenticado
-
-            // Verifica se a próxima fase está desbloqueada
-            checkPhaseProgress(uid, level, unit).then(isNextPhaseUnlocked => {
-                if (!isNextPhaseUnlocked) {
-                    const message = "You have not completed this phase. Are you sure you want to leave?";
-                    event.returnValue = message; // Para navegadores modernos
-                    return message; // Para navegadores mais antigos
-                }
-            });
-        }
-    });
-});
 
         function previousQuestion() {
             if (currentQuestion > 1) {
