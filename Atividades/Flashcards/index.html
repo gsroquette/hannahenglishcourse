@@ -335,12 +335,16 @@ function speakText(text, voice, buttonElement) {
 }
 
         function checkCompletion() {
-            const allCardsInteracted = interactedCards.every(interacted => interacted);
-            if (allCardsInteracted && soundPlayed === totalCards) {
-                showModal();
-                ensureUserIsAuthenticated(updateNextPhase);
-            }
-        }
+    const allCardsInteracted = interactedCards.every(interacted => interacted);
+    console.log(`Interações: ${interactedCards}`);
+    console.log(`Áudios reproduzidos: ${soundPlayed}, Total de cartões: ${totalCards}`);
+
+    if (allCardsInteracted && soundPlayed === totalCards) {
+        console.log("Todos os cartões foram virados e os áudios reproduzidos.");
+        showModal();
+        ensureUserIsAuthenticated(updateNextPhase);
+    }
+}
 
         function showModal() {
             document.getElementById('completion-modal').style.display = 'block';
@@ -363,25 +367,31 @@ function speakText(text, voice, buttonElement) {
         }
 
         async function updateNextPhase(userId) {
-            const currentPhase = getPhaseFromURL();
-            const { level, unit } = getLevelAndUnitFromURL();
-            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-            
-            try {
-                if (currentPhase === "last") {
-                    const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-                    await dbRef.child(nextUnit).set({ fase1: true });
-                } else if (currentPhase === "end") {
-                    const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
-                    await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
-                } else {
-                    const nextPhase = parseInt(currentPhase) + 1;
-                    await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
-                }
-            } catch (error) {
-                console.error("Erro ao atualizar o progresso da fase:", error);
-            }
+    const currentPhase = getPhaseFromURL();
+    const { level, unit } = getLevelAndUnitFromURL();
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+    console.log("Atualizando progresso no banco de dados...");
+    console.log(`Level: ${level}, Unit: ${unit}, Current Phase: ${currentPhase}`);
+
+    try {
+        if (currentPhase === "last") {
+            const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+            await dbRef.child(nextUnit).set({ fase1: true });
+            console.log(`Progresso atualizado para a próxima unidade: ${nextUnit}`);
+        } else if (currentPhase === "end") {
+            const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+            await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+            console.log(`Progresso atualizado para o próximo nível: ${nextLevel}`);
+        } else {
+            const nextPhase = parseInt(currentPhase) + 1;
+            await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
+            console.log(`Progresso atualizado para a fase: ${nextPhase}`);
         }
+    } catch (error) {
+        console.error("Erro ao atualizar o progresso da fase:", error);
+    }
+}
 
         function getPhaseFromURL() {
             const params = new URLSearchParams(window.location.search);
