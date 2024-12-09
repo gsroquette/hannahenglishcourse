@@ -309,6 +309,70 @@
             return { level: parts[1], unit: parts[2] };
         }
 
+        async function loadWords() {
+            const { level, unit } = getLevelAndUnitFromURL();
+            const wordsPath = `../../${level}/${unit}/data1/words.txt`;
+            try {
+                const response = await fetch(wordsPath);
+                if (!response.ok) throw new Error(`Failed to fetch words from ${wordsPath}`);
+                const text = await response.text();
+                return text.split('\n').filter(word => word.trim() !== '').map(word => word.trim());
+            } catch (error) {
+                console.error("Error loading words:", error);
+                return [];
+            }
+        }
+
+        async function generateFlashcards() {
+            const words = await loadWords();
+            const container = document.getElementById('flashcards-container');
+
+            if (words.length === 0) {
+                container.innerHTML = "Could not load flashcards.";
+                return;
+            }
+
+            words.forEach((word, index) => {
+                const card = document.createElement('div');
+                card.classList.add('card');
+
+                const cardInner = document.createElement('div');
+                cardInner.classList.add('card-inner');
+
+                const cardFront = document.createElement('div');
+                cardFront.classList.add('card-front');
+                const img = document.createElement('img');
+                img.src = `../../${getLevelAndUnitFromURL().level}/${getLevelAndUnitFromURL().unit}/data1/imagens/imagem${index + 1}.png`;
+                img.onerror = function () {
+                    console.error(`Error loading image: imagem${index + 1}.png`);
+                };
+                cardFront.appendChild(img);
+
+                const cardBack = document.createElement('div');
+                cardBack.classList.add('card-back');
+                cardBack.textContent = word;
+
+                card.addEventListener('click', function () {
+                    card.classList.toggle('rotated');
+                });
+
+                const playSoundIcon = document.createElement('img');
+                playSoundIcon.classList.add('play-sound');
+                playSoundIcon.src = 'businessman.png';
+                playSoundIcon.alt = "Play Sound";
+                playSoundIcon.onclick = (event) => {
+                    event.stopPropagation();
+                    toggleSpeech(word, playSoundIcon, index);
+                };
+
+                cardInner.appendChild(cardFront);
+                cardInner.appendChild(cardBack);
+                card.appendChild(cardInner);
+                card.appendChild(playSoundIcon);
+                container.appendChild(card);
+            });
+        }
+
         generateFlashcards();
     </script>
 </body>
