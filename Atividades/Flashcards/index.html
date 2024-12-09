@@ -176,7 +176,7 @@
 </head>
 <body>
     <div class="header-container">
-        <button class="back-button" onclick="goBack()">Back</button>
+        <button class="back-button" onclick="handleBackButtonClick()">Back</button>
         <h1>Hannah FlashCards</h1>
     </div>
     <div id="flashcards-container"></div>
@@ -206,132 +206,95 @@
 
         firebase.initializeApp(firebaseConfig);
 
-        let totalCards = 0;
-        let interactedCards = [];
-        let soundPlayed = 0;
+        let alertDisplayed = false;
 
-        async function loadWords() {
-            try {
-                const response = await fetch('../data1/words.txt');
-                const text = await response.text();
-                return text.split('\n').filter(word => word.trim() !== '').map(word => word.trim());
-            } catch (error) {
-                console.error("Erro ao carregar o arquivo words.txt", error);
-                return [];
-            }
-        }
-
-        async function generateFlashcards() {
-            const words = await loadWords();
-            totalCards = words.length;
-            interactedCards = new Array(totalCards).fill(false);
-            const container = document.getElementById('flashcards-container');
-
-            if (words.length === 0) {
-                container.innerHTML = "Não foi possível carregar os flash cards.";
+        function toggleSpeech(text, buttonElement, index) {
+            if (!('speechSynthesis' in window)) {
+                alert("Your browser does not support speech synthesis. Please enable it or use a compatible browser.");
                 return;
             }
 
-            words.forEach((word, index) => {
-                const card = document.createElement('div');
-                card.classList.add('card');
+            if (window.speechSynthesis.speaking) {
+                window.speechSynthesis.cancel();
+                buttonElement.src = 'businessman.png';
+            } else {
+                let voices = window.speechSynthesis.getVoices();
+                let usVoice = voices.find(voice => voice.lang === 'en-US');
 
-                const cardInner = document.createElement('div');
-                cardInner.classList.add('card-inner');
+                if (!usVoice && voices.length === 0) {
+                    window.speechSynthesis.onvoiceschanged = () => {
+                        voices = window.speechSynthesis.getVoices();
+                        usVoice = voices.find(voice => voice.lang === 'en-US');
 
-                const cardFront = document.createElement('div');
-                cardFront.classList.add('card-front');
-                const img = document.createElement('img');
-                img.src = `../data1/imagens/imagem${index + 1}.png`;
-                img.onerror = function() {
-                    console.error(`Erro ao carregar a imagem: imagem${index + 1}.png`);
-                };
-                cardFront.appendChild(img);
+                        if (!usVoice && !alertDisplayed) {
+                            alert("No 'en-US' voice found in your speech synthesizer. Please enable English language in your browser's speech synthesizer.");
+                            alertDisplayed = true;
+                        }
 
-                const cardBack = document.createElement('div');
-                cardBack.classList.add('card-back');
-                cardBack.textContent = word;
-
-                card.addEventListener('click', function() {
-                    card.classList.toggle('rotated');
-                    interactedCards[index] = true;
-                    checkCompletion();
-                });
-
-                const playSoundIcon = document.createElement('img');
-                playSoundIcon.classList.add('play-sound');
-                playSoundIcon.src = 'businessman.png';
-                playSoundIcon.alt = "Play Sound";
-                playSoundIcon.onclick = (event) => {
-                    event.stopPropagation();
-                    playSound(word);
-                    if (!playSoundIcon.classList.contains('played')) {
-                        playSoundIcon.classList.add('played');
-                        soundPlayed++;
-                        checkCompletion();
+                        speakText(text, usVoice || voices[0], buttonElement, index);
+                    };
+                } else {
+                    if (!usVoice && !alertDisplayed) {
+                        alert("No 'en-US' voice found. Using default voice instead.");
+                        alertDisplayed = true;
                     }
-                };
 
-                cardInner.appendChild(cardFront);
-                cardInner.appendChild(cardBack);
-                card.appendChild(cardInner);
-                card.appendChild(playSoundIcon);
-                container.appendChild(card);
-            });
-        }
+                    speakText(text, usVoice || voices[0], buttonElement, index);
+                }
 
-        function playSound(word) {
-            const utterance = new SpeechSynthesisUtterance(word);
-            utterance.lang = 'en-US';
-            window.speechSynthesis.speak(utterance);
-        }
-
-        function checkCompletion() {
-            const allCardsInteracted = interactedCards.every(interacted => interacted);
-            if (allCardsInteracted && soundPlayed === totalCards) {
-                showModal();
-                ensureUserIsAuthenticated(updateNextPhase);
+                buttonElement.src = 'pause.png';
             }
         }
 
-        function showModal() {
-            document.getElementById('completion-modal').style.display = 'block';
-            document.getElementById('overlay').style.display = 'block';
+        function speakText(text, voice, buttonElement, index) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.voice = voice;
+            utterance.lang = 'en-US';
+            utterance.onend = () => {
+                buttonElement.src = 'businessman.png';
+            };
+            window.speechSynthesis.speak(utterance);
         }
 
-        function closeModal() {
-            document.getElementById('completion-modal').style.display = 'none';
-            document.getElementById('overlay').style.display = 'none';
-        }
+        async function handleBackButtonClick() {
+            const { level, unit } = getLevelAndUnitFromURL();
 
-        function ensureUserIsAuthenticated(callback) {
-            firebase.auth().onAuthStateChanged(function(user) {
+            if (!level || !unit) {
+                alert("Level or Unit not identified in the URL.");
+                return;
+            }
+
+            firebase.auth().onAuthStateChanged(async (user) => {
                 if (user) {
-                    callback(user.uid);
+                    const uid = user.uid;
+                    const isNextPhaseUnlocked = await checkPhaseProgress(uid, level, unit);
+
+                    if (isNextPhaseUnlocked) {
+                        window.history.back();
+                    } else {
+                        const confirmExit = confirm(
+                            "You have not completed this phase. Do you want to go back anyway?"
+                        );
+                        if (confirmExit) {
+                            window.history.back();
+                        }
+                    }
                 } else {
-                    console.error("Usuário não autenticado");
+                    alert("Please log in to save your progress and continue.");
                 }
             });
         }
 
-        async function updateNextPhase(userId) {
-            const currentPhase = getPhaseFromURL();
-            const { level, unit } = getLevelAndUnitFromURL();
-            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-            
+        async function checkPhaseProgress(uid, level, unit) {
             try {
-                if (currentPhase === "last") {
-                    const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-                    await dbRef.child(nextUnit).set({ fase1: true });
-                } else if (currentPhase === "end") {
-                    const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
-                    await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
-                } else {
-                    const nextPhase = parseInt(currentPhase) + 1;
-                    await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
-                }
+                const currentPhase = parseInt(getPhaseFromURL());
+                const nextPhase = `fase${currentPhase + 1}`;
+                const dbRef = firebase.database().ref(`usuarios/${uid}/progresso/${level}/${unit}/${nextPhase}`);
+                const snapshot = await dbRef.once("value");
+                return snapshot.val() === true;
             } catch (error) {
-                console.error("Erro ao atualizar o progresso da fase:", error);
+                console.error("Error checking phase progress:", error);
+                return false;
             }
         }
 
@@ -343,13 +306,7 @@
         function getLevelAndUnitFromURL() {
             const url = window.location.pathname;
             const parts = url.split('/');
-            const level = parts[1];
-            const unit = parts[2];
-            return { level, unit };
-        }
-
-        function goBack() {
-            window.history.back();
+            return { level: parts[1], unit: parts[2] };
         }
 
         generateFlashcards();
