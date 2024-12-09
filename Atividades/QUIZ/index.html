@@ -542,9 +542,8 @@ function speakText(text, voice, buttonElement, index) {
 }
 
 async function handleBackButtonClick() {
-    const { level, unit } = getLevelAndUnitFromURL(); // Função existente no código.
+    const { level, unit } = getLevelAndUnitFromURL();
 
-// Log para verificar level e unit
     console.log("Checking progress for level:", level, "unit:", unit);
 
     if (!level || !unit) {
@@ -555,12 +554,15 @@ async function handleBackButtonClick() {
     firebase.auth().onAuthStateChanged(async (user) => {
         if (user) {
             const uid = user.uid;
-            const isPhaseCompleted = await checkPhaseProgress(uid, level, unit);
+            const isNextPhaseUnlocked = await checkPhaseProgress(uid, level, unit);
 
-            if (isPhaseCompleted) {
-                window.history.back();
+            if (isNextPhaseUnlocked) {
+                window.history.back(); // Permite voltar normalmente
             } else {
-                const confirmExit = confirm("The next phase is not completed. Do you wish to leave anyway?");
+                // Exibe a mensagem se a próxima fase não estiver desbloqueada
+                const confirmExit = confirm(
+                    "You have not completed this phase. Do you want to go back anyway?"
+                );
                 if (confirmExit) {
                     window.history.back();
                 }
@@ -573,12 +575,22 @@ async function handleBackButtonClick() {
 
 async function checkPhaseProgress(uid, level, unit) {
     try {
-        const dbRef = firebase.database().ref(`usuarios/${uid}/progresso/${level}/${unit}/fase2`);
+        // Obtem a fase atual e calcula a próxima
+        const currentPhase = parseInt(getPhaseFromURL());
+        const nextPhase = `fase${currentPhase + 1}`;
+        console.log("Checking progress for next phase:", nextPhase);
+
+        // Referência ao banco de dados para verificar a próxima fase
+        const dbRef = firebase.database().ref(`usuarios/${uid}/progresso/${level}/${unit}/${nextPhase}`);
         const snapshot = await dbRef.once("value");
-        return snapshot.val();
+        
+        const isUnlocked = snapshot.val() === true;
+        console.log(`Next phase (${nextPhase}) unlocked:`, isUnlocked);
+
+        return isUnlocked; // Retorna true se a próxima fase estiver desbloqueada
     } catch (error) {
         console.error("Error checking phase progress:", error);
-        return false;
+        return false; // Retorna false em caso de erro
     }
 }
 
