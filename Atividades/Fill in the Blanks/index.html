@@ -614,8 +614,9 @@ async function checkPhaseProgress(uid, level, unit) {
     }
 }
 
+
 // Detecta a tentativa de sair da página
-window.addEventListener("beforeunload", async function (event) {
+window.addEventListener("beforeunload", function (event) {
     const { level, unit } = getLevelAndUnitFromURL(); // Obtém o nível e a unidade da URL
 
     if (!level || !unit) {
@@ -624,17 +625,18 @@ window.addEventListener("beforeunload", async function (event) {
     }
 
     // Espera o retorno de `checkPhaseProgress`
-    firebase.auth().onAuthStateChanged(async (user) => {
+    firebase.auth().onAuthStateChanged(function (user) {
         if (user) {
             const uid = user.uid; // Obtém o UID do usuário autenticado
 
-            const isNextPhaseUnlocked = await checkPhaseProgress(uid, level, unit);
-
-            if (!isNextPhaseUnlocked) {
-                const message = "You have not completed this phase. Are you sure you want to leave?";
-                event.returnValue = message; // Para navegadores modernos
-                return message; // Para navegadores mais antigos
-            }
+            // Verifica se a próxima fase está desbloqueada
+            checkPhaseProgress(uid, level, unit).then(isNextPhaseUnlocked => {
+                if (!isNextPhaseUnlocked) {
+                    const message = "You have not completed this phase. Are you sure you want to leave?";
+                    event.returnValue = message; // Para navegadores modernos
+                    return message; // Para navegadores mais antigos
+                }
+            });
         }
     });
 });
