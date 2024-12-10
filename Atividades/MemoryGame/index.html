@@ -243,31 +243,59 @@
         let matchedPairs = 0;
         let totalPairs = 0;
 
+function getParamsFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    return {
+        level: params.get('level'),
+        unit: params.get('unit'),
+        fase: params.get('fase'),
+    };
+}
+
         function loadCardsData(callback) {
-            fetch('../data1/words.txt')
-                .then(response => response.text())
-                .then(text => {
-                    const words = text.trim().split('\n');
-                    const cardsArray = [];
+    const { level, unit } = getParamsFromURL();
+    if (!level || !unit) {
+        console.error("Parâmetros 'level' e 'unit' são obrigatórios na URL.");
+        return;
+    }
 
-                    words.forEach((word, index) => {
-                        const imageName = `image${index + 1}`;
-                        cardsArray.push({
-                            type: 'image',
-                            src: `../data1/imagens/imagem${index + 1}.png`,
-                            pair: imageName
-                        });
-                        cardsArray.push({
-                            type: 'word',
-                            text: word.trim(),
-                            pair: imageName
-                        });
-                    });
+    const wordsPath = `../../${level}/${unit}/data1/words.txt`;
+    const imagePathTemplate = `../../${level}/${unit}/data1/imagem`;
 
-                    totalPairs = words.length;
-                    callback(cardsArray);
+    fetch(wordsPath)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Erro ao carregar palavras de ${wordsPath}`);
+            }
+            return response.text();
+        })
+        .then(text => {
+            const words = text.trim().split('\n');
+            const cardsArray = [];
+
+            words.forEach((word, index) => {
+                const imagePath = `${imagePathTemplate}${index + 1}.png`;
+
+                cardsArray.push({
+                    type: 'image',
+                    src: imagePath,
+                    pair: `pair${index + 1}`,
                 });
-        }
+
+                cardsArray.push({
+                    type: 'word',
+                    text: word.trim(),
+                    pair: `pair${index + 1}`,
+                });
+            });
+
+            totalPairs = words.length;
+            callback(cardsArray);
+        })
+        .catch(error => {
+            console.error("Erro ao carregar dados:", error);
+        });
+}
 
         function initGame(cardsArray) {
             gameContainer.innerHTML = '';

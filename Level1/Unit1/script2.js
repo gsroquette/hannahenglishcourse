@@ -16,11 +16,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentUnit = urlPathParts[2]; // Ex: "Unit1"
 
     const Atividades = [
-    { id: 6, name: "MemoryGame", path: `../${currentUnit}/MemoryGame/index.html?level=${currentLevel}&unit=${currentUnit}&fase=6`, img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
-    { id: 7, name: "Speak", path: `../${currentUnit}/Speak/index.html?level=${currentLevel}&unit=${currentUnit}&fase=7`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
-    { id: 8, name: "Flashcards2", path: `../${currentUnit}/Flashcards2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=8`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-    { id: 9, name: "MemoryGame2", path: `../${currentUnit}/MemoryGame2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=9`, img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
-    { id: 10, name: "Speak2", path: `../${currentUnit}/Speak2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=10`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
+    { id: 1006, name: "MemoryGame", path: `../${currentUnit}/MemoryGame/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1006`, img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
+    { id: 1007, name: "Speak", path: `../${currentUnit}/Speak/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1007`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
+    { id: 1008, name: "Flashcards2", path: `../${currentUnit}/Flashcards2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1008`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+    { id: 1009, name: "MemoryGame2", path: `../${currentUnit}/MemoryGame2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1009`, img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
+    { id: 1010, name: "Speak2", path: `../${currentUnit}/Speak2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1010`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
 ];
 
     // Fechar o dropdown ao clicar fora dele
