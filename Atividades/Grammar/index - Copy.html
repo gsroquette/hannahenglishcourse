@@ -111,31 +111,43 @@
             transform: scale(1.1);
         }
         .answer {
-            font-weight: bold;
-            color: #007bff;
-            margin-left: 10px;
-        }
-        .show-answer-btn {
-            padding: 8px 15px;
-            background-color: white;
-            color: black;
-            border: 1px solid #ccc;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: background-color 0.3s ease, box-shadow 0.3s ease;
-            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
-        }
-        .show-answer-btn:hover {
-            background-color: #f0f0f0;
-            box-shadow: 3px 3px 7px rgba(0, 0, 0, 0.2);
-        }
+    font-weight: bold;
+    color: green;
+    margin-left: 10px;
+    display: none; /* Respostas começam ocultas */
+}
+.answer-input {
+    width: 100px;
+    padding: 5px;
+    margin-left: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 1rem;
+    transition: background-color 0.3s ease; /* Animação de transição de cor */
+}
+
+.show-answer-btn {
+    padding: 8px 15px;
+    background-color: white;
+    color: black;
+    border: 1px solid #ccc;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.show-answer-btn:hover {
+    background-color: #f0f0f0;
+    box-shadow: 3px 3px 7px rgba(0, 0, 0, 0.2);
+}
     </style>
 </head>
 <body>
 
 <div class="container">
-  <a href="javascript:void(0);" class="back-button" onclick="goBack()">Back</a>
+    <a href="javascript:history.back()" class="back-button">Back</a>
     <h1 id="title">Loading title...</h1>
     
     <div class="image-container">
@@ -147,7 +159,7 @@
     </div>
 
     <div id="content">
-        <!-- Conteúdo dinâmico será carregado aqui -->
+        <!-- Dynamic content will be loaded here -->
     </div>
 
     <button class="btn-download" onclick="generatePDF()">Download as PDF</button>
@@ -176,25 +188,11 @@
 
     let totalAnswers = 0;
     let clickedAnswers = 0;
-    let alertDisplayed = false;
 
-   function loadTextFile() {
+function loadTextFile() {
     const { level, unit } = getLevelAndUnitFromURL();
-
-    // Verificando a URL completa
-    console.log("Parâmetros da URL - Level:", level, "Unit:", unit);
-
-    // Construindo o caminho correto com base no level e unit
     const filePath = `../../${level}/${unit}/DataGrammar/texto.txt`;
 
-    // Log para o caminho gerado
-    console.log("Caminho gerado para o arquivo texto.txt:", filePath);
-
-    // Verificando o caminho absoluto em relação à URL atual
-    const absolutePath = new URL(filePath, window.location.href).href;
-    console.log("Caminho absoluto gerado:", absolutePath); // Log para caminho absoluto
-
-    // Tentando carregar o arquivo
     fetch(filePath)
         .then(response => {
             if (!response.ok) {
@@ -218,88 +216,75 @@
                     currentSection = line.replace('# ', '');
                     htmlContent += `<div class="section"><h2>${currentSection}</h2>`;
                 } else if (line.includes('[Answer:')) {
+                    // Separar pergunta e resposta
                     const [question, answer] = line.split('[Answer:');
                     const cleanedAnswer = answer.replace(']', '').trim();
-                    htmlContent += `<p>${question.trim()} <button class="show-answer-btn" onclick="handleAnswerClick(this)">Answer</button><span class="answer" style="display:none;">${cleanedAnswer}</span></p>`;
-                    totalAnswers++;
+
+                    htmlContent += `
+                        <p>
+                            ${question.trim()} 
+                            <input type="text" class="answer-input" placeholder="Type here..." />
+                           <button class="show-answer-btn" data-answer="${cleanedAnswer}" onclick="checkAnswer(this)">Answer</button>
+                            <span class="answer" style="display: none;">${cleanedAnswer}</span>
+                        </p>`;
                 } else {
                     htmlContent += `<p>${line}</p>`;
                 }
             });
 
-            contentDiv.innerHTML = htmlContent + '</div>';
+            contentDiv.innerHTML = htmlContent;
         })
-        .catch(error => {
-            console.error('Error loading the text file:', error);
-            alert("Erro ao carregar o arquivo. Verifique a URL ou a estrutura dos diretórios.");
-        });
+        .catch(error => console.error('Erro ao carregar o arquivo:', error));
 }
 
-    function handleAnswerClick(button) {
-        const answerElement = button.nextElementSibling;
-        if (answerElement.style.display === 'none') {
-            answerElement.style.display = 'inline';
-            clickedAnswers++;
+function getAnswerFromLine(line) {
+    // Extrai a resposta de uma linha de texto que contém '[Answer:...]'
+    const match = line.match(/\[Answer:(.*?)\]/);
+    return match ? match[1].trim() : '';
+}
 
-            // Se todas as respostas foram clicadas, marca a atividade como concluída
-            if (clickedAnswers === totalAnswers) {
-                markActivityAsCompleted();
-            }
+function checkAnswer(button) {
+    const userInput = button.previousElementSibling; // Campo de texto anterior
+    const answerSpan = button.nextElementSibling; // Resposta oculta
+    const correctAnswer = button.getAttribute('data-answer'); // Resposta correta no botão
 
-            // Chama a função para ler o texto em voz alta
-            readText(answerElement.innerText);
-        }
+    if (userInput.value.trim() === '') {
+        alert('Please type your answer before checking.');
+        return;
     }
 
-    function readText(text) {
-        if (!window.speechSynthesis) {
-            console.error("Sintetizador de fala não suportado neste navegador.");
-            return;
-        }
-
-        const synth = window.speechSynthesis;
-        synth.cancel(); // Cancela qualquer síntese de voz anterior
-
-        let voices = synth.getVoices();
-
-        function findVoice() {
-            let enUSVoice = voices.find(voice => voice.lang === 'en-US');
-            
-            if (!enUSVoice) {
-                if (voices.length === 0) {
-                    window.speechSynthesis.onvoiceschanged = function() {
-                        voices = synth.getVoices();
-                        enUSVoice = voices.find(voice => voice.lang === 'en-US');
-                        if (enUSVoice) {
-                            speakText(text, enUSVoice);
-                        } else {
-                            showAlert("No 'en-US' voice found. Using default voice instead.");
-                        }
-                    };
-                } else {
-                                        showAlert("No 'en-US' voice found in your speech synthesizer. Please enable English language in your browser's speech synthesizer. For now, the default voice will be used.");
-                    speakText(text, synth.getVoices()[0]);
-                }
-            } else {
-                speakText(text, enUSVoice);
-            }
-        }
-
-        function speakText(text, voice) {
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.voice = voice;
-            synth.speak(utterance);
-        }
-
-        function showAlert(message) {
-            if (!alertDisplayed) {
-                alert(message);
-                alertDisplayed = true;
-            }
-        }
-
-        findVoice();
+    // Comparação da resposta
+    if (userInput.value.trim().toLowerCase() === correctAnswer.toLowerCase()) {
+        userInput.style.backgroundColor = 'lightgreen'; // Resposta correta
+    } else {
+        userInput.style.backgroundColor = 'lightcoral'; // Resposta incorreta
     }
+
+    // Exibir resposta correta
+    answerSpan.style.display = 'inline'; // Tornar visível
+    button.disabled = true; // Desabilitar botão após o clique
+}
+
+function loadLessonContent() {
+    const { level, unit } = getLevelAndUnitFromURL();
+    const currentPhase = getPhaseFromURL(); // Pega a fase da URL
+    const lessonPath = `../../${level}/${unit}/DataGrammar/aulas/aula${currentPhase}/lesson.txt`;
+    
+    fetch(lessonPath)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Erro ao carregar a lição: ${response.statusText}`);
+            }
+            return response.text();
+        })
+        .then(data => {
+            const lessonDiv = document.getElementById('lesson');
+            lessonDiv.innerHTML = data;
+        })
+        .catch(error => {
+            console.error('Erro ao carregar o arquivo da lição:', error);
+        });
+}
 
     function markActivityAsCompleted() {
         console.log("Atividade concluída!");
@@ -315,40 +300,6 @@
             }
         });
     }
-
-// Função de navegação com verificação da próxima fase
-function goBack() {
-    const { level, unit } = getLevelAndUnitFromURL(); // Obtém o nível e unidade da URL
-    const currentPhase = getPhaseFromURL(); // Obtém a fase atual
-
-    // Verifica a próxima fase
-    let nextPhase;
-    if (currentPhase === "2") {
-        nextPhase = "3";
-    } else {
-        nextPhase = String(parseInt(currentPhase) + 1); // Incrementa a fase
-    }
-
-    // Consulta ao Firebase para verificar se a próxima fase está desbloqueada
-    ensureUserIsAuthenticated(async function(userId) {
-        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-        
-        try {
-            const snapshot = await dbRef.once('value');
-            const progress = snapshot.val();
-            const isNextPhaseUnlocked = progress && progress[`fase${nextPhase}`];
-
-            if (!isNextPhaseUnlocked) {
-                alert(`The next phase (${nextPhase}) is not unlocked yet. Please complete the current phase to proceed.`);
-            } else {
-                history.back(); // Volta para a página anterior se a próxima fase estiver desbloqueada
-            }
-        } catch (error) {
-            console.error("Erro ao verificar o progresso do usuário:", error);
-            alert("An error occurred while checking the progress.");
-        }
-    });
-}
 
     async function updateNextPhase(userId) {
         const currentPhase = getPhaseFromURL();
@@ -372,22 +323,24 @@ function goBack() {
     }
 
     function getPhaseFromURL() {
-        const params = new URLSearchParams(window.location.search);
-        return params.get('fase');
-    }
+    const params = new URLSearchParams(window.location.search);
+    return params.get('fase');  // Pega o parâmetro 'fase' da URL
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadTextFile();
+    loadLessonContent();
+});
 
     function getLevelAndUnitFromURL() {
     const params = new URLSearchParams(window.location.search);
     const level = params.get('level');
     const unit = params.get('unit');
-    
-    console.log("getLevelAndUnitFromURL - Level:", level, "Unit:", unit); // Log para verificar se os parâmetros estão corretos
-
     return { level, unit };
 }
 
     function generatePDF() {
-        fetch(`../../${getLevelAndUnitFromURL().level}/${getLevelAndUnitFromURL().unit}/DataGrammar/texto.txt`)
+        fetch('texto.txt')
             .then(response => response.text())
             .then(data => {
                 const { jsPDF } = window.jspdf;
@@ -432,7 +385,9 @@ function goBack() {
     const buttonContainer = document.querySelector('.button-container');
     const maxProfessors = 10;
 
-    // Gerar os botões dos professores
+    // Obtém o level e unit da URL
+    const { level, unit } = getLevelAndUnitFromURL();
+
     for (let i = 1; i <= maxProfessors; i++) {
         const imgPath = `professores/professor${i}.png`;
         const img = new Image();
@@ -441,18 +396,11 @@ function goBack() {
             const button = document.createElement('button');
             img.alt = `Professor ${i}`;
             button.appendChild(img);
-
-            // Caminho dinâmico para a aula
-            const { level, unit } = getLevelAndUnitFromURL();
-            const lessonPath = `../../${level}/${unit}/DataGrammar/aulas/aula${i}/index.html`;
-
-            // Log para verificar o caminho gerado
-            console.log(`Caminho gerado para a aula ${i}: ${lessonPath}`);
-
             button.onclick = function() {
-                window.location.href = lessonPath;
+                // Monta o caminho dinâmico para a aula do professor
+                const lessonPath = `../../${level}/${unit}/DataGrammar/aulas/aula${i}/index.html`;
+                window.location.href = lessonPath;  // Navega para o caminho correto
             };
-
             buttonContainer.appendChild(button);
         };
 
@@ -472,4 +420,3 @@ function goBack() {
 
 </body>
 </html>
-
