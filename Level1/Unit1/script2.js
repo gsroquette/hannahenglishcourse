@@ -15,13 +15,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentLevel = urlPathParts[1]; // Ex: "Level1"
     const currentUnit = urlPathParts[2]; // Ex: "Unit1"
 
-    const activities = [
-        { id: 1001, name: "StoryCards", path: `/Atividades/StoryCards/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1001`, img: "../../imagens/botoes/storycards_button.png", unlocked: false },
-        { id: 1002, name: "QUIZ", path: `/Atividades/QUIZ/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1002`, img: "../../imagens/botoes/quiz_button.png", unlocked: false },
-        { id: 1003, name: "Flashcards", path: `/Atividades/Flashcards/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1003`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-        { id: 1004, name: "Grammar", path: `/Atividades/Grammar/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1004`, img: "../../imagens/botoes/grammar_button.png", unlocked: false },
-        { id: 1005, name: "Fill in the Blanks", path: `/Atividades/Fill%20in%20the%20Blanks/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1005`, img: "../../imagens/botoes/fillintheblanks_button.png", unlocked: false },
-    ];
+     const Atividades = [
+    { id: 1006, name: "MemoryGame", path: `/Atividades/MemoryGame/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1006`, img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
+    { id: 1007, name: "Speak", path: `/Atividades/Speak/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1007`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
+    { id: 1008, name: "Flashcards2", path: `/Atividades/Flashcards2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1008`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+    { id: 1009, name: "MemoryGame2", path: `/Atividades/MemoryGame2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1009`, img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
+    { id: 1010, name: "Speak2", path: `/Atividades/Speak2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1010`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
+];
 
     // Fechar o dropdown ao clicar fora dele
     document.addEventListener("click", function(event) {
