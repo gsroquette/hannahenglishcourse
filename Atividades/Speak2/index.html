@@ -250,23 +250,81 @@ fetch(wordListUrl)
     .catch(error => console.error('Error fetching words:', error));
 
            
-        function loadWord(index) {
-            if (index < 0) {
-                currentWordIndex = 0;
-            } else if (index >= words.length) {
-                return;
-            } else {
-                currentWordIndex = index;
-                const currentWord = words[currentWordIndex];
-                const currentImage = `imagem${currentWordIndex + 1}.png`;
+      function loadWord(index) {
+    const urlParams = getLevelAndUnitFromURL();
+    if (!urlParams) {
+        alert("Erro: Não foi possível carregar o conteúdo. Verifique a URL.");
+        return;
+    }
 
-                document.getElementById("word").textContent = currentWord;
-                document.getElementById("image").src = imageFolderUrl + currentImage;
-                resetFeedback();
-                tryAgainInProgress = false;
-                enableStartButton();
-            }
-        }
+    const { level, unit } = urlParams;
+
+    if (index < 0) {
+        currentWordIndex = 0;
+    } else if (index >= words.length) {
+        return;
+    } else {
+        currentWordIndex = index;
+
+        const currentWord = words[currentWordIndex];
+        const currentImage = `../../${level}/${unit}/data2/imagens/imagem${currentWordIndex + 1}.png`;
+
+        document.getElementById("word").textContent = currentWord;
+
+        // Define o caminho dinâmico para a imagem
+        const imageElement = document.getElementById("image");
+        imageElement.src = currentImage;
+
+        // Tratamento de erros no carregamento da imagem
+        imageElement.onerror = () => {
+            console.error(`Erro ao carregar a imagem: ${currentImage}`);
+            imageElement.src = '../../../imagens/fallback.png'; // Caminho para uma imagem padrão
+        };
+
+        resetFeedback();
+        tryAgainInProgress = false;
+        enableStartButton();
+    }
+}
+
+function loadWords() {
+    const urlParams = getLevelAndUnitFromURL();
+    if (!urlParams) {
+        alert("Erro: Não foi possível carregar o conteúdo. Verifique a URL.");
+        return;
+    }
+
+    const { level, unit } = urlParams;
+    const wordListUrl = `../../${level}/${unit}/data2/Words.txt`;
+
+    fetch(wordListUrl)
+        .then(response => response.text())
+        .then(data => {
+            words = data.split('\n').map(word => word.trim()).filter(word => word);
+            words.forEach((word, index) => {
+                attemptsPerWord[index] = 0;
+            });
+
+            console.log("Palavras carregadas com sucesso:", words);
+            loadWord(currentWordIndex); // Carrega a primeira palavra
+        })
+        .catch(error => console.error('Erro ao carregar as palavras:', error));
+}
+
+// Carregamento de Palavras
+const wordListUrl = '../data2/words.txt'; // O caminho continua estático para o exemplo
+fetch(wordListUrl)
+    .then(response => response.text())
+    .then(data => {
+        words = data.split('\n').map(word => word.trim()).filter(word => word);
+        words.forEach((word, index) => {
+            attemptsPerWord[index] = 0;
+        });
+
+        console.log("Palavras carregadas com sucesso:", words);
+        loadWord(currentWordIndex); // Carrega a primeira palavra
+    })
+    .catch(error => console.error('Erro ao carregar as palavras:', error));
 
         const startButton = document.getElementById("startButton");
         const prevButton = document.getElementById("prevButton");
@@ -468,12 +526,16 @@ function enableNextWord() {
         }
 
         function getLevelAndUnitFromURL() {
-            const url = window.location.pathname;
-            const parts = url.split('/');
-            const level = parts[1];
-            const unit = parts[2];
-            return { level, unit };
-        }
+    const params = new URLSearchParams(window.location.search);
+    const level = params.get('level');
+    const unit = params.get('unit');
+    const fase = params.get('fase');
+    if (!level || !unit) {
+        console.error("Level ou Unit não encontrados na URL");
+        return null;
+    }
+    return { level, unit, fase };
+}
 
         function readWordWithHighlight(word, callback) {
             wordDiv.classList.add("enlarged");
