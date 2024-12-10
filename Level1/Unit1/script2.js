@@ -110,7 +110,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Função para inicializar o mapa
     function initializeMap(userAvatar) {
         window.scrollTo(0, 0);
-        activities.forEach((activity, index) => {
+       Atividades.forEach((activity, index) => {
             const phaseDiv = document.createElement('div');
             phaseDiv.classList.add('phase');
 
