@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentUnit = urlPathParts[2]; // Ex: "Unit1"
 
     const activities = [
-    { id: 1029, name: "TestQuizLeVeAB", path: `../${currentUnit}/TestQuizLeVeAB/index.html?level=${currentLevel}&unit=${currentUnit}&fase=last`, img: "../../imagens/test.png", unlocked: false },               
+        { id: 1029, name: "TestQuizLeVeAB", path: `/Atividades/TestQuizLeVeAB/index.html?level=${currentLevel}&unit=${currentUnit}&fase=last`, img: "../../imagens/test.png", unlocked: false },           
 ];
 
     // Fechar o dropdown ao clicar fora dele
