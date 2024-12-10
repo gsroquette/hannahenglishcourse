@@ -16,11 +16,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentUnit = urlPathParts[2]; // Ex: "Unit1"
 
     const activities = [
-        { id: 1, name: "StoryCards", path: `/Atividades/StoryCards/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1`, img: "../../imagens/botoes/storycards_button.png", unlocked: false },
-        { id: 2, name: "QUIZ", path: `/Atividades/QUIZ/index.html?level=${currentLevel}&unit=${currentUnit}&fase=2`, img: "../../imagens/botoes/quiz_button.png", unlocked: false },
-        { id: 3, name: "Flashcards", path: `/Atividades/Flashcards/index.html?level=${currentLevel}&unit=${currentUnit}&fase=3`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-        { id: 4, name: "Grammar", path: `/Atividades/Grammar/index.html?level=${currentLevel}&unit=${currentUnit}&fase=4`, img: "../../imagens/botoes/grammar_button.png", unlocked: false },
-        { id: 5, name: "Fill in the Blanks", path: `/Atividades/Fill%20in%20the%20Blanks/index.html?level=${currentLevel}&unit=${currentUnit}&fase=5`, img: "../../imagens/botoes/fillintheblanks_button.png", unlocked: false },
+        { id: 1001, name: "StoryCards", path: `/Atividades/StoryCards/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1001`, img: "../../imagens/botoes/storycards_button.png", unlocked: false },
+        { id: 1002, name: "QUIZ", path: `/Atividades/QUIZ/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1002`, img: "../../imagens/botoes/quiz_button.png", unlocked: false },
+        { id: 1003, name: "Flashcards", path: `/Atividades/Flashcards/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1003`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+        { id: 1004, name: "Grammar", path: `/Atividades/Grammar/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1004`, img: "../../imagens/botoes/grammar_button.png", unlocked: false },
+        { id: 1005, name: "Fill in the Blanks", path: `/Atividades/Fill%20in%20the%20Blanks/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1005`, img: "../../imagens/botoes/fillintheblanks_button.png", unlocked: false },
     ];
 
     // Fechar o dropdown ao clicar fora dele
