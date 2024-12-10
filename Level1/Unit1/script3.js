@@ -16,12 +16,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentUnit = urlPathParts[2]; // Ex: "Unit1"
 
     const activities = [
-    { id: 11, name: "Mixed Letters FIXO", path: `../${currentUnit}/Mixed Letters FIXO/index.html?level=${currentLevel}&unit=${currentUnit}&fase=11`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
-    { id: 12, name: "WordSearch", path: `../${currentUnit}/WordSearch/index.html?level=${currentLevel}&unit=${currentUnit}&fase=12`, img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
-    { id: 13, name: "Missing Word", path: `../${currentUnit}/Missing Word/index.html?level=${currentLevel}&unit=${currentUnit}&fase=13`, img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
-    { id: 14, name: "Flashcards3", path: `../${currentUnit}/Flashcards3/index.html?level=${currentLevel}&unit=${currentUnit}&fase=14`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-    { id: 15, name: "WordSearch2", path: `../${currentUnit}/WordSearch2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=15`, img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
-    { id: 16, name: "Speak3", path: `../${currentUnit}/Speak3/index.html?level=${currentLevel}&unit=${currentUnit}&fase=16`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
+    { id: 1011, name: "Mixed Letters FIXO", path: `../${currentUnit}/Mixed Letters FIXO/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1011`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
+    { id: 1012, name: "WordSearch", path: `../${currentUnit}/WordSearch/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1012`, img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
+    { id: 1013, name: "Missing Word", path: `../${currentUnit}/Missing Word/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1013`, img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
+    { id: 1014, name: "Flashcards3", path: `../${currentUnit}/Flashcards3/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1014`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+    { id: 1015, name: "WordSearch2", path: `../${currentUnit}/WordSearch2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1015`, img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
+    { id: 1016, name: "Speak3", path: `../${currentUnit}/Speak3/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1016`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
 ];
 
     // Fechar o dropdown ao clicar fora dele

@@ -16,12 +16,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentUnit = urlPathParts[2]; // Ex: "Unit1"
 
    const activities = [
-    { id: 23, name: "WordSearch3", path: `../${currentUnit}/WordSearch3/index.html?level=${currentLevel}&unit=${currentUnit}&fase=23`, img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
-    { id: 24, name: "Mixed Letters FIXO3", path: `../${currentUnit}/Mixed Letters FIXO3/index.html?level=${currentLevel}&unit=${currentUnit}&fase=24`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
-    { id: 25, name: "Missing Word3", path: `../${currentUnit}/Missing Word3/index.html?level=${currentLevel}&unit=${currentUnit}&fase=25`, img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
-    { id: 26, name: "Hannah Video", path: `../${currentUnit}/HannahVideo/index.html?level=${currentLevel}&unit=${currentUnit}&fase=26`, img: "../../imagens/botoes/video_button.png", unlocked: false },
-    { id: 27, name: "MatchingGame", path: `../${currentUnit}/MatchingGame/index.html?level=${currentLevel}&unit=${currentUnit}&fase=27`, img: "../../imagens/botoes/matching_game_button.png", unlocked: false },
-    { id: 28, name: "LifeLessons", path: `../${currentUnit}/LifeLessons/index.html?level=${currentLevel}&unit=${currentUnit}&fase=28`, img: "../../imagens/botoes/life_lessons_button.png", unlocked: false },
+    { id: 1023, name: "WordSearch3", path: `../${currentUnit}/WordSearch3/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1023`, img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
+    { id: 1024, name: "Mixed Letters FIXO3", path: `../${currentUnit}/Mixed Letters FIXO3/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1024`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
+    { id: 1025, name: "Missing Word3", path: `../${currentUnit}/Missing Word3/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1025`, img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
+    { id: 1026, name: "Hannah Video", path: `../${currentUnit}/HannahVideo/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1026`, img: "../../imagens/botoes/video_button.png", unlocked: false },
+    { id: 1027, name: "MatchingGame", path: `../${currentUnit}/MatchingGame/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1027`, img: "../../imagens/botoes/matching_game_button.png", unlocked: false },
+    { id: 1028, name: "LifeLessons", path: `../${currentUnit}/LifeLessons/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1028`, img: "../../imagens/botoes/life_lessons_button.png", unlocked: false },
 ];
 
     // Fechar o dropdown ao clicar fora dele
