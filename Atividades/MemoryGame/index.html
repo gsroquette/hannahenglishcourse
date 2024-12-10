@@ -475,9 +475,45 @@ function getParamsFromURL() {
             return { level: parts[1], unit: parts[2] };
         }
 
-        function goBack() {
-            window.history.back();
+       function goBack() {
+    const { level, unit, fase } = getParamsFromURL();
+
+    // Verifica o usuário autenticado
+    firebase.auth().onAuthStateChanged(function(user) {
+        if (!user) {
+            alert("You need to be logged in to proceed.");
+            return;
         }
+
+        const userId = user.uid;
+        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+        dbRef.get().then(snapshot => {
+            if (snapshot.exists()) {
+                const progress = snapshot.val();
+                const currentFase = parseInt(fase, 10);
+                const nextFaseKey = `fase${currentFase + 1}`;
+
+                // Verifica se a próxima fase está desbloqueada
+                if (progress[nextFaseKey]) {
+                    window.history.back(); // Volta para a página anterior
+                } else {
+                    const confirmNavigation = confirm(
+                        "The next phase is locked. Do you still want to go back?"
+                    );
+                    if (confirmNavigation) {
+                        window.history.back(); // Volta para a página anterior
+                    }
+                }
+            } else {
+                alert("Could not verify progress. Please try again later.");
+            }
+        }).catch(error => {
+            console.error("Error checking progress:", error);
+            alert("An error occurred while checking progress. Please try again.");
+        });
+    });
+}
 
         function showCompletionModal() {
             overlay.style.display = 'block';
