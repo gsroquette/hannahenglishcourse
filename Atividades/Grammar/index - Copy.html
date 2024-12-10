@@ -188,8 +188,18 @@
 
     let totalAnswers = 0;
     let clickedAnswers = 0;
-
+    let isTextFileLoaded = false; // Variável para rastrear se já foi carregado
+    
 function loadTextFile() {
+    if (isTextFileLoaded) {
+        console.log("Arquivo de texto já carregado. Ignorando duplicação.");
+        return; // Impede execução duplicada
+    }
+
+    console.log(`Iniciando cálculo de totalAnswers.`);
+    totalAnswers = 0; // Resetar o totalAnswers antes de carregar os botões
+    console.log(`Reset totalAnswers para: ${totalAnswers}`);
+
     const { level, unit } = getLevelAndUnitFromURL();
     const filePath = `../../${level}/${unit}/DataGrammar/texto.txt`;
 
@@ -216,11 +226,9 @@ function loadTextFile() {
                     currentSection = line.replace('# ', '');
                     htmlContent += `<div class="section"><h2>${currentSection}</h2>`;
                 } else if (line.includes('[Answer:')) {
-                    // Separar pergunta e resposta
                     const [question, answer] = line.split('[Answer:');
                     const cleanedAnswer = answer.replace(']', '').trim();
 
-                    // Substituir ___ pelo campo de entrada diretamente
                     const questionWithInput = question.replace('___', '<input type="text" class="answer-input" placeholder="Type here..." />');
 
                     htmlContent += `
@@ -229,12 +237,16 @@ function loadTextFile() {
                             <button class="show-answer-btn" data-answer="${cleanedAnswer}" onclick="checkAnswer(this)">Answer</button>
                             <span class="answer" style="display: none;">${cleanedAnswer}</span>
                         </p>`;
+                    totalAnswers++;
+                    console.log(`Incrementando totalAnswers: ${totalAnswers}`);
                 } else {
                     htmlContent += `<p>${line}</p>`;
                 }
             });
 
             contentDiv.innerHTML = htmlContent;
+            console.log(`Total de botões "Answer" carregados: ${totalAnswers}`);
+            isTextFileLoaded = true; // Marca como carregado
         })
         .catch(error => console.error('Erro ao carregar o arquivo:', error));
 }
@@ -258,13 +270,25 @@ function checkAnswer(button) {
     // Comparação da resposta
     if (userInput.value.trim().toLowerCase() === correctAnswer.toLowerCase()) {
         userInput.style.backgroundColor = 'lightgreen'; // Resposta correta
+        console.log("Resposta correta!");
     } else {
         userInput.style.backgroundColor = 'lightcoral'; // Resposta incorreta
+        console.log("Resposta incorreta!");
     }
 
     // Exibir resposta correta
     answerSpan.style.display = 'inline'; // Tornar visível
     button.disabled = true; // Desabilitar botão após o clique
+
+    // Incrementar o contador de botões clicados
+    clickedAnswers++;
+    console.log(`Botões clicados: ${clickedAnswers} de ${totalAnswers}`);
+
+    // Verificar se todos os botões foram clicados
+    if (clickedAnswers === totalAnswers) {
+        console.log("Todos os botões foram clicados. Marcando atividade como concluída...");
+        markActivityAsCompleted(); // Marcar a atividade como concluída
+    }
 }
 
 function loadLessonContent() {
@@ -288,10 +312,10 @@ function loadLessonContent() {
         });
 }
 
-    function markActivityAsCompleted() {
-        console.log("Atividade concluída!");
-        ensureUserIsAuthenticated(updateNextPhase);
-    }
+   function markActivityAsCompleted() {
+    console.log("Atividade concluída! Chamada da função markActivityAsCompleted.");
+    ensureUserIsAuthenticated(updateNextPhase);
+}
 
     function ensureUserIsAuthenticated(callback) {
         firebase.auth().onAuthStateChanged(function(user) {
@@ -329,7 +353,7 @@ function loadLessonContent() {
     return params.get('fase');  // Pega o parâmetro 'fase' da URL
 }
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     loadTextFile();
     loadLessonContent();
 });
@@ -414,8 +438,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 }
 
-    document.addEventListener('DOMContentLoaded', function() {
-        loadTextFile();
+    document.addEventListener('DOMContentLoaded', function() {        
         loadProfessorButtons();
     });
 </script>
