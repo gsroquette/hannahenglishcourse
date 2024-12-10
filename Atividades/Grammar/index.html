@@ -428,6 +428,7 @@ function loadLessonContent() {
 document.addEventListener('DOMContentLoaded', function () {
     loadTextFile();
     loadLessonContent();
+    setupBackButton(); // Configura a lógica do botão Back
 });
 
     function getLevelAndUnitFromURL() {
@@ -478,6 +479,56 @@ document.addEventListener('DOMContentLoaded', function () {
             })
             .catch(error => console.error('Error generating the PDF:', error));
     }
+
+function setupBackButton() {
+    const backButton = document.querySelector('.back-button');
+
+    backButton.addEventListener('click', async (event) => {
+        event.preventDefault(); // Impede a navegação imediata
+        const { level, unit } = getLevelAndUnitFromURL();
+        const currentPhase = parseInt(getPhaseFromURL()); // Converte a fase atual para número
+        const nextPhase = `fase${currentPhase + 1}`; // Calcula a próxima fase
+
+        try {
+            const user = await getAuthenticatedUser();
+            if (user) {
+                const userId = user.uid;
+                const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/${nextPhase}`);
+                const snapshot = await dbRef.once('value');
+
+                if (snapshot.exists() && snapshot.val() === true) {
+                    // Próxima fase existe e está desbloqueada, permite voltar
+                    history.back();
+                } else {
+                    // Exibe mensagem se a próxima fase não existir ou não estiver desbloqueada
+                    const confirmLeave = confirm(
+                        "The current phase has not been completed. Are you sure you want to leave?"
+                    );
+                    if (confirmLeave) {
+                        history.back();
+                    }
+                }
+            } else {
+                console.error("User is not authenticated.");
+            }
+        } catch (error) {
+            console.error("Error checking phase progression:", error);
+        }
+    });
+}
+
+// Função para obter o usuário autenticado
+function getAuthenticatedUser() {
+    return new Promise((resolve, reject) => {
+        firebase.auth().onAuthStateChanged((user) => {
+            if (user) {
+                resolve(user);
+            } else {
+                reject(new Error("User not authenticated"));
+            }
+        });
+    });
+}
 
    function loadProfessorButtons() {
     const buttonContainer = document.querySelector('.button-container');

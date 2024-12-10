@@ -23,6 +23,22 @@
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             position: relative;
         }
+.check-btn {
+    padding: 8px 15px;
+    background-color: white;
+    color: black;
+    border: 1px solid #ccc;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.check-btn:hover {
+    background-color: #f0f0f0;
+    box-shadow: 3px 3px 7px rgba(0, 0, 0, 0.2);
+}
         .back-button {
             position: absolute;
             top: 20px;
@@ -142,9 +158,34 @@
     background-color: #f0f0f0;
     box-shadow: 3px 3px 7px rgba(0, 0, 0, 0.2);
 }
+
+.see-answer-btn {
+    padding: 8px 15px;
+    background-color: #f0ad4e;
+    color: white;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    margin-left: 10px;
+}
+
+.see-answer-btn:hover {
+    background-color: #ec971f;
+    box-shadow: 3px 3px 7px rgba(0, 0, 0, 0.2);
+}
     </style>
 </head>
 <body>
+
+<div id="completionModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); z-index:9999;">
+    <div style="background:white; padding:20px; border-radius:8px; max-width:400px; margin:100px auto; text-align:center;">
+        <h2>Congratulations!</h2>
+        <p>You have successfully completed the activity!</p>
+        <button onclick="closeModal()">OK</button>
+    </div>
+</div>
 
 <div class="container">
     <a href="javascript:history.back()" class="back-button">Back</a>
@@ -229,12 +270,13 @@ function loadTextFile() {
                     const [question, answer] = line.split('[Answer:');
                     const cleanedAnswer = answer.replace(']', '').trim();
 
+                    // Substituir ___ pelo campo de entrada diretamente
                     const questionWithInput = question.replace('___', '<input type="text" class="answer-input" placeholder="Type here..." />');
 
                     htmlContent += `
                         <p>
                             ${questionWithInput} 
-                            <button class="show-answer-btn" data-answer="${cleanedAnswer}" onclick="checkAnswer(this)">Answer</button>
+                            <button class="check-btn" data-answer="${cleanedAnswer}" onclick="checkAnswer(this)">Check</button>
                             <span class="answer" style="display: none;">${cleanedAnswer}</span>
                         </p>`;
                     totalAnswers++;
@@ -245,7 +287,7 @@ function loadTextFile() {
             });
 
             contentDiv.innerHTML = htmlContent;
-            console.log(`Total de botões "Answer" carregados: ${totalAnswers}`);
+            console.log(`Total de botões "Check" carregados: ${totalAnswers}`);
             isTextFileLoaded = true; // Marca como carregado
         })
         .catch(error => console.error('Erro ao carregar o arquivo:', error));
@@ -271,24 +313,54 @@ function checkAnswer(button) {
     if (userInput.value.trim().toLowerCase() === correctAnswer.toLowerCase()) {
         userInput.style.backgroundColor = 'lightgreen'; // Resposta correta
         console.log("Resposta correta!");
+
+        if (!button.disabled) {
+            clickedAnswers++; // Incrementar contador de respostas corretas apenas uma vez
+            button.disabled = true; // Desabilitar botão se a resposta estiver correta
+        }
+
+        // Remover o botão "See Answer" se já existir
+        const seeAnswerButton = button.parentNode.querySelector('.see-answer-btn');
+        if (seeAnswerButton) {
+            seeAnswerButton.remove();
+        }
     } else {
         userInput.style.backgroundColor = 'lightcoral'; // Resposta incorreta
-        console.log("Resposta incorreta!");
+        console.log("Resposta incorreta! Por favor, tente novamente.");
+
+        // Criar o botão "See Answer" se ainda não existir
+        let seeAnswerButton = button.parentNode.querySelector('.see-answer-btn');
+        if (!seeAnswerButton) {
+            seeAnswerButton = document.createElement('button');
+            seeAnswerButton.textContent = 'See Answer';
+            seeAnswerButton.className = 'see-answer-btn';
+            seeAnswerButton.onclick = () => showCorrectAnswer(answerSpan);
+            button.parentNode.appendChild(seeAnswerButton);
+        }
     }
 
-    // Exibir resposta correta
-    answerSpan.style.display = 'inline'; // Tornar visível
-    button.disabled = true; // Desabilitar botão após o clique
-
-    // Incrementar o contador de botões clicados
-    clickedAnswers++;
-    console.log(`Botões clicados: ${clickedAnswers} de ${totalAnswers}`);
-
-    // Verificar se todos os botões foram clicados
+    // Checar se todas as respostas estão corretas
+    console.log(`Botões clicados (respostas corretas): ${clickedAnswers} de ${totalAnswers}`);
     if (clickedAnswers === totalAnswers) {
-        console.log("Todos os botões foram clicados. Marcando atividade como concluída...");
+        console.log("Todas as respostas estão corretas. Marcando atividade como concluída...");
         markActivityAsCompleted(); // Marcar a atividade como concluída
+        showCompletionMessage(); // Exibir mensagem de conclusão
     }
+}
+
+function showCorrectAnswer(answerSpan) {
+    answerSpan.style.display = 'inline'; // Tornar visível
+    console.log("Resposta correta exibida:", answerSpan.textContent);
+}
+
+function showCompletionMessage() {
+    const modal = document.getElementById('completionModal');
+    modal.style.display = 'block';
+}
+
+function closeModal() {
+    const modal = document.getElementById('completionModal');
+    modal.style.display = 'none';
 }
 
 function loadLessonContent() {
