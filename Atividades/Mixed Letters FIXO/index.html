@@ -320,6 +320,7 @@ async function generatePDF() {
 
     let activities = [];
     let completedWords = 0;
+    let alertDisplayed = false; // Controle para exibir o alerta apenas uma vez
 
     // Função para embaralhar a palavra
     function shuffleWord(word) {
@@ -327,13 +328,45 @@ async function generatePDF() {
         return shuffled !== word ? shuffled : shuffleWord(word);
     }
 
-    // Função para ler o texto
-    function speakText(text) {
-        const synth = window.speechSynthesis;
-        const utterThis = new SpeechSynthesisUtterance(text);
-        utterThis.lang = 'en-US';
-        synth.speak(utterThis);
+    function readText(text) {
+    const synth = window.speechSynthesis;
+
+    // Cancela qualquer síntese de voz anterior
+    synth.cancel();
+
+    // Busca por vozes disponíveis
+    const voices = synth.getVoices();
+    let selectedVoice = voices.find(voice => voice.lang === "en-US");
+
+    if (!selectedVoice) {
+        if (voices.length === 0) {
+            // Se nenhuma voz estiver disponível, aguarda carregamento
+            synth.onvoiceschanged = () => {
+                const updatedVoices = synth.getVoices();
+                selectedVoice = updatedVoices.find(voice => voice.lang === "en-US");
+
+                if (!selectedVoice && !alertDisplayed) {
+                    alert("No 'en-US' voice found. Using default voice instead.");
+                    alertDisplayed = true;
+                }
+
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.voice = selectedVoice || updatedVoices[0]; // Usa a primeira voz disponível como fallback
+                synth.speak(utterance);
+            };
+            return;
+        } else if (!alertDisplayed) {
+            // Se já houver vozes, mas nenhuma for "en-US", exibe alerta
+            alert("No 'en-US' voice found. Using default voice instead.");
+            alertDisplayed = true;
+        }
     }
+
+    // Cria e fala o texto usando a voz selecionada
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.voice = selectedVoice || voices[0]; // Usa a primeira voz disponível como fallback
+    synth.speak(utterance);
+}
 
     // Função para capturar fase, level e unit do URL
     function getPhaseFromURL() {
@@ -469,24 +502,28 @@ async function generatePDF() {
             .join('');
 
         const letterInputs = inputContainer.querySelectorAll('.letter-input');
-        if (userAnswer === word.toUpperCase()) {
-            letterInputs.forEach(input => {
-                input.classList.add('correct');
-                input.classList.remove('incorrect');
-            });
+      if (userAnswer === word.toUpperCase()) {
+    letterInputs.forEach(input => {
+        input.classList.add('correct');
+        input.classList.remove('incorrect');
+    });
 
-            if (activityDiv.dataset.completed === "false") {
-                completedWords++;
-                activityDiv.dataset.completed = "true"; // Marca como concluída
-                console.log(`User Answer: ${userAnswer}, Correct Answer: ${word}`);
-                console.log(`Completed Words: ${completedWords}/${activities.length}`);
-            }
+    // Lê a palavra correta usando o sintetizador de voz
+    readText(word);
 
-            if (completedWords === activities.length) {
-                console.log("All activities completed!");
-                showCompletionModal(); // Exibe o modal de conclusão
-                ensureUserIsAuthenticated(updateNextPhase); // Atualiza a próxima fase no Firebase
-            }
+    if (activityDiv.dataset.completed === "false") {
+        completedWords++;
+        activityDiv.dataset.completed = "true"; // Marca como concluída
+        console.log(`User Answer: ${userAnswer}, Correct Answer: ${word}`);
+        console.log(`Completed Words: ${completedWords}/${activities.length}`);
+    }
+
+    if (completedWords === activities.length) {
+        console.log("All activities completed!");
+        showCompletionModal(); // Exibe o modal de conclusão
+        ensureUserIsAuthenticated(updateNextPhase); // Atualiza a próxima fase no Firebase
+    }
+}
         } else {
             letterInputs.forEach(input => {
                 input.classList.add('incorrect');
