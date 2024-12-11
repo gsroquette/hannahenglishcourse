@@ -240,8 +240,12 @@ function getParamsFromURL() {
 // Obtém os parâmetros da URL
 const params = getParamsFromURL();
 if (!params) {
-    throw new Error('URL parameters missing');
+    throw new Error('URL parameters missing or invalid. Stopping execution.');
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    setupBackButton();
+});
 
        // Caminhos dinâmicos baseados nos parâmetros da URL
 const wordListUrl = `../../${params.level}/${params.unit}/data1/words.txt`;
@@ -321,10 +325,6 @@ prevButton.addEventListener('click', () => {
 nextButton.addEventListener('click', () => {
     disableStartButton();
     loadWord(currentWordIndex + 1);
-});
-
-backButton.addEventListener('click', () => {
-    window.history.back();
 });
 
 restartButton.addEventListener('click', () => {
@@ -536,6 +536,58 @@ function disableStartButton() {
 
 function enableStartButton() {
     startButton.disabled = false;
+}
+
+function setupBackButton() {
+    const backButton = document.getElementById("backButton"); // Seleciona o botão pelo id
+
+    backButton.addEventListener('click', async (event) => {
+        event.preventDefault(); // Impede a navegação imediata
+        const params = getParamsFromURL();
+        if (!params) return; // Interrompe se os parâmetros estiverem ausentes
+
+        const { level, unit, fase } = params;
+        const nextPhase = `fase${parseInt(fase) + 1}`; // Calcula a próxima fase
+
+        try {
+            const user = await getAuthenticatedUser();
+            if (user) {
+                const userId = user.uid;
+                const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/${nextPhase}`);
+                const snapshot = await dbRef.once('value');
+
+                if (snapshot.exists() && snapshot.val() === true) {
+                    // Próxima fase existe e está desbloqueada, permite voltar
+                    history.back();
+                } else {
+                    // Exibe mensagem se a próxima fase não existir ou não estiver desbloqueada
+                    const confirmLeave = confirm(
+                        "The current phase has not been completed. Are you sure you want to leave?"
+                    );
+                    if (confirmLeave) {
+                        history.back();
+                    }
+                }
+            } else {
+                console.error("User is not authenticated.");
+            }
+        } catch (error) {
+            console.error("Error checking phase progression:", error);
+        }
+    });
+}
+
+// Função para obter o usuário autenticado
+async function getAuthenticatedUser() {
+    return new Promise((resolve, reject) => {
+        firebase.auth().onAuthStateChanged((user) => {
+            if (user) {
+                resolve(user);
+            } else {
+                reject("No authenticated user found.");
+            }
+        });
+    });
 }
     </script>
 </body>
