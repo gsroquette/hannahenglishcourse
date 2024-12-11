@@ -33,9 +33,10 @@
             border-radius: 10px;
             box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
         }
-     .icon {
-    display: block; /* Garante que o botão esteja separado da imagem */
-    margin: 20px auto; /* Centraliza o botão horizontalmente */
+   .icon {
+    position: absolute;
+    top: 10px;
+    right: 10px;
     width: 40px;
     height: 40px;
     cursor: pointer;
@@ -179,15 +180,16 @@
 <body>
     <button id="backButton" class="button">Back</button>
     <h1>Word Reading Practice</h1>
-    <div class="container">
-        <img id="image" class="image" src="" alt="Image">       
-    </div>
+   <div class="container">
+    <img id="image" class="image" src="" alt="Image">       
     <img id="icon" class="icon" src="businessman.png" alt="Icon">
+</div>
     <div class="word" id="word"></div>
+    <img id="correctGif" src="certo.gif" alt="Correct animation" style="display: none; width: 150px; height: auto; margin: 10px auto;">
     <button id="startButton">
         <img src="microfone.png" alt="Start Speaking">
     </button>
-    <div class="result" id="result"></div>
+    <div class="result" id="result"></div>   
     <div class="navigation">
         <button id="prevButton" class="button nav-button">Previous</button>
         <button id="nextButton" class="button nav-button">Next</button>
@@ -223,187 +225,201 @@
 
         firebase.initializeApp(firebaseConfig);
 
-  // Obtém parâmetros da URL
-    function getParamsFromURL() {
-        const params = new URLSearchParams(window.location.search);
-        return {
-            level: params.get('level'),
-            unit: params.get('unit'),
-            fase: params.get('fase'),
-        };
+// Extrai parâmetros da URL
+function getParamsFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    const level = params.get('level');
+    const unit = params.get('unit');
+    const fase = params.get('fase');
+    if (!level || !unit || !fase) {
+        console.error('Missing level, unit, or fase in URL.');
+        alert('URL parameters are missing. Please provide level, unit, and fase.');
+        return null;
     }
+    return { level, unit, fase };
+}
 
-    const { level, unit } = getParamsFromURL();
+// Obtém os parâmetros da URL
+const params = getParamsFromURL();
+if (!params) {
+    throw new Error('URL parameters missing or invalid. Stopping execution.');
+}
 
-    if (!level || !unit) {
-        console.error("Parâmetros 'level' e 'unit' são obrigatórios na URL.");
-        alert("Por favor, forneça os parâmetros 'level' e 'unit' na URL.");
-    } else {
-        const wordListUrl = `../../${level}/${unit}/data1/words.txt`;
-        const imageFolderUrl = `../../${level}/${unit}/data1/imagens/`;
-        let words = [];
-        let currentWordIndex = 0;
-        let attemptsPerWord = {}; // Registro de tentativas por palavra
+document.addEventListener('DOMContentLoaded', () => {
+    setupBackButton();
+});
 
-        // Carregamento dinâmico de palavras
-        fetch(wordListUrl)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Erro ao carregar palavras de ${wordListUrl}`);
-                }
-                return response.text();
-            })
-            .then(data => {
-                words = data.split('\n').map(word => word.trim()).filter(word => word);
+       // Caminhos dinâmicos baseados nos parâmetros da URL
+const wordListUrl = `../../${params.level}/${params.unit}/data1/words.txt`;
+const imageFolderUrl = `../../${params.level}/${params.unit}/data1/imagens/`;
 
-                // Inicializa o registro de tentativas
-                words.forEach((_, index) => {
-                    attemptsPerWord[index] = 0;
-                });
+let words = [];
+let currentWordIndex = 0;
+let wordsTried = 0; 
+let recognitionTimeout;
+let tryAgainInProgress = false;        
+let attemptsPerWord = {}; // Registro de tentativas por palavra
+let alertDisplayed = false; // Para evitar múltiplos alertas
+let synth = window.speechSynthesis; // Inicializa o sintetizador de fala
 
-                console.log("Palavras carregadas:", words);
-
-                // Carrega a primeira palavra
-                loadWord(currentWordIndex);
-            })
-            .catch(error => {
-                console.error("Erro ao carregar dados:", error);
-                alert("Erro ao carregar os dados. Verifique o console para mais detalhes.");
-            });
-
-        // Função para carregar uma palavra e sua imagem correspondente
-        function loadWord(index) {
-            if (index < 0) {
-                currentWordIndex = 0;
-            } else if (index >= words.length) {
-                return;
-            } else {
-                currentWordIndex = index;
-                const currentWord = words[currentWordIndex];
-                const currentImage = `imagem${currentWordIndex + 1}.png`;
-
-                document.getElementById("word").textContent = currentWord;
-                document.getElementById("image").src = `${imageFolderUrl}${currentImage}`;
-                resetFeedback();
-                enableStartButton();
-            }
+// Inicializa as palavras após carregá-las do arquivo
+fetch(wordListUrl)
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Failed to fetch word list from ${wordListUrl}`);
         }
-    }
+        return response.text();
+    })
+    .then(data => {
+        words = data.split('\n').map(word => word.trim()).filter(word => word);
+        words.forEach((word, index) => {
+            attemptsPerWord[index] = 0; // Inicializa tentativas
+        });
+        console.log("Palavras carregadas:", words);
+        loadWord(currentWordIndex); // Carrega a primeira palavra
+    })
+    .catch(error => console.error('Error fetching words:', error));
+           
+       // Função para carregar a palavra e imagem
+function loadWord(index) {
+    if (index < 0) index = 0;
+    if (index >= words.length) return;
 
-        const startButton = document.getElementById("startButton");
-        const prevButton = document.getElementById("prevButton");
-        const nextButton = document.getElementById("nextButton");
-        const backButton = document.getElementById("backButton");
-        const resultDiv = document.getElementById("result");
-        const wordDiv = document.getElementById("word");
-        const imageElement = document.getElementById("image");
-        const iconElement = document.getElementById("icon");
-        const finalFeedbackDiv = document.getElementById("finalFeedback");
-        const restartButton = document.getElementById("restartButton");
+    currentWordIndex = index;
+    const currentWord = words[currentWordIndex];
+    const currentImage = `imagem${currentWordIndex + 1}.png`;
 
-        const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-        recognition.lang = 'en-US';
-        recognition.interimResults = false;
-        recognition.maxAlternatives = 1;
+    document.getElementById("word").textContent = currentWord;
+    document.getElementById("image").src = `${imageFolderUrl}${currentImage}`;
+    document.getElementById("image").onerror = () => {
+        console.error(`Image not found: ${imageFolderUrl}${currentImage}`);
+        document.getElementById("image").src = ''; // Limpa a imagem
+    };
 
-        startButton.addEventListener('click', () => {
+    resetFeedback();
+    enableStartButton();
+}
+
+const startButton = document.getElementById("startButton");
+const prevButton = document.getElementById("prevButton");
+const nextButton = document.getElementById("nextButton");
+const backButton = document.getElementById("backButton");
+const resultDiv = document.getElementById("result");
+const wordDiv = document.getElementById("word");
+const imageElement = document.getElementById("image");
+const iconElement = document.getElementById("icon");
+const finalFeedbackDiv = document.getElementById("finalFeedback");
+const restartButton = document.getElementById("restartButton");
+
+// Adiciona evento ao botão "businessman"
+iconElement.addEventListener('click', () => {
+    const word = words[currentWordIndex]; // Obtém a palavra atual
+    readTextInUS(word); // Lê a palavra em inglês americano
+});
+
+const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+recognition.lang = 'en-US';
+recognition.interimResults = false;
+recognition.maxAlternatives = 1;
+
+startButton.addEventListener('click', () => {
     disableStartButton();
     startRecognition();
 });
 
-        prevButton.addEventListener('click', () => {
-            disableStartButton();
-            loadWord(currentWordIndex - 1);
-        });
+prevButton.addEventListener('click', () => {
+    disableStartButton();
+    loadWord(currentWordIndex - 1);
+});
 
-        nextButton.addEventListener('click', () => {
-            disableStartButton();
-            loadWord(currentWordIndex + 1);
-        });
+nextButton.addEventListener('click', () => {
+    disableStartButton();
+    loadWord(currentWordIndex + 1);
+});
 
-        backButton.addEventListener('click', () => {
-            window.history.back();
-        });
+restartButton.addEventListener('click', () => {
+    restartGame();
+});
 
-        restartButton.addEventListener('click', () => {
-            restartGame();
-        });
-
-       recognition.onresult = (event) => {
+recognition.onresult = (event) => {
     clearTimeout(recognitionTimeout);
     const speechResult = event.results[0][0].transcript.toLowerCase();
     const expectedWord = words[currentWordIndex].toLowerCase();
 
-    // Incrementa o número de tentativas para a palavra atual
     attemptsPerWord[currentWordIndex]++;
-    console.log(`Tentativa registrada. Palavra esperada: ${expectedWord}, Resultado reconhecido: ${speechResult}`); // Log aqui
+    console.log(`Tentativa registrada. Palavra esperada: ${expectedWord}, Resultado reconhecido: ${speechResult}`);
 
     if (speechResult.includes(expectedWord)) {
-        handleCorrectAnswer(); // Marca como correta
-        attemptsPerWord[currentWordIndex] = 3; // Considera a palavra concluída
-        console.log("Resposta correta. Palavra marcada como concluída."); // Log aqui
+        handleCorrectAnswer();
+        attemptsPerWord[currentWordIndex] = 3;
+        console.log("Resposta correta. Palavra marcada como concluída.");
     } else {
         if (attemptsPerWord[currentWordIndex] < 3) {
-            handleIncorrectAttempt(); // Permite mais tentativas
-            console.log("Resposta incorreta. Tentativas restantes:", 3 - attemptsPerWord[currentWordIndex]); // Log aqui
+            handleIncorrectAttempt();
+            console.log("Resposta incorreta. Tentativas restantes:", 3 - attemptsPerWord[currentWordIndex]);
         } else {
-            enableNextWord(); // Avança automaticamente após 3 tentativas
-            console.log("Máximo de tentativas atingido. Avançando para a próxima palavra."); // Log aqui
+            enableNextWord();
+            console.log("Máximo de tentativas atingido. Avançando para a próxima palavra.");
         }
     }
 
-    checkCompletion(); // Verifica se todas as palavras foram concluídas
+    checkCompletion();
 };
 
-        recognition.onerror = (event) => {
-            resultDiv.textContent = "Error occurred in recognition: " + event.error;
-            resultDiv.style.color = "red";
-            clearTimeout(recognitionTimeout);
-            enableStartButton();
-        };
+recognition.onerror = (event) => {
+    resultDiv.textContent = "Error occurred in recognition: " + event.error;
+    resultDiv.style.color = "red";
+    clearTimeout(recognitionTimeout);
+    enableStartButton();
+};
 
-        recognition.onend = () => {
-            if (!resultDiv.textContent.includes("Correct!") && !tryAgainInProgress) {
-                handleIncorrectAttempt();
-            }
-        };
+recognition.onend = () => {
+    if (!resultDiv.textContent.includes("Correct!") && !tryAgainInProgress) {
+        handleIncorrectAttempt();
+    }
+};
 
-        function startRecognition() {
-            recognition.start();
-            recognitionTimeout = setTimeout(() => {
-                recognition.stop();
-            }, 5000);
+      function startRecognition() {
+    recognition.start();
+    recognitionTimeout = setTimeout(() => {
+        recognition.stop();
+    }, 5000);
+}
+
+      function handleCorrectAnswer() {
+    const resultDiv = document.getElementById("result");
+    const correctGif = document.getElementById("correctGif");
+
+    // Atualiza o texto de resultado
+    resultDiv.textContent = "Correct!";
+    resultDiv.style.color = "green";
+
+    // Exibe o GIF
+    correctGif.style.display = "block";
+
+    // Toca o áudio
+    const audio = new Audio("certo.mp3");
+    audio.play();
+
+    // Oculta o GIF e avança para a próxima palavra após 3 segundos
+    setTimeout(() => {
+        correctGif.style.display = "none";
+        if (currentWordIndex + 1 < words.length) {
+            loadWord(currentWordIndex + 1);
+        } else {
+            showFinalFeedback();
         }
+    }, 3000);
+}
 
-        function handleCorrectAnswer() {
-            resultDiv.textContent = "Correct!";
-            resultDiv.style.color = "green";
-            setTimeout(() => {
-                if (currentWordIndex + 1 < words.length) {
-                    loadWord(currentWordIndex + 1);
-                } else {
-                    showFinalFeedback();
-                }
-            }, 3000);
-        }
-
-        function handleIncorrectAttempt() {
-            tryAgainInProgress = true;
-            resultDiv.textContent = "Try again.";
-            resultDiv.style.color = "red";
-            readWordWithHighlight(words[currentWordIndex], () => {
-                enableStartButton();
-                tryAgainInProgress = false;
-            });
-        }
-
-function getParamsFromURL() {
-    const params = new URLSearchParams(window.location.search);
-    return {
-        level: params.get('level'),
-        unit: params.get('unit'),
-        fase: params.get('fase'),
-    };
+function handleIncorrectAttempt() {
+    tryAgainInProgress = true;
+    resultDiv.textContent = "Try again.";
+    resultDiv.style.color = "red";
+    readWordWithHighlight(words[currentWordIndex], () => {
+        enableStartButton();
+        tryAgainInProgress = false;
+    });
 }
 
 function enableNextWord() {
@@ -411,65 +427,61 @@ function enableNextWord() {
     resultDiv.style.color = "orange";
     setTimeout(() => {
         if (currentWordIndex + 1 < words.length) {
-            loadWord(currentWordIndex + 1); // Carrega a próxima palavra
+            loadWord(currentWordIndex + 1);
         } else {
-            checkCompletion(); // Verifica se todas as palavras foram concluídas
+            checkCompletion();
         }
-    }, 2000); // Dá uma pausa antes de avançar
+    }, 2000);
 }
 
-        function resetFeedback() {
-            resultDiv.textContent = "";
-        }
+function resetFeedback() {
+    resultDiv.textContent = "";
+}
 
-   function checkCompletion() {
+function checkCompletion() {
     console.log("Verificando conclusão. Tentativas atuais:", attemptsPerWord);
 
     const allWordsCompleted = Object.values(attemptsPerWord).every(
-        (attempts) => attempts >= 3 // Palavra foi acertada ou tentada 3 vezes
+        (attempts) => attempts >= 3
     );
 
     if (allWordsCompleted) {
         console.log("Todas as palavras foram completadas ou tentadas 3 vezes.");
-
-        // Exibe o modal de conclusão
         markActivityAsCompleted();
-
-        // Aguarda a autenticação do usuário e atualiza o progresso
         ensureUserIsAuthenticated((userId) => {
             console.log("Usuário autenticado. Atualizando progresso no banco de dados.");
-            updateNextPhase(userId); // Atualiza o progresso no banco de dados
+            updateNextPhase(userId);
         });
     } else {
         console.log("Ainda há palavras incompletas.");
     }
 }
 
-     function markActivityAsCompleted() {
+function markActivityAsCompleted() {
     console.log("Exibindo modal de conclusão.");
     document.getElementById('overlay').style.display = 'block';
     document.getElementById('completion-modal').style.display = 'block';
 }
 
-        function closeModal() {
-            document.getElementById('overlay').style.display = 'none';
-            document.getElementById('completion-modal').style.display = 'none';
-        }
+function closeModal() {
+    document.getElementById('overlay').style.display = 'none';
+    document.getElementById('completion-modal').style.display = 'none';
+}
 
-      function ensureUserIsAuthenticated(callback) {
+function ensureUserIsAuthenticated(callback) {
     firebase.auth().onAuthStateChanged(function(user) {
         if (user) {
-            console.log("Usuário autenticado:", user.uid); // Log aqui
+            console.log("Usuário autenticado:", user.uid);
             callback(user.uid);
         } else {
-            console.error("Usuário não autenticado."); // Log aqui
+            console.error("Usuário não autenticado.");
         }
     });
 }
 
-    function updateNextPhase(userId) {
+function updateNextPhase(userId) {
     const currentPhase = getPhaseFromURL();
-    const { level, unit } = getParamsFromURL();
+    const { level, unit } = params;
     const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
 
     console.log("Atualizando próximo progresso no banco de dados:", { userId, currentPhase, level, unit });
@@ -493,75 +505,143 @@ function enableNextWord() {
     }
 }
 
-        function getPhaseFromURL() {
-            const params = new URLSearchParams(window.location.search);
-            return params.get('fase');
-        }
-
-        function getLevelAndUnitFromURL() {
-            const url = window.location.pathname;
-            const parts = url.split('/');
-            const level = parts[1];
-            const unit = parts[2];
-            return { level, unit };
-        }
-
-        function readWordWithHighlight(word, callback) {
-            wordDiv.classList.add("enlarged");
-            const utterance = new SpeechSynthesisUtterance(word);
-            utterance.lang = 'en-US';
-            utterance.rate = 0.7;
-            utterance.onend = () => {
-                wordDiv.classList.remove("enlarged");
-                if (callback) callback();
-            };
-            speechSynthesis.speak(utterance);
-        }
-
-        imageElement.addEventListener('click', () => {
-            readWordWithHighlight(words[currentWordIndex]);
-        });
-
-      let voiceSpeed = 1; // Velocidade inicial do sintetizador de voz
-
-iconElement.addEventListener('click', () => {
-    // Chama a função de leitura com a velocidade atual
-    readWordWithSpeed(words[currentWordIndex], voiceSpeed);
-
-    // Alterna entre as velocidades 1 e 0.5
-    voiceSpeed = (voiceSpeed === 1) ? 0.5 : 1;
-});
-
-// Função para ler a palavra com velocidade ajustável
-function readWordWithSpeed(word, speed) {
-    const utterance = new SpeechSynthesisUtterance(word);
-    utterance.lang = 'en-US'; // Idioma
-    utterance.rate = speed; // Configura a velocidade
-    speechSynthesis.speak(utterance); // Reproduz a palavra
+function getPhaseFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('fase');
 }
 
-        function showFinalFeedback() {
-            finalFeedbackDiv.textContent = "You've completed all words!";
-            finalFeedbackDiv.style.display = "block";
-            restartButton.style.display = "inline-block";
-            enableStartButton();
+function readWordWithHighlight(word, callback) {
+    wordDiv.classList.add("enlarged");
+    readTextInUS(word); // Chama a nova função para leitura
+    setTimeout(() => {
+        wordDiv.classList.remove("enlarged");
+        if (callback) callback();
+    }, 3000); // Ajuste o tempo conforme necessário
+}
+
+function readWordWithSpeed(word, speed) {
+    const utterance = new SpeechSynthesisUtterance(word);
+    utterance.lang = 'en-US';
+    utterance.rate = speed;
+    readTextInUS(word); // Chama a nova função para leitura
+}
+
+function showFinalFeedback() {
+    finalFeedbackDiv.textContent = "You've completed all words!";
+    finalFeedbackDiv.style.display = "block";
+    restartButton.style.display = "inline-block";
+    enableStartButton();
+}
+
+function restartGame() {
+    currentWordIndex = 0;
+    finalFeedbackDiv.style.display = "none";
+    restartButton.style.display = "none";
+    wordsTried = 0;
+    loadWord(0);
+}
+
+function disableStartButton() {
+    startButton.disabled = true;
+}
+
+function enableStartButton() {
+    startButton.disabled = false;
+}
+
+function setupBackButton() {
+    const backButton = document.getElementById("backButton"); // Seleciona o botão pelo id
+
+    backButton.addEventListener('click', async (event) => {
+        event.preventDefault(); // Impede a navegação imediata
+        const params = getParamsFromURL();
+        if (!params) return; // Interrompe se os parâmetros estiverem ausentes
+
+        const { level, unit, fase } = params;
+        const nextPhase = `fase${parseInt(fase) + 1}`; // Calcula a próxima fase
+
+        try {
+            const user = await getAuthenticatedUser();
+            if (user) {
+                const userId = user.uid;
+                const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/${nextPhase}`);
+                const snapshot = await dbRef.once('value');
+
+                if (snapshot.exists() && snapshot.val() === true) {
+                    // Próxima fase existe e está desbloqueada, permite voltar
+                    history.back();
+                } else {
+                    // Exibe mensagem se a próxima fase não existir ou não estiver desbloqueada
+                    const confirmLeave = confirm(
+                        "The current phase has not been completed. Are you sure you want to leave?"
+                    );
+                    if (confirmLeave) {
+                        history.back();
+                    }
+                }
+            } else {
+                console.error("User is not authenticated.");
+            }
+        } catch (error) {
+            console.error("Error checking phase progression:", error);
+        }
+    });
+}
+
+// Função para obter o usuário autenticado
+async function getAuthenticatedUser() {
+    return new Promise((resolve, reject) => {
+        firebase.auth().onAuthStateChanged((user) => {
+            if (user) {
+                resolve(user);
+            } else {
+                reject("No authenticated user found.");
+            }
+        });
+    });
+}
+
+// Função para ler texto em inglês americano
+function readTextInUS(text) {
+    synth.cancel(); // Cancela qualquer leitura atual
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US'; // Força o idioma para Inglês Americano
+
+    let voices = synth.getVoices(); // Obtém as vozes disponíveis
+    let enUSVoice = voices.find((voice) => voice.lang === 'en-US'); // Procura pela voz "en-US"
+
+    if (!enUSVoice) {
+        if (voices.length === 0) {
+            // Aguarda carregamento de vozes
+            synth.onvoiceschanged = () => {
+                voices = synth.getVoices();
+                enUSVoice = voices.find((voice) => voice.lang === 'en-US');
+
+                if (enUSVoice) {
+                    utterance.voice = enUSVoice; // Define a voz se encontrada
+                } else if (!alertDisplayed) {
+                    alert("No 'en-US' voice found. Using default voice instead.");
+                    alertDisplayed = true;
+                }
+
+                synth.speak(utterance); // Inicia a leitura
+            };
+            return;
         }
 
-        function restartGame() {
-            currentWordIndex = 0;
-            finalFeedbackDiv.style.display = "none";
-            restartButton.style.display = "none";
-            wordsTried = 0;
-            loadWord(0);
+        if (!alertDisplayed) {
+            alert(
+                "No 'en-US' voice found in your speech synthesizer. Please enable English language in your browser's speech synthesizer. For now, the default voice will be used, which may cause problems."
+            );
+            alertDisplayed = true;
         }
+    } else {
+        utterance.voice = enUSVoice; // Define a voz "en-US"
+    }
 
-        function disableStartButton() {
-            startButton.disabled = true;
-        }
-
-        function enableStartButton() {
-            startButton.disabled = false;
-        }
+    synth.speak(utterance); // Inicia a leitura
+}
     </script>
 </body>
 </html>
