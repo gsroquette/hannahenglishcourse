@@ -158,7 +158,7 @@
     </style>
 </head>
 <body>
-<button onclick="history.back()" style="padding: 15px 25px; background-color: black; color: white; border: none; border-radius: 10px; font-size: 1.5rem; cursor: pointer; transition: background-color 0.3s ease;">
+<button id="backButton" style="padding: 15px 25px; background-color: black; color: white; border: none; border-radius: 10px; font-size: 1.5rem; cursor: pointer; transition: background-color 0.3s ease;">
     Back
 </button>
 <button id="pdfButton" onclick="generatePDF()" style="display: none; padding: 15px 25px; background-color: #32CD32; color: white; border: none; border-radius: 10px; font-size: 1.5rem; cursor: pointer; transition: background-color 0.3s ease; margin-top: 10px;">
@@ -195,6 +195,41 @@
         databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
     };
     firebase.initializeApp(firebaseConfig);
+
+document.getElementById('backButton').addEventListener('click', async function () {
+    const { level, unit } = getLevelAndUnitFromURL();
+    const currentPhase = parseInt(getPhaseFromURL());
+    const nextPhase = currentPhase + 1;
+
+    // Referência ao progresso no Firebase
+    const user = firebase.auth().currentUser;
+    if (!user) {
+        alert("You must be logged in to perform this action.");
+        return;
+    }
+
+    const userId = user.uid;
+    const progressRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/fase${nextPhase}`);
+
+    try {
+        // Verifica se a próxima fase está desbloqueada
+        const snapshot = await progressRef.once('value');
+        const isUnlocked = snapshot.val();
+
+        if (isUnlocked) {
+            history.back(); // Navega para a página anterior
+        } else {
+            // Mostra mensagem de confirmação se a próxima fase não estiver desbloqueada
+            const confirmMessage = "The next phase is locked. Are you sure you want to leave this page?";
+            if (confirm(confirmMessage)) {
+                history.back(); // Navega para a página anterior mesmo assim
+            }
+        }
+    } catch (error) {
+        console.error("Error checking phase progress:", error);
+        alert("An error occurred while checking the next phase progress.");
+    }
+});
 
 firebase.auth().onAuthStateChanged((user) => {
     if (user) {
