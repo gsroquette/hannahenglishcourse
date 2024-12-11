@@ -206,11 +206,11 @@
 
         firebase.initializeApp(firebaseConfig);
 
-    let totalCards = 0;
+let totalCards = 0;
     let interactedCards = [];
     let soundPlayed = 0;
+    let alertDisplayed = false;
 
-    // Função para obter todos os parâmetros da URL (level, unit, fase)
     function getParamsFromURL() {
         const params = new URLSearchParams(window.location.search);
         return {
@@ -223,7 +223,6 @@
     async function loadWords() {
         const { level, unit } = getParamsFromURL();
         const filePath = `../../${level}/${unit}/data1/words.txt`;
-        console.log("Tentando carregar o arquivo:", filePath); // LOG PARA DEBUG
         try {
             const response = await fetch(filePath);
             if (!response.ok) throw new Error(`Erro ao carregar o arquivo: ${filePath}`);
@@ -238,7 +237,6 @@
     async function generateFlashcards() {
         const { level, unit } = getParamsFromURL();
         const words = await loadWords();
-        console.log("Palavras carregadas:", words); // LOG PARA DEBUG
         totalCards = words.length;
         interactedCards = new Array(totalCards).fill(false);
         const container = document.getElementById('flashcards-container');
@@ -259,7 +257,6 @@
             cardFront.classList.add('card-front');
             const img = document.createElement('img');
             img.src = `../../${level}/${unit}/data1/imagens/imagem${index + 1}.png`;
-            console.log("Tentando carregar a imagem:", img.src); // LOG PARA DEBUG
             img.onerror = function () {
                 console.error(`Erro ao carregar a imagem: imagem${index + 1}.png`);
             };
@@ -297,10 +294,44 @@
         });
     }
 
-    function playSound(word) {
-        const utterance = new SpeechSynthesisUtterance(word);
+    function readText(text) {
+        const synth = window.speechSynthesis;
+        const voices = synth.getVoices();
+        let enUSVoice = voices.find(voice => voice.lang === 'en-US');
+
+        if (!enUSVoice) {
+            if (voices.length === 0) {
+                synth.onvoiceschanged = () => {
+                    const voicesAfterLoad = synth.getVoices();
+                    enUSVoice = voicesAfterLoad.find(voice => voice.lang === 'en-US');
+
+                    if (!enUSVoice && !alertDisplayed) {
+                        alert("No 'en-US' voice found. Using default voice instead.");
+                        alertDisplayed = true;
+                    }
+                };
+            } else if (!alertDisplayed) {
+                alert("No 'en-US' voice found. Using default voice instead.");
+                alertDisplayed = true;
+            }
+        }
+
+        const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'en-US';
-        window.speechSynthesis.speak(utterance);
+        utterance.voice = enUSVoice || voices[0];
+        synth.cancel();
+        synth.speak(utterance);
+    }
+
+    function playSound(word) {
+        const synth = window.speechSynthesis;
+
+        if (!synth) {
+            alert("Speech synthesizer not available in your browser.");
+            return;
+        }
+
+        readText(word);
     }
 
     function checkCompletion() {
