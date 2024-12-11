@@ -206,98 +206,96 @@
 
         firebase.initializeApp(firebaseConfig);
 
-        let totalCards = 0;
+    let totalCards = 0;
     let interactedCards = [];
     let soundPlayed = 0;
 
-    function getLevelAndUnitFromURL() {
+    // Função para obter todos os parâmetros da URL (level, unit, fase)
+    function getParamsFromURL() {
         const params = new URLSearchParams(window.location.search);
-        const level = params.get('level');
-        const unit = params.get('unit');
-        return { level, unit };
-    }
-
-    function getPhaseFromURL() {
-        const params = new URLSearchParams(window.location.search);
-        return params.get('fase');
+        return {
+            level: params.get('level'),
+            unit: params.get('unit'),
+            fase: params.get('fase'),
+        };
     }
 
     async function loadWords() {
-    const { level, unit } = getLevelAndUnitFromURL();
-    const filePath = `../../${level}/${unit}/data1/words.txt`;
-    console.log("Tentando carregar o arquivo:", filePath); // LOG PARA DEBUG
-    try {
-        const response = await fetch(filePath);
-        if (!response.ok) throw new Error(`Erro ao carregar o arquivo: ${filePath}`);
-        const text = await response.text();
-        return text.split('\n').filter(word => word.trim() !== '').map(word => word.trim());
-    } catch (error) {
-        console.error("Erro ao carregar o arquivo words.txt:", error);
-        return [];
+        const { level, unit } = getParamsFromURL();
+        const filePath = `../../${level}/${unit}/data1/words.txt`;
+        console.log("Tentando carregar o arquivo:", filePath); // LOG PARA DEBUG
+        try {
+            const response = await fetch(filePath);
+            if (!response.ok) throw new Error(`Erro ao carregar o arquivo: ${filePath}`);
+            const text = await response.text();
+            return text.split('\n').filter(word => word.trim() !== '').map(word => word.trim());
+        } catch (error) {
+            console.error("Erro ao carregar o arquivo words.txt:", error);
+            return [];
+        }
     }
-}
 
     async function generateFlashcards() {
-    const { level, unit } = getLevelAndUnitFromURL();
-    const words = await loadWords();
-    console.log("Palavras carregadas:", words); // LOG PARA DEBUG
-    totalCards = words.length;
-    interactedCards = new Array(totalCards).fill(false);
-    const container = document.getElementById('flashcards-container');
+        const { level, unit } = getParamsFromURL();
+        const words = await loadWords();
+        console.log("Palavras carregadas:", words); // LOG PARA DEBUG
+        totalCards = words.length;
+        interactedCards = new Array(totalCards).fill(false);
+        const container = document.getElementById('flashcards-container');
 
-    if (words.length === 0) {
-        container.innerHTML = "Não foi possível carregar os flash cards.";
-        return;
-    }
+        if (words.length === 0) {
+            container.innerHTML = "Não foi possível carregar os flash cards.";
+            return;
+        }
 
-    words.forEach((word, index) => {
-        const card = document.createElement('div');
-        card.classList.add('card');
+        words.forEach((word, index) => {
+            const card = document.createElement('div');
+            card.classList.add('card');
 
-        const cardInner = document.createElement('div');
-        cardInner.classList.add('card-inner');
+            const cardInner = document.createElement('div');
+            cardInner.classList.add('card-inner');
 
-        const cardFront = document.createElement('div');
-        cardFront.classList.add('card-front');
-        const img = document.createElement('img');
-        img.src = `../../${level}/${unit}/data1/imagens/imagem${index + 1}.png`;
-        console.log("Tentando carregar a imagem:", img.src); // LOG PARA DEBUG
-        img.onerror = function () {
-            console.error(`Erro ao carregar a imagem: imagem${index + 1}.png`);
-        };
-        cardFront.appendChild(img);
+            const cardFront = document.createElement('div');
+            cardFront.classList.add('card-front');
+            const img = document.createElement('img');
+            img.src = `../../${level}/${unit}/data1/imagens/imagem${index + 1}.png`;
+            console.log("Tentando carregar a imagem:", img.src); // LOG PARA DEBUG
+            img.onerror = function () {
+                console.error(`Erro ao carregar a imagem: imagem${index + 1}.png`);
+            };
+            cardFront.appendChild(img);
 
-        const cardBack = document.createElement('div');
-        cardBack.classList.add('card-back');
-        cardBack.textContent = word;
+            const cardBack = document.createElement('div');
+            cardBack.classList.add('card-back');
+            cardBack.textContent = word;
 
-        card.addEventListener('click', function () {
-            card.classList.toggle('rotated');
-            interactedCards[index] = true;
-            checkCompletion();
-        });
-
-        const playSoundIcon = document.createElement('img');
-        playSoundIcon.classList.add('play-sound');
-        playSoundIcon.src = 'businessman.png';
-        playSoundIcon.alt = "Play Sound";
-        playSoundIcon.onclick = (event) => {
-            event.stopPropagation();
-            playSound(word);
-            if (!playSoundIcon.classList.contains('played')) {
-                playSoundIcon.classList.add('played');
-                soundPlayed++;
+            card.addEventListener('click', function () {
+                card.classList.toggle('rotated');
+                interactedCards[index] = true;
                 checkCompletion();
-            }
-        };
+            });
 
-        cardInner.appendChild(cardFront);
-        cardInner.appendChild(cardBack);
-        card.appendChild(cardInner);
-        card.appendChild(playSoundIcon);
-        container.appendChild(card);
-    });
-}
+            const playSoundIcon = document.createElement('img');
+            playSoundIcon.classList.add('play-sound');
+            playSoundIcon.src = 'businessman.png';
+            playSoundIcon.alt = "Play Sound";
+            playSoundIcon.onclick = (event) => {
+                event.stopPropagation();
+                playSound(word);
+                if (!playSoundIcon.classList.contains('played')) {
+                    playSoundIcon.classList.add('played');
+                    soundPlayed++;
+                    checkCompletion();
+                }
+            };
+
+            cardInner.appendChild(cardFront);
+            cardInner.appendChild(cardBack);
+            card.appendChild(cardInner);
+            card.appendChild(playSoundIcon);
+            container.appendChild(card);
+        });
+    }
 
     function playSound(word) {
         const utterance = new SpeechSynthesisUtterance(word);
@@ -324,20 +322,19 @@
     }
 
     async function updateNextPhase(userId) {
-        const currentPhase = getPhaseFromURL();
-        const { level, unit } = getLevelAndUnitFromURL();
+        const { level, unit, fase } = getParamsFromURL();
         const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
 
         try {
-            if (currentPhase === "last") {
+            if (fase === "last") {
                 const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
                 await dbRef.child(nextUnit).set({ fase1: true });
-            } else if (currentPhase === "end") {
+            } else if (fase === "end") {
                 const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
                 await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
             } else {
-                const nextPhase = parseInt(currentPhase) + 1;
-                await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
+                const nextPhase = parseInt(fase) + 1;
+                await dbRef.update({ [`fase${fase}`]: true, [`fase${nextPhase}`]: true });
             }
         } catch (error) {
             console.error("Erro ao atualizar o progresso da fase:", error);
@@ -354,46 +351,47 @@
         document.getElementById('overlay').style.display = 'none';
     }
 
-       function goBack() {
-    const { level, unit, fase } = getParamsFromURL();
+    function goBack() {
+        const { level, unit, fase } = getParamsFromURL();
 
-    // Verifica o usuário autenticado
-    firebase.auth().onAuthStateChanged(function(user) {
-        if (!user) {
-            alert("You need to be logged in to proceed.");
-            return;
-        }
-
-        const userId = user.uid;
-        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-
-        dbRef.get().then(snapshot => {
-            if (snapshot.exists()) {
-                const progress = snapshot.val();
-                const currentFase = parseInt(fase, 10);
-                const nextFaseKey = `fase${currentFase + 1}`;
-
-                // Verifica se a próxima fase está desbloqueada
-                if (progress[nextFaseKey]) {
-                    window.history.back(); // Volta para a página anterior
-                } else {
-                    const confirmNavigation = confirm(
-                        "The next phase is locked. Do you still want to go back?"
-                    );
-                    if (confirmNavigation) {
-                        window.history.back(); // Volta para a página anterior
-                    }
-                }
-            } else {
-                alert("Could not verify progress. Please try again later.");
+        // Verifica o usuário autenticado
+        firebase.auth().onAuthStateChanged(function(user) {
+            if (!user) {
+                alert("You need to be logged in to proceed.");
+                return;
             }
-        }).catch(error => {
-            console.error("Error checking progress:", error);
-            alert("An error occurred while checking progress. Please try again.");
+
+            const userId = user.uid;
+            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+            dbRef.get().then(snapshot => {
+                if (snapshot.exists()) {
+                    const progress = snapshot.val();
+                    const currentFase = parseInt(fase, 10);
+                    const nextFaseKey = `fase${currentFase + 1}`;
+
+                    // Verifica se a próxima fase está desbloqueada
+                    if (progress[nextFaseKey]) {
+                        window.history.back(); // Volta para a página anterior
+                    } else {
+                        const confirmNavigation = confirm(
+                            "The next phase is locked. Do you still want to go back?"
+                        );
+                        if (confirmNavigation) {
+                            window.history.back(); // Volta para a página anterior
+                        }
+                    }
+                } else {
+                    alert("Could not verify progress. Please try again later.");
+                }
+            }).catch(error => {
+                console.error("Error checking progress:", error);
+                alert("An error occurred while checking progress. Please try again.");
+            });
         });
-    });
-}
+    }
+
     generateFlashcards();
-  </script>
+</script>
 </body>
 </html>
