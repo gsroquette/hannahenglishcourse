@@ -307,12 +307,11 @@ async function generatePDF() {
     }
 
     function getLevelAndUnitFromURL() {
-        const url = window.location.pathname;
-        const parts = url.split('/');
-        const level = parts[1];
-        const unit = parts[2];
-        return { level, unit };
-    }
+    const params = new URLSearchParams(window.location.search);
+    const level = params.get('level');
+    const unit = params.get('unit');
+    return { level, unit };
+}
 
     // Função para verificar autenticação do usuário
     function ensureUserIsAuthenticated(callback) {
@@ -352,104 +351,97 @@ async function generatePDF() {
 
     // Função para carregar as atividades
     async function loadActivities() {
-        try {
-            const response = await fetch('../data1/words.txt');
-            const text = await response.text();
-            const words = text.trim().split('\n');
+    try {
+        // Obtém level e unit da URL
+        const { level, unit } = getLevelAndUnitFromURL();
 
-            words.forEach((word, index) => {
-                const imageName = `imagem${index + 1}.png`;
-                const imageUrl = `../data1/imagens/${imageName}`;
-                
-                createActivity(imageUrl, word);
-            });
-        } catch (error) {
-            console.error('Erro ao carregar palavras:', error);
-        }
+        // Caminho dinâmico para o arquivo words.txt
+        const wordsPath = `../../${level}/${unit}/data1/words.txt`;
+
+        // Faz o fetch do arquivo de palavras
+        const response = await fetch(wordsPath);
+        const text = await response.text();
+        const words = text.trim().split('\n');
+
+        words.forEach((word, index) => {
+            // Caminho dinâmico para as imagens
+            const imageUrl = `../../${level}/${unit}/data1/imagens/imagem${index + 1}.png`;
+            createActivity(imageUrl, word); // Cria a atividade com caminho dinâmico
+        });
+    } catch (error) {
+        console.error('Erro ao carregar palavras ou imagens:', error);
     }
+}
 
     // Função para criar uma atividade
-    function createActivity(imageUrl, word) {
-        const activityContainer = document.getElementById('activity-container');
-        const activityDiv = document.createElement('div');
-        activityDiv.classList.add('activity');
+   function createActivity(imageUrl, word) {
+    const activityContainer = document.getElementById('activity-container');
+    const activityDiv = document.createElement('div');
+    activityDiv.classList.add('activity');
 
-        const imgElement = document.createElement('img');
-        imgElement.src = imageUrl;
-        imgElement.onerror = function() {
-            console.error(`Erro ao carregar a imagem: ${imageUrl}`);
-        };
-        activityDiv.appendChild(imgElement);
+    const imgElement = document.createElement('img');
+    imgElement.src = imageUrl;
 
-        const wordContainer = document.createElement('div');
-        wordContainer.classList.add('word-container');
+    // Tratamento de erro para carregamento da imagem
+    imgElement.onerror = function() {
+        console.warn(`Erro ao carregar a imagem: ${imageUrl}`);
+        imgElement.style.display = 'none'; // Esconde a imagem se não carregar
+    };
 
-        const shuffledWord = shuffleWord(word);
+    activityDiv.appendChild(imgElement);
 
-        const mixedLettersElement = document.createElement('div');
-        mixedLettersElement.classList.add('mixed-letters');
-        shuffledWord.split('').forEach(letter => {
-            const letterElement = document.createElement('span');
-            letterElement.innerText = letter;
-            mixedLettersElement.appendChild(letterElement);
-        });
-        wordContainer.appendChild(mixedLettersElement);
+    const wordContainer = document.createElement('div');
+    wordContainer.classList.add('word-container');
 
-        const inputContainer = document.createElement('div');
-        shuffledWord.split('').forEach((_, index, array) => {
-            const letterInput = document.createElement('input');
-            letterInput.classList.add('letter-input');
-            letterInput.maxLength = 1;
+    const shuffledWord = shuffleWord(word);
 
-            letterInput.addEventListener('input', function() {
-                if (letterInput.value.length === 1 && index < array.length - 1) {
-                    inputContainer.children[index + 1].focus();
-                }
+    const mixedLettersElement = document.createElement('div');
+    mixedLettersElement.classList.add('mixed-letters');
+    shuffledWord.split('').forEach(letter => {
+        const letterElement = document.createElement('span');
+        letterElement.innerText = letter;
+        mixedLettersElement.appendChild(letterElement);
+    });
+    wordContainer.appendChild(mixedLettersElement);
+
+    const inputContainer = document.createElement('div');
+    shuffledWord.split('').forEach(() => {
+        const letterInput = document.createElement('input');
+        letterInput.classList.add('letter-input');
+        letterInput.maxLength = 1;
+        inputContainer.appendChild(letterInput);
+    });
+
+    wordContainer.appendChild(inputContainer);
+
+    const checkAnswerBtn = document.createElement('button');
+    checkAnswerBtn.classList.add('check-answer-btn');
+    checkAnswerBtn.innerText = 'Check Answer';
+
+    checkAnswerBtn.onclick = function() {
+        const userAnswer = Array.from(inputContainer.querySelectorAll('.letter-input'))
+            .map(input => input.value.toUpperCase())
+            .join('');
+
+        const letterInputs = inputContainer.querySelectorAll('.letter-input');
+        if (userAnswer === word.toUpperCase()) {
+            letterInputs.forEach(input => {
+                input.classList.add('correct');
+                input.classList.remove('incorrect');
             });
+        } else {
+            letterInputs.forEach(input => {
+                input.classList.add('incorrect');
+                input.classList.remove('correct');
+            });
+        }
+    };
 
-            inputContainer.appendChild(letterInput);
-        });
+    wordContainer.appendChild(checkAnswerBtn);
 
-        wordContainer.appendChild(inputContainer);
-
-        const checkAnswerBtn = document.createElement('button');
-        checkAnswerBtn.classList.add('check-answer-btn');
-        checkAnswerBtn.innerText = 'Check Answer';
-
-        checkAnswerBtn.onclick = function() {
-            const userAnswer = Array.from(inputContainer.querySelectorAll('.letter-input'))
-                .map(input => input.value.toUpperCase())
-                .join('');
-
-            const letterInputs = inputContainer.querySelectorAll('.letter-input');
-            if (userAnswer === word.toUpperCase()) {
-                letterInputs.forEach(input => {
-                    input.classList.add('correct');
-                    input.classList.remove('incorrect');
-                });
-                speakText(word);
-                completedWords++;
-
-                // Verifica se todas as palavras foram completadas
-                if (completedWords === activities.length) {
-                    showCompletionModal();
-                    ensureUserIsAuthenticated(updateNextPhase);
-                }
-            } else {
-                letterInputs.forEach(input => {
-                    input.classList.add('incorrect');
-                    input.classList.remove('correct');
-                });
-            }
-        };
-
-        wordContainer.appendChild(checkAnswerBtn);
-
-        activityDiv.appendChild(wordContainer);
-        activityContainer.appendChild(activityDiv);
-
-        activities.push(word);
-    }
+    activityDiv.appendChild(wordContainer);
+    activityContainer.appendChild(activityDiv);
+}
 
     // Função para exibir o modal de conclusão
     function showCompletionModal() {
