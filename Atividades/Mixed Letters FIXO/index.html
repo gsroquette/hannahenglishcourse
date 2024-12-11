@@ -360,51 +360,45 @@ async function generatePDF() {
     }
 
     // Função para atualizar o progresso no banco de dados
-    async function updateNextPhase(userId) {
-        console.log("Updating next phase...");
-        const currentPhase = getPhaseFromURL();
-        const { level, unit } = getLevelAndUnitFromURL();
-        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+   async function updateNextPhase(userId) {
+    console.log("Updating next phase...");
+    const currentPhase = getPhaseFromURL();
+    const { level, unit } = getLevelAndUnitFromURL();
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
 
-        try {
-            if (currentPhase === "last") {
-                // Cria uma nova Unit dentro do mesmo Level
-                const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-                await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
-            } else if (currentPhase === "end") {
-                // Cria um novo Level com Unit1
-                const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
-                await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
-            } else {
-                // Para fases normais, desbloqueia a próxima fase
-                const nextPhase = parseInt(currentPhase) + 1;
-                await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
-            }
-        } catch (error) {
-            console.error("Erro ao atualizar o progresso da fase:", error);
+    try {
+        if (currentPhase === "last") {
+            const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+            await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
+        } else if (currentPhase === "end") {
+            const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+            await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+        } else {
+            const nextPhase = parseInt(currentPhase) + 1;
+            await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
         }
+    } catch (error) {
+        console.error("Erro ao atualizar o progresso da fase:", error);
     }
+}
 
     // Função para carregar as atividades
-    async function loadActivities() {
+  async function loadActivities() {
     try {
-        // Obtém level e unit da URL
         const { level, unit } = getLevelAndUnitFromURL();
 
-        // Caminho dinâmico para o arquivo words.txt
         const wordsPath = `../../${level}/${unit}/data1/words.txt`;
-
-        // Faz o fetch do arquivo de palavras
         const response = await fetch(wordsPath);
         const text = await response.text();
         const words = text.trim().split('\n');
 
         words.forEach((word, index) => {
-            // Caminho dinâmico para as imagens
             const imageUrl = `../../${level}/${unit}/data1/imagens/imagem${index + 1}.png`;
-            createActivity(imageUrl, word); // Cria a atividade com caminho dinâmico
+            activities.push(word); // Adiciona cada palavra ao array activities
+            createActivity(imageUrl, word);
         });
-       console.log("Activities Loaded:", activities);
+
+        console.log("Activities Loaded:", activities); // Log para depuração
     } catch (error) {
         console.error('Erro ao carregar palavras ou imagens:', error);
     }
@@ -420,7 +414,6 @@ async function generatePDF() {
     const imgElement = document.createElement('img');
     imgElement.src = imageUrl;
 
-    // Tratamento de erro para carregamento da imagem
     imgElement.onerror = function() {
         console.warn(`Erro ao carregar a imagem: ${imageUrl}`);
         imgElement.style.display = 'none'; // Esconde a imagem se não carregar
@@ -450,7 +443,6 @@ async function generatePDF() {
         letterInput.classList.add('letter-input');
         letterInput.maxLength = 1;
 
-        // Evento de input para mover o cursor automaticamente
         letterInput.addEventListener('input', function() {
             if (letterInput.value.length === 1) {
                 if (index < array.length - 1) {
@@ -471,43 +463,37 @@ async function generatePDF() {
     checkAnswerBtn.classList.add('check-answer-btn');
     checkAnswerBtn.innerText = 'Check Answer';
 
-   checkAnswerBtn.onclick = function() {
-    const userAnswer = Array.from(inputContainer.querySelectorAll('.letter-input'))
-        .map(input => input.value.toUpperCase())
-        .join('');
+    checkAnswerBtn.onclick = function() {
+        const userAnswer = Array.from(inputContainer.querySelectorAll('.letter-input'))
+            .map(input => input.value.toUpperCase())
+            .join('');
 
-    const letterInputs = inputContainer.querySelectorAll('.letter-input');
-    if (userAnswer === word.toUpperCase()) {
-        // Atualiza os estilos para resposta correta
-        letterInputs.forEach(input => {
-            input.classList.add('correct');
-            input.classList.remove('incorrect');
-        });
+        const letterInputs = inputContainer.querySelectorAll('.letter-input');
+        if (userAnswer === word.toUpperCase()) {
+            letterInputs.forEach(input => {
+                input.classList.add('correct');
+                input.classList.remove('incorrect');
+            });
 
-        // Incrementa completedWords apenas se ainda não foi contado
-        if (!activityDiv.dataset.completed) {
-            completedWords++;
-            console.log(`User Answer: ${userAnswer}, Correct Answer: ${word}`);
-            console.log(`Completed Words: ${completedWords}/${activities.length}`);
-            activityDiv.dataset.completed = true; // Marca a atividade como concluída
+            if (activityDiv.dataset.completed === "false") {
+                completedWords++;
+                activityDiv.dataset.completed = "true"; // Marca como concluída
+                console.log(`User Answer: ${userAnswer}, Correct Answer: ${word}`);
+                console.log(`Completed Words: ${completedWords}/${activities.length}`);
+            }
+
+            if (completedWords === activities.length) {
+                console.log("All activities completed!");
+                showCompletionModal(); // Exibe o modal de conclusão
+                ensureUserIsAuthenticated(updateNextPhase); // Atualiza a próxima fase no Firebase
+            }
+        } else {
+            letterInputs.forEach(input => {
+                input.classList.add('incorrect');
+                input.classList.remove('correct');
+            });
         }
-
-        console.log(`Completed Words: ${completedWords}, Total Activities: ${activities.length}`);
-
-        // Verifica se todas as palavras foram completadas
-        if (completedWords === activities.length) {
-            console.log("All activities completed!");
-            showCompletionModal(); // Exibe o modal de conclusão
-            ensureUserIsAuthenticated(updateNextPhase); // Atualiza a próxima fase no Firebase
-        }
-    } else {
-        // Atualiza os estilos para resposta incorreta
-        letterInputs.forEach(input => {
-            input.classList.add('incorrect');
-            input.classList.remove('correct');
-        });
-    }
-};
+    };
 
     wordContainer.appendChild(checkAnswerBtn);
 
@@ -516,10 +502,10 @@ async function generatePDF() {
 }
 
     // Função para exibir o modal de conclusão
-    function showCompletionModal() {
-        document.getElementById('overlay').style.display = 'block';
-        document.getElementById('completion-modal').style.display = 'block';
-    }
+   function showCompletionModal() {
+    document.getElementById('overlay').style.display = 'block';
+    document.getElementById('completion-modal').style.display = 'block';
+}
 
     // Função para fechar o modal de conclusão
     function closeModal() {
