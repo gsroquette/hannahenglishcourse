@@ -257,6 +257,8 @@ let wordsTried = 0;
 let recognitionTimeout;
 let tryAgainInProgress = false;        
 let attemptsPerWord = {}; // Registro de tentativas por palavra
+let alertDisplayed = false; // Para evitar múltiplos alertas
+let synth = window.speechSynthesis; // Inicializa o sintetizador de fala
 
 // Inicializa as palavras após carregá-las do arquivo
 fetch(wordListUrl)
@@ -488,31 +490,18 @@ function getPhaseFromURL() {
 
 function readWordWithHighlight(word, callback) {
     wordDiv.classList.add("enlarged");
-    const utterance = new SpeechSynthesisUtterance(word);
-    utterance.lang = 'en-US';
-    utterance.rate = 0.7;
-    utterance.onend = () => {
+    readTextInUS(word); // Chama a nova função para leitura
+    setTimeout(() => {
         wordDiv.classList.remove("enlarged");
         if (callback) callback();
-    };
-    speechSynthesis.speak(utterance);
+    }, 3000); // Ajuste o tempo conforme necessário
 }
-
-imageElement.addEventListener('click', () => {
-    readWordWithHighlight(words[currentWordIndex]);
-});
-
-let voiceSpeed = 1;
-iconElement.addEventListener('click', () => {
-    readWordWithSpeed(words[currentWordIndex], voiceSpeed);
-    voiceSpeed = (voiceSpeed === 1) ? 0.5 : 1;
-});
 
 function readWordWithSpeed(word, speed) {
     const utterance = new SpeechSynthesisUtterance(word);
     utterance.lang = 'en-US';
     utterance.rate = speed;
-    speechSynthesis.speak(utterance);
+    readTextInUS(word); // Chama a nova função para leitura
 }
 
 function showFinalFeedback() {
@@ -588,6 +577,48 @@ async function getAuthenticatedUser() {
             }
         });
     });
+}
+
+// Função para ler texto em inglês americano
+function readTextInUS(text) {
+    synth.cancel(); // Cancela qualquer leitura atual
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US'; // Força o idioma para Inglês Americano
+
+    let voices = synth.getVoices(); // Obtém as vozes disponíveis
+    let enUSVoice = voices.find((voice) => voice.lang === 'en-US'); // Procura pela voz "en-US"
+
+    if (!enUSVoice) {
+        if (voices.length === 0) {
+            // Aguarda carregamento de vozes
+            synth.onvoiceschanged = () => {
+                voices = synth.getVoices();
+                enUSVoice = voices.find((voice) => voice.lang === 'en-US');
+
+                if (enUSVoice) {
+                    utterance.voice = enUSVoice; // Define a voz se encontrada
+                } else if (!alertDisplayed) {
+                    alert("No 'en-US' voice found. Using default voice instead.");
+                    alertDisplayed = true;
+                }
+
+                synth.speak(utterance); // Inicia a leitura
+            };
+            return;
+        }
+
+        if (!alertDisplayed) {
+            alert(
+                "No 'en-US' voice found in your speech synthesizer. Please enable English language in your browser's speech synthesizer. For now, the default voice will be used, which may cause problems."
+            );
+            alertDisplayed = true;
+        }
+    } else {
+        utterance.voice = enUSVoice; // Define a voz "en-US"
+    }
+
+    synth.speak(utterance); // Inicia a leitura
 }
     </script>
 </body>
