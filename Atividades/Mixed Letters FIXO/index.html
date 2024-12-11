@@ -361,6 +361,7 @@ async function generatePDF() {
 
     // Função para atualizar o progresso no banco de dados
     async function updateNextPhase(userId) {
+        console.log("Updating next phase...");
         const currentPhase = getPhaseFromURL();
         const { level, unit } = getLevelAndUnitFromURL();
         const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
@@ -403,6 +404,7 @@ async function generatePDF() {
             const imageUrl = `../../${level}/${unit}/data1/imagens/imagem${index + 1}.png`;
             createActivity(imageUrl, word); // Cria a atividade com caminho dinâmico
         });
+       console.log("Activities Loaded:", activities);
     } catch (error) {
         console.error('Erro ao carregar palavras ou imagens:', error);
     }
@@ -413,6 +415,7 @@ async function generatePDF() {
     const activityContainer = document.getElementById('activity-container');
     const activityDiv = document.createElement('div');
     activityDiv.classList.add('activity');
+    activityDiv.dataset.completed = false; // Inicializa como não concluída
 
     const imgElement = document.createElement('img');
     imgElement.src = imageUrl;
@@ -468,24 +471,43 @@ async function generatePDF() {
     checkAnswerBtn.classList.add('check-answer-btn');
     checkAnswerBtn.innerText = 'Check Answer';
 
-    checkAnswerBtn.onclick = function() {
-        const userAnswer = Array.from(inputContainer.querySelectorAll('.letter-input'))
-            .map(input => input.value.toUpperCase())
-            .join('');
+   checkAnswerBtn.onclick = function() {
+    const userAnswer = Array.from(inputContainer.querySelectorAll('.letter-input'))
+        .map(input => input.value.toUpperCase())
+        .join('');
 
-        const letterInputs = inputContainer.querySelectorAll('.letter-input');
-        if (userAnswer === word.toUpperCase()) {
-            letterInputs.forEach(input => {
-                input.classList.add('correct');
-                input.classList.remove('incorrect');
-            });
-        } else {
-            letterInputs.forEach(input => {
-                input.classList.add('incorrect');
-                input.classList.remove('correct');
-            });
+    const letterInputs = inputContainer.querySelectorAll('.letter-input');
+    if (userAnswer === word.toUpperCase()) {
+        // Atualiza os estilos para resposta correta
+        letterInputs.forEach(input => {
+            input.classList.add('correct');
+            input.classList.remove('incorrect');
+        });
+
+        // Incrementa completedWords apenas se ainda não foi contado
+        if (!activityDiv.dataset.completed) {
+            completedWords++;
+            console.log(`User Answer: ${userAnswer}, Correct Answer: ${word}`);
+            console.log(`Completed Words: ${completedWords}/${activities.length}`);
+            activityDiv.dataset.completed = true; // Marca a atividade como concluída
         }
-    };
+
+        console.log(`Completed Words: ${completedWords}, Total Activities: ${activities.length}`);
+
+        // Verifica se todas as palavras foram completadas
+        if (completedWords === activities.length) {
+            console.log("All activities completed!");
+            showCompletionModal(); // Exibe o modal de conclusão
+            ensureUserIsAuthenticated(updateNextPhase); // Atualiza a próxima fase no Firebase
+        }
+    } else {
+        // Atualiza os estilos para resposta incorreta
+        letterInputs.forEach(input => {
+            input.classList.add('incorrect');
+            input.classList.remove('correct');
+        });
+    }
+};
 
     wordContainer.appendChild(checkAnswerBtn);
 
