@@ -383,80 +383,81 @@ function speakWithVoice(voice, text) {
         }
     }
 
-  function createActivity(imageUrl, word) {
-    const activityContainer = document.getElementById('activity-container');
-    const activityDiv = document.createElement('div');
-    activityDiv.classList.add('activity');
+   function createActivity(imageUrl, word) {
+        const activityContainer = document.getElementById('activity-container');
+        const activityDiv = document.createElement('div');
+        activityDiv.classList.add('activity');
 
-    const imgElement = document.createElement('img');
-    imgElement.src = imageUrl;
-    imgElement.onerror = function () {
-        console.error(`Erro ao carregar a imagem: ${imageUrl}`);
-    };
-    activityDiv.appendChild(imgElement);
+        const imgElement = document.createElement('img');
+        imgElement.src = imageUrl;
+        imgElement.onerror = function() {
+            console.error(`Erro ao carregar a imagem: ${imageUrl}`);
+        };
+        activityDiv.appendChild(imgElement);
 
-    const wordContainer = document.createElement('div');
-    wordContainer.classList.add('word-container');
+        const wordContainer = document.createElement('div');
+        wordContainer.classList.add('word-container');
 
-    const missingWordElement = document.createElement('div');
-    missingWordElement.classList.add('missing-word');
+        const missingWordElement = document.createElement('div');
+        missingWordElement.classList.add('missing-word');
 
-    const letterInputs = [];
+        const letterInputs = [];
+        word.split('').forEach((letter, index) => {
+            const letterInput = document.createElement('input');
+            letterInput.classList.add('missing-letter-input');
+            letterInput.maxLength = 1;
 
-    // Adiciona os traços para a primeira letra
-    const firstLetterPlaceholder = document.createElement('span');
-    firstLetterPlaceholder.textContent = "___";
-    firstLetterPlaceholder.style.marginRight = "10px";
-    missingWordElement.appendChild(firstLetterPlaceholder);
+            letterInput.addEventListener('input', function() {
+                if (letterInput.value.toUpperCase() === letter.toUpperCase()) {
+                    letterInput.classList.add('correct');
+                    letterInput.classList.remove('incorrect');
 
-    // Cria caixas de entrada para as letras restantes
-    word.split('').forEach((letter, index) => {
-        if (index === 0) return; // Pula a primeira letra
-
-        const letterInput = document.createElement('input');
-        letterInput.classList.add('missing-letter-input');
-        letterInput.maxLength = 1;
-
-        letterInput.addEventListener('input', function () {
-            if (letterInput.value.toUpperCase() === letter.toUpperCase()) {
-                letterInput.classList.add('correct');
-                letterInput.classList.remove('incorrect');
-
-                if (index < word.length - 1) {
-                    letterInputs[index - 1 + 1].focus(); // Move para o próximo input
-                }
-
-                const userWord = letterInputs.map(input => input.value.toUpperCase()).join('');
-                if (userWord === word.substring(1).toUpperCase()) {
-                    speakText(word);
-                    completedWords++;
-
-                    if (completedWords === activities.length) {
-                        showCompletionModal();
+                    if (index < word.length - 1) {
+                        letterInputs[index + 1].focus(); 
                     }
+
+                    const animationElement = document.createElement('div');
+                    animationElement.classList.add('letter-animation');
+                    animationElement.innerText = letter.toUpperCase();
+                    activityDiv.appendChild(animationElement);
+                    animationElement.style.display = 'block';
+
+                    setTimeout(() => {
+                        animationElement.style.display = 'none';
+                        animationElement.remove();
+                    }, 1000);
+
+                    const userWord = letterInputs.map(input => input.value.toUpperCase()).join('');
+                    if (userWord === word.toUpperCase()) {
+                        speakText(word);
+                        completedWords++;
+
+                        if (completedWords === activities.length) {
+                            showCompletionModal();
+                        }
+                    } else {
+                        speakText(letter);
+                    }
+                } else {
+                    letterInput.classList.add('incorrect');
+                    letterInput.classList.remove('correct');
                 }
-            } else {
-                letterInput.classList.add('incorrect');
-                letterInput.classList.remove('correct');
-            }
+            });
+
+            letterInputs.push(letterInput);
+            missingWordElement.appendChild(letterInput);
         });
 
-        letterInputs.push(letterInput);
-        missingWordElement.appendChild(letterInput);
-    });
-
-    wordContainer.appendChild(missingWordElement);
-    activityDiv.appendChild(wordContainer);
-    activityContainer.appendChild(activityDiv);
-    activities.push(word);
-
-    // Adiciona a palavra completa (sem a primeira letra) para exibição
-    const fullWordElement = document.createElement('div');
-    fullWordElement.innerText = word.toUpperCase();
-    fullWordElement.style.fontWeight = 'bold';
-    fullWordElement.style.marginTop = '10px';
-    wordContainer.appendChild(fullWordElement);
-}
+        wordContainer.appendChild(missingWordElement);
+        activityDiv.appendChild(wordContainer);
+        activityContainer.appendChild(activityDiv);
+        activities.push(word);
+        const fullWordElement = document.createElement('div');
+        fullWordElement.innerText = word.toUpperCase();
+        fullWordElement.style.fontWeight = 'bold';
+        fullWordElement.style.marginTop = '10px';
+        wordContainer.appendChild(fullWordElement);
+    }
 
     function showCompletionModal() {
         updateProgressInDatabase();
