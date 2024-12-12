@@ -1,4 +1,4 @@
-const gridSize = 8;
+const gridSize = 15;
 const canvas = document.getElementById('word-search-canvas');
 const ctx = canvas.getContext('2d');
 
@@ -13,19 +13,60 @@ let foundCells = [];
 const wordsList = document.getElementById('words');
 let wordsToFind = [];
 
-// Função para carregar as palavras da fase
-async function loadWords() {
+// Função para capturar parâmetros level, unit e fase da URL
+function getParamsFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    return {
+        level: params.get('level') || 'Level1', // Valor padrão caso o parâmetro esteja ausente
+        unit: params.get('unit') || 'Unit1',   // Valor padrão caso o parâmetro esteja ausente
+        fase: params.get('fase') || '1'       // Valor padrão caso o parâmetro esteja ausente
+    };
+}
+
+// Função para verificar se a próxima fase está desbloqueada
+async function checkNextPhaseUnlocked() {
+    const { level, unit, fase } = getParamsFromURL(); // Obtém os parâmetros da URL
+    const nextPhase = parseInt(fase) + 1;
+    let isUnlocked = false;
+
     try {
-        const response = await fetch('../data2/words.txt');
+        const user = await firebase.auth().currentUser;
+        if (!user) {
+            throw new Error('Usuário não autenticado.');
+        }
+
+        const userId = user.uid;
+        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+        const snapshot = await dbRef.get();
+
+        if (snapshot.exists()) {
+            const progress = snapshot.val();
+            isUnlocked = progress[`fase${nextPhase}`] === true; // Verifica se a próxima fase está desbloqueada
+        }
+    } catch (error) {
+        console.error('Erro ao verificar desbloqueio da próxima fase:', error);
+    }
+
+    return isUnlocked;
+}
+
+// Função para carregar palavras dinamicamente
+async function loadWords() {
+    const { level, unit } = getParamsFromURL(); // Obtém os parâmetros da URL
+    const filePath = `../../${level}/${unit}/data2/words.txt`; // Monta o caminho do arquivo dinamicamente
+
+    try {
+        const response = await fetch(filePath);
         if (!response.ok) {
-            throw new Error('Network response was not ok');
+            throw new Error(`Erro ao carregar o arquivo: ${filePath}`);
         }
         const text = await response.text();
-        wordsToFind = text.split(/\r?\n/).filter(word => word.trim() !== '').slice(0, 5);
-        console.log('Palavras carregadas:', wordsToFind); // Log para verificar as palavras carregadas
-        init();
+        wordsToFind = text.split(/\r?\n/).filter(word => word.trim() !== '');
+        console.log('Palavras carregadas dinamicamente:', wordsToFind); // Log para verificar as palavras carregadas
+        init(); // Inicia o jogo com as palavras carregadas
     } catch (error) {
-        console.error('Error loading words:', error);
+        console.error('Erro no carregamento dinâmico de palavras:', error);
+        alert('Não foi possível carregar as palavras. Verifique o caminho ou a conexão.');
     }
 }
 
@@ -281,4 +322,24 @@ function init() {
 
 // Inicializa o jogo e carrega as palavras
 document.getElementById('reset-button').addEventListener('click', resetGame);
-loadWords();
+// Inicializa o jogo e carrega as palavras dinamicamente
+document.getElementById('reset-button').addEventListener('click', resetGame);
+loadWords(); // Chama a nova função com carregamento dinâmico
+// Evento para o botão Back
+document.getElementById('back-button').addEventListener('click', async () => {
+    const isUnlocked = await checkNextPhaseUnlocked();
+
+    if (!isUnlocked) {
+        // Exibe mensagem de aviso caso a próxima fase não esteja desbloqueada
+        const confirmNavigation = confirm(
+            "The next phase is not unlocked yet. Do you still want to go back?"
+        );
+        if (!confirmNavigation) {
+            return; // Cancela a navegação se o usuário não confirmar
+        }
+    }
+
+    // Navega para a página anterior
+    history.back();
+});
+
