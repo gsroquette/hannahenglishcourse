@@ -23,6 +23,33 @@ function getParamsFromURL() {
     };
 }
 
+// Função para verificar se a próxima fase está desbloqueada
+async function checkNextPhaseUnlocked() {
+    const { level, unit, fase } = getParamsFromURL(); // Obtém os parâmetros da URL
+    const nextPhase = parseInt(fase) + 1;
+    let isUnlocked = false;
+
+    try {
+        const user = await firebase.auth().currentUser;
+        if (!user) {
+            throw new Error('Usuário não autenticado.');
+        }
+
+        const userId = user.uid;
+        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+        const snapshot = await dbRef.get();
+
+        if (snapshot.exists()) {
+            const progress = snapshot.val();
+            isUnlocked = progress[`fase${nextPhase}`] === true; // Verifica se a próxima fase está desbloqueada
+        }
+    } catch (error) {
+        console.error('Erro ao verificar desbloqueio da próxima fase:', error);
+    }
+
+    return isUnlocked;
+}
+
 // Função para carregar palavras dinamicamente
 async function loadWords() {
     const { level, unit } = getParamsFromURL(); // Obtém os parâmetros da URL
@@ -298,4 +325,21 @@ document.getElementById('reset-button').addEventListener('click', resetGame);
 // Inicializa o jogo e carrega as palavras dinamicamente
 document.getElementById('reset-button').addEventListener('click', resetGame);
 loadWords(); // Chama a nova função com carregamento dinâmico
+// Evento para o botão Back
+document.getElementById('back-button').addEventListener('click', async () => {
+    const isUnlocked = await checkNextPhaseUnlocked();
+
+    if (!isUnlocked) {
+        // Exibe mensagem de aviso caso a próxima fase não esteja desbloqueada
+        const confirmNavigation = confirm(
+            "The next phase is not unlocked yet. Do you still want to go back?"
+        );
+        if (!confirmNavigation) {
+            return; // Cancela a navegação se o usuário não confirmar
+        }
+    }
+
+    // Navega para a página anterior
+    history.back();
+});
 
