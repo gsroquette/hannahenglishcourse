@@ -13,19 +13,33 @@ let foundCells = [];
 const wordsList = document.getElementById('words');
 let wordsToFind = [];
 
-// Função para carregar as palavras da fase
+// Função para capturar parâmetros level, unit e fase da URL
+function getParamsFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    return {
+        level: params.get('level') || 'Level1', // Valor padrão caso o parâmetro esteja ausente
+        unit: params.get('unit') || 'Unit1',   // Valor padrão caso o parâmetro esteja ausente
+        fase: params.get('fase') || '1'       // Valor padrão caso o parâmetro esteja ausente
+    };
+}
+
+// Função para carregar palavras dinamicamente
 async function loadWords() {
+    const { level, unit } = getParamsFromURL(); // Obtém os parâmetros da URL
+    const filePath = `../../${level}/${unit}/data1/words.txt`; // Monta o caminho do arquivo dinamicamente
+
     try {
-        const response = await fetch('../data1/words.txt');
+        const response = await fetch(filePath);
         if (!response.ok) {
-            throw new Error('Network response was not ok');
+            throw new Error(`Erro ao carregar o arquivo: ${filePath}`);
         }
         const text = await response.text();
-        wordsToFind = text.split(/\r?\n/).filter(word => word.trim() !== '').slice(0, 5);
-        console.log('Palavras carregadas:', wordsToFind); // Log para verificar as palavras carregadas
-        init();
+        wordsToFind = text.split(/\r?\n/).filter(word => word.trim() !== '').slice(0, 5); // Seleciona as 5 primeiras palavras válidas
+        console.log('Palavras carregadas dinamicamente:', wordsToFind); // Log para verificar as palavras carregadas
+        init(); // Inicia o jogo com as palavras carregadas
     } catch (error) {
-        console.error('Error loading words:', error);
+        console.error('Erro no carregamento dinâmico de palavras:', error);
+        alert('Não foi possível carregar as palavras. Verifique o caminho ou a conexão.');
     }
 }
 
@@ -281,4 +295,7 @@ function init() {
 
 // Inicializa o jogo e carrega as palavras
 document.getElementById('reset-button').addEventListener('click', resetGame);
-loadWords();
+// Inicializa o jogo e carrega as palavras dinamicamente
+document.getElementById('reset-button').addEventListener('click', resetGame);
+loadWords(); // Chama a nova função com carregamento dinâmico
+
