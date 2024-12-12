@@ -243,8 +243,40 @@
 });
 
         function goBack() {
-            window.history.back();
-        }
+    const { level, unit } = getLevelAndUnitFromURL();
+    const currentPhase = getPhaseFromURL();
+    const userId = firebase.auth().currentUser?.uid;
+
+    if (!userId) {
+        console.error("User not authenticated. Redirecting to login.");
+        alert("You are not authenticated. Please log in.");
+        window.location.href = '/login.html'; // Redireciona para a página de login
+        return;
+    }
+
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+    const nextPhase = parseInt(currentPhase) + 1;
+
+    dbRef.child(`fase${nextPhase}`).once('value')
+        .then(snapshot => {
+            const isUnlocked = snapshot.val();
+            if (isUnlocked) {
+                console.log(`Next phase (fase${nextPhase}) is unlocked. Navigating back.`);
+                window.history.back(); // Retorna para a página anterior
+            } else {
+                const confirmNavigation = confirm("The next phase is not unlocked yet. Do you still want to go back?");
+                if (confirmNavigation) {
+                    window.history.back(); // Retorna para a página anterior
+                } else {
+                    console.log("User chose not to navigate back.");
+                }
+            }
+        })
+        .catch(error => {
+            console.error("Error checking next phase progress:", error);
+            alert("An error occurred while checking your progress. Please try again.");
+        });
+}
 
  function speakText(text, callback) {
     clearTimeout(idleTimer);
