@@ -242,32 +242,61 @@
         let lockBoard = false;
         let matchedPairs = 0;
         let totalPairs = 0;
+        let alertDisplayed = false; // Variável global para rastrear se a mensagem já foi exibida
+
+function getParamsFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    return {
+        level: params.get('level'),
+        unit: params.get('unit'),
+        fase: params.get('fase'),
+    };
+}
 
         function loadCardsData(callback) {
-            fetch('../data3/words.txt')
-                .then(response => response.text())
-                .then(text => {
-                    const words = text.trim().split('\n');
-                    const cardsArray = [];
+    const { level, unit } = getParamsFromURL();
+    if (!level || !unit) {
+        console.error("Parâmetros 'level' e 'unit' são obrigatórios na URL.");
+        return;
+    }
 
-                    words.forEach((word, index) => {
-                        const imageName = `image${index + 1}`;
-                        cardsArray.push({
-                            type: 'image',
-                            src: `../data3/imagens/imagem${index + 1}.png`,
-                            pair: imageName
-                        });
-                        cardsArray.push({
-                            type: 'word',
-                            text: word.trim(),
-                            pair: imageName
-                        });
-                    });
+    const wordsPath = `../../${level}/${unit}/data3/words.txt`;
+    const imagePathTemplate = `../../${level}/${unit}/data3/imagens/imagem`;
 
-                    totalPairs = words.length;
-                    callback(cardsArray);
+    fetch(wordsPath)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Erro ao carregar palavras de ${wordsPath}`);
+            }
+            return response.text();
+        })
+        .then(text => {
+            const words = text.trim().split('\n');
+            const cardsArray = [];
+
+            words.forEach((word, index) => {
+                const imagePath = `${imagePathTemplate}${index + 1}.png`;
+
+                cardsArray.push({
+                    type: 'image',
+                    src: imagePath,
+                    pair: `pair${index + 1}`,
                 });
-        }
+
+                cardsArray.push({
+                    type: 'word',
+                    text: word.trim(),
+                    pair: `pair${index + 1}`,
+                });
+            });
+
+            totalPairs = words.length;
+            callback(cardsArray);
+        })
+        .catch(error => {
+            console.error("Erro ao carregar dados:", error);
+        });
+}
 
         function initGame(cardsArray) {
             gameContainer.innerHTML = '';
@@ -413,28 +442,31 @@
             });
         }
 
-        function updateNextPhase(userId) {
-            const currentPhase = getPhaseFromURL();
-            const { level, unit } = getLevelAndUnitFromURL();
-            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-            
-            try {
-                if (currentPhase === "last") {
-                    const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-                    // Criar a nova unidade no nível atual
-                    firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
-                } else if (currentPhase === "end") {
-                    const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
-                    // Criar um novo nível e adicionar Unit1
-                    firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
-                } else {
-                    const nextPhase = parseInt(currentPhase) + 1;
-                    dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
-                }
-            } catch (error) {
-                console.error("Erro ao atualizar o progresso da fase:", error);
-            }
+       async function updateNextPhase(userId) {
+    console.log("Updating next phase...");
+    const currentPhase = getPhaseFromURL();
+    const { level, unit } = getParamsFromURL();
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+    try {
+        if (currentPhase === "last") {
+            const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+            console.log(`Unlocking next unit: ${nextUnit}`);
+            await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
+        } else if (currentPhase === "end") {
+            const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+            console.log(`Unlocking next level: ${nextLevel}`);
+            await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+        } else {
+            const nextPhase = parseInt(currentPhase) + 1;
+            console.log(`Unlocking next phase: fase${nextPhase}`);
+            await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
         }
+        console.log("Update successful.");
+    } catch (error) {
+        console.error("Error updating next phase:", error);
+    }
+}
 
         function getPhaseFromURL() {
             const params = new URLSearchParams(window.location.search);
@@ -447,9 +479,45 @@
             return { level: parts[1], unit: parts[2] };
         }
 
-        function goBack() {
-            window.history.back();
+       function goBack() {
+    const { level, unit, fase } = getParamsFromURL();
+
+    // Verifica o usuário autenticado
+    firebase.auth().onAuthStateChanged(function(user) {
+        if (!user) {
+            alert("You need to be logged in to proceed.");
+            return;
         }
+
+        const userId = user.uid;
+        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+        dbRef.get().then(snapshot => {
+            if (snapshot.exists()) {
+                const progress = snapshot.val();
+                const currentFase = parseInt(fase, 10);
+                const nextFaseKey = `fase${currentFase + 1}`;
+
+                // Verifica se a próxima fase está desbloqueada
+                if (progress[nextFaseKey]) {
+                    window.history.back(); // Volta para a página anterior
+                } else {
+                    const confirmNavigation = confirm(
+                        "The next phase is locked. Do you still want to go back?"
+                    );
+                    if (confirmNavigation) {
+                        window.history.back(); // Volta para a página anterior
+                    }
+                }
+            } else {
+                alert("Could not verify progress. Please try again later.");
+            }
+        }).catch(error => {
+            console.error("Error checking progress:", error);
+            alert("An error occurred while checking progress. Please try again.");
+        });
+    });
+}
 
         function showCompletionModal() {
             overlay.style.display = 'block';
@@ -468,9 +536,46 @@
 
 function speakText(text) {
     const synth = window.speechSynthesis;
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'en-US'; // Configura o idioma como inglês americano
-    synth.speak(utterance);
+
+    // Cancela qualquer síntese anterior
+    synth.cancel();
+
+    // Função para verificar vozes e realizar a leitura
+    const readText = () => {
+        const voices = synth.getVoices();
+        let voice = voices.find(v => v.lang === 'en-US');
+
+        // Caso não encontre a voz "en-US"
+        if (!voice && !alertDisplayed) {
+            if (voices.length === 0) {
+                alert("No 'en-US' voice found in your speech synthesizer. Please enable English language in your browser's speech synthesizer. For now, the default voice will be used, which may cause problems.");
+            } else {
+                alert("No 'en-US' voice found. Using default voice instead.");
+            }
+            alertDisplayed = true; // Marca a mensagem como exibida
+        }
+
+        // Configura o texto para leitura
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'en-US'; // Força o idioma inglês americano
+        if (voice) {
+            utterance.voice = voice;
+        }
+
+        // Realiza a leitura
+        synth.speak(utterance);
+    };
+
+    // Verifica se as vozes já estão carregadas
+    if (synth.getVoices().length === 0) {
+        // Adiciona evento para aguardar o carregamento das vozes
+        synth.onvoiceschanged = () => {
+            readText();
+        };
+    } else {
+        // Caso as vozes já estejam disponíveis
+        readText();
+    }
 }
 
         loadCardsData(initGame);

@@ -152,7 +152,7 @@
     </style>
 </head>
 <body>
-<button onclick="window.history.back()" style="padding: 10px 20px; font-size: 1em; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; transition: background-color 0.3s ease;">
+<button id="back-btn" onclick="handleBackButtonClick()" style="padding: 10px 20px; font-size: 1em; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; transition: background-color 0.3s ease;">
     Back
 </button>
 
@@ -234,9 +234,29 @@ firebase.auth().onAuthStateChanged(function(user) {
     let answeredQuestions = [];
     let userAnswers = {}; // Objeto para armazenar as respostas do usuário
     let speechSynthesisUtterance = null;
+async function loadQuestions() {
+    // Obtém os parâmetros level e unit da URL
+    const { level, unit } = getLevelAndUnitFromURL();
 
-    async function loadQuestions() {
-        const response = await fetch('questions.txt');
+    // Adicione os logs para verificar level e unit
+    console.log("Level:", level);
+    console.log("Unit:", unit);
+
+    if (!level || !unit) {
+        console.error("Level or Unit not identified in the URL.");
+        return;
+    }
+
+    // Gera o caminho dinâmico baseado no level e unit
+    const questionsPath = `../../${level}/${unit}/DataQuiz2/questions.txt`;
+
+    // Adicione o log para verificar o caminho gerado
+    console.log("Generated Path:", questionsPath);
+
+    try {
+        const response = await fetch(questionsPath);
+        if (!response.ok) throw new Error(`Failed to fetch questions from ${questionsPath}`);
+        
         const text = await response.text();
         const lines = text.split('\n');
         let currentQuestion = null;
@@ -248,7 +268,7 @@ firebase.auth().onAuthStateChanged(function(user) {
                     questions.push(currentQuestion);
                 }
                 currentQuestion = { question: line.substring(2).trim(), answers: [], correct: '' };
-            } else if (/^[A-Z]\./.test(line)) {  
+            } else if (/^[A-Z]\./.test(line)) {
                 currentQuestion.answers.push(line);
             } else if (line.startsWith('Correct:')) {
                 currentQuestion.correct = line.split(':')[1].trim();
@@ -261,7 +281,13 @@ firebase.auth().onAuthStateChanged(function(user) {
 
         answeredQuestions = new Array(questions.length).fill(false);
         displayQuestion();
+
+        // Log para verificar as perguntas carregadas
+        console.log("Loaded Questions:", questions);
+    } catch (error) {
+        console.error("Error loading questions:", error);
     }
+}
 
    function displayQuestion() {
     const container = document.getElementById('quiz-container');
@@ -305,6 +331,7 @@ firebase.auth().onAuthStateChanged(function(user) {
 
     function showNextQuestion() {
         hideGIF();
+        console.log("Before Next Question:", currentQuestionIndex);
         if (currentQuestionIndex < questions.length - 1) {
             currentQuestionIndex++;
             displayQuestion();
@@ -313,6 +340,7 @@ firebase.auth().onAuthStateChanged(function(user) {
 
     function showPreviousQuestion() {
         hideGIF();
+        console.log("Before Previous Question:", currentQuestionIndex);
         if (currentQuestionIndex > 0) {
             currentQuestionIndex--;
             displayQuestion();
@@ -374,19 +402,58 @@ function toggleButtons(state) {
         gifContainer.style.display = 'none';
     }
 
-    function readQuestion() {
-        stopReading();
-        const questionText = document.getElementById('question-text').innerText;
-        speechSynthesisUtterance = new SpeechSynthesisUtterance(questionText);
-        speechSynthesisUtterance.lang = 'en-US';
-        speechSynthesis.speak(speechSynthesisUtterance);
+  function toggleSpeech(text, buttonElement, index) {
+    if (!('speechSynthesis' in window)) {
+        alert("Your browser does not support speech synthesis. Please enable it or use a compatible browser.");
+        return;
     }
 
-    function stopReading() {
-        if (speechSynthesisUtterance) {
-            speechSynthesis.cancel();
+    if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+        console.log("Speech synthesis stopped.");
+        buttonElement.src = 'businessman.png';
+    } else {
+        let voices = window.speechSynthesis.getVoices();
+        let usVoice = voices.find(voice => voice.lang === 'en-US');
+
+        if (!usVoice && voices.length === 0) {
+            // Se não houver vozes disponíveis, configure o evento para buscar as vozes posteriormente
+            window.speechSynthesis.onvoiceschanged = () => {
+                voices = window.speechSynthesis.getVoices();
+                usVoice = voices.find(voice => voice.lang === 'en-US');
+
+                if (!usVoice && !alertDisplayed) {
+                    alert("No 'en-US' voice found in your speech synthesizer. Please enable English language in your browser's speech synthesizer. For now, the default voice will be used, which may cause problems.");
+                    alertDisplayed = true;
+                }
+
+                speakText(text, usVoice || voices[0], buttonElement, index);
+            };
+        } else {
+            if (!usVoice && !alertDisplayed) {
+                alert("No 'en-US' voice found. Using default voice instead.");
+                alertDisplayed = true;
+            }
+
+            speakText(text, usVoice || voices[0], buttonElement, index);
         }
+
+        buttonElement.src = 'pause.png';
     }
+}
+
+function speakText(text, voice, buttonElement, index) {
+    let utterance = new SpeechSynthesisUtterance(text);
+    utterance.voice = voice;
+    utterance.lang = 'en-US';
+    console.log("Speaking with voice: ", voice.name);
+    window.speechSynthesis.speak(utterance);
+    utterance.onend = () => {
+        buttonElement.src = 'businessman.png';
+        spokenCards.add(index);
+        checkCompletion();
+    };
+}
 
     function checkCompletion() {
         if (answeredQuestions.every((answered) => answered)) {
@@ -457,13 +524,92 @@ function toggleButtons(state) {
         return params.get('fase'); 
     }
 
-    function getLevelAndUnitFromURL() {
-        const url = window.location.pathname;
-        const parts = url.split('/');
-        const level = parts[1];
-        const unit = parts[2];
-        return { level, unit };
+  function getLevelAndUnitFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    const level = params.get('level');
+    const unit = params.get('unit');
+
+    // Adicione os logs para verificar level e unit
+    console.log("Extracted Level from URL:", level);
+    console.log("Extracted Unit from URL:", unit);
+
+    return { level, unit };
+}
+
+async function handleBackButtonClick() {
+    const { level, unit } = getLevelAndUnitFromURL();
+
+    console.log("Checking progress for level:", level, "unit:", unit);
+
+    if (!level || !unit) {
+        alert("Level or Unit not identified in the URL.");
+        return;
     }
+
+    firebase.auth().onAuthStateChanged(async (user) => {
+        if (user) {
+            const uid = user.uid;
+            const isNextPhaseUnlocked = await checkPhaseProgress(uid, level, unit);
+
+            if (isNextPhaseUnlocked) {
+                window.history.back(); // Permite voltar normalmente
+            } else {
+                // Exibe a mensagem se a próxima fase não estiver desbloqueada
+                const confirmExit = confirm(
+                    "You have not completed this phase. Do you want to go back anyway?"
+                );
+                if (confirmExit) {
+                    window.history.back();
+                }
+            }
+        } else {
+            alert("Please log in to save your progress and continue.");
+        }
+    });
+}
+
+async function checkPhaseProgress(uid, level, unit) {
+    try {
+        // Obtem a fase atual e calcula a próxima
+        const currentPhase = parseInt(getPhaseFromURL());
+        const nextPhase = `fase${currentPhase + 1}`;
+        console.log("Checking progress for next phase:", nextPhase);
+
+        // Referência ao banco de dados para verificar a próxima fase
+        const dbRef = firebase.database().ref(`usuarios/${uid}/progresso/${level}/${unit}/${nextPhase}`);
+        const snapshot = await dbRef.once("value");
+        
+        const isUnlocked = snapshot.val() === true;
+        console.log(`Next phase (${nextPhase}) unlocked:`, isUnlocked);
+
+        return isUnlocked; // Retorna true se a próxima fase estiver desbloqueada
+    } catch (error) {
+        console.error("Error checking phase progress:", error);
+        return false; // Retorna false em caso de erro
+    }
+}
+
+function readQuestion() {
+    console.log("Reading question...");
+    stopReading(); // Cancela qualquer leitura anterior
+    const questionText = document.getElementById('question-text').innerText;
+
+    if (!('speechSynthesis' in window)) {
+        alert("Your browser does not support speech synthesis. Please enable it or use a compatible browser.");
+        return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(questionText);
+    utterance.lang = 'en-US';
+    window.speechSynthesis.speak(utterance);
+}
+
+function stopReading() {
+    console.log("Stopping reading...");
+    if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+    }
+}
 
     function generatePDF() {
         const { jsPDF } = window.jspdf;
