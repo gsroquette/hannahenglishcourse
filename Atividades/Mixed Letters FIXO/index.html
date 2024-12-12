@@ -302,49 +302,6 @@
         loadActivities();
     });
 
-// Função para atualizar o progresso no banco de dados
-  async function updateNextPhase(userId) {
-    console.log("Updating next phase...");
-    const currentPhase = getPhaseFromURL();
-    const { level, unit } = getLevelAndUnitFromURL();
-    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-
-    try {
-        if (currentPhase === "last") {
-            const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-            await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
-        } else if (currentPhase === "end") {
-            const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
-            await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
-        } else {
-            const nextPhase = parseInt(currentPhase) + 1;
-            await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true }); // Correção aqui
-        }
-    } catch (error) {
-        console.error("Erro ao atualizar o progresso da fase:", error);
-    }
-}
-
-    async function loadActivities() {
-        const { level, unit } = getLevelAndUnitFromURL();
-
-        try {
-            const wordsPath = `../../${level}/${unit}/data1/words.txt`;
-            const response = await fetch(wordsPath);
-            if (!response.ok) throw new Error(`Erro ao buscar palavras. Status: ${response.status}`);
-            const text = await response.text();
-
-            const words = text.trim().split('\n');
-            words.forEach((word, index) => {
-                const imageUrl = `../../${level}/${unit}/data1/imagens/imagem${index + 1}.png`;
-                activities.push(word);
-                createActivity(imageUrl, word);
-            });
-        } catch (error) {
-            console.error('Erro ao carregar palavras ou imagens:', error);
-        }
-    }
-
     function createActivity(imageUrl, word) {
         const activityContainer = document.getElementById('activity-container');
         const activityDiv = document.createElement('div');
@@ -420,9 +377,19 @@
                     activityDiv.dataset.completed = "true";
                 }
 
-                if (completedWords === activities.length) {
-                    showCompletionModal();
-                }
+               if (completedWords === activities.length) {
+    console.log("Todas as atividades foram concluídas!");
+    showCompletionModal();
+
+    // Atualiza o progresso no banco de dados
+    firebase.auth().onAuthStateChanged((user) => {
+        if (user) {
+            updateNextPhase(user.uid);
+        } else {
+            console.error("Usuário não autenticado. Progresso não pode ser atualizado.");
+        }
+    });
+}
             } else {
                 letterInputs.forEach(input => {
                     input.classList.add('incorrect');
@@ -434,6 +401,49 @@
         wordContainer.appendChild(checkAnswerBtn);
         activityDiv.appendChild(wordContainer);
         activityContainer.appendChild(activityDiv);
+    }
+
+// Função para atualizar o progresso no banco de dados
+  async function updateNextPhase(userId) {
+    console.log("Updating next phase...");
+    const currentPhase = getPhaseFromURL();
+    const { level, unit } = getLevelAndUnitFromURL();
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+    try {
+        if (currentPhase === "last") {
+            const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+            await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
+        } else if (currentPhase === "end") {
+            const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+            await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+        } else {
+            const nextPhase = parseInt(currentPhase) + 1;
+            await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true }); // Correção aqui
+        }
+    } catch (error) {
+        console.error("Erro ao atualizar o progresso da fase:", error);
+    }
+}
+
+    async function loadActivities() {
+        const { level, unit } = getLevelAndUnitFromURL();
+
+        try {
+            const wordsPath = `../../${level}/${unit}/data1/words.txt`;
+            const response = await fetch(wordsPath);
+            if (!response.ok) throw new Error(`Erro ao buscar palavras. Status: ${response.status}`);
+            const text = await response.text();
+
+            const words = text.trim().split('\n');
+            words.forEach((word, index) => {
+                const imageUrl = `../../${level}/${unit}/data1/imagens/imagem${index + 1}.png`;
+                activities.push(word);
+                createActivity(imageUrl, word);
+            });
+        } catch (error) {
+            console.error('Erro ao carregar palavras ou imagens:', error);
+        }
     }
 
     function shuffleWord(word) {
