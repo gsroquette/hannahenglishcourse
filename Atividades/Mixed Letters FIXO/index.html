@@ -144,17 +144,18 @@
         #completion-modal button:hover {
             background-color: #28a428;
         }
-@media (max-width: 600px) {
-    .letter-input {
-        width: 30px;
-        font-size: 28px;
-        margin-right: 3px;
-    }
 
-    .mixed-letters {
-        font-size: 28px;
-    }
-}
+        @media (max-width: 600px) {
+            .letter-input {
+                width: 30px;
+                font-size: 28px;
+                margin-right: 3px;
+            }
+
+            .mixed-letters {
+                font-size: 28px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -177,13 +178,12 @@
     <button onclick="closeModal()">Close</button>
 </div>
 
-<!-- Scripts do Firebase -->
+<!-- Scripts -->
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
 <script>
-    // Configuração do Firebase
     const firebaseConfig = {
         apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
         authDomain: "hannahenglishcourse.firebaseapp.com",
@@ -196,406 +196,314 @@
     };
     firebase.initializeApp(firebaseConfig);
 
-document.getElementById('backButton').addEventListener('click', async function () {
-    console.log("Botão 'Back' pressionado.");
-
-    const { level, unit } = getLevelAndUnitFromURL();
-    const currentPhase = parseInt(getPhaseFromURL());
-    const nextPhase = currentPhase + 1;
-
-    const user = firebase.auth().currentUser;
-    if (!user) {
-        console.error("Usuário não autenticado.");
-        alert("Você deve estar logado para realizar esta ação.");
-        return;
-    }
-
-    const userId = user.uid;
-    const progressRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/fase${nextPhase}`);
-
-    try {
-        const snapshot = await progressRef.once('value');
-        const isUnlocked = snapshot.val();
-        console.log("Próxima fase desbloqueada:", isUnlocked);
-
-        if (isUnlocked) {
-            history.back();
-        } else {
-            console.warn("A próxima fase está bloqueada.");
-            const confirmMessage = "A próxima fase está bloqueada. Tem certeza de que deseja sair desta página?";
-            if (confirm(confirmMessage)) {
-                history.back();
-            }
-        }
-    } catch (error) {
-        console.error("Erro ao verificar o progresso da fase:", error);
-        alert("Ocorreu um erro ao verificar o progresso.");
-    }
-});
-
-firebase.auth().onAuthStateChanged((user) => {
-    if (user) {
-        console.log("Usuário autenticado com sucesso:", user.uid);
-
-        const userId = user.uid;
-        const userRoleRef = firebase.database().ref(`usuarios/${userId}/role`);
-
-        userRoleRef.once('value').then((snapshot) => {
-            const role = snapshot.val();
-            console.log("Role do usuário recuperado:", role);
-
-            // Exibe o botão apenas se o role for "professor" ou "proprietário"
-            if (role === 'professor' || role === 'proprietário') {
-                document.getElementById("pdfButton").style.display = "inline-block";
-                console.log("Botão PDF exibido para o usuário.");
-            } else {
-                console.log("Usuário não é 'professor' ou 'proprietário'. Botão PDF oculto.");
-            }
-        }).catch((error) => {
-            console.error("Erro ao buscar o role do usuário no Firebase:", error);
-        });
-    } else {
-        console.warn("Nenhum usuário autenticado. Certifique-se de que o login foi realizado.");
-    }
-});
-
-async function generatePDF() {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-
-    // Carrega a logo e gera o PDF
-    const logo = new Image();
-    logo.src = 'Logo.png';
-
-    logo.onload = function() {
-        doc.addImage(logo, 'PNG', 10, 10, 30, 30);
-        doc.setFontSize(12);
-        doc.text("Name: __________________________________________ Date: ____________", 50, 20);
-        doc.setFontSize(16);
-        doc.text("Hannah Mixed Letters", 10, 50);
-
-        let yOffset = 60;
-        document.querySelectorAll('.activity').forEach((activity, index) => {
-            if (yOffset > 270) {
-                doc.addPage();
-                yOffset = 20;
-            }
-
-            const imgElement = activity.querySelector('img');
-            if (imgElement) {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                canvas.width = imgElement.width;
-                canvas.height = imgElement.height;
-                ctx.drawImage(imgElement, 0, 0, imgElement.width, imgElement.height);
-                const imgData = canvas.toDataURL('image/png');
-                doc.addImage(imgData, 'JPEG', 10, yOffset, 30, 30);
-            }
-
-            const wordContainer = activity.querySelector('.word-container');
-            if (wordContainer) {
-                doc.setFontSize(14);
-                let xPos = 50;
-                
-                // Adiciona espaços para o aluno escrever as letras
-                wordContainer.querySelectorAll('.letter-input').forEach(() => {
-                    doc.text("_____", xPos, yOffset + 10);
-                    xPos += 15;
-                });
-
-                // Adiciona as letras embaralhadas abaixo dos espaços
-                const mixedLettersElement = wordContainer.querySelector('.mixed-letters');
-                if (mixedLettersElement) {
-                    const mixedLetters = Array.from(mixedLettersElement.children).map(el => el.innerText).join(' ');
-                    yOffset += 10;
-                    doc.text(`Letters (mixed): ${mixedLetters}`, 50, yOffset + 10);
-                }
-
-                yOffset += 40;
-            }
-        });
-
-        doc.save("Hannah_Mixed_Letters.pdf");
-    };
-
-    logo.onerror = function() {
-        doc.setFontSize(12);
-        doc.text("Name: __________________________________________ Date: ____________", 50, 20);
-        doc.setFontSize(16);
-        doc.text("Hannah Mixed Letters", 10, 50);
-        doc.save("Hannah_Mixed_Letters.pdf");
-    };
-}
-
     let activities = [];
     let completedWords = 0;
-    let alertDisplayed = false; // Controle para exibir o alerta apenas uma vez
-    let selectedVoice = null; // Variável global para armazenar a voz selecionada
+    let alertDisplayed = false;
+    let selectedVoice = null;
 
-    // Função para embaralhar a palavra
+    document.getElementById('backButton').addEventListener('click', async function () {
+        console.log("Botão 'Back' pressionado.");
+
+        const { level, unit } = getLevelAndUnitFromURL();
+        const currentPhase = parseInt(getPhaseFromURL());
+        const nextPhase = currentPhase + 1;
+
+        const user = firebase.auth().currentUser;
+        if (!user) {
+            console.error("Usuário não autenticado.");
+            alert("Você deve estar logado para realizar esta ação.");
+            return;
+        }
+
+        const userId = user.uid;
+        const progressRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/fase${nextPhase}`);
+
+        try {
+            const snapshot = await progressRef.once('value');
+            const isUnlocked = snapshot.val();
+            console.log("Próxima fase desbloqueada:", isUnlocked);
+
+            if (isUnlocked) {
+                history.back();
+            } else {
+                console.warn("A próxima fase está bloqueada.");
+                const confirmMessage = "A próxima fase está bloqueada. Tem certeza de que deseja sair desta página?";
+                if (confirm(confirmMessage)) {
+                    history.back();
+                }
+            }
+        } catch (error) {
+            console.error("Erro ao verificar o progresso da fase:", error);
+            alert("Ocorreu um erro ao verificar o progresso.");
+        }
+    });
+
+    firebase.auth().onAuthStateChanged((user) => {
+        if (user) {
+            console.log("Usuário autenticado com sucesso:", user.uid);
+
+            const userId = user.uid;
+            const userRoleRef = firebase.database().ref(`usuarios/${userId}/role`);
+
+            userRoleRef.once('value').then((snapshot) => {
+                const role = snapshot.val();
+                console.log("Role do usuário recuperado:", role);
+
+                if (role === 'professor' || role === 'proprietário') {
+                    document.getElementById("pdfButton").style.display = "inline-block";
+                    console.log("Botão PDF exibido para o usuário.");
+                } else {
+                    console.log("Usuário não é 'professor' ou 'proprietário'. Botão PDF oculto.");
+                }
+            }).catch((error) => {
+                console.error("Erro ao buscar o role do usuário no Firebase:", error);
+            });
+        } else {
+            console.warn("Nenhum usuário autenticado. Certifique-se de que o login foi realizado.");
+        }
+    });
+
+    function initializeVoices() {
+        const synth = window.speechSynthesis;
+        const voices = synth.getVoices();
+
+        console.log("Available voices:", voices);
+
+        selectedVoice = voices.find(voice => voice.lang === "en-US");
+
+        if (!selectedVoice && !alertDisplayed) {
+            alertDisplayed = true;
+            alert("No 'en-US' voice found. Using the first available voice.");
+            selectedVoice = voices[0];
+        }
+
+        console.log("Selected voice:", selectedVoice ? selectedVoice.name : "Default voice");
+    }
+
+    if (!window.speechSynthesis.onvoiceschanged) {
+        window.speechSynthesis.onvoiceschanged = initializeVoices;
+    }
+
+    function readText(text) {
+        const synth = window.speechSynthesis;
+        synth.cancel();
+
+        if (!selectedVoice) {
+            initializeVoices();
+        }
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.voice = selectedVoice || synth.getVoices()[0];
+        synth.speak(utterance);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initializeVoices();
+        loadActivities();
+    });
+
+    async function loadActivities() {
+        const { level, unit } = getLevelAndUnitFromURL();
+
+        try {
+            const wordsPath = `../../${level}/${unit}/data1/words.txt`;
+            const response = await fetch(wordsPath);
+            if (!response.ok) throw new Error(`Erro ao buscar palavras. Status: ${response.status}`);
+            const text = await response.text();
+
+            const words = text.trim().split('\n');
+            words.forEach((word, index) => {
+                const imageUrl = `../../${level}/${unit}/data1/imagens/imagem${index + 1}.png`;
+                activities.push(word);
+                createActivity(imageUrl, word);
+            });
+        } catch (error) {
+            console.error('Erro ao carregar palavras ou imagens:', error);
+        }
+    }
+
+    function createActivity(imageUrl, word) {
+        const activityContainer = document.getElementById('activity-container');
+        const activityDiv = document.createElement('div');
+        activityDiv.classList.add('activity');
+        activityDiv.dataset.completed = "false";
+
+        const imgElement = document.createElement('img');
+        imgElement.src = imageUrl;
+
+        imgElement.onerror = function () {
+            imgElement.style.display = 'none';
+        };
+
+        activityDiv.appendChild(imgElement);
+
+        const wordContainer = document.createElement('div');
+        wordContainer.classList.add('word-container');
+
+        const shuffledWord = shuffleWord(word);
+        const mixedLettersElement = document.createElement('div');
+        mixedLettersElement.classList.add('mixed-letters');
+        shuffledWord.split('').forEach(letter => {
+            const letterElement = document.createElement('span');
+            letterElement.innerText = letter;
+            mixedLettersElement.appendChild(letterElement);
+        });
+        wordContainer.appendChild(mixedLettersElement);
+
+        const inputContainer = document.createElement('div');
+        const letterInputs = [];
+
+        shuffledWord.split('').forEach((_, index, array) => {
+            const letterInput = document.createElement('input');
+            letterInput.classList.add('letter-input');
+            letterInput.maxLength = 1;
+
+            letterInput.addEventListener('input', function () {
+                if (letterInput.value.length === 1) {
+                    if (index < array.length - 1) {
+                        letterInputs[index + 1].focus();
+                    } else {
+                        letterInput.blur();
+                    }
+                }
+            });
+
+            inputContainer.appendChild(letterInput);
+            letterInputs.push(letterInput);
+        });
+
+        wordContainer.appendChild(inputContainer);
+
+        const checkAnswerBtn = document.createElement('button');
+        checkAnswerBtn.classList.add('check-answer-btn');
+        checkAnswerBtn.innerText = 'Check Answer';
+
+        checkAnswerBtn.onclick = function () {
+            const userAnswer = Array.from(inputContainer.querySelectorAll('.letter-input'))
+                .map(input => input.value.toUpperCase())
+                .join('');
+
+            const letterInputs = inputContainer.querySelectorAll('.letter-input');
+            if (userAnswer === word.toUpperCase()) {
+                letterInputs.forEach(input => {
+                    input.classList.add('correct');
+                    input.classList.remove('incorrect');
+                });
+
+                readText(word);
+
+                if (activityDiv.dataset.completed === "false") {
+                    completedWords++;
+                    activityDiv.dataset.completed = "true";
+                }
+
+                if (completedWords === activities.length) {
+                    showCompletionModal();
+                }
+            } else {
+                letterInputs.forEach(input => {
+                    input.classList.add('incorrect');
+                    input.classList.remove('correct');
+                });
+            }
+        };
+
+        wordContainer.appendChild(checkAnswerBtn);
+        activityDiv.appendChild(wordContainer);
+        activityContainer.appendChild(activityDiv);
+    }
+
     function shuffleWord(word) {
         const shuffled = word.split('').sort(() => 0.5 - Math.random()).join('');
         return shuffled !== word ? shuffled : shuffleWord(word);
-    }   
-
-function readText(text) {
-    const synth = window.speechSynthesis;
-    synth.cancel(); // Cancela qualquer síntese de voz anterior
-
-    if (!selectedVoice) {
-        const voices = synth.getVoices();
-        selectedVoice = voices.find(voice => voice.lang === "en-US");
-
-        if (!selectedVoice) {
-            if (voices.length === 0) {
-                synth.onvoiceschanged = () => {
-                    const updatedVoices = synth.getVoices();
-                    selectedVoice = updatedVoices.find(voice => voice.lang === "en-US");
-
-                    if (!selectedVoice && !alertDisplayed) {
-                        alertDisplayed = true; // Marca que o alerta foi exibido
-                        alert("No 'en-US' voice found. Using the default available voice.");
-                    }
-
-                    const utterance = new SpeechSynthesisUtterance(text);
-                    utterance.voice = selectedVoice || updatedVoices[0]; // Fallback para a primeira voz disponível
-                    synth.speak(utterance);
-                };
-                return;
-            } else if (!alertDisplayed) {
-                alertDisplayed = true; // Marca que o alerta foi exibido
-                alert("No 'en-US' voice found. Using the default available voice.");
-            }
-        }
     }
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.voice = selectedVoice || synth.getVoices()[0]; // Fallback para a primeira voz disponível
-    synth.speak(utterance);
-}
-
-function initializeVoices() {
-    const synth = window.speechSynthesis;
-    const voices = synth.getVoices();
-
-    console.log("Available voices:", voices);
-
-    selectedVoice = voices.find(voice => voice.lang === "en-US");
-    
-    if (!selectedVoice && !alertDisplayed) {
-        alertDisplayed = true; // Garante que o alerta seja exibido apenas uma vez
-        alert("No 'en-US' voice found. Using the first available voice.");
-        selectedVoice = voices[0]; // Fallback para a primeira voz
+    function showCompletionModal() {
+        document.getElementById('overlay').style.display = 'block';
+        document.getElementById('completion-modal').style.display = 'block';
     }
 
-    console.log("Selected voice:", selectedVoice ? selectedVoice.name : "Default voice");
-}
-
-// Configura evento global apenas uma vez
-if (!window.speechSynthesis.onvoiceschanged) {
-    window.speechSynthesis.onvoiceschanged = initializeVoices;
-}
-
-    // Função para capturar fase, level e unit do URL
-    function getPhaseFromURL() {
-        const params = new URLSearchParams(window.location.search);
-        return params.get('fase'); // Obtém o valor de 'fase'
-    }
-
-    function getLevelAndUnitFromURL() {
-    const params = new URLSearchParams(window.location.search);
-    const level = params.get('level');
-    const unit = params.get('unit');
-    return { level, unit };
-}
-
-    // Função para verificar autenticação do usuário
-    function ensureUserIsAuthenticated(callback) {
-        firebase.auth().onAuthStateChanged(function(user) {
-            if (user) {
-                callback(user.uid); // Executa a função de callback se o usuário estiver logado
-            } else {
-                console.error("Usuário não autenticado");
-            }
-        });
-    }
-
-    // Função para atualizar o progresso no banco de dados
-  async function updateNextPhase(userId) {
-    console.log("Updating next phase...");
-    const currentPhase = getPhaseFromURL();
-    const { level, unit } = getLevelAndUnitFromURL();
-    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-
-    try {
-        if (currentPhase === "last") {
-            const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-            await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
-        } else if (currentPhase === "end") {
-            const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
-            await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
-        } else {
-            const nextPhase = parseInt(currentPhase) + 1;
-            await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true }); // Correção aqui
-        }
-    } catch (error) {
-        console.error("Erro ao atualizar o progresso da fase:", error);
-    }
-}
-
-    // Função para carregar as atividades
-async function loadActivities() {
-    try {
-        const { level, unit } = getLevelAndUnitFromURL();
-        console.log("Level e Unit extraídos da URL:", level, unit);
-
-        const wordsPath = `../../${level}/${unit}/data1/words.txt`;
-        console.log("Caminho para o arquivo de palavras:", wordsPath);
-
-        const response = await fetch(wordsPath);
-        if (!response.ok) throw new Error(`Erro ao buscar palavras. Status: ${response.status}`);
-        const text = await response.text();
-
-        const words = text.trim().split('\n');
-        console.log("Palavras carregadas:", words);
-
-        words.forEach((word, index) => {
-           const imageUrl = `../../${level}/${unit}/data1/imagens/imagem${index + 1}.png`;
-            console.log(`Tentando carregar imagem para a palavra '${word}':`, imageUrl);
-            activities.push(word);
-            createActivity(imageUrl, word);
-        });
-    } catch (error) {
-        console.error('Erro ao carregar palavras ou imagens:', error);
-    }
-}
-
-    // Função para criar uma atividade
-function createActivity(imageUrl, word) {
-    console.log("Criando atividade para a palavra:", word, "com imagem:", imageUrl);
-
-    const activityContainer = document.getElementById('activity-container');
-    const activityDiv = document.createElement('div');
-    activityDiv.classList.add('activity');
-    activityDiv.dataset.completed = "false"; // Inicializa como não concluída
-
-    const imgElement = document.createElement('img');
-    imgElement.src = imageUrl;
-
-    imgElement.onerror = function () {
-        console.warn(`Erro ao carregar a imagem: ${imageUrl}`);
-        imgElement.style.display = 'none'; // Esconde a imagem se não carregar
-    };
-
-    activityDiv.appendChild(imgElement);
-
-    const wordContainer = document.createElement('div');
-    wordContainer.classList.add('word-container');
-
-    const shuffledWord = shuffleWord(word);
-    console.log("Palavra embaralhada:", shuffledWord);
-
-    const mixedLettersElement = document.createElement('div');
-    mixedLettersElement.classList.add('mixed-letters');
-    shuffledWord.split('').forEach(letter => {
-        const letterElement = document.createElement('span');
-        letterElement.innerText = letter;
-        mixedLettersElement.appendChild(letterElement);
-    });
-    wordContainer.appendChild(mixedLettersElement);
-
-    const inputContainer = document.createElement('div');
-    const letterInputs = [];
-
-    shuffledWord.split('').forEach((_, index, array) => {
-        const letterInput = document.createElement('input');
-        letterInput.classList.add('letter-input');
-        letterInput.maxLength = 1;
-
-        letterInput.addEventListener('input', function () {
-            if (letterInput.value.length === 1) {
-                if (index < array.length - 1) {
-                    letterInputs[index + 1].focus(); // Move o foco para o próximo campo
-                } else {
-                    letterInput.blur(); // Remove o foco do último campo
-                }
-            }
-        });
-
-        inputContainer.appendChild(letterInput);
-        letterInputs.push(letterInput);
-    });
-
-    wordContainer.appendChild(inputContainer);
-
-    const checkAnswerBtn = document.createElement('button');
-    checkAnswerBtn.classList.add('check-answer-btn');
-    checkAnswerBtn.innerText = 'Check Answer';
-
-    checkAnswerBtn.onclick = function () {
-        const userAnswer = Array.from(inputContainer.querySelectorAll('.letter-input'))
-            .map(input => input.value.toUpperCase())
-            .join('');
-        console.log("Resposta do usuário:", userAnswer);
-
-        const letterInputs = inputContainer.querySelectorAll('.letter-input');
-        if (userAnswer === word.toUpperCase()) {
-            console.log("Resposta correta:", word);
-
-            // Marca inputs como corretos
-            letterInputs.forEach(input => {
-                input.classList.add('correct');
-                input.classList.remove('incorrect');
-            });
-
-            // Lê a palavra correta usando o sintetizador de voz
-            readText(word);
-
-            if (activityDiv.dataset.completed === "false") {
-                completedWords++;
-                activityDiv.dataset.completed = "true"; // Marca a atividade como concluída
-                console.log(`Palavras concluídas: ${completedWords}/${activities.length}`);
-            }
-
-            // Verifica se todas as atividades foram concluídas
-            if (completedWords === activities.length) {
-                console.log("Todas as atividades foram concluídas!");
-                showCompletionModal(); // Exibe o modal de conclusão
-                ensureUserIsAuthenticated(updateNextPhase); // Atualiza a próxima fase no Firebase
-            }
-        } else {
-            console.warn("Resposta incorreta:", userAnswer);
-
-            // Marca inputs como incorretos
-            letterInputs.forEach(input => {
-                input.classList.add('incorrect');
-                input.classList.remove('correct');
-            });
-        }
-    };
-
-    wordContainer.appendChild(checkAnswerBtn);
-    activityDiv.appendChild(wordContainer);
-    activityContainer.appendChild(activityDiv);
-}
-
-    // Função para exibir o modal de conclusão
-   function showCompletionModal() {
-    document.getElementById('overlay').style.display = 'block';
-    document.getElementById('completion-modal').style.display = 'block';
-}
-
-    // Função para fechar o modal de conclusão
     function closeModal() {
         document.getElementById('overlay').style.display = 'none';
         document.getElementById('completion-modal').style.display = 'none';
     }
 
-  document.addEventListener('DOMContentLoaded', () => {
-    initializeVoices(); // Inicializa as vozes disponíveis
-    loadActivities(); // Carrega as atividades
-});
-</script>
+    async function generatePDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
 
+        const logo = new Image();
+        logo.src = 'Logo.png';
+
+        logo.onload = function () {
+            doc.addImage(logo, 'PNG', 10, 10, 30, 30);
+            doc.setFontSize(12);
+            doc.text("Name: __________________________________________ Date: ____________", 50, 20);
+            doc.setFontSize(16);
+            doc.text("Hannah Mixed Letters", 10, 50);
+
+            let yOffset = 60;
+            document.querySelectorAll('.activity').forEach((activity, index) => {
+                if (yOffset > 270) {
+                    doc.addPage();
+                    yOffset = 20;
+                }
+
+                const imgElement = activity.querySelector('img');
+                if (imgElement) {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = imgElement.width;
+                    canvas.height = imgElement.height;
+                    ctx.drawImage(imgElement, 0, 0, imgElement.width, imgElement.height);
+                    const imgData = canvas.toDataURL('image/png');
+                    doc.addImage(imgData, 'JPEG', 10, yOffset, 30, 30);
+                }
+
+                const wordContainer = activity.querySelector('.word-container');
+                if (wordContainer) {
+                    doc.setFontSize(14);
+                    let xPos = 50;
+
+                    wordContainer.querySelectorAll('.letter-input').forEach(() => {
+                        doc.text("_____", xPos, yOffset + 10);
+                        xPos += 15;
+                    });
+
+                    const mixedLettersElement = wordContainer.querySelector('.mixed-letters');
+                    if (mixedLettersElement) {
+                        const mixedLetters = Array.from(mixedLettersElement.children).map(el => el.innerText).join(' ');
+                        yOffset += 10;
+                        doc.text(`Letters (mixed): ${mixedLetters}`, 50, yOffset + 10);
+                    }
+
+                    yOffset += 40;
+                }
+            });
+
+            doc.save("Hannah_Mixed_Letters.pdf");
+        };
+
+        logo.onerror = function () {
+            doc.setFontSize(12);
+            doc.text("Name: __________________________________________ Date: ____________", 50, 20);
+            doc.setFontSize(16);
+            doc.text("Hannah Mixed Letters", 10, 50);
+            doc.save("Hannah_Mixed_Letters.pdf");
+        };
+    }
+
+    function getPhaseFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('fase');
+    }
+
+    function getLevelAndUnitFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        const level = params.get('level');
+        const unit = params.get('unit');
+        return { level, unit };
+    }
+</script>
 </body>
 </html>
