@@ -292,13 +292,54 @@
 
     let activities = [];
     let completedWords = 0; // Contador de palavras concluídas
+    let alertDisplayed = false;
 
     function speakText(text) {
-        const synth = window.speechSynthesis;
-        const utterThis = new SpeechSynthesisUtterance(text);
-        utterThis.lang = 'en-US';
-        synth.speak(utterThis);
+    const synth = window.speechSynthesis;
+    synth.cancel(); // Cancela qualquer síntese de voz anterior
+
+    // Função para encontrar a voz "en-US"
+    function getEnglishVoice() {
+        const voices = synth.getVoices();
+        return voices.find(voice => voice.lang === "en-US");
     }
+
+    const englishVoice = getEnglishVoice();
+
+    if (!englishVoice) {
+        if (!alertDisplayed) {
+            if (synth.getVoices().length === 0) {
+                alert("No voices available in your speech synthesizer. Please enable English language in your browser's settings.");
+            } else {
+                alert("No 'en-US' voice found. Using the default voice instead.");
+            }
+            alertDisplayed = true;
+        }
+
+        if (!synth.onvoiceschanged) {
+            synth.onvoiceschanged = () => {
+                const newEnglishVoice = getEnglishVoice();
+                if (newEnglishVoice) {
+                    speakWithVoice(newEnglishVoice, text);
+                }
+            };
+        }
+
+        speakWithVoice(null, text); // Usa a voz padrão, se disponível
+    } else {
+        speakWithVoice(englishVoice, text);
+    }
+}
+
+function speakWithVoice(voice, text) {
+    const synth = window.speechSynthesis;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "en-US";
+    if (voice) {
+        utterance.voice = voice;
+    }
+    synth.speak(utterance);
+}
 
     async function loadActivities() {
         try {
