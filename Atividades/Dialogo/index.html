@@ -245,24 +245,70 @@
             window.history.back();
         }
 
-        function speakText(text, callback) {
-            clearTimeout(idleTimer);
-            const utterance = new SpeechSynthesisUtterance(text.replace(/usuario_nome/g, userName));
-            utterance.lang = 'en-US';
-            utterance.onstart = function() {
-                robotImg.src = '../../../../../imagens/robo1.gif';
-            };
-            utterance.onend = function() {
-                robotImg.src = '../../../../../imagens/robo1_static.png';
-                if (callback) {
-                    callback();
-                }
-                dialoguesRead++;
-                checkCompletion();
-                startIdleTimer();
-            };
-            window.speechSynthesis.speak(utterance);
+     function speakText(text, callback) {
+    clearTimeout(idleTimer);
+
+    const synth = window.speechSynthesis;
+    let voices = synth.getVoices();
+    let alertDisplayed = false; // Garante que o alerta seja exibido apenas uma vez
+    let selectedVoice = null;
+
+    console.log("Checking for available voices...");
+
+    function findAndSetVoice() {
+        voices = synth.getVoices();
+        selectedVoice = voices.find(voice => voice.lang === 'en-US'); // Procura a voz "en-US"
+
+        if (!selectedVoice) {
+            if (voices.length === 0) {
+                console.warn("No voices loaded yet. Waiting for voices to load...");
+                synth.onvoiceschanged = findAndSetVoice; // Tenta novamente quando as vozes forem carregadas
+                return;
+            } else if (!alertDisplayed) {
+                alertDisplayed = true;
+                alert("No 'en-US' voice found. Using default voice instead.");
+                console.warn("No 'en-US' voice found. Using default voice.");
+            }
+        } else {
+            console.log("Using voice:", selectedVoice.name, "(", selectedVoice.lang, ")");
         }
+
+        // Criar a fala somente após carregar as vozes
+        createUtterance();
+    }
+
+    function createUtterance() {
+        const utterance = new SpeechSynthesisUtterance(text.replace(/usuario_nome/g, userName));
+        utterance.lang = 'en-US'; // Força o idioma para "en-US"
+        utterance.voice = selectedVoice || null; // Usa a voz encontrada ou a padrão
+
+        utterance.onstart = function () {
+            robotImg.src = '../../../../../imagens/robo1.gif';
+        };
+        utterance.onend = function () {
+            robotImg.src = '../../../../../imagens/robo1_static.png';
+            if (callback) {
+                callback();
+            }
+            dialoguesRead++;
+            console.log("Dialogues read:", dialoguesRead);
+            checkCompletion();
+            startIdleTimer();
+        };
+
+        // Caso nenhuma voz esteja disponível ainda
+        if (!voices.length) {
+            alertDisplayed = true;
+            alert("No 'en-US' voice found in your speech synthesizer. Please enable English language in your browser's speech synthesizer. For now, the default voice will be used, which may cause problems.");
+            console.warn("Speech synthesis not fully loaded. Default voice may be used.");
+        }
+
+        synth.speak(utterance);
+    }
+
+    // Verifica vozes antes de criar o utterance
+    findAndSetVoice();
+}
 
  function initializeDialogue() {
     const { level, unit } = getLevelAndUnitFromURL();
