@@ -1,4 +1,4 @@
-const gridSize = 15;
+const gridSize = 8;
 const canvas = document.getElementById('word-search-canvas');
 const ctx = canvas.getContext('2d');
 
@@ -61,7 +61,7 @@ async function loadWords() {
             throw new Error(`Erro ao carregar o arquivo: ${filePath}`);
         }
         const text = await response.text();
-        wordsToFind = text.split(/\r?\n/).filter(word => word.trim() !== '');
+        wordsToFind = text.split(/\r?\n/).filter(word => word.trim() !== '').slice(0, 5); // Seleciona as 5 primeiras palavras válidas
         console.log('Palavras carregadas dinamicamente:', wordsToFind); // Log para verificar as palavras carregadas
         init(); // Inicia o jogo com as palavras carregadas
     } catch (error) {
