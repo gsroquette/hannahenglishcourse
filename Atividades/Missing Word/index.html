@@ -156,7 +156,7 @@
    </style>
 </head>
 <body>
-<button onclick="history.back()" style="padding: 15px 25px; background-color: black; color: white; border: none; border-radius: 10px; font-size: 1.5rem; cursor: pointer; transition: background-color 0.3s ease;">
+<button id="backButton" style="padding: 15px 25px; background-color: black; color: white; border: none; border-radius: 10px; font-size: 1.5rem; cursor: pointer; transition: background-color 0.3s ease;">
     Back
 </button>
 <button id="pdfButton" onclick="generatePDF()" style="display: none; padding: 15px 25px; background-color: #32CD32; color: white; border: none; border-radius: 10px; font-size: 1.5rem; cursor: pointer; transition: background-color 0.3s ease; margin-top: 10px;">
@@ -518,6 +518,42 @@ function getPhaseFromURL() {
     }
 
     document.addEventListener('DOMContentLoaded', loadActivities);
+document.getElementById("backButton").addEventListener("click", async () => {
+    const { level, unit } = getLevelAndUnitFromURL();
+    const currentPhase = parseInt(getPhaseFromURL());
+    const nextPhase = `fase${currentPhase + 1}`;
+
+    try {
+        // Verifica se o usuário está autenticado
+        const user = firebase.auth().currentUser;
+        if (!user) {
+            console.error("Usuário não autenticado.");
+            history.back(); // Permite a navegação mesmo sem autenticação
+            return;
+        }
+
+        const userId = user.uid;
+        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/${nextPhase}`);
+
+        const snapshot = await dbRef.once("value");
+        if (snapshot.exists() && snapshot.val() === true) {
+            // Próxima fase está desbloqueada
+            history.back();
+        } else {
+            // Exibe a mensagem de confirmação
+            const confirmNavigation = confirm("The next phase is locked. Do you still want to navigate back?");
+            if (confirmNavigation) {
+                history.back();
+            }
+        }
+    } catch (error) {
+        console.error("Erro ao verificar o progresso da fase:", error);
+        const confirmNavigation = confirm("Unable to verify the next phase status. Do you still want to navigate back?");
+        if (confirmNavigation) {
+            history.back();
+        }
+    }
+});
 </script>
 
 </body>
