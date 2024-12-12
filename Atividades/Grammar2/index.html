@@ -23,6 +23,22 @@
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             position: relative;
         }
+.check-btn {
+    padding: 8px 15px;
+    background-color: white;
+    color: black;
+    border: 1px solid #ccc;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.check-btn:hover {
+    background-color: #f0f0f0;
+    box-shadow: 3px 3px 7px rgba(0, 0, 0, 0.2);
+}
         .back-button {
             position: absolute;
             top: 20px;
@@ -111,28 +127,65 @@
             transform: scale(1.1);
         }
         .answer {
-            font-weight: bold;
-            color: #007bff;
-            margin-left: 10px;
-        }
-        .show-answer-btn {
-            padding: 8px 15px;
-            background-color: white;
-            color: black;
-            border: 1px solid #ccc;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: background-color 0.3s ease, box-shadow 0.3s ease;
-            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
-        }
-        .show-answer-btn:hover {
-            background-color: #f0f0f0;
-            box-shadow: 3px 3px 7px rgba(0, 0, 0, 0.2);
-        }
+    font-weight: bold;
+    color: green;
+    margin-left: 10px;
+    display: none; /* Respostas começam ocultas */
+}
+.answer-input {
+    width: 100px;
+    padding: 5px;
+    margin-left: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 1rem;
+    transition: background-color 0.3s ease; /* Animação de transição de cor */
+}
+
+.show-answer-btn {
+    padding: 8px 15px;
+    background-color: white;
+    color: black;
+    border: 1px solid #ccc;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.show-answer-btn:hover {
+    background-color: #f0f0f0;
+    box-shadow: 3px 3px 7px rgba(0, 0, 0, 0.2);
+}
+
+.see-answer-btn {
+    padding: 8px 15px;
+    background-color: #f0ad4e;
+    color: white;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    margin-left: 10px;
+}
+
+.see-answer-btn:hover {
+    background-color: #ec971f;
+    box-shadow: 3px 3px 7px rgba(0, 0, 0, 0.2);
+}
     </style>
 </head>
 <body>
+
+<div id="completionModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); z-index:9999;">
+    <div style="background:white; padding:20px; border-radius:8px; max-width:400px; margin:100px auto; text-align:center;">
+        <h2>Congratulations!</h2>
+        <p>You have successfully completed the activity!</p>
+        <button onclick="closeModal()">OK</button>
+    </div>
+</div>
 
 <div class="container">
     <a href="javascript:history.back()" class="back-button">Back</a>
@@ -176,56 +229,165 @@
 
     let totalAnswers = 0;
     let clickedAnswers = 0;
-
-    function loadTextFile() {
-        fetch('texto.txt')
-            .then(response => response.text())
-            .then(data => {
-                const contentDiv = document.getElementById('content');
-                const lines = data.split('\n');
-                let currentSection = '';
-                let htmlContent = '';
-
-                lines.forEach(line => {
-                    if (line.startsWith('Title: ')) {
-                        document.getElementById('title').innerText = line.replace('Title: ', '');
-                    } else if (line.startsWith('# ')) {
-                        if (currentSection) {
-                            htmlContent += '</div>';
-                        }
-                        currentSection = line.replace('# ', '');
-                        htmlContent += `<div class="section"><h2>${currentSection}</h2>`;
-                    } else if (line.includes('[Answer:')) {
-                        const [question, answer] = line.split('[Answer:');
-                        const cleanedAnswer = answer.replace(']', '').trim();
-                        htmlContent += `<p>${question.trim()} <button class="show-answer-btn" onclick="handleAnswerClick(this)">Answer</button><span class="answer" style="display:none;">${cleanedAnswer}</span></p>`;
-                        totalAnswers++;
-                    } else {
-                        htmlContent += `<p>${line}</p>`;
-                    }
-                });
-
-                contentDiv.innerHTML = htmlContent + '</div>';
-            })
-            .catch(error => console.error('Error loading the text file:', error));
+    let isTextFileLoaded = false; // Variável para rastrear se já foi carregado
+    
+function loadTextFile() {
+    if (isTextFileLoaded) {
+        console.log("Arquivo de texto já carregado. Ignorando duplicação.");
+        return; // Impede execução duplicada
     }
 
-    function handleAnswerClick(button) {
-        const answerElement = button.nextElementSibling;
-        if (answerElement.style.display === 'none') {
-            answerElement.style.display = 'inline';
-            clickedAnswers++;
+    console.log(`Iniciando cálculo de totalAnswers.`);
+    totalAnswers = 0; // Resetar o totalAnswers antes de carregar os botões
+    console.log(`Reset totalAnswers para: ${totalAnswers}`);
 
-            if (clickedAnswers === totalAnswers) {
-                markActivityAsCompleted();
+    const { level, unit } = getLevelAndUnitFromURL();
+    const filePath = `../../${level}/${unit}/DataGrammar2/texto.txt`;
+
+    fetch(filePath)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Erro ao carregar o arquivo: ${response.statusText}`);
             }
+            return response.text();
+        })
+        .then(data => {
+            const contentDiv = document.getElementById('content');
+            const lines = data.split('\n');
+            let currentSection = '';
+            let htmlContent = '';
+
+            lines.forEach(line => {
+                if (line.startsWith('Title: ')) {
+                    document.getElementById('title').innerText = line.replace('Title: ', '');
+                } else if (line.startsWith('# ')) {
+                    if (currentSection) {
+                        htmlContent += '</div>';
+                    }
+                    currentSection = line.replace('# ', '');
+                    htmlContent += `<div class="section"><h2>${currentSection}</h2>`;
+                } else if (line.includes('[Answer:')) {
+                    const [question, answer] = line.split('[Answer:');
+                    const cleanedAnswer = answer.replace(']', '').trim();
+
+                    // Substituir ___ pelo campo de entrada diretamente
+                    const questionWithInput = question.replace('___', '<input type="text" class="answer-input" placeholder="Type here..." />');
+
+                    htmlContent += `
+                        <p>
+                            ${questionWithInput} 
+                            <button class="check-btn" data-answer="${cleanedAnswer}" onclick="checkAnswer(this)">Check</button>
+                            <span class="answer" style="display: none;">${cleanedAnswer}</span>
+                        </p>`;
+                    totalAnswers++;
+                    console.log(`Incrementando totalAnswers: ${totalAnswers}`);
+                } else {
+                    htmlContent += `<p>${line}</p>`;
+                }
+            });
+
+            contentDiv.innerHTML = htmlContent;
+            console.log(`Total de botões "Check" carregados: ${totalAnswers}`);
+            isTextFileLoaded = true; // Marca como carregado
+        })
+        .catch(error => console.error('Erro ao carregar o arquivo:', error));
+}
+
+function getAnswerFromLine(line) {
+    // Extrai a resposta de uma linha de texto que contém '[Answer:...]'
+    const match = line.match(/\[Answer:(.*?)\]/);
+    return match ? match[1].trim() : '';
+}
+
+function checkAnswer(button) {
+    const userInput = button.previousElementSibling; // Campo de texto anterior
+    const answerSpan = button.nextElementSibling; // Resposta oculta
+    const correctAnswer = button.getAttribute('data-answer'); // Resposta correta no botão
+
+    if (userInput.value.trim() === '') {
+        alert('Please type your answer before checking.');
+        return;
+    }
+
+    // Comparação da resposta
+    if (userInput.value.trim().toLowerCase() === correctAnswer.toLowerCase()) {
+        userInput.style.backgroundColor = 'lightgreen'; // Resposta correta
+        console.log("Resposta correta!");
+
+        if (!button.disabled) {
+            clickedAnswers++; // Incrementar contador de respostas corretas apenas uma vez
+            button.disabled = true; // Desabilitar botão se a resposta estiver correta
+        }
+
+        // Remover o botão "See Answer" se já existir
+        const seeAnswerButton = button.parentNode.querySelector('.see-answer-btn');
+        if (seeAnswerButton) {
+            seeAnswerButton.remove();
+        }
+    } else {
+        userInput.style.backgroundColor = 'lightcoral'; // Resposta incorreta
+        console.log("Resposta incorreta! Por favor, tente novamente.");
+
+        // Criar o botão "See Answer" se ainda não existir
+        let seeAnswerButton = button.parentNode.querySelector('.see-answer-btn');
+        if (!seeAnswerButton) {
+            seeAnswerButton = document.createElement('button');
+            seeAnswerButton.textContent = 'See Answer';
+            seeAnswerButton.className = 'see-answer-btn';
+            seeAnswerButton.onclick = () => showCorrectAnswer(answerSpan);
+            button.parentNode.appendChild(seeAnswerButton);
         }
     }
 
-    function markActivityAsCompleted() {
-        console.log("Atividade concluída!");
-        ensureUserIsAuthenticated(updateNextPhase);
+    // Checar se todas as respostas estão corretas
+    console.log(`Botões clicados (respostas corretas): ${clickedAnswers} de ${totalAnswers}`);
+    if (clickedAnswers === totalAnswers) {
+        console.log("Todas as respostas estão corretas. Marcando atividade como concluída...");
+        markActivityAsCompleted(); // Marcar a atividade como concluída
+        showCompletionMessage(); // Exibir mensagem de conclusão
     }
+}
+
+function showCorrectAnswer(answerSpan) {
+    answerSpan.style.display = 'inline'; // Tornar visível
+    console.log("Resposta correta exibida:", answerSpan.textContent);
+}
+
+function showCompletionMessage() {
+    const modal = document.getElementById('completionModal');
+    modal.style.display = 'block';
+}
+
+function closeModal() {
+    const modal = document.getElementById('completionModal');
+    modal.style.display = 'none';
+}
+
+function loadLessonContent() {
+    const { level, unit } = getLevelAndUnitFromURL();
+    const currentPhase = getPhaseFromURL(); // Pega a fase da URL
+    const lessonPath = `../../${level}/${unit}/DataGrammar2/aulas/aula${currentPhase}/lesson.txt`;
+    
+    fetch(lessonPath)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Erro ao carregar a lição: ${response.statusText}`);
+            }
+            return response.text();
+        })
+        .then(data => {
+            const lessonDiv = document.getElementById('lesson');
+            lessonDiv.innerHTML = data;
+        })
+        .catch(error => {
+            console.error('Erro ao carregar o arquivo da lição:', error);
+        });
+}
+
+   function markActivityAsCompleted() {
+    console.log("Atividade concluída! Chamada da função markActivityAsCompleted.");
+    ensureUserIsAuthenticated(updateNextPhase);
+}
 
     function ensureUserIsAuthenticated(callback) {
         firebase.auth().onAuthStateChanged(function(user) {
@@ -259,16 +421,22 @@
     }
 
     function getPhaseFromURL() {
-        const params = new URLSearchParams(window.location.search);
-        return params.get('fase');
-    }
+    const params = new URLSearchParams(window.location.search);
+    return params.get('fase');  // Pega o parâmetro 'fase' da URL
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    loadTextFile();
+    loadLessonContent();
+    setupBackButton(); // Configura a lógica do botão Back
+});
 
     function getLevelAndUnitFromURL() {
-        const url = window.location.pathname.split('/');
-        const level = url[1];
-        const unit = url[2];
-        return { level, unit };
-    }
+    const params = new URLSearchParams(window.location.search);
+    const level = params.get('level');
+    const unit = params.get('unit');
+    return { level, unit };
+}
 
     function generatePDF() {
         fetch('texto.txt')
@@ -312,34 +480,88 @@
             .catch(error => console.error('Error generating the PDF:', error));
     }
 
-    function loadProfessorButtons() {
-        const buttonContainer = document.querySelector('.button-container');
-        const maxProfessors = 10;
+function setupBackButton() {
+    const backButton = document.querySelector('.back-button');
 
-        for (let i = 1; i <= maxProfessors; i++) {
-            const imgPath = `professores/professor${i}.png`;
-            const img = new Image();
-            
-            img.onload = function() {
-                const button = document.createElement('button');
-                img.alt = `Professor ${i}`;
-                button.appendChild(img);
-                button.onclick = function() {
-                    window.location.href = `aulas/aula${i}/index.html`;
-                };
-                buttonContainer.appendChild(button);
-            };
+    backButton.addEventListener('click', async (event) => {
+        event.preventDefault(); // Impede a navegação imediata
+        const { level, unit } = getLevelAndUnitFromURL();
+        const currentPhase = parseInt(getPhaseFromURL()); // Converte a fase atual para número
+        const nextPhase = `fase${currentPhase + 1}`; // Calcula a próxima fase
 
-            img.onerror = function() {
-                console.log(`Imagem professor${i}.png não encontrada, pulando.`);
-            };
+        try {
+            const user = await getAuthenticatedUser();
+            if (user) {
+                const userId = user.uid;
+                const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/${nextPhase}`);
+                const snapshot = await dbRef.once('value');
 
-            img.src = imgPath;
+                if (snapshot.exists() && snapshot.val() === true) {
+                    // Próxima fase existe e está desbloqueada, permite voltar
+                    history.back();
+                } else {
+                    // Exibe mensagem se a próxima fase não existir ou não estiver desbloqueada
+                    const confirmLeave = confirm(
+                        "The current phase has not been completed. Are you sure you want to leave?"
+                    );
+                    if (confirmLeave) {
+                        history.back();
+                    }
+                }
+            } else {
+                console.error("User is not authenticated.");
+            }
+        } catch (error) {
+            console.error("Error checking phase progression:", error);
         }
-    }
+    });
+}
 
-    document.addEventListener('DOMContentLoaded', function() {
-        loadTextFile();
+// Função para obter o usuário autenticado
+function getAuthenticatedUser() {
+    return new Promise((resolve, reject) => {
+        firebase.auth().onAuthStateChanged((user) => {
+            if (user) {
+                resolve(user);
+            } else {
+                reject(new Error("User not authenticated"));
+            }
+        });
+    });
+}
+
+   function loadProfessorButtons() {
+    const buttonContainer = document.querySelector('.button-container');
+    const maxProfessors = 10;
+
+    // Obtém o level e unit da URL
+    const { level, unit } = getLevelAndUnitFromURL();
+
+    for (let i = 1; i <= maxProfessors; i++) {
+        const imgPath = `professores/professor${i}.png`;
+        const img = new Image();
+        
+        img.onload = function() {
+            const button = document.createElement('button');
+            img.alt = `Professor ${i}`;
+            button.appendChild(img);
+            button.onclick = function() {
+                // Monta o caminho dinâmico para a aula do professor
+                const lessonPath = `../../${level}/${unit}/DataGrammar2/aulas/aula${i}/index.html`;
+                window.location.href = lessonPath;  // Navega para o caminho correto
+            };
+            buttonContainer.appendChild(button);
+        };
+
+        img.onerror = function() {
+            console.log(`Imagem professor${i}.png não encontrada, pulando.`);
+        };
+
+        img.src = imgPath;
+    }
+}
+
+    document.addEventListener('DOMContentLoaded', function() {        
         loadProfessorButtons();
     });
 </script>
