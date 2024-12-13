@@ -1,5 +1,4 @@
 const express = require('express');
-const bodyParser = require('body-parser');
 const cors = require('cors');
 const { Configuration, OpenAIApi } = require('openai');
 
@@ -7,7 +6,7 @@ const app = express();
 const PORT = process.env.PORT || 3000; // Porta dinâmica para compatibilidade com o Render
 
 app.use(cors());
-app.use(bodyParser.json());
+app.use(express.json()); // Middleware nativo para interpretar JSON
 
 // Configuração da API do OpenAI
 const configuration = new Configuration({
