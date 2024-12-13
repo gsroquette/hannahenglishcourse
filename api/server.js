@@ -33,6 +33,11 @@ app.post('/server', async (req, res) => {
     }
 });
 
+// Adicionando endpoint de teste para garantir resposta na raiz
+app.get('/', (req, res) => {
+    res.send('Servidor rodando com sucesso no Render!');
+});
+
 // Iniciando o servidor
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);
