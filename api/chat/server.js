@@ -9,12 +9,12 @@ app.use(bodyParser.json());
 
 // Configure a OpenAI API Key
 const configuration = new Configuration({
-    apiKey: process.env.OPENAI_API_KEY, // Variável de ambiente
+    apiKey: process.env.OPENAI_API_KEY, // Variável de ambiente configurada no Vercel
 });
 const openai = new OpenAIApi(configuration);
 
 // Endpoint para receber mensagens do frontend
-app.post('/api/chat', async (req, res) => {
+app.post('/chat', async (req, res) => {
     const userMessage = req.body.message;
 
     try {
@@ -26,12 +26,10 @@ app.post('/api/chat', async (req, res) => {
         const responseMessage = completion.data.choices[0].message.content;
         res.json({ response: responseMessage });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ response: "Desculpe, algo deu errado!" });
+        console.error("Erro na API OpenAI:", error);
+        res.status(500).json({ response: "Desculpe, algo deu errado ao processar sua mensagem." });
     }
 });
 
-// Inicia o servidor
-app.listen(3000, () => {
-    console.log('Servidor rodando na porta 3000.');
-});
+// Exporta o app como módulo serverless
+module.exports = app;
