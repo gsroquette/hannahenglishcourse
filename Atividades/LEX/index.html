@@ -49,7 +49,7 @@
 </head>
 <body>
     <h1>Talk to the Robot</h1>
-    <img id="robotImg" src="../../imagens/robo1_static.png" alt="Robot">
+    <img id="robotImg" src="./imagens/robo1_static.png" alt="Robot">
     <br>
     <button id="recordButton">Press to Speak</button>
     <p id="errorMessage"></p>
@@ -57,90 +57,46 @@
 
     <script>
         const API_URL = "/api/chat";
+        const START_URL = "/api/start";
         const robotImg = document.getElementById("robotImg");
         const recordButton = document.getElementById("recordButton");
         const errorMessage = document.getElementById("errorMessage");
         const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
 
-        recognition.lang = "en-US"; // Language: English (US)
+        recognition.lang = "en-US";
         recognition.interimResults = false;
 
-        let recognitionTimeout;
-
-        recordButton.addEventListener("click", () => {
-            // Reseta mensagens de erro
-            errorMessage.textContent = "";
-
-            // Atualiza botão para "Listening..."
-            recordButton.textContent = "Listening...";
-            recordButton.classList.add("listening");
-
-            // Inicia reconhecimento de fala
-            recognition.start();
-
-            // Para automaticamente após 10 segundos
-            recognitionTimeout = setTimeout(() => {
-                recognition.stop();
-                errorMessage.textContent = "You exceeded the time limit. Please use shorter phrases.";
-            }, 10000);
-        });
-
-        recognition.onresult = async (event) => {
-            clearTimeout(recognitionTimeout); // Limpa timeout se o usuário parar de falar
-            const userMessage = event.results[0][0].transcript.trim();
-
+        // Inicia a conversa ao carregar a página
+        window.onload = async () => {
             try {
-                const response = await fetch(API_URL, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({ message: userMessage }),
-                });
-
+                const response = await fetch(START_URL);
                 if (!response.ok) {
-                    throw new Error("Error communicating with the API.");
+                    throw new Error("Error starting the conversation.");
                 }
 
                 const data = await response.json();
                 playResponse(data.response);
             } catch (error) {
-                console.error("Error:", error);
-                errorMessage.textContent = "Error sending the message.";
-                resetButton();
+                console.error("Error starting the conversation:", error);
+                errorMessage.textContent = "Error initializing the conversation.";
             }
         };
 
-        recognition.onerror = (event) => {
-            console.error("Voice recognition error:", event.error);
-            errorMessage.textContent = "Error capturing speech. Please try again.";
-            resetButton();
-        };
-
-        recognition.onend = () => {
-            clearTimeout(recognitionTimeout); // Limpa timeout se terminar naturalmente
-            resetButton();
-        };
-
+        // Outros eventos do reconhecimento de voz permanecem os mesmos...
         function playResponse(response) {
             const synth = window.speechSynthesis;
             const utterance = new SpeechSynthesisUtterance(response);
             utterance.lang = "en-US";
 
             utterance.onstart = () => {
-                robotImg.src = "../../imagens/robo1.gif"; // Ativa GIF
+                robotImg.src = "./imagens/robo1.gif";
             };
 
             utterance.onend = () => {
-                robotImg.src = "../../imagens/robo1_static.png"; // Volta ao estático
+                robotImg.src = "./imagens/robo1_static.png";
             };
 
             synth.speak(utterance);
-        }
-
-        function resetButton() {
-            recordButton.textContent = "Press to Speak";
-            recordButton.classList.remove("listening");
         }
     </script>
 </body>

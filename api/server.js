@@ -20,13 +20,13 @@ const openai = new OpenAIApi(configuration);
 const baseContextMessage = {
     role: "system",
     content: `
-        You will act as Lex, a friendly and patient English teacher robot. Your role is to conduct English lessons in a focused and motivating manner.
+        You are Lex, a friendly and patient English teacher robot. Your goal is to conduct focused and motivating lessons.
         Adapt your responses based on the student's age and English level. Use simpler language for younger or beginner students, and more advanced dialogue for older or more advanced students.
-        Introduce yourself as "Professor Lex" and address the student by name only in the first interaction. Keep subsequent responses focused on the lesson topic.
+        Always introduce yourself politely at the beginning of the session, greet the student by name, state the topic of the lesson, and ask if they are ready to begin.
     `,
 };
 
-// Leitura do arquivo conversa.txt
+// Lê o arquivo conversa.txt na mesma pasta do server.js
 function readConversaFile() {
     const filePath = path.join(__dirname, 'conversa.txt');
     try {
@@ -39,10 +39,32 @@ function readConversaFile() {
     }
 }
 
-// Variável para rastrear a primeira interação
-let isFirstInteraction = true;
+// Endpoint para iniciar a conversa
+app.get('/api/start', async (req, res) => {
+    try {
+        const studentDetails = readConversaFile(); // Lê as informações do aluno
+        const messages = [
+            baseContextMessage, // Contexto inicial fixo
+            studentDetails, // Informações do aluno
+            { role: "system", content: "Begin the conversation with a polite introduction." },
+        ];
 
-// Endpoint para o chatbot
+        console.log("Messages sent to OpenAI (start):", JSON.stringify(messages, null, 2)); // Log para depuração
+
+        const completion = await openai.createChatCompletion({
+            model: 'gpt-4',
+            messages: messages,
+        });
+
+        const responseMessage = completion.data.choices[0].message.content;
+        res.json({ response: responseMessage });
+    } catch (error) {
+        console.error("Error in OpenAI API:", error.response ? error.response.data : error.message);
+        res.status(500).json({ response: "Error initializing the conversation." });
+    }
+});
+
+// Endpoint para continuar a conversa
 app.post('/api/chat', async (req, res) => {
     const userMessage = req.body.message;
 
@@ -51,20 +73,12 @@ app.post('/api/chat', async (req, res) => {
     }
 
     try {
-        const studentDetails = readConversaFile(); // Lê informações do aluno
+        const studentDetails = readConversaFile(); // Lê as informações do aluno
         const messages = [
             baseContextMessage, // Contexto inicial fixo
             studentDetails, // Informações do aluno
+            { role: "user", content: userMessage }, // Mensagem do usuário
         ];
-
-        if (isFirstInteraction) {
-            // Adiciona a introdução na primeira interação
-            messages.push({ role: "system", content: "Introduce yourself to the student." });
-            isFirstInteraction = false; // Marca que a introdução foi feita
-        }
-
-        // Adiciona a mensagem do usuário
-        messages.push({ role: "user", content: userMessage });
 
         console.log("Messages sent to OpenAI:", JSON.stringify(messages, null, 2)); // Log para depuração
 
