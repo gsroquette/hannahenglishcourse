@@ -33,6 +33,3 @@ app.post('/server', async (req, res) => {
 
 module.exports = app;
 
-
-// Exporta o app como módulo serverless
-module.exports = app;
