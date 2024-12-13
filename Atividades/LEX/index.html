@@ -41,6 +41,10 @@
             color: red;
             margin-top: 10px;
         }
+        #noteMessage {
+            color: gray;
+            margin-top: 15px;
+        }
     </style>
 </head>
 <body>
@@ -49,37 +53,56 @@
     <br>
     <button id="recordButton">Press to Speak</button>
     <p id="errorMessage"></p>
+    <p id="noteMessage">Note: Speak in short phrases (up to 10 seconds or 100 words).</p>
 
     <script>
         const API_URL = "/api/chat";
         const robotImg = document.getElementById("robotImg");
         const recordButton = document.getElementById("recordButton");
         const errorMessage = document.getElementById("errorMessage");
-
         const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-        recognition.lang = "en-US"; // English (United States)
+
+        recognition.lang = "en-US"; // Language: English (US)
         recognition.interimResults = false;
+
+        let recognitionTimeout;
 
         recordButton.addEventListener("click", () => {
             errorMessage.textContent = "";
             robotImg.src = "../../imagens/robo1_static.png";
 
             try {
-                // Update the button to show "Listening..." with pulsing effect
+                // Update button to "Listening..." with pulsing effect
                 recordButton.textContent = "Listening...";
                 recordButton.classList.add("listening");
+
+                // Start recognition
                 recognition.start();
+
+                // Stop listening after 10 seconds
+                recognitionTimeout = setTimeout(() => {
+                    recognition.stop();
+                    errorMessage.textContent = "Please use shorter phrases for better responses.";
+                }, 10000); // 10 seconds
             } catch (error) {
                 console.error("Error starting voice recognition:", error);
                 errorMessage.textContent = "Error accessing the microphone.";
-                recordButton.textContent = "Press to Speak";
-                recordButton.classList.remove("listening");
+                resetButton();
             }
         });
 
         recognition.onresult = async (event) => {
-            const userMessage = event.results[0][0].transcript; // Captures the spoken text
+            clearTimeout(recognitionTimeout); // Clear the timeout if speech ends earlier
+            const userMessage = event.results[0][0].transcript.trim(); // Captures the spoken text
             console.log("User said:", userMessage);
+
+            // Limit to 100 words
+            const words = userMessage.split(" ");
+            if (words.length > 100) {
+                errorMessage.textContent = "Please limit your phrases to 100 words.";
+                resetButton();
+                return;
+            }
 
             // Switch to the static robot image while processing
             robotImg.src = "../../imagens/robo1_static.png";
@@ -105,27 +128,25 @@
             } catch (error) {
                 console.error("Error:", error);
                 errorMessage.textContent = "Error sending the message.";
-                robotImg.src = "../../imagens/robo1_static.png";
+                resetButton();
             }
         };
 
         recognition.onerror = (event) => {
             console.error("Voice recognition error:", event.error);
             errorMessage.textContent = "Error capturing speech. Please try again.";
-            recordButton.textContent = "Press to Speak";
-            recordButton.classList.remove("listening");
+            resetButton();
         };
 
         recognition.onend = () => {
-            // Restore the button state after stopping listening
-            recordButton.textContent = "Press to Speak";
-            recordButton.classList.remove("listening");
+            clearTimeout(recognitionTimeout); // Clear timeout if ended naturally
+            resetButton();
         };
 
         function playResponse(response) {
             const synth = window.speechSynthesis;
             const utterance = new SpeechSynthesisUtterance(response);
-            utterance.lang = "en-US"; // English (United States)
+            utterance.lang = "en-US"; // Language: English (US)
             utterance.rate = 1;
 
             // When the speech starts
@@ -139,6 +160,11 @@
             };
 
             synth.speak(utterance);
+        }
+
+        function resetButton() {
+            recordButton.textContent = "Press to Speak";
+            recordButton.classList.remove("listening");
         }
     </script>
 </body>
