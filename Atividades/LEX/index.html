@@ -1,27 +1,28 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Robô Inteligente</title>
+    <title>Chat com Robô</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             text-align: center;
-            padding-top: 50px;
+            margin: 0;
+            padding: 0;
         }
         img {
             width: 200px;
+            margin-top: 20px;
         }
-        input[type="text"] {
-            width: 300px;
-            height: 30px;
+        #chat-container {
+            margin-top: 30px;
+        }
+        input, button {
+            padding: 10px;
             font-size: 16px;
         }
         button {
-            height: 36px;
-            padding: 0 20px;
-            font-size: 16px;
             background-color: #4CAF50;
             color: white;
             border: none;
@@ -30,67 +31,68 @@
         button:hover {
             background-color: #45a049;
         }
-        .message {
-            color: red;
-            font-weight: bold;
-            margin-top: 10px;
-        }
     </style>
 </head>
 <body>
-    <img id="robo-image" src="../../imagens/robo1_static.png" alt="Robô">
     <h1>Robô</h1>
-    <input type="text" id="user-input" placeholder="Digite sua mensagem">
-    <button id="send-button">Enviar</button>
-    <p class="message" id="message"></p>
+    <img id="robotImg" src="../../imagens/robo1_static.png" alt="Robô">
+    <div id="chat-container">
+        <input type="text" id="userInput" placeholder="Digite sua mensagem">
+        <button id="sendButton">Enviar</button>
+    </div>
 
     <script>
-        const roboImage = document.getElementById('robo-image');
-        const userInput = document.getElementById('user-input');
-        const sendButton = document.getElementById('send-button');
-        const messageElement = document.getElementById('message');
+        const robotImg = document.getElementById("robotImg");
+        const userInput = document.getElementById("userInput");
+        const sendButton = document.getElementById("sendButton");
 
-        sendButton.addEventListener('click', async () => {
+        const API_URL = "/api/chat";
+
+        sendButton.addEventListener("click", async () => {
             const userMessage = userInput.value.trim();
             if (!userMessage) {
-                messageElement.textContent = "Por favor, digite uma mensagem.";
+                alert("Por favor, escreva uma mensagem.");
                 return;
             }
 
-            messageElement.textContent = ""; // Limpar mensagens anteriores
-            roboImage.src = "../../imagens/robo1.gif"; // Muda para gif animado
+            // Ativar o GIF do robô
+            robotImg.src = "../../imagens/robo1.gif";
 
             try {
-                const response = await fetch('/api/chat', {
-                    method: 'POST',
+                // Enviar a mensagem para o backend
+                const response = await fetch(API_URL, {
+                    method: "POST",
                     headers: {
-                        'Content-Type': 'application/json',
+                        "Content-Type": "application/json",
                     },
                     body: JSON.stringify({ message: userMessage }),
                 });
 
                 if (!response.ok) {
-                    throw new Error("Erro na resposta do servidor");
+                    throw new Error("Erro ao se comunicar com a API.");
                 }
 
                 const data = await response.json();
-                const roboResponse = data.response;
+                const botResponse = data.response;
 
-                alert(`Robô: ${roboResponse}`);
-                speakText(roboResponse); // Faz o robô falar
+                // Usar Web Speech API para falar
+                const synth = window.speechSynthesis;
+                const utterance = new SpeechSynthesisUtterance(botResponse);
+                utterance.lang = "pt-BR"; // Altere para o idioma desejado
+                utterance.rate = 1; // Velocidade da fala
+                utterance.onend = () => {
+                    // Voltar para a imagem estática quando a fala terminar
+                    robotImg.src = "../../imagens/robo1_static.png";
+                };
+
+                synth.speak(utterance);
             } catch (error) {
-                console.error(error);
-                messageElement.textContent = "Erro ao enviar a mensagem.";
-            } finally {
-                roboImage.src = "../../imagens/robo1_static.png"; // Volta para imagem estática
+                console.error("Erro:", error);
+                alert("Erro ao enviar a mensagem.");
+                // Voltar para a imagem estática em caso de erro
+                robotImg.src = "../../imagens/robo1_static.png";
             }
         });
-
-        function speakText(text) {
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = "pt-BR"; // Configurar para português do Brasil
-            window.speechSynthesis.speak(utterance);
-        }
     </script>
 </body>
 </html>
