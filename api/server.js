@@ -13,6 +13,7 @@ app.use(bodyParser.json());
 const configuration = new Configuration({
     apiKey: process.env.OPENAI_API_KEY,
 });
+console.log("Chave da OpenAI:", process.env.OPENAI_API_KEY); // Verifique no log
 const openai = new OpenAIApi(configuration);
 
 // Endpoint para o chatbot
