@@ -4,12 +4,14 @@ const cors = require('cors');
 const { Configuration, OpenAIApi } = require('openai');
 
 const app = express();
+const PORT = process.env.PORT || 3000; // Porta dinâmica para compatibilidade com o Render
+
 app.use(cors());
 app.use(bodyParser.json());
 
-// Configure a OpenAI API Key
+// Configuração da API do OpenAI
 const configuration = new Configuration({
-    apiKey: process.env.OPENAI_API_KEY, // Variável de ambiente configurada no Vercel
+    apiKey: process.env.OPENAI_API_KEY, // Chave de API definida como variável de ambiente no Render
 });
 const openai = new OpenAIApi(configuration);
 
@@ -31,5 +33,7 @@ app.post('/server', async (req, res) => {
     }
 });
 
-module.exports = app;
-
+// Iniciando o servidor
+app.listen(PORT, () => {
+    console.log(`Servidor rodando na porta ${PORT}`);
+});
