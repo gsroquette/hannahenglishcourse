@@ -1,65 +1,71 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat com Robô</title>
+    <title>Robô</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             text-align: center;
-            margin: 0;
-            padding: 0;
+            margin-top: 50px;
         }
-        img {
+        #robotImg {
             width: 200px;
-            margin-top: 20px;
+            height: auto;
         }
-        #chat-container {
-            margin-top: 30px;
-        }
-        input, button {
+        #userInput {
+            width: 300px;
             padding: 10px;
-            font-size: 16px;
+            margin: 10px;
         }
-        button {
-            background-color: #4CAF50;
+        #sendButton {
+            padding: 10px 20px;
+            background-color: green;
             color: white;
             border: none;
             cursor: pointer;
         }
-        button:hover {
-            background-color: #45a049;
+        #sendButton:hover {
+            background-color: darkgreen;
         }
     </style>
 </head>
 <body>
     <h1>Robô</h1>
     <img id="robotImg" src="../../imagens/robo1_static.png" alt="Robô">
-    <div id="chat-container">
-        <input type="text" id="userInput" placeholder="Digite sua mensagem">
-        <button id="sendButton">Enviar</button>
-    </div>
+    <br>
+    <input type="text" id="userInput" placeholder="Digite sua mensagem aqui...">
+    <button id="sendButton">Enviar</button>
+    <p id="errorMessage" style="color: red;"></p>
 
     <script>
+        const API_URL = "/api/chat";
         const robotImg = document.getElementById("robotImg");
         const userInput = document.getElementById("userInput");
         const sendButton = document.getElementById("sendButton");
-
-        const API_URL = "/api/chat";
+        const errorMessage = document.getElementById("errorMessage");
+        const responseCache = new Map(); // Cache de respostas
 
         sendButton.addEventListener("click", async () => {
             const userMessage = userInput.value.trim();
+            errorMessage.textContent = "";
+
             if (!userMessage) {
-                alert("Por favor, escreva uma mensagem.");
+                errorMessage.textContent = "Por favor, digite uma mensagem.";
                 return;
             }
 
-            // Ativar o GIF do robô
+            // Troca para o GIF animado
             robotImg.src = "../../imagens/robo1.gif";
 
+            // Verificar cache
+            if (responseCache.has(userMessage)) {
+                playResponse(responseCache.get(userMessage));
+                return;
+            }
+
             try {
-                // Enviar a mensagem para o backend
                 const response = await fetch(API_URL, {
                     method: "POST",
                     headers: {
@@ -75,24 +81,28 @@
                 const data = await response.json();
                 const botResponse = data.response;
 
-                // Usar Web Speech API para falar
-                const synth = window.speechSynthesis;
-                const utterance = new SpeechSynthesisUtterance(botResponse);
-                utterance.lang = "pt-BR"; // Altere para o idioma desejado
-                utterance.rate = 1; // Velocidade da fala
-                utterance.onend = () => {
-                    // Voltar para a imagem estática quando a fala terminar
-                    robotImg.src = "../../imagens/robo1_static.png";
-                };
+                // Adicionar ao cache
+                responseCache.set(userMessage, botResponse);
 
-                synth.speak(utterance);
+                // Reproduzir a resposta
+                playResponse(botResponse);
             } catch (error) {
                 console.error("Erro:", error);
-                alert("Erro ao enviar a mensagem.");
-                // Voltar para a imagem estática em caso de erro
+                errorMessage.textContent = "Erro ao enviar a mensagem.";
                 robotImg.src = "../../imagens/robo1_static.png";
             }
         });
+
+        function playResponse(response) {
+            const synth = window.speechSynthesis;
+            const utterance = new SpeechSynthesisUtterance(response);
+            utterance.lang = "pt-BR";
+            utterance.rate = 1;
+            utterance.onend = () => {
+                robotImg.src = "../../imagens/robo1_static.png";
+            };
+            synth.speak(utterance);
+        }
     </script>
 </body>
 </html>

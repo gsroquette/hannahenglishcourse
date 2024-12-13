@@ -20,6 +20,10 @@ const openai = new OpenAIApi(configuration);
 app.post('/api/chat', async (req, res) => {
     const userMessage = req.body.message;
 
+    if (!userMessage) {
+        return res.status(400).json({ response: "Mensagem não pode estar vazia." });
+    }
+
     try {
         const completion = await openai.createChatCompletion({
             model: 'gpt-4',
@@ -29,7 +33,7 @@ app.post('/api/chat', async (req, res) => {
         const responseMessage = completion.data.choices[0].message.content;
         res.json({ response: responseMessage });
     } catch (error) {
-        console.error("Erro na API OpenAI:", error);
+        console.error("Erro na API OpenAI:", error.response ? error.response.data : error.message);
         res.status(500).json({ response: "Erro ao processar a mensagem." });
     }
 });
