@@ -120,40 +120,50 @@
 }
 
         // Configurar reconhecimento de voz
-        function setupSpeechRecognition() {
-            recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-            recognition.lang = "en-US";
-            recognition.interimResults = false;
-            recognition.maxAlternatives = 1;
+      function setupSpeechRecognition() {
+    recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
 
-            recognition.onstart = () => {
-                speakButton.classList.add("listening");
-                speakButton.innerText = "Listening...";
-            };
+    // Solicitar permissão para usar o microfone
+    navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(() => {
+            console.log("Microphone permission granted.");
+        })
+        .catch((error) => {
+            alert("Microphone permission denied. Please enable it in your browser settings.");
+            console.error("Microphone access error:", error);
+        });
 
-            recognition.onend = () => {
-                speakButton.classList.remove("listening");
-                speakButton.innerText = "Press to Speak";
-            };
+    recognition.onstart = () => {
+        speakButton.classList.add("listening");
+        speakButton.innerText = "Listening...";
+    };
 
-            recognition.onresult = async (event) => {
-                const userSpeech = event.results[0][0].transcript;
-                messageElement.innerText = `You said: ${userSpeech}`;
-                try {
-                    const response = await fetch('/api/chat', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ message: userSpeech })
-                    });
-                    const data = await response.json();
-                    messageElement.innerText = data.response;
-                    speak(data.response);
-                } catch (error) {
-                    console.error("Error communicating with the server:", error);
-                    messageElement.innerText = "Error communicating with the server.";
-                }
-            };
+    recognition.onend = () => {
+        speakButton.classList.remove("listening");
+        speakButton.innerText = "Press to Speak";
+    };
+
+    recognition.onresult = async (event) => {
+        const userSpeech = event.results[0][0].transcript;
+        messageElement.innerText = `You said: ${userSpeech}`;
+        try {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: userSpeech })
+            });
+            const data = await response.json();
+            messageElement.innerText = data.response;
+            speak(data.response);
+        } catch (error) {
+            console.error("Error communicating with the server:", error);
+            messageElement.innerText = "Error communicating with the server.";
         }
+    };
+}
 
         speakButton.addEventListener("click", () => {
             if (recognition) {
