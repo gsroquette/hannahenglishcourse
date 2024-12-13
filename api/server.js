@@ -26,7 +26,7 @@ try {
 
 // Rota para iniciar a conversa
 app.get('/api/start', (req, res) => {
-    const initialMessage = `Hello! My name is Lex, your English teacher. Today's topic is: ${conversationDetails}. Shall we begin?`;
+    const initialMessage = `Hello! My name is Lex, your great English teacher. Today's topic is: ${conversationDetails}. Shall we begin?`;
     res.json({ response: initialMessage });
 });
 
