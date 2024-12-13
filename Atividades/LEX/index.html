@@ -53,7 +53,7 @@
     <br>
     <button id="recordButton">Press to Speak</button>
     <p id="errorMessage"></p>
-    <p id="noteMessage">Note: Speak in short phrases (up to 10 seconds or 100 words).</p>
+    <p id="noteMessage">Note: Speak in short phrases (up to 10 seconds).</p>
 
     <script>
         const API_URL = "/api/chat";
@@ -68,30 +68,26 @@
         let recognitionTimeout;
 
         recordButton.addEventListener("click", () => {
+            // Reseta mensagens de erro
             errorMessage.textContent = "";
-            robotImg.src = "../../imagens/robo1_static.png";
 
-            try {
-                recordButton.textContent = "Listening...";
-                recordButton.classList.add("listening");
+            // Atualiza botão para "Listening..."
+            recordButton.textContent = "Listening...";
+            recordButton.classList.add("listening");
 
-                recognition.start();
+            // Inicia reconhecimento de fala
+            recognition.start();
 
-                recognitionTimeout = setTimeout(() => {
-                    recognition.stop();
-                    errorMessage.textContent = "Please use shorter phrases for better responses.";
-                }, 10000);
-            } catch (error) {
-                console.error("Error starting voice recognition:", error);
-                errorMessage.textContent = "Error accessing the microphone.";
-                resetButton();
-            }
+            // Para automaticamente após 10 segundos
+            recognitionTimeout = setTimeout(() => {
+                recognition.stop();
+                errorMessage.textContent = "You exceeded the time limit. Please use shorter phrases.";
+            }, 10000);
         });
 
         recognition.onresult = async (event) => {
-            clearTimeout(recognitionTimeout);
+            clearTimeout(recognitionTimeout); // Limpa timeout se o usuário parar de falar
             const userMessage = event.results[0][0].transcript.trim();
-            console.log("User said:", userMessage);
 
             try {
                 const response = await fetch(API_URL, {
@@ -115,8 +111,14 @@
             }
         };
 
+        recognition.onerror = (event) => {
+            console.error("Voice recognition error:", event.error);
+            errorMessage.textContent = "Error capturing speech. Please try again.";
+            resetButton();
+        };
+
         recognition.onend = () => {
-            clearTimeout(recognitionTimeout);
+            clearTimeout(recognitionTimeout); // Limpa timeout se terminar naturalmente
             resetButton();
         };
 
@@ -124,14 +126,13 @@
             const synth = window.speechSynthesis;
             const utterance = new SpeechSynthesisUtterance(response);
             utterance.lang = "en-US";
-            utterance.rate = 1;
 
             utterance.onstart = () => {
-                robotImg.src = "../../imagens/robo1.gif";
+                robotImg.src = "../../imagens/robo1.gif"; // Ativa GIF
             };
 
             utterance.onend = () => {
-                robotImg.src = "../../imagens/robo1_static.png";
+                robotImg.src = "../../imagens/robo1_static.png"; // Volta ao estático
             };
 
             synth.speak(utterance);
