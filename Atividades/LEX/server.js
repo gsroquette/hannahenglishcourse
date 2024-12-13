@@ -9,7 +9,7 @@ app.use(bodyParser.json());
 
 // Configure a OpenAI API Key
 const configuration = new Configuration({
-    apiKey: process.env.OPENAI_API_KEY, // Variável de ambiente
+    apiKey: process.env.OPENAI_API_KEY, // Variável de ambiente configurada no Vercel
 });
 const openai = new OpenAIApi(configuration);
 
