@@ -14,7 +14,7 @@ const configuration = new Configuration({
 const openai = new OpenAIApi(configuration);
 
 // Endpoint para receber mensagens do frontend
-app.post('/chat', async (req, res) => {
+app.post('/server', async (req, res) => {
     const userMessage = req.body.message;
 
     try {
@@ -30,6 +30,9 @@ app.post('/chat', async (req, res) => {
         res.status(500).json({ response: "Desculpe, algo deu errado ao processar sua mensagem." });
     }
 });
+
+module.exports = app;
+
 
 // Exporta o app como módulo serverless
 module.exports = app;
