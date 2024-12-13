@@ -3,97 +3,98 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Converse com o Robô</title>
+    <title>Chat com IA</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             text-align: center;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
             margin-top: 50px;
         }
-        #character {
-            width: 200px;
-            height: auto;
+        .robot-container {
+            margin-bottom: 20px;
         }
-        #speech-box {
+        .robot {
+            width: 150px;
+            height: 150px;
+        }
+        .input-container {
+            display: flex;
+            justify-content: center;
             margin-top: 20px;
-            padding: 10px;
-            border: 2px solid #ddd;
-            border-radius: 10px;
-            display: inline-block;
-            background-color: #f9f9f9;
-            max-width: 300px;
-            word-wrap: break-word;
         }
-        #talking {
-            display: none;
-        }
-        textarea {
+        .input-container input {
             width: 300px;
-            height: 50px;
-            margin-top: 20px;
+            padding: 10px;
+            font-size: 16px;
+        }
+        .input-container button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin-left: 10px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        .response {
+            margin-top: 30px;
+            font-size: 18px;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
-    <h1>Converse com o Robô</h1>
-    <img id="idle" src="../../imagens/robo1_static.png" alt="Robô Parado">
-    <img id="talking" src="../../imagens/robo1.gif" alt="Robô Falando">
-    <div id="speech-box">Escreva algo abaixo e clique em "Enviar"!</div>
-    <textarea id="user-input" placeholder="Digite sua mensagem aqui..."></textarea>
-    <br>
-    <button id="send-btn">Enviar</button>
+    <div class="container">
+        <div class="robot-container">
+            <img id="robot" class="robot" src="robot-static.png" alt="Robô">
+        </div>
+        <div class="input-container">
+            <input type="text" id="userInput" placeholder="Digite sua mensagem">
+            <button onclick="sendMessage()">Enviar</button>
+        </div>
+        <div class="response" id="response"></div>
+    </div>
 
-   <script>
-    const idleGif = document.getElementById('idle');
-    const talkingGif = document.getElementById('talking');
-    const speechBox = document.getElementById('speech-box');
-    const sendBtn = document.getElementById('send-btn');
-    const userInput = document.getElementById('user-input');
+    <script>
+        async function sendMessage() {
+            const userInput = document.getElementById('userInput').value;
+            const responseDiv = document.getElementById('response');
+            const robot = document.getElementById('robot');
 
-    // Função para enviar mensagem para o backend
-    async function sendMessage() {
-        const userMessage = userInput.value;
-
-        if (!userMessage.trim()) {
-            alert("Por favor, digite uma mensagem!");
-            return;
-        }
-
-        // Mostra o GIF de fala
-        idleGif.style.display = 'none';
-        talkingGif.style.display = 'block';
-
-        // Envia mensagem para o backend
-        try {
-            const response = await fetch('https://hannahenglishcourse.onrender.com/api/server', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ message: userMessage }),
-            });
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.response || "Erro ao processar a mensagem.");
+            if (!userInput.trim()) {
+                alert("Digite uma mensagem!");
+                return;
             }
 
-            // Mostra a resposta no balão de fala
-            speechBox.textContent = data.response;
-        } catch (error) {
-            console.error("Erro no fetch:", error);
-            speechBox.textContent = "Ops! Algo deu errado.";
-        } finally {
-            // Volta para o GIF parado após 2 segundos
-            setTimeout(() => {
-                talkingGif.style.display = 'none';
-                idleGif.style.display = 'block';
-            }, 2000);
-        }
-    }
+            // Muda para GIF enquanto espera a resposta
+            robot.src = "robot-gif.gif";
 
-    // Adiciona evento ao botão
-    sendBtn.addEventListener('click', sendMessage);
-   </script>
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: userInput }),
+                });
+
+                const data = await response.json();
+                responseDiv.innerText = data.response;
+
+                // Retorna para imagem estática
+                robot.src = "robot-static.png";
+            } catch (error) {
+                console.error("Erro:", error);
+                responseDiv.innerText = "Erro ao enviar a mensagem.";
+                robot.src = "robot-static.png";
+            }
+        }
+    </script>
 </body>
 </html>
