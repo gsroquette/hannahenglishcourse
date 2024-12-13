@@ -1,14 +1,15 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const { Configuration, OpenAIApi } = require('openai');
 const fs = require('fs');
-const path = require('path');
+const { Configuration, OpenAIApi } = require('openai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+app.use(cors({
+    origin: '*', // Permitir todas as origens
+}));
 app.use(bodyParser.json());
 
 // Configuração da API do OpenAI
@@ -17,29 +18,24 @@ const configuration = new Configuration({
 });
 const openai = new OpenAIApi(configuration);
 
-// Mensagem de contexto inicial
-const contextMessage = {
-    role: "system",
-    content: `
-        You will act as Lex, a friendly and patient English teacher robot. Your role is to conduct English lessons in a focused and motivating manner.
-        Adapt your responses based on the student's age and English level. Use simpler language for younger or beginner students, and more advanced dialogue for older or more advanced students.
-        Always introduce yourself as "Professor Lex" and address the student by name at the beginning of the conversation. Keep the conversation focused on the lesson topic.
-    `,
-};
-
-// Lê o arquivo conversa.txt
-function readConversaFile() {
-    const filePath = path.join(__dirname, 'conversa.txt');
-    try {
-        const content = fs.readFileSync(filePath, 'utf-8');
-        return { role: "system", content: `Student details:\n${content}` };
-    } catch (error) {
-        console.error("Error reading conversa.txt:", error);
-        return { role: "system", content: "No student details provided." };
-    }
+// Carregar informações do arquivo conversa.txt
+let conversationDetails = 'General conversation'; // Valor padrão
+try {
+    conversationDetails = fs.readFileSync('./conversa.txt', 'utf-8');
+} catch (error) {
+    console.error("Erro ao carregar conversa.txt. Usando valor padrão:", error);
 }
 
-// Endpoint para o chatbot
+// Rota para iniciar a conversa
+app.get('/api/start', (req, res) => {
+    const topic = conversationDetails.trim() || "a general topic";
+    const initialMessage = `Hello! My name is Lex, your great English teacher. Today's topic is: ${topic}. Shall we begin?`;
+    res.json({ response: initialMessage });
+});
+
+// Array para manter o histórico da conversa
+const chatHistory = [];
+
 app.post('/api/chat', async (req, res) => {
     const userMessage = req.body.message;
 
@@ -48,29 +44,35 @@ app.post('/api/chat', async (req, res) => {
     }
 
     try {
-        const studentDetails = readConversaFile(); // Lê as informações do aluno
-        const messages = [
-            contextMessage, // Contexto inicial
-            studentDetails, // Informações do aluno
-            { role: "user", content: userMessage }, // Mensagem do usuário
-        ];
+        // Adicionar mensagem do usuário ao histórico
+        chatHistory.push({ role: 'user', content: userMessage });
 
+        // Fazer a chamada para a API OpenAI com o histórico completo
         const completion = await openai.createChatCompletion({
             model: 'gpt-4',
-            messages: messages,
+            messages: chatHistory,
         });
 
         const responseMessage = completion.data.choices[0].message.content;
+
+        // Adicionar a resposta do robô ao histórico
+        chatHistory.push({ role: 'assistant', content: responseMessage });
+
         res.json({ response: responseMessage });
     } catch (error) {
-        console.error("Erro na API OpenAI:", error.response ? error.response.data : error.message);
-        res.status(500).json({ response: "Erro ao processar a mensagem." });
+        console.error("Erro na API OpenAI:", error);
+        res.status(500).json({ response: "Error processing the message." });
     }
 });
 
 // Rota para teste
 app.get('/', (req, res) => {
     res.send("Servidor rodando com sucesso no Vercel!");
+});
+
+// Iniciar o servidor
+app.listen(PORT, () => {
+    console.log(`Servidor rodando na porta ${PORT}`);
 });
 
 module.exports = app;
