@@ -3,145 +3,169 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Talk to the Robot</title>
+    <title>Talk to Lex</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
             text-align: center;
-            margin-top: 50px;
+            font-family: Arial, sans-serif;
+            margin: 20px;
         }
-        #robotImg {
+        #robot-img {
             width: 200px;
-            height: auto;
         }
-        #recordButton {
-            padding: 10px 20px;
+        #speak-button {
             background-color: green;
             color: white;
-            border: none;
-            cursor: pointer;
             font-size: 16px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
         }
-        #recordButton.listening {
-            background-color: red;
+        #speak-button.listening {
+            background-color: orange;
             animation: pulse 1s infinite;
         }
         @keyframes pulse {
-            0% {
-                box-shadow: 0 0 5px red;
-            }
-            50% {
-                box-shadow: 0 0 15px red;
-            }
-            100% {
-                box-shadow: 0 0 5px red;
-            }
-        }
-        #errorMessage {
-            color: red;
-            margin-top: 10px;
-        }
-        #noteMessage {
-            color: gray;
-            margin-top: 15px;
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
         }
     </style>
 </head>
 <body>
     <h1>Talk to the Robot</h1>
-    <img id="robotImg" src="../../imagens/robo1_static.png" alt="Robot">
-    <br>
-    <button id="recordButton">Press to Speak</button>
-    <p id="errorMessage"></p>
-    <p id="noteMessage">Note: Speak in short phrases (up to 10 seconds).</p>
+    <img id="robot-img" src="../../imagens/robo1_static.png" alt="Robot">
+    <p id="message">Loading...</p>
+    <button id="speak-button">Press to Speak</button>
 
     <script>
-        const API_URL = "/api/chat";
-        const robotImg = document.getElementById("robotImg");
-        const recordButton = document.getElementById("recordButton");
-        const errorMessage = document.getElementById("errorMessage");
-        const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        const ROBOT_GIF = "../../imagens/robo1.gif";
+        const ROBOT_STATIC = "../../imagens/robo1_static.png";
+        const messageElement = document.getElementById("message");
+        const robotImg = document.getElementById("robot-img");
+        const speakButton = document.getElementById("speak-button");
 
-        recognition.lang = "en-US"; // Language: English (US)
-        recognition.interimResults = false;
+        let recognition;
+        let speaking = false;
 
-        let recognitionTimeout;
+        // Inicializar interação com mensagem inicial
+        async function initializeConversation() {
+            try {
+                const response = await fetch('/api/start');
+                const data = await response.json();
+                messageElement.innerText = data.response;
 
-        recordButton.addEventListener("click", () => {
-            // Reseta mensagens de erro
-            errorMessage.textContent = "";
+                // Iniciar fala do robô
+                speak(data.response);
+            } catch (error) {
+                console.error("Error initializing the conversation:", error);
+                messageElement.innerText = "Error initializing the conversation.";
+            }
+        }
 
-            // Atualiza botão para "Listening..."
-            recordButton.textContent = "Listening...";
-            recordButton.classList.add("listening");
+        // Função para o robô falar
+       function speak(text) {
+    const synth = window.speechSynthesis;
+    let voices = synth.getVoices();
+    let alertDisplayed = false;
 
-            // Inicia reconhecimento de fala
-            recognition.start();
+    // Cancela qualquer síntese de fala anterior
+    synth.cancel();
 
-            // Para automaticamente após 10 segundos
-            recognitionTimeout = setTimeout(() => {
-                recognition.stop();
-                errorMessage.textContent = "You exceeded the time limit. Please use shorter phrases.";
-            }, 10000);
+    // Função para buscar a voz "en-US"
+    function findVoice() {
+        voices = synth.getVoices(); // Atualiza a lista de vozes disponíveis
+        return voices.find((voice) => voice.lang === "en-US");
+    }
+
+    let selectedVoice = findVoice();
+
+    if (!selectedVoice) {
+        // Caso nenhuma voz esteja disponível ainda, aguarda o carregamento
+        if (voices.length === 0) {
+            synth.onvoiceschanged = () => {
+                voices = synth.getVoices();
+                selectedVoice = findVoice();
+
+                if (!selectedVoice && !alertDisplayed) {
+                    alertDisplayed = true;
+                    alert(
+                        "No 'en-US' voice found in your speech synthesizer. Please enable English language in your browser's speech synthesizer. For now, the default voice will be used, which may cause problems."
+                    );
+                }
+            };
+        } else if (!alertDisplayed) {
+            alertDisplayed = true;
+            alert(
+                "No 'en-US' voice found. Using default voice instead."
+            );
+        }
+    }
+
+    // Cria o objeto de fala
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "en-US";
+    utterance.voice = selectedVoice || null; // Usa a voz encontrada ou a padrão
+
+    utterance.onstart = () => {
+        robotImg.src = ROBOT_GIF; // Ativa GIF
+    };
+
+    utterance.onend = () => {
+        robotImg.src = ROBOT_STATIC; // Volta ao estático
+    };
+
+    synth.speak(utterance);
+}
+
+        // Configurar reconhecimento de voz
+        function setupSpeechRecognition() {
+            recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = "en-US";
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            recognition.onstart = () => {
+                speakButton.classList.add("listening");
+                speakButton.innerText = "Listening...";
+            };
+
+            recognition.onend = () => {
+                speakButton.classList.remove("listening");
+                speakButton.innerText = "Press to Speak";
+            };
+
+            recognition.onresult = async (event) => {
+                const userSpeech = event.results[0][0].transcript;
+                messageElement.innerText = `You said: ${userSpeech}`;
+                try {
+                    const response = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: userSpeech })
+                    });
+                    const data = await response.json();
+                    messageElement.innerText = data.response;
+                    speak(data.response);
+                } catch (error) {
+                    console.error("Error communicating with the server:", error);
+                    messageElement.innerText = "Error communicating with the server.";
+                }
+            };
+        }
+
+        speakButton.addEventListener("click", () => {
+            if (recognition) {
+                recognition.start();
+            }
         });
 
-        recognition.onresult = async (event) => {
-            clearTimeout(recognitionTimeout); // Limpa timeout se o usuário parar de falar
-            const userMessage = event.results[0][0].transcript.trim();
-
-            try {
-                const response = await fetch(API_URL, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({ message: userMessage }),
-                });
-
-                if (!response.ok) {
-                    throw new Error("Error communicating with the API.");
-                }
-
-                const data = await response.json();
-                playResponse(data.response);
-            } catch (error) {
-                console.error("Error:", error);
-                errorMessage.textContent = "Error sending the message.";
-                resetButton();
-            }
+        // Inicializar aplicação
+        window.onload = () => {
+            setupSpeechRecognition();
+            initializeConversation();
         };
-
-        recognition.onerror = (event) => {
-            console.error("Voice recognition error:", event.error);
-            errorMessage.textContent = "Error capturing speech. Please try again.";
-            resetButton();
-        };
-
-        recognition.onend = () => {
-            clearTimeout(recognitionTimeout); // Limpa timeout se terminar naturalmente
-            resetButton();
-        };
-
-        function playResponse(response) {
-            const synth = window.speechSynthesis;
-            const utterance = new SpeechSynthesisUtterance(response);
-            utterance.lang = "en-US";
-
-            utterance.onstart = () => {
-                robotImg.src = "../../imagens/robo1.gif"; // Ativa GIF
-            };
-
-            utterance.onend = () => {
-                robotImg.src = "../../imagens/robo1_static.png"; // Volta ao estático
-            };
-
-            synth.speak(utterance);
-        }
-
-        function resetButton() {
-            recordButton.textContent = "Press to Speak";
-            recordButton.classList.remove("listening");
-        }
     </script>
 </body>
 </html>
