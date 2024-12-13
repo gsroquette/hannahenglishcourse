@@ -26,8 +26,8 @@ app.post('/chat', async (req, res) => {
         const responseMessage = completion.data.choices[0].message.content;
         res.json({ response: responseMessage });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ response: "Desculpe, algo deu errado!" });
+        console.error("Erro na API OpenAI:", error);
+        res.status(500).json({ response: "Desculpe, algo deu errado ao processar sua mensagem." });
     }
 });
 
