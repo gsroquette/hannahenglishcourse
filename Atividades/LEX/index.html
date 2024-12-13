@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Robô</title>
+    <title>Fale com o Robô</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -14,56 +14,57 @@
             width: 200px;
             height: auto;
         }
-        #userInput {
-            width: 300px;
-            padding: 10px;
-            margin: 10px;
-        }
-        #sendButton {
+        #recordButton {
             padding: 10px 20px;
             background-color: green;
             color: white;
             border: none;
             cursor: pointer;
         }
-        #sendButton:hover {
+        #recordButton:hover {
             background-color: darkgreen;
+        }
+        #errorMessage {
+            color: red;
+            margin-top: 10px;
         }
     </style>
 </head>
 <body>
-    <h1>Robô</h1>
+    <h1>Fale com o Robô</h1>
     <img id="robotImg" src="../../imagens/robo1_static.png" alt="Robô">
     <br>
-    <input type="text" id="userInput" placeholder="Digite sua mensagem aqui...">
-    <button id="sendButton">Enviar</button>
-    <p id="errorMessage" style="color: red;"></p>
+    <button id="recordButton">Aperte para Falar</button>
+    <p id="errorMessage"></p>
 
     <script>
         const API_URL = "/api/chat";
         const robotImg = document.getElementById("robotImg");
-        const userInput = document.getElementById("userInput");
-        const sendButton = document.getElementById("sendButton");
+        const recordButton = document.getElementById("recordButton");
         const errorMessage = document.getElementById("errorMessage");
-        const responseCache = new Map(); // Cache de respostas
 
-        sendButton.addEventListener("click", async () => {
-            const userMessage = userInput.value.trim();
+        const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        recognition.lang = "pt-BR"; // Idioma de reconhecimento de voz
+        recognition.interimResults = false;
+
+        recordButton.addEventListener("click", () => {
             errorMessage.textContent = "";
+            robotImg.src = "../../imagens/robo1_static.png";
 
-            if (!userMessage) {
-                errorMessage.textContent = "Por favor, digite uma mensagem.";
-                return;
+            try {
+                recognition.start();
+            } catch (error) {
+                console.error("Erro ao iniciar o reconhecimento de voz:", error);
+                errorMessage.textContent = "Erro ao iniciar o microfone.";
             }
+        });
 
-            // Mostrar que o robô está "processando"
-            robotImg.src = "../../imagens/robo1_static.png"; // Mantém estático até a fala começar
+        recognition.onresult = async (event) => {
+            const userMessage = event.results[0][0].transcript; // Captura o texto falado
+            console.log("Usuário disse:", userMessage);
 
-            // Verificar cache
-            if (responseCache.has(userMessage)) {
-                playResponse(responseCache.get(userMessage));
-                return;
-            }
+            // Trocar para o GIF do robô pensando
+            robotImg.src = "../../imagens/robo1_static.png";
 
             try {
                 const response = await fetch(API_URL, {
@@ -81,17 +82,19 @@
                 const data = await response.json();
                 const botResponse = data.response;
 
-                // Adicionar ao cache
-                responseCache.set(userMessage, botResponse);
-
-                // Reproduzir a resposta
+                // Reproduzir a resposta do robô
                 playResponse(botResponse);
             } catch (error) {
                 console.error("Erro:", error);
                 errorMessage.textContent = "Erro ao enviar a mensagem.";
                 robotImg.src = "../../imagens/robo1_static.png";
             }
-        });
+        };
+
+        recognition.onerror = (event) => {
+            console.error("Erro no reconhecimento de voz:", event.error);
+            errorMessage.textContent = "Erro ao capturar a fala. Tente novamente.";
+        };
 
         function playResponse(response) {
             const synth = window.speechSynthesis;
@@ -99,14 +102,14 @@
             utterance.lang = "pt-BR";
             utterance.rate = 1;
 
-            // Quando a fala começa
+            // Quando a fala começar
             utterance.onstart = () => {
-                robotImg.src = "../../imagens/robo1.gif"; // Inicia o GIF apenas no início da fala
+                robotImg.src = "../../imagens/robo1.gif"; // Inicia o GIF
             };
 
-            // Quando a fala termina
+            // Quando a fala terminar
             utterance.onend = () => {
-                robotImg.src = "../../imagens/robo1_static.png"; // Volta para imagem estática
+                robotImg.src = "../../imagens/robo1_static.png"; // Volta para a imagem estática
             };
 
             synth.speak(utterance);
