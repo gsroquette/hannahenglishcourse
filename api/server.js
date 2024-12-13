@@ -4,31 +4,38 @@ const cors = require('cors');
 const { Configuration, OpenAIApi } = require('openai');
 
 const app = express();
+const PORT = process.env.PORT || 3000;
+
 app.use(cors());
 app.use(bodyParser.json());
 
-// Configuração da OpenAI API
+// Configuração da API do OpenAI
 const configuration = new Configuration({
-    apiKey: process.env.OPENAI_API_KEY, // Substituir pela variável de ambiente no Vercel
+    apiKey: process.env.OPENAI_API_KEY,
 });
 const openai = new OpenAIApi(configuration);
 
-// Endpoint para comunicação
+// Endpoint para o chatbot
 app.post('/api/chat', async (req, res) => {
     const userMessage = req.body.message;
 
     try {
         const completion = await openai.createChatCompletion({
-            model: "gpt-4",
-            messages: [{ role: "user", content: userMessage }],
+            model: 'gpt-4',
+            messages: [{ role: 'user', content: userMessage }],
         });
 
         const responseMessage = completion.data.choices[0].message.content;
         res.json({ response: responseMessage });
     } catch (error) {
-        console.error("Erro na API OpenAI:", error.response?.data || error.message);
-        res.status(500).json({ response: "Desculpe, houve um erro ao processar sua mensagem." });
+        console.error("Erro na API OpenAI:", error);
+        res.status(500).json({ response: "Erro ao processar a mensagem." });
     }
+});
+
+// Rota para teste
+app.get('/', (req, res) => {
+    res.send("Servidor rodando com sucesso no Vercel!");
 });
 
 module.exports = app;
