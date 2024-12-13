@@ -9,11 +9,12 @@ app.use(bodyParser.json());
 
 // Configure a OpenAI API Key
 const configuration = new Configuration({
-    apiKey: process.env.OPENAI_API_KEY,
+    apiKey: process.env.OPENAI_API_KEY, // Variável de ambiente
 });
 const openai = new OpenAIApi(configuration);
 
-app.post('/chat', async (req, res) => {
+// Endpoint para receber mensagens do frontend
+app.post('/api/chat', async (req, res) => {
     const userMessage = req.body.message;
 
     try {
@@ -32,5 +33,5 @@ app.post('/chat', async (req, res) => {
 
 // Inicia o servidor
 app.listen(3000, () => {
-    console.log('Servidor rodando em http://localhost:3000');
+    console.log('Servidor rodando na porta 3000.');
 });
