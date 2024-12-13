@@ -26,7 +26,7 @@ const baseContextMessage = {
     `,
 };
 
-// Lê o arquivo conversa.txt na mesma pasta do server.js
+// Lê o arquivo conversa.txt
 function readConversaFile() {
     const filePath = path.join(__dirname, 'conversa.txt');
     try {
