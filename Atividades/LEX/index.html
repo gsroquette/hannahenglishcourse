@@ -36,8 +36,8 @@
 <body>
     <h1>Talk to the Robot</h1>
     <img id="robot-img" src="../../imagens/robo1_static.png" alt="Robot">
-    <p id="message">Loading...</p>
-    <button id="speak-button">Press to Speak</button>
+    <p id="message" style="visibility: hidden;">Loading...</p>
+    <button id="speak-button">Press to Start</button>
 
     <script>
         const ROBOT_GIF = "../../imagens/robo1.gif";
@@ -47,82 +47,91 @@
         const speakButton = document.getElementById("speak-button");
 
         let recognition;
+        let isSpeaking = false; // Estado para rastrear se o robô está falando
 
-       // Inicializar conversa
-async function initializeConversation() {
-    try {
-        console.log("Fetching initial conversation...");
-        const response = await fetch('/api/start');
-        const data = await response.json();
-        console.log("Received data:", data);
-
-        // Ocultar o texto inicial até o botão ser pressionado
-        messageElement.style.visibility = "hidden";
-        messageElement.innerText = data.response;
-
-        // Garantir carregamento de vozes
-        const waitForVoices = new Promise((resolve) => {
+        // Função para o robô falar
+        function speak(text) {
             const synth = window.speechSynthesis;
-            if (synth.getVoices().length > 0) {
-                resolve();
-            } else {
-                synth.onvoiceschanged = resolve;
+            const voices = synth.getVoices();
+            let selectedVoice = voices.find((voice) => voice.lang === "en-US");
+
+            if (!selectedVoice) {
+                console.warn("Voz 'en-US' não encontrada. Usando a primeira voz disponível.");
+                selectedVoice = voices[0]; // Fallback para a primeira voz disponível
             }
-        });
 
-        await waitForVoices;
-        console.log("Vozes carregadas, aguardando interação do usuário...");
+            console.log("Usando voz:", selectedVoice ? selectedVoice.name : "Nenhuma voz disponível.");
 
-        // Alterar texto do botão para "Press to Start"
-        speakButton.innerText = "Press to Start";
-        speakButton.addEventListener("click", () => {
-            // Mostrar o texto e falar ao pressionar o botão
-            messageElement.style.visibility = "visible";
-            speak(data.response);
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = selectedVoice ? selectedVoice.lang : "en-US";
+            utterance.voice = selectedVoice;
 
-            // Alterar texto do botão para "Press to Speak"
-            speakButton.innerText = "Press to Speak";
+            utterance.onstart = () => {
+                isSpeaking = true;
+                robotImg.src = ROBOT_GIF;
 
-            // Substituir o evento do botão para reconhecimento de fala
-            speakButton.addEventListener("click", () => {
-                if (recognition) {
-                    recognition.start();
-                }
-            }, { once: true });
-        }, { once: true });
-    } catch (error) {
-        console.error("Error initializing the conversation:", error);
-        messageElement.innerText = "Error initializing the conversation.";
-    }
-}
+                // Parar reconhecimento enquanto o robô está falando
+                if (recognition) recognition.stop();
+            };
 
-// Função para o robô falar
-function speak(text) {
-    const synth = window.speechSynthesis;
-    const voices = synth.getVoices();
-    let selectedVoice = voices.find((voice) => voice.lang === "en-US");
+            utterance.onend = () => {
+                isSpeaking = false;
+                robotImg.src = ROBOT_STATIC;
 
-    if (!selectedVoice) {
-        console.warn("Voz 'en-US' não encontrada. Usando a primeira voz disponível.");
-        selectedVoice = voices[0]; // Usar a primeira voz disponível como fallback
-    }
+                // Ativar reconhecimento após o robô terminar de falar
+                if (recognition) recognition.start();
+            };
 
-    console.log("Usando voz:", selectedVoice ? selectedVoice.name : "Nenhuma voz disponível.");
+            synth.speak(utterance);
+        }
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = selectedVoice ? selectedVoice.lang : "en-US";
-    utterance.voice = selectedVoice;
+        // Inicializar conversa
+        async function initializeConversation() {
+            try {
+                console.log("Fetching initial conversation...");
+                const response = await fetch('/api/start');
+                const data = await response.json();
+                console.log("Received data:", data);
 
-    utterance.onstart = () => {
-        robotImg.src = ROBOT_GIF;
-    };
+                // Atualizar texto e prepará-lo para exibição
+                messageElement.style.visibility = "hidden";
+                messageElement.innerText = data.response;
 
-    utterance.onend = () => {
-        robotImg.src = ROBOT_STATIC;
-    };
+                // Carregar vozes
+                const waitForVoices = new Promise((resolve) => {
+                    const synth = window.speechSynthesis;
+                    if (synth.getVoices().length > 0) {
+                        resolve();
+                    } else {
+                        synth.onvoiceschanged = resolve;
+                    }
+                });
 
-    synth.speak(utterance);
-}
+                await waitForVoices;
+                console.log("Vozes carregadas, aguardando interação do usuário...");
+
+                // Alterar texto do botão para "Press to Start"
+                speakButton.innerText = "Press to Start";
+                speakButton.addEventListener("click", () => {
+                    // Mostrar texto e iniciar fala do robô
+                    messageElement.style.visibility = "visible";
+                    speak(data.response);
+
+                    // Alterar texto do botão para "Press to Speak"
+                    speakButton.innerText = "Press to Speak";
+
+                    // Substituir evento do botão para reconhecimento de fala
+                    speakButton.addEventListener("click", () => {
+                        if (!isSpeaking && recognition) {
+                            recognition.start();
+                        }
+                    });
+                }, { once: true });
+            } catch (error) {
+                console.error("Error initializing the conversation:", error);
+                messageElement.innerText = "Error initializing the conversation.";
+            }
+        }
 
         // Configurar reconhecimento de voz
         function setupSpeechRecognition() {
@@ -168,12 +177,6 @@ function speak(text) {
                 }
             };
         }
-
-        speakButton.addEventListener("click", () => {
-            if (recognition) {
-                recognition.start();
-            }
-        });
 
         // Inicializar aplicação
         window.onload = () => {
