@@ -53,7 +53,7 @@ app.get('/api/start', (req, res) => {
     };
 
     const topic = conversationDetails || "a general topic";
-    const initialMessage = `Hello ${studentInfo.name}! My name is Lex, your great English teacher. Today's topic is: ${topic}. Shall we begin?`;
+    const initialMessage = `Hello ${studentInfo.name}! My name is Lex, your English teacher. Today's topic is: ${topic}. Shall we begin?`;
 
     res.json({
         response: initialMessage,
