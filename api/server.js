@@ -33,7 +33,7 @@ try {
 }
 
 // Mensagem de contexto inicial
-    const contextMessage = {
+const contextMessage = {
     role: "system",
     content: `
         You will play as Lex, a friendly and patient English teaching robot. Your job is to conduct English lessons in a focused, cheerful, and motivating way.
