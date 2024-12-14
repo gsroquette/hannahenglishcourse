@@ -86,7 +86,19 @@ app.post('/api/chat', async (req, res) => {
         // Adicionar a resposta do robô ao histórico
         chatHistory.push({ role: 'assistant', content: responseMessage });
 
-        res.json({ response: responseMessage });
+        // Simular resposta com síntese de fala e bloquear o botão enquanto o Lex está falando
+        const speechResponse = {
+            text: responseMessage,
+            disableSpeakButton: true
+        };
+
+        res.json(speechResponse);
+
+        // Lógica para reabilitar o botão após a fala terminar
+        setTimeout(() => {
+            speechResponse.disableSpeakButton = false;
+        }, responseMessage.length * 50); // Aproximar tempo de fala (50ms por caractere)
+
     } catch (error) {
         console.error("Erro na API OpenAI:", error);
         res.status(500).json({ response: "Error processing the message." });
