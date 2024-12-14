@@ -54,9 +54,11 @@
             try {
                 const response = await fetch('/api/start');
                 const data = await response.json();
+
+                // Exibir mensagem inicial personalizada
                 messageElement.innerText = data.response;
 
-                // Iniciar fala do robô
+                // Falar mensagem inicial
                 speak(data.response);
             } catch (error) {
                 console.error("Error initializing the conversation:", error);
@@ -65,105 +67,105 @@
         }
 
         // Função para o robô falar
-       function speak(text) {
-    const synth = window.speechSynthesis;
-    let voices = synth.getVoices();
-    let alertDisplayed = false;
+        function speak(text) {
+            const synth = window.speechSynthesis;
+            let voices = synth.getVoices();
+            let alertDisplayed = false;
 
-    // Cancela qualquer síntese de fala anterior
-    synth.cancel();
+            // Cancela qualquer síntese de fala anterior
+            synth.cancel();
 
-    // Função para buscar a voz "en-US"
-    function findVoice() {
-        voices = synth.getVoices(); // Atualiza a lista de vozes disponíveis
-        return voices.find((voice) => voice.lang === "en-US");
-    }
+            // Função para buscar a voz "en-US"
+            function findVoice() {
+                voices = synth.getVoices(); // Atualiza a lista de vozes disponíveis
+                return voices.find((voice) => voice.lang === "en-US");
+            }
 
-    let selectedVoice = findVoice();
+            let selectedVoice = findVoice();
 
-    if (!selectedVoice) {
-        // Caso nenhuma voz esteja disponível ainda, aguarda o carregamento
-        if (voices.length === 0) {
-            synth.onvoiceschanged = () => {
-                voices = synth.getVoices();
-                selectedVoice = findVoice();
+            if (!selectedVoice) {
+                // Caso nenhuma voz esteja disponível ainda, aguarda o carregamento
+                if (voices.length === 0) {
+                    synth.onvoiceschanged = () => {
+                        voices = synth.getVoices();
+                        selectedVoice = findVoice();
 
-                if (!selectedVoice && !alertDisplayed) {
+                        if (!selectedVoice && !alertDisplayed) {
+                            alertDisplayed = true;
+                            alert(
+                                "No 'en-US' voice found in your speech synthesizer. Please enable English language in your browser's speech synthesizer. For now, the default voice will be used, which may cause problems."
+                            );
+                        }
+                    };
+                } else if (!alertDisplayed) {
                     alertDisplayed = true;
                     alert(
-                        "No 'en-US' voice found in your speech synthesizer. Please enable English language in your browser's speech synthesizer. For now, the default voice will be used, which may cause problems."
+                        "No 'en-US' voice found. Using default voice instead."
                     );
                 }
+            }
+
+            // Cria o objeto de fala
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = "en-US";
+            utterance.voice = selectedVoice || null; // Usa a voz encontrada ou a padrão
+
+            utterance.onstart = () => {
+                robotImg.src = ROBOT_GIF; // Ativa GIF
             };
-        } else if (!alertDisplayed) {
-            alertDisplayed = true;
-            alert(
-                "No 'en-US' voice found. Using default voice instead."
-            );
+
+            utterance.onend = () => {
+                robotImg.src = ROBOT_STATIC; // Volta ao estático
+            };
+
+            synth.speak(utterance);
         }
-    }
-
-    // Cria o objeto de fala
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "en-US";
-    utterance.voice = selectedVoice || null; // Usa a voz encontrada ou a padrão
-
-    utterance.onstart = () => {
-        robotImg.src = ROBOT_GIF; // Ativa GIF
-    };
-
-    utterance.onend = () => {
-        robotImg.src = ROBOT_STATIC; // Volta ao estático
-    };
-
-    synth.speak(utterance);
-}
 
         // Configurar reconhecimento de voz
-      function setupSpeechRecognition() {
-    recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-    recognition.lang = "en-US";
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
+        function setupSpeechRecognition() {
+            recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = "en-US";
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
 
-    // Solicitar permissão para usar o microfone
-    navigator.mediaDevices.getUserMedia({ audio: true })
-        .then(() => {
-            console.log("Microphone permission granted.");
-        })
-        .catch((error) => {
-            alert("Microphone permission denied. Please enable it in your browser settings.");
-            console.error("Microphone access error:", error);
-        });
+            // Solicitar permissão para usar o microfone
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(() => {
+                    console.log("Microphone permission granted.");
+                })
+                .catch((error) => {
+                    alert("Microphone permission denied. Please enable it in your browser settings.");
+                    console.error("Microphone access error:", error);
+                });
 
-    recognition.onstart = () => {
-        speakButton.classList.add("listening");
-        speakButton.innerText = "Listening...";
-    };
+            recognition.onstart = () => {
+                speakButton.classList.add("listening");
+                speakButton.innerText = "Listening...";
+            };
 
-    recognition.onend = () => {
-        speakButton.classList.remove("listening");
-        speakButton.innerText = "Press to Speak";
-    };
+            recognition.onend = () => {
+                speakButton.classList.remove("listening");
+                speakButton.innerText = "Press to Speak";
+            };
 
-    recognition.onresult = async (event) => {
-        const userSpeech = event.results[0][0].transcript;
-        messageElement.innerText = `You said: ${userSpeech}`;
-        try {
-            const response = await fetch('/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: userSpeech })
-            });
-            const data = await response.json();
-            messageElement.innerText = data.response;
-            speak(data.response);
-        } catch (error) {
-            console.error("Error communicating with the server:", error);
-            messageElement.innerText = "Error communicating with the server.";
+            recognition.onresult = async (event) => {
+                const userSpeech = event.results[0][0].transcript;
+                messageElement.innerText = `You said: ${userSpeech}`;
+                try {
+                    const response = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: userSpeech })
+                    });
+                    const data = await response.json();
+                    messageElement.innerText = data.response;
+                    speak(data.response);
+                } catch (error) {
+                    console.error("Error communicating with the server:", error);
+                    messageElement.innerText = "Error communicating with the server.";
+                }
+            };
         }
-    };
-}
 
         speakButton.addEventListener("click", () => {
             if (recognition) {

@@ -32,15 +32,35 @@ try {
     console.error("Erro ao carregar conversa.txt:", error);
 }
 
+// Mensagem de contexto inicial
+const contextMessage = {
+    role: "system",
+    content: `
+        You will act as Lex, a friendly and patient English teacher robot. Your role is to conduct English lessons in a focused and motivating manner.
+        Adapt your responses based on the student's age and English level. Use simpler language for younger or beginner students, and more advanced dialogue for older or more advanced students.
+        Always introduce yourself as "Professor Lex" and address the student by name at the beginning of the conversation. Keep the conversation focused on the lesson topic.
+    `,
+};
+
 // Rota para iniciar a conversa
 app.get('/api/start', (req, res) => {
+    const studentInfo = {
+        name: "Vera Gilda",
+        age: 70,
+        level: "Beginner",
+    };
+
     const topic = conversationDetails || "a general topic";
-    const initialMessage = `Hello! My name is Lex, your great English teacher. Today's topic is: ${topic}. Shall we begin?`;
-    res.json({ response: initialMessage });
+    const initialMessage = `Hello ${studentInfo.name}! My name is Lex, your great English teacher. Today's topic is: ${topic}. Shall we begin?`;
+
+    res.json({
+        response: initialMessage,
+        studentInfo,
+    });
 });
 
 // Array para manter o histórico da conversa
-const chatHistory = [];
+const chatHistory = [contextMessage];
 
 app.post('/api/chat', async (req, res) => {
     const userMessage = req.body.message;
