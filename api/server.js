@@ -36,12 +36,12 @@ try {
 const contextMessage = {
     role: "system",
     content: 
-      `You will play as Lex, a friendly and patient English teaching robot. Your job is to conduct English lessons in a focused, cheerful and motivating way.
+      You will play as Lex, a friendly and patient English teaching robot. Your job is to conduct English lessons in a focused, cheerful and motivating way.
       The student's name is Vera, she is 70 years old and her English level is beginner.
       The topic of this lesson is: ${conversationDetails}.
       Adjust your answers based on the student's age and English level. Use simpler language and speak more slowly with beginner students. Always use short, clear and direct texts when speaking to students (never be verbose). Keep the conversation focused on the topic of the lesson, do not let the student get sidetracked.
       Always introduce yourself as "Teacher Lex" and address the student by name at the beginning of the conversation.
-    `,
+    ,
 };
 
 // Rota para iniciar a conversa
@@ -53,7 +53,7 @@ app.get('/api/start', (req, res) => {
     };
 
     const topic = conversationDetails || "a general topic";
-    const initialMessage = `Hello ${studentInfo.name}! My name is Lex, your English teacher. Today's topic is: ${topic}. Shall we begin?`;
+    const initialMessage = Hello ${studentInfo.name}! My name is Lex, your English teacher. Today's topic is: ${topic}. Shall we begin?;
 
     res.json({
         response: initialMessage,
@@ -86,19 +86,7 @@ app.post('/api/chat', async (req, res) => {
         // Adicionar a resposta do robô ao histórico
         chatHistory.push({ role: 'assistant', content: responseMessage });
 
-        // Simular resposta com síntese de fala e bloquear o botão enquanto o Lex está falando
-        const speechResponse = {
-            text: responseMessage,
-            disableSpeakButton: true
-        };
-
-        res.json(speechResponse);
-
-        // Lógica para reabilitar o botão após a fala terminar
-        setTimeout(() => {
-            speechResponse.disableSpeakButton = false;
-        }, responseMessage.length * 50); // Aproximar tempo de fala (50ms por caractere)
-
+        res.json({ response: responseMessage });
     } catch (error) {
         console.error("Erro na API OpenAI:", error);
         res.status(500).json({ response: "Error processing the message." });
@@ -112,7 +100,7 @@ app.get('/', (req, res) => {
 
 // Iniciar o servidor
 app.listen(PORT, () => {
-    console.log(`Servidor rodando na porta ${PORT}`);
+    console.log(Servidor rodando na porta ${PORT});
 });
 
 module.exports = app;
