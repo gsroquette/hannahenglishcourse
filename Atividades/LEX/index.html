@@ -70,16 +70,15 @@
                 isSpeaking = true;
                 robotImg.src = ROBOT_GIF;
 
-                // Parar reconhecimento enquanto o robô está falando
-                if (recognition) recognition.stop();
+                // Garantir que o reconhecimento de voz esteja desativado enquanto o robô fala
+                if (recognition && recognition.state === 'active') {
+                    recognition.stop();
+                }
             };
 
             utterance.onend = () => {
                 isSpeaking = false;
                 robotImg.src = ROBOT_STATIC;
-
-                // Ativar reconhecimento após o robô terminar de falar
-                if (recognition) recognition.start();
             };
 
             synth.speak(utterance);
@@ -93,7 +92,7 @@
                 const data = await response.json();
                 console.log("Received data:", data);
 
-                // Atualizar texto e prepará-lo para exibição
+                // Atualizar texto inicial
                 messageElement.style.visibility = "hidden";
                 messageElement.innerText = data.response;
 
@@ -108,25 +107,26 @@
                 });
 
                 await waitForVoices;
-                console.log("Vozes carregadas, aguardando interação do usuário...");
+                console.log("Vozes carregadas.");
 
                 // Alterar texto do botão para "Press to Start"
                 speakButton.innerText = "Press to Start";
+
                 speakButton.addEventListener("click", () => {
-                    // Mostrar texto e iniciar fala do robô
+                    // Mostrar o texto inicial e iniciar fala do robô
                     messageElement.style.visibility = "visible";
                     speak(data.response);
 
                     // Alterar texto do botão para "Press to Speak"
                     speakButton.innerText = "Press to Speak";
 
-                    // Substituir evento do botão para reconhecimento de fala
+                    // Atualizar evento do botão para permitir apenas reconhecimento de fala
                     speakButton.addEventListener("click", () => {
                         if (!isSpeaking && recognition) {
                             recognition.start();
                         }
                     });
-                }, { once: true });
+                }, { once: true }); // Garantir que este evento execute apenas uma vez
             } catch (error) {
                 console.error("Error initializing the conversation:", error);
                 messageElement.innerText = "Error initializing the conversation.";
