@@ -2,6 +2,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const fs = require('fs');
+const path = require('path');
 const { Configuration, OpenAIApi } = require('openai');
 
 const app = express();
@@ -21,14 +22,19 @@ const openai = new OpenAIApi(configuration);
 // Carregar informações do arquivo conversa.txt
 let conversationDetails = 'General conversation'; // Valor padrão
 try {
-    conversationDetails = fs.readFileSync('./conversa.txt', 'utf-8');
+    const filePath = path.join(__dirname, 'conversa.txt');
+    if (fs.existsSync(filePath)) {
+        conversationDetails = fs.readFileSync(filePath, 'utf-8').trim();
+    } else {
+        console.error("Arquivo conversa.txt não encontrado. Usando valor padrão.");
+    }
 } catch (error) {
-    console.error("Erro ao carregar conversa.txt. Usando valor padrão:", error);
+    console.error("Erro ao carregar conversa.txt:", error);
 }
 
 // Rota para iniciar a conversa
 app.get('/api/start', (req, res) => {
-    const topic = conversationDetails.trim() || "a general topic";
+    const topic = conversationDetails || "a general topic";
     const initialMessage = `Hello! My name is Lex, your great English teacher. Today's topic is: ${topic}. Shall we begin?`;
     res.json({ response: initialMessage });
 });
