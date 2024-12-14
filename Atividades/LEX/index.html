@@ -42,47 +42,73 @@
     <script>
         const ROBOT_GIF = "../../imagens/robo1.gif";
         const ROBOT_STATIC = "../../imagens/robo1_static.png";
+        const ROBOT_ALTERNATE = "../../imagens/robo2.gif";
         const messageElement = document.getElementById("message");
         const robotImg = document.getElementById("robot-img");
         const speakButton = document.getElementById("speak-button");
 
         let recognition;
         let isSpeaking = false; // Estado para rastrear se o robô está falando
+        let staticTime = 0; // Tempo acumulado em estado estático
+        let alternateTimeout; // Timeout para exibição de `robo2.gif`
 
         // Função para o robô falar
-      function speak(text, rate = 0.5) { // Adicionado parâmetro `rate` com valor padrão 1
-    const synth = window.speechSynthesis;
-    const voices = synth.getVoices();
-    let selectedVoice = voices.find((voice) => voice.lang === "en-US");
+        function speak(text, rate = 0.5) {
+            const synth = window.speechSynthesis;
+            const voices = synth.getVoices();
+            let selectedVoice = voices.find((voice) => voice.lang === "en-US");
 
-    if (!selectedVoice) {
-        console.warn("Voz 'en-US' não encontrada. Usando a primeira voz disponível.");
-        selectedVoice = voices[0]; // Fallback para a primeira voz disponível
-    }
+            if (!selectedVoice) {
+                console.warn("Voz 'en-US' não encontrada. Usando a primeira voz disponível.");
+                selectedVoice = voices[0]; // Fallback para a primeira voz disponível
+            }
 
-    console.log("Usando voz:", selectedVoice ? selectedVoice.name : "Nenhuma voz disponível.");
+            console.log("Usando voz:", selectedVoice ? selectedVoice.name : "Nenhuma voz disponível.");
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = selectedVoice ? selectedVoice.lang : "en-US";
-    utterance.voice = selectedVoice;
-    utterance.rate = rate; // Configurar velocidade da fala
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = selectedVoice ? selectedVoice.lang : "en-US";
+            utterance.voice = selectedVoice;
+            utterance.rate = rate;
 
-    utterance.onstart = () => {
-        isSpeaking = true;
-        robotImg.src = ROBOT_GIF;
+            utterance.onstart = () => {
+                isSpeaking = true;
+                robotImg.src = ROBOT_GIF;
 
-        if (recognition && recognition.state === 'active') {
-            recognition.stop();
+                if (recognition && recognition.state === 'active') {
+                    recognition.stop();
+                }
+
+                // Resetar temporizador de estado estático
+                clearInterval(alternateTimeout);
+                staticTime = 0;
+            };
+
+            utterance.onend = () => {
+                isSpeaking = false;
+                robotImg.src = ROBOT_STATIC;
+            };
+
+            synth.speak(utterance);
         }
-    };
 
-    utterance.onend = () => {
-        isSpeaking = false;
-        robotImg.src = ROBOT_STATIC;
-    };
+        // Alternar imagem após 15 segundos
+        function startStaticImageTimer() {
+            setInterval(() => {
+                if (!isSpeaking) {
+                    staticTime += 1;
 
-    synth.speak(utterance);
-}
+                    if (staticTime === 15) {
+                        robotImg.src = ROBOT_ALTERNATE; // Mostrar `robo2.gif`
+
+                        // Voltar à imagem estática após 7 segundos
+                        alternateTimeout = setTimeout(() => {
+                            robotImg.src = ROBOT_STATIC;
+                            staticTime = 0; // Resetar tempo estático
+                        }, 7000);
+                    }
+                }
+            }, 1000); // Verificar a cada 1 segundo
+        }
 
         // Inicializar conversa
         async function initializeConversation() {
@@ -120,13 +146,13 @@
                     // Alterar texto do botão para "Press to Speak"
                     speakButton.innerText = "Press to Speak";
 
-                    // Atualizar evento do botão para permitir apenas reconhecimento de fala
+                    // Atualizar evento do botão para reconhecimento de fala
                     speakButton.addEventListener("click", () => {
                         if (!isSpeaking && recognition) {
                             recognition.start();
                         }
                     });
-                }, { once: true }); // Garantir que este evento execute apenas uma vez
+                }, { once: true });
             } catch (error) {
                 console.error("Error initializing the conversation:", error);
                 messageElement.innerText = "Error initializing the conversation.";
@@ -182,6 +208,7 @@
         window.onload = () => {
             setupSpeechRecognition();
             initializeConversation();
+            startStaticImageTimer(); // Iniciar temporizador de imagem estática
         };
     </script>
 </body>
