@@ -22,7 +22,7 @@ const openai = new OpenAIApi(configuration);
 // Carregar informações do arquivo conversa.txt
 let conversationDetails = 'General conversation'; // Valor padrão
 try {
-    const filePath = path.join(__dirname, 'conversa.txt');
+    const filePath = path.join(__dirname, 'conversa.txt'); // Caminho correto
     if (fs.existsSync(filePath)) {
         conversationDetails = fs.readFileSync(filePath, 'utf-8').trim();
     } else {
