@@ -47,94 +47,45 @@
         const speakButton = document.getElementById("speak-button");
 
         let recognition;
-        let speaking = false;
 
-       async function initializeConversation() {
-    try {
-        console.log("Fetching initial conversation...");
-        const response = await fetch('/api/start');
-        const data = await response.json();
-        console.log("Received data:", data);
+        // Inicializar conversa
+        async function initializeConversation() {
+            try {
+                console.log("Fetching initial conversation...");
+                const response = await fetch('/api/start');
+                const data = await response.json();
+                console.log("Received data:", data);
 
-        messageElement.innerText = data.response;
+                messageElement.innerText = data.response;
 
-        // Garantir carregamento de vozes antes de falar
-        const waitForVoices = new Promise((resolve) => {
+                // Garantir que vozes estejam carregadas antes de falar
+                const waitForVoices = new Promise((resolve) => {
+                    const synth = window.speechSynthesis;
+                    if (synth.getVoices().length > 0) {
+                        resolve();
+                    } else {
+                        synth.onvoiceschanged = resolve;
+                    }
+                });
+
+                await waitForVoices;
+                console.log("Vozes carregadas, iniciando fala...");
+                speak(data.response);
+            } catch (error) {
+                console.error("Error initializing the conversation:", error);
+                messageElement.innerText = "Error initializing the conversation.";
+            }
+        }
+
+        // Função para o robô falar
+        function speak(text) {
             const synth = window.speechSynthesis;
-            if (synth.getVoices().length > 0) {
-                resolve();
-            } else {
-                synth.onvoiceschanged = resolve;
-            }
-        });
+            const voices = synth.getVoices();
+            const selectedVoice = voices.find((voice) => voice.lang === "en-US") || null;
 
-        await waitForVoices;
-        console.log("Vozes carregadas, iniciando fala...");
-        speak(data.response);
-    } catch (error) {
-        console.error("Error initializing the conversation:", error);
-        messageElement.innerText = "Error initializing the conversation.";
-    }
-}
-
-// Função para o robô falar
-function speak(text) {
-    const synth = window.speechSynthesis;
-    const voices = synth.getVoices();
-    const selectedVoice = voices.find((voice) => voice.lang === "en-US") || null;
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "en-US";
-    utterance.voice = selectedVoice;
-
-    utterance.onstart = () => {
-        robotImg.src = ROBOT_GIF;
-    };
-
-    utterance.onend = () => {
-        robotImg.src = ROBOT_STATIC;
-    };
-
-    synth.speak(utterance);
-}
-
-            // Cancela qualquer síntese de fala anterior
-            synth.cancel();
-
-            // Função para buscar a voz "en-US"
-            function findVoice() {
-                voices = synth.getVoices(); // Atualiza a lista de vozes disponíveis
-                return voices.find((voice) => voice.lang === "en-US");
-            }
-
-            let selectedVoice = findVoice();
-
-            if (!selectedVoice) {
-                // Caso nenhuma voz esteja disponível ainda, aguarda o carregamento
-                if (voices.length === 0) {
-                    synth.onvoiceschanged = () => {
-                        voices = synth.getVoices();
-                        selectedVoice = findVoice();
-
-                        if (!selectedVoice && !alertDisplayed) {
-                            alertDisplayed = true;
-                            alert(
-                                "No 'en-US' voice found in your speech synthesizer. Please enable English language in your browser's speech synthesizer. For now, the default voice will be used, which may cause problems."
-                            );
-                        }
-                    };
-                } else if (!alertDisplayed) {
-                    alertDisplayed = true;
-                    alert(
-                        "No 'en-US' voice found. Using default voice instead."
-                    );
-                }
-            }
-
-            // Cria o objeto de fala
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = "en-US";
-            utterance.voice = selectedVoice || null; // Usa a voz encontrada ou a padrão
+            utterance.voice = selectedVoice;
 
             utterance.onstart = () => {
                 robotImg.src = ROBOT_GIF; // Ativa GIF
@@ -154,7 +105,6 @@ function speak(text) {
             recognition.interimResults = false;
             recognition.maxAlternatives = 1;
 
-            // Solicitar permissão para usar o microfone
             navigator.mediaDevices.getUserMedia({ audio: true })
                 .then(() => {
                     console.log("Microphone permission granted.");
