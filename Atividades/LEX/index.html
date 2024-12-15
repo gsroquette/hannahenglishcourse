@@ -39,6 +39,9 @@
             100% { transform: scale(1); }
         }
     </style>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
 </head>
 <body>
     <h1>Talk to Robot Lex</h1>
@@ -47,6 +50,18 @@
     <button id="speak-button">Press to Start</button>
 
     <script>
+        // Configuração do Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+            authDomain: "hannahenglishcourse.firebaseapp.com",
+            databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "hannahenglishcourse",
+            storageBucket: "hannahenglishcourse.appspot.com",
+            messagingSenderId: "449818788486",
+            appId: "1:449818788486:web:8a49d3f68591e6fb3f0707"
+        };
+        firebase.initializeApp(firebaseConfig);
+
         const ROBOT_GIF = "../../imagens/robo1.gif";
         const ROBOT_STATIC = "../../imagens/robo1_static.png";
         const ROBOT_ALTERNATE = "../../imagens/robo2.gif";
@@ -56,15 +71,29 @@
 
         let recognition;
         let isSpeaking = false;
-        let staticTime = 0;
-        let alternateTimeout;
 
+        // Capturar parâmetros da URL
         function getParamsFromURL() {
             const params = new URLSearchParams(window.location.search);
             return {
                 uid: params.get('uid'),
                 level: params.get('level'),
             };
+        }
+
+        // Obter UID automaticamente se não estiver na URL
+        async function checkAndFetchUID() {
+            const params = getParamsFromURL();
+            if (!params.uid) {
+                await firebase.auth().onAuthStateChanged((user) => {
+                    if (user) {
+                        const uid = user.uid;
+                        window.location.href = `index.html?uid=${uid}&level=Level1`;
+                    } else {
+                        alert("Please log in to access the conversation.");
+                    }
+                });
+            }
         }
 
         async function initializeConversation() {
@@ -74,23 +103,19 @@
                     throw new Error("UID and Level must be provided in the URL.");
                 }
 
-                console.log("Fetching initial conversation...");
                 const response = await fetch(`/api/start?uid=${uid}&level=${level}`);
                 const data = await response.json();
-                console.log("Received data:", data);
 
                 messageElement.style.visibility = "visible";
                 messageElement.innerText = data.response;
 
                 speakButton.addEventListener("click", () => {
                     speak(data.response);
-                    speakButton.innerText = "Press to Speak";
                 }, { once: true });
 
                 setupSpeechRecognition();
             } catch (error) {
-                console.error("Error initializing the conversation:", error.message);
-                messageElement.style.visibility = "visible";
+                console.error("Error initializing the conversation:", error);
                 messageElement.innerText = "Failed to load conversation. Check UID and level in the URL.";
             }
         }
@@ -104,8 +129,6 @@
             utterance.onstart = () => {
                 isSpeaking = true;
                 robotImg.src = ROBOT_GIF;
-                clearTimeout(alternateTimeout);
-                staticTime = 0;
             };
 
             utterance.onend = () => {
@@ -151,7 +174,8 @@
             }
         }
 
-        window.onload = () => {
+        window.onload = async () => {
+            await checkAndFetchUID();
             initializeConversation();
         };
     </script>
