@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Talk to Robot Lex</title>
     <style>
-       body {
+        body {
             font-family: Arial, sans-serif;
             display: flex;
             flex-direction: column;
@@ -91,8 +91,8 @@
             };
 
             utterance.onend = () => {
-        isSpeaking = false;
-        robotImg.src = ROBOT_STATIC;   
+                isSpeaking = false;
+                robotImg.src = ROBOT_STATIC;   
             };
 
             synth.speak(utterance);
@@ -157,6 +157,9 @@
                     speakButton.addEventListener("click", () => {
                         if (!isSpeaking && recognition) {
                             recognition.start();
+                            console.log("Speech recognition started.");
+                        } else {
+                            console.warn("Recognition instance not available.");
                         }
                     });
                 }, { once: true });
@@ -168,47 +171,52 @@
 
         // Configurar reconhecimento de voz
         function setupSpeechRecognition() {
-            recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-            recognition.lang = "en-US";
-            recognition.interimResults = false;
-            recognition.maxAlternatives = 1;
+            try {
+                recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+                recognition.lang = "en-US";
+                recognition.interimResults = false;
+                recognition.maxAlternatives = 1;
 
-            navigator.mediaDevices.getUserMedia({ audio: true })
-                .then(() => {
-                    console.log("Microphone permission granted.");
-                })
-                .catch((error) => {
-                    alert("Microphone permission denied. Please enable it in your browser settings.");
-                    console.error("Microphone access error:", error);
-                });
-
-            recognition.onstart = () => {
-                speakButton.classList.add("listening");
-                speakButton.innerText = "Listening...";
-            };
-
-            recognition.onend = () => {
-                speakButton.classList.remove("listening");
-                speakButton.innerText = "Press to Speak";
-            };
-
-            recognition.onresult = async (event) => {
-                const userSpeech = event.results[0][0].transcript;
-                messageElement.innerText = `You said: ${userSpeech}`;
-                try {
-                    const response = await fetch('/api/chat', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ message: userSpeech })
+                navigator.mediaDevices.getUserMedia({ audio: true })
+                    .then(() => {
+                        console.log("Microphone permission granted.");
+                    })
+                    .catch((error) => {
+                        alert("Microphone permission denied. Please enable it in your browser settings.");
+                        console.error("Microphone access error:", error);
                     });
-                    const data = await response.json();
-                    messageElement.innerText = data.response;
-                    speak(data.response);
-                } catch (error) {
-                    console.error("Error communicating with the server:", error);
-                    messageElement.innerText = "Error communicating with the server.";
-                }
-            };
+
+                recognition.onstart = () => {
+                    speakButton.classList.add("listening");
+                    speakButton.innerText = "Listening...";
+                };
+
+                recognition.onend = () => {
+                    speakButton.classList.remove("listening");
+                    speakButton.innerText = "Press to Speak";
+                };
+
+                recognition.onresult = async (event) => {
+                    const userSpeech = event.results[0][0].transcript;
+                    messageElement.innerText = `You said: ${userSpeech}`;
+                    try {
+                        const response = await fetch('/api/chat', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ message: userSpeech })
+                        });
+                        const data = await response.json();
+                        messageElement.innerText = data.response;
+                        speak(data.response);
+                    } catch (error) {
+                        console.error("Error communicating with the server:", error);
+                        messageElement.innerText = "Error communicating with the server.";
+                    }
+                };
+            } catch (err) {
+                console.error("Speech Recognition not supported:", err);
+                alert("Speech recognition is not supported in this browser.");
+            }
         }
 
         // Inicializar aplicação
