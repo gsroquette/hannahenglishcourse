@@ -1,8 +1,8 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const admin = require('firebase-admin'); // SDK do Firebase Admin para Node.js
-const { Configuration, OpenAIApi } = require('openai');
+const { initializeApp } = require('firebase/app'); // Firebase App SDK
+const { getDatabase, ref, get } = require('firebase/database'); // Firebase Realtime Database SDK
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -13,29 +13,18 @@ app.use(cors({
 }));
 app.use(bodyParser.json());
 
-// Inicializar Firebase Admin SDK
+// Configuração do Firebase
 const firebaseConfig = {
-    credential: admin.credential.cert({
-        type: "service_account",
-        project_id: "hannahenglishcourse",
-        private_key_id: "SUA_PRIVATE_KEY_ID", // Substitua por sua chave privada do Firebase Admin SDK
-        private_key: "-----BEGIN PRIVATE KEY-----\nSUA_CHAVE_PRIVADA\n-----END PRIVATE KEY-----\n".replace(/\\n/g, '\n'),
-        client_email: "firebase-adminsdk@hannahenglishcourse.iam.gserviceaccount.com",
-        client_id: "CLIENT_ID",
-        auth_uri: "https://accounts.google.com/o/oauth2/auth",
-        token_uri: "https://oauth2.googleapis.com/token",
-        auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-        client_x509_cert_url: "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk"
-    }),
-    databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+    apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+    authDomain: "hannahenglishcourse.firebaseapp.com",
+    databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "hannahenglishcourse",
+    storageBucket: "hannahenglishcourse.appspot.com",
+    messagingSenderId: "449818788486",
+    appId: "1:449818788486:web:8a49d3f68591e6fb3f0707"
 };
-admin.initializeApp(firebaseConfig);
-
-// Configuração da API do OpenAI
-const configuration = new Configuration({
-    apiKey: process.env.OPENAI_API_KEY,
-});
-const openai = new OpenAIApi(configuration);
+const firebaseApp = initializeApp(firebaseConfig);
+const database = getDatabase(firebaseApp);
 
 // Mensagem de contexto inicial
 let contextMessage = {
@@ -48,7 +37,6 @@ let contextMessage = {
 // Rota para buscar informações do Firebase e da URL
 app.get('/api/start', async (req, res) => {
     try {
-        // Substitua 'uidDoUsuarioLogado' pelo UID do usuário logado
         const uid = req.query.uid; // O UID deve ser enviado via query string
         const level = req.query.level; // O nível deve ser enviado via query string
 
@@ -61,8 +49,8 @@ app.get('/api/start', async (req, res) => {
         }
 
         // Busca o nome do usuário no Firebase Database
-        const userRef = admin.database().ref(`/usuarios/${uid}`);
-        const snapshot = await userRef.once('value');
+        const userRef = ref(database, `/usuarios/${uid}`);
+        const snapshot = await get(userRef);
 
         if (!snapshot.exists()) {
             return res.status(404).json({ response: "Usuário não encontrado no Firebase." });
