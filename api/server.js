@@ -41,8 +41,10 @@ const contextMessage = {
         Follow these guidelines to conduct the conversation:
 
         Adapt your language to the student's level:
-        - If the level is Level1, use short sentences (a maximum of 3 per interaction), simple, clear, and direct. Avoid being verbose.
-        - If the level is Level2, use short sentences (a maximum of 5 per interaction), while keeping them simple and clear. Avoid being verbose.
+     - If the level is Level 1, it means that the student's English level in the CEFR is A1. Use short sentences (maximum of 3 per interaction), simple, clear and direct. Do not be verbose.
+     - If the level is Level 2, it means that the student's English level in the CEFR is A2. Use short sentences (maximum of 3 per interaction), keeping them simple and clear. Do not be verbose.
+     - If the level is Level 3, it means that the student's English level in the CEFR is B1. Use short sentences (maximum of 4 per interaction). Avoid being verbose.
+     - If the level is Level 4, it means that the student's English level in the CEFR is B2. Avoid being verbose.
 
         Focus on the topic:
         - Keep the conversation always centered on the lesson topic and avoid distractions.
@@ -72,7 +74,7 @@ app.get('/api/start', (req, res) => {
     };
 
     const topic = conversationDetails || "a general topic";
-    const initialMessage = `Hello ${studentInfo.name}! My name is Lex, your English teacher. Today's topic is: ${topic}. Shall we begin?`;
+    const initialMessage = `Hello ${studentInfo.name}! My name is Lex, your robot friend. Today's topic is: ${topic}. Shall we begin?`;
 
     res.json({
         response: initialMessage,
