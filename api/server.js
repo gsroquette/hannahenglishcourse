@@ -47,7 +47,7 @@ app.get('/api/start', async (req, res) => {
         });
     } catch (error) {
         console.error("Error retrieving user data:", error.message);
-        res.status(500).json({ response: "Internal server error." });
+        res.status(500).json({ response: "Internal server error.", error: error.message });
     }
 });
 

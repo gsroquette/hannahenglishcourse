@@ -62,15 +62,15 @@
         };
         firebase.initializeApp(firebaseConfig);
 
+        const BASE_URL = "https://hannahenglishcourse.vercel.app/api";
+
         const ROBOT_GIF = "../../imagens/robo1.gif";
         const ROBOT_STATIC = "../../imagens/robo1_static.png";
-        const ROBOT_ALTERNATE = "../../imagens/robo2.gif";
         const messageElement = document.getElementById("message");
         const robotImg = document.getElementById("robot-img");
         const speakButton = document.getElementById("speak-button");
 
         let recognition;
-        let isSpeaking = false;
 
         // Capturar parâmetros da URL
         function getParamsFromURL() {
@@ -81,21 +81,6 @@
             };
         }
 
-        // Obter UID automaticamente se não estiver na URL
-        async function checkAndFetchUID() {
-            const params = getParamsFromURL();
-            if (!params.uid) {
-                await firebase.auth().onAuthStateChanged((user) => {
-                    if (user) {
-                        const uid = user.uid;
-                        window.location.href = `index.html?uid=${uid}&level=Level1`;
-                    } else {
-                        alert("Please log in to access the conversation.");
-                    }
-                });
-            }
-        }
-
         async function initializeConversation() {
             try {
                 const { uid, level } = getParamsFromURL();
@@ -103,20 +88,19 @@
                     throw new Error("UID and Level must be provided in the URL.");
                 }
 
-                const response = await fetch(`/api/start?uid=${uid}&level=${level}`);
+                const response = await fetch(`${BASE_URL}/start?uid=${uid}&level=${level}`);
                 const data = await response.json();
 
-                messageElement.style.visibility = "visible";
-                messageElement.innerText = data.response;
-
-                speakButton.addEventListener("click", () => {
-                    speak(data.response);
-                }, { once: true });
-
-                setupSpeechRecognition();
+                if (data.response) {
+                    messageElement.style.visibility = "visible";
+                    messageElement.innerText = data.response;
+                    speakButton.addEventListener("click", () => speak(data.response));
+                } else {
+                    throw new Error("Invalid response from server.");
+                }
             } catch (error) {
                 console.error("Error initializing the conversation:", error);
-                messageElement.innerText = "Failed to load conversation. Check UID and level in the URL.";
+                messageElement.innerText = "Failed to load conversation. Please check your connection.";
             }
         }
 
@@ -126,58 +110,13 @@
             utterance.lang = "en-US";
             utterance.rate = rate;
 
-            utterance.onstart = () => {
-                isSpeaking = true;
-                robotImg.src = ROBOT_GIF;
-            };
-
-            utterance.onend = () => {
-                isSpeaking = false;
-                robotImg.src = ROBOT_STATIC;
-            };
+            utterance.onstart = () => robotImg.src = ROBOT_GIF;
+            utterance.onend = () => robotImg.src = ROBOT_STATIC;
 
             synth.speak(utterance);
         }
 
-        function setupSpeechRecognition() {
-            try {
-                recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-                recognition.lang = "en-US";
-
-                recognition.onstart = () => {
-                    speakButton.classList.add("listening");
-                    speakButton.innerText = "Listening...";
-                };
-
-                recognition.onend = () => {
-                    speakButton.classList.remove("listening");
-                    speakButton.innerText = "Press to Speak";
-                };
-
-                recognition.onresult = async (event) => {
-                    const userSpeech = event.results[0][0].transcript;
-                    messageElement.innerText = `You said: ${userSpeech}`;
-
-                    const response = await fetch('/api/chat', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ message: userSpeech })
-                    });
-                    const data = await response.json();
-                    messageElement.innerText = data.response;
-                    speak(data.response);
-                };
-
-                speakButton.addEventListener("click", () => recognition.start());
-            } catch (err) {
-                console.error("Speech recognition not supported:", err);
-            }
-        }
-
-        window.onload = async () => {
-            await checkAndFetchUID();
-            initializeConversation();
-        };
+        window.onload = initializeConversation;
     </script>
 </body>
 </html>
