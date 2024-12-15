@@ -55,8 +55,8 @@
         const speakButton = document.getElementById("speak-button");
 
         let recognition;
-        let isSpeaking = false; 
-        let staticTime = 0; 
+        let isSpeaking = false;
+        let staticTime = 0;
         let alternateTimeout;
 
         function getParamsFromURL() {
@@ -79,61 +79,32 @@
                 const data = await response.json();
                 console.log("Received data:", data);
 
-                messageElement.style.visibility = "hidden";
+                messageElement.style.visibility = "visible";
                 messageElement.innerText = data.response;
 
-                const waitForVoices = new Promise((resolve) => {
-                    const synth = window.speechSynthesis;
-                    if (synth.getVoices().length > 0) {
-                        resolve();
-                    } else {
-                        synth.onvoiceschanged = resolve;
-                    }
-                });
-
-                await waitForVoices;
-                console.log("Vozes carregadas.");
-
-                speakButton.innerText = "Press to Start";
-
                 speakButton.addEventListener("click", () => {
-                    messageElement.style.visibility = "visible";
                     speak(data.response);
-
                     speakButton.innerText = "Press to Speak";
-                    speakButton.addEventListener("click", () => {
-                        if (!isSpeaking && recognition) {
-                            recognition.start();
-                        } else {
-                            console.warn("Recognition instance not available.");
-                        }
-                    });
                 }, { once: true });
+
+                setupSpeechRecognition();
             } catch (error) {
-                console.error("Error initializing the conversation:", error);
-                messageElement.innerText = "Error initializing the conversation.";
+                console.error("Error initializing the conversation:", error.message);
+                messageElement.style.visibility = "visible";
+                messageElement.innerText = "Failed to load conversation. Check UID and level in the URL.";
             }
         }
 
         function speak(text, rate = 0.8) {
             const synth = window.speechSynthesis;
-            const voices = synth.getVoices();
-            let selectedVoice = voices.find((voice) => voice.lang === "en-US");
-
-            if (!selectedVoice) {
-                console.warn("Voz 'en-US' não encontrada.");
-                selectedVoice = voices[0];
-            }
-
             const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = selectedVoice ? selectedVoice.lang : "en-US";
-            utterance.voice = selectedVoice;
+            utterance.lang = "en-US";
             utterance.rate = rate;
 
             utterance.onstart = () => {
                 isSpeaking = true;
                 robotImg.src = ROBOT_GIF;
-                clearInterval(alternateTimeout);
+                clearTimeout(alternateTimeout);
                 staticTime = 0;
             };
 
@@ -143,6 +114,41 @@
             };
 
             synth.speak(utterance);
+        }
+
+        function setupSpeechRecognition() {
+            try {
+                recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+                recognition.lang = "en-US";
+
+                recognition.onstart = () => {
+                    speakButton.classList.add("listening");
+                    speakButton.innerText = "Listening...";
+                };
+
+                recognition.onend = () => {
+                    speakButton.classList.remove("listening");
+                    speakButton.innerText = "Press to Speak";
+                };
+
+                recognition.onresult = async (event) => {
+                    const userSpeech = event.results[0][0].transcript;
+                    messageElement.innerText = `You said: ${userSpeech}`;
+
+                    const response = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: userSpeech })
+                    });
+                    const data = await response.json();
+                    messageElement.innerText = data.response;
+                    speak(data.response);
+                };
+
+                speakButton.addEventListener("click", () => recognition.start());
+            } catch (err) {
+                console.error("Speech recognition not supported:", err);
+            }
         }
 
         window.onload = () => {
