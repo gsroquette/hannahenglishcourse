@@ -36,7 +36,7 @@ try {
 const contextMessage = {
     role: "system",
     content: `
-        You will act as Lex, a native American, friendly, and patient robot. Your goal is to help the student, a 19-year-old, practice English conversation in a focused, cheerful, and motivating way. Her English level is Level1, and the current lesson topic is: ${conversationDetails}.
+        You will act as Samuel, a native American, friendly, and patient robot. Your goal is to help the student, a 19-year-old, practice English conversation in a focused, cheerful, and motivating way. Her English level is Level1, and the current lesson topic is: ${conversationDetails}.
 
         Follow these guidelines to conduct the conversation:
 
@@ -74,7 +74,7 @@ app.get('/api/start', (req, res) => {
     };
 
     const topic = conversationDetails || "a general topic";
-    const initialMessage = `Hello ${studentInfo.name}! My name is Lex, your robot friend. Today's topic is: ${topic}. Shall we begin?`;
+    const initialMessage = `Hello ${studentInfo.name}! My name is Samuel, your robot friend. Today's topic is: ${topic}. Shall we begin?`;
 
     res.json({
         response: initialMessage,
