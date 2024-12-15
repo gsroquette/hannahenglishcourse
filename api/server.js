@@ -1,17 +1,35 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const fs = require('fs');
-const path = require('path');
+const admin = require('firebase-admin'); // SDK do Firebase Admin para Node.js
 const { Configuration, OpenAIApi } = require('openai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Configurações do Express
 app.use(cors({
     origin: '*', // Permitir todas as origens
 }));
 app.use(bodyParser.json());
+
+// Inicializar Firebase Admin SDK
+const firebaseConfig = {
+    credential: admin.credential.cert({
+        type: "service_account",
+        project_id: "hannahenglishcourse",
+        private_key_id: "SUA_PRIVATE_KEY_ID", // Substitua por sua chave privada do Firebase Admin SDK
+        private_key: "-----BEGIN PRIVATE KEY-----\nSUA_CHAVE_PRIVADA\n-----END PRIVATE KEY-----\n".replace(/\\n/g, '\n'),
+        client_email: "firebase-adminsdk@hannahenglishcourse.iam.gserviceaccount.com",
+        client_id: "CLIENT_ID",
+        auth_uri: "https://accounts.google.com/o/oauth2/auth",
+        token_uri: "https://oauth2.googleapis.com/token",
+        auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
+        client_x509_cert_url: "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk"
+    }),
+    databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+};
+admin.initializeApp(firebaseConfig);
 
 // Configuração da API do OpenAI
 const configuration = new Configuration({
@@ -19,71 +37,59 @@ const configuration = new Configuration({
 });
 const openai = new OpenAIApi(configuration);
 
-// Carregar informações do arquivo conversa.txt
-let conversationDetails = 'General conversation'; // Valor padrão
-try {
-    const filePath = path.join(__dirname, 'conversa.txt'); // Caminho correto
-    if (fs.existsSync(filePath)) {
-        conversationDetails = fs.readFileSync(filePath, 'utf-8').trim();
-    } else {
-        console.error("Arquivo conversa.txt não encontrado. Usando valor padrão.");
-    }
-} catch (error) {
-    console.error("Erro ao carregar conversa.txt:", error);
-}
-
 // Mensagem de contexto inicial
-const contextMessage = {
+let contextMessage = {
     role: "system",
     content: `
-        You will act as Lex, a native American, friendly, and patient robot. Your goal is to help the student, a 19-year-old, practice English conversation in a focused, cheerful, and motivating way. Her English level is Level1, and the current lesson topic is: ${conversationDetails}.
-
-        Follow these guidelines to conduct the conversation:
-
-        Adapt your language to the student's level:
-     - If the level is Level 1, it means that the student's English level in the CEFR is A1. Use short sentences (maximum of 3 per interaction), simple, clear and direct. Do not be verbose.
-     - If the level is Level 2, it means that the student's English level in the CEFR is A2. Use short sentences (maximum of 3 per interaction), keeping them simple and clear. Do not be verbose.
-     - If the level is Level 3, it means that the student's English level in the CEFR is B1. Use short sentences (maximum of 4 per interaction). Avoid being verbose.
-     - If the level is Level 4, it means that the student's English level in the CEFR is B2. Avoid being verbose.
-
-        Focus on the topic:
-        - Keep the conversation always centered on the lesson topic and avoid distractions.
-        - If the student speaks in another language, politely ask him to switch back to English.
-
-        Interaction: 
-        - Address the student by name. 
-        - Praise correct answers and encourage the student even when he or she makes mistakes.
-
-        Correction and support:
-        - Correct grammar and language usage mistakes in a friendly and motivating way.
-        - If you receive a nonsensical response or fail to understand something, assume it could be a pronunciation error. Help the student to fix and improve her speech.
-
-        Clarity and objectivity:
-        - Maintain a positive and encouraging tone throughout the interaction.
-        - Avoid long or complex sentences.
-        - Keep the learning experience light, friendly, and productive!
+        You will act as Lex, a native American, friendly, and patient robot. Your goal is to help the student practice English conversation in a focused, cheerful, and motivating way.
     `,
 };
 
-// Rota para iniciar a conversa
-app.get('/api/start', (req, res) => {
-    const studentInfo = {
-        name: "Anne",
-        age: 19,
-        level: "Level1",
-    };
+// Rota para buscar informações do Firebase e da URL
+app.get('/api/start', async (req, res) => {
+    try {
+        // Substitua 'uidDoUsuarioLogado' pelo UID do usuário logado
+        const uid = req.query.uid; // O UID deve ser enviado via query string
+        const level = req.query.level; // O nível deve ser enviado via query string
 
-    const topic = conversationDetails || "a general topic";
-    const initialMessage = `Hello ${studentInfo.name}! My name is Lex, your robot friend. Today's topic is: ${topic}. Shall we begin?`;
+        if (!uid) {
+            return res.status(400).json({ response: "UID do usuário não fornecido." });
+        }
 
-    res.json({
-        response: initialMessage,
-        studentInfo,
-    });
+        if (!level) {
+            return res.status(400).json({ response: "Level não fornecido na URL." });
+        }
+
+        // Busca o nome do usuário no Firebase Database
+        const userRef = admin.database().ref(`/usuarios/${uid}`);
+        const snapshot = await userRef.once('value');
+
+        if (!snapshot.exists()) {
+            return res.status(404).json({ response: "Usuário não encontrado no Firebase." });
+        }
+
+        const userData = snapshot.val();
+        const studentInfo = {
+            name: userData.nome || "Student", // Nome do usuário
+            level: level, // Nível extraído da URL
+        };
+
+        // Mensagem inicial
+        const topic = "a general topic"; // Você pode adicionar lógica para personalizar o tópico
+        const initialMessage = `Hello ${studentInfo.name}! My name is Lex, your robot friend. Your level is ${studentInfo.level}. Today's topic is: ${topic}. Shall we begin?`;
+
+        res.json({
+            response: initialMessage,
+            studentInfo,
+        });
+    } catch (error) {
+        console.error("Erro ao buscar informações do usuário no Firebase:", error.message);
+        res.status(500).json({ response: "Error loading student data." });
+    }
 });
 
 // Array para manter o histórico da conversa
-const chatHistory = [contextMessage]; // Certifique-se de que a mensagem de contexto esteja no histórico
+const chatHistory = [contextMessage];
 
 // Rota para interação com a IA
 app.post('/api/chat', async (req, res) => {
@@ -117,7 +123,7 @@ app.post('/api/chat', async (req, res) => {
 
 // Rota para teste
 app.get('/', (req, res) => {
-    res.send("Servidor rodando com sucesso no Vercel!");
+    res.send("Servidor rodando com sucesso!");
 });
 
 // Iniciar o servidor
