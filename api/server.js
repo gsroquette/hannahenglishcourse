@@ -66,7 +66,7 @@ const contextMessage = {
 // Rota para iniciar a conversa
 app.get('/api/start', (req, res) => {
     const studentInfo = {
-        name: "Vera",
+        name: "Anne",
         age: 19,
         level: "Level1",
     };
