@@ -53,18 +53,22 @@ app.get('/api/start', async (req, res) => {
     }
 
     try {
-        console.log(`Fetching data for User ID: ${userId}`);
+        console.log(`Tentando buscar dados para o User ID: ${userId}`);
+
+        // Acesse o caminho correto no Firebase
         const userRef = db.ref(`usuarios/${userId}/nome`);
         const snapshot = await userRef.once('value');
 
         if (!snapshot.exists()) {
-            console.warn(`No data found for User ID: ${userId}`);
+            console.warn(`Nenhum dado encontrado para o User ID: ${userId}`);
             return res.status(404).json({ error: "User not found" });
         }
 
+        // Captura o valor do nome
         const studentName = snapshot.val() || "Student";
-        console.log(`User data found: ${studentName}`);
+        console.log(`Nome do usuário encontrado: ${studentName}`);
 
+        // Resposta com a mensagem inicial
         const initialMessage = `Hello ${studentName}! My name is Samuel, your robot friend. Today's topic is: ${conversationDetails}. Shall we begin?`;
 
         res.json({
@@ -75,7 +79,7 @@ app.get('/api/start', async (req, res) => {
             },
         });
     } catch (error) {
-        console.error("Error fetching user data from Firebase:", error.message);
+        console.error("Erro ao buscar os dados do Firebase:", error.message);
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
