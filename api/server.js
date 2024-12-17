@@ -53,23 +53,21 @@ app.get('/api/start', async (req, res) => {
     }
 
     try {
-        console.log(`Tentando buscar dados para o User ID: ${userId}`);
+        console.log(`Tentando acessar o caminho: usuarios/${userId}/nome`);
 
-        // Acesse o caminho correto no Firebase
+        // Verificar se o Firebase está respondendo corretamente
         const userRef = db.ref(`usuarios/${userId}/nome`);
         const snapshot = await userRef.once('value');
 
         if (!snapshot.exists()) {
-            console.warn(`Nenhum dado encontrado para o User ID: ${userId}`);
+            console.warn(`Nenhum dado encontrado no Firebase para UID: ${userId}`);
             return res.status(404).json({ error: "User not found" });
         }
 
-        // Captura o valor do nome
-        const studentName = snapshot.val() || "Student";
-        console.log(`Nome do usuário encontrado: ${studentName}`);
+        const studentName = snapshot.val();
+        console.log(`Nome encontrado: ${studentName}`);
 
-        // Resposta com a mensagem inicial
-        const initialMessage = `Hello ${studentName}! My name is Samuel, your robot friend. Today's topic is: ${conversationDetails}. Shall we begin?`;
+        const initialMessage = `Hello ${studentName}! My name is Samuel, your robot friend. Today's topic is: General conversation. Shall we begin?`;
 
         res.json({
             response: initialMessage,
@@ -79,8 +77,8 @@ app.get('/api/start', async (req, res) => {
             },
         });
     } catch (error) {
-        console.error("Erro ao buscar os dados do Firebase:", error.message);
-        res.status(500).json({ error: "Internal Server Error" });
+        console.error("Erro ao acessar o Firebase:", error);
+        res.status(500).json({ error: "Internal Server Error", details: error.message });
     }
 });
 
