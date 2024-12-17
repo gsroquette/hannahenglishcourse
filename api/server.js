@@ -48,28 +48,29 @@ app.get('/api/start', async (req, res) => {
     const userId = req.query.uid;
 
     if (!userId) {
-        console.error("No User ID provided in the request");
+        console.error("❌ [ERRO] Nenhum User ID foi fornecido.");
         return res.status(400).json({ error: "User ID is required" });
     }
 
     try {
-        console.log(`Tentando acessar o caminho: usuarios/${userId}/nome`);
+        console.log(`🔍 Buscando dados no caminho: usuarios/${userId}/nome`);
 
-        // Verificar se o Firebase está respondendo corretamente
+        // Verificar a referência no Firebase
         const userRef = db.ref(`usuarios/${userId}/nome`);
         const snapshot = await userRef.once('value');
 
         if (!snapshot.exists()) {
-            console.warn(`Nenhum dado encontrado no Firebase para UID: ${userId}`);
+            console.warn(`⚠️ [AVISO] Nenhum dado encontrado para UID: ${userId}`);
             return res.status(404).json({ error: "User not found" });
         }
 
         const studentName = snapshot.val();
-        console.log(`Nome encontrado: ${studentName}`);
+        console.log(`✅ [SUCESSO] Nome do usuário encontrado: ${studentName}`);
 
+        // Responder com os dados
         const initialMessage = `Hello ${studentName}! My name is Samuel, your robot friend. Today's topic is: General conversation. Shall we begin?`;
 
-        res.json({
+        return res.json({
             response: initialMessage,
             studentInfo: {
                 name: studentName,
@@ -77,7 +78,7 @@ app.get('/api/start', async (req, res) => {
             },
         });
     } catch (error) {
-        console.error("Erro ao acessar o Firebase:", error);
+        console.error("❌ [ERRO] Falha ao acessar o Firebase:", error.message);
         res.status(500).json({ error: "Internal Server Error", details: error.message });
     }
 });
