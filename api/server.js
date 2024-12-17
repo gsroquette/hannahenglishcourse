@@ -57,6 +57,7 @@ app.get('/api/start', async (req, res) => {
         const snapshot = await userRef.once('value');
 
         if (!snapshot.exists()) {
+            console.warn(`No user data found for UID: ${userId}`);
             return res.status(404).json({ error: "User not found" });
         }
 
@@ -71,7 +72,7 @@ app.get('/api/start', async (req, res) => {
             },
         });
     } catch (error) {
-        console.error("Error fetching user data:", error);
+        console.error("Error fetching user data:", error.message);
         res.status(500).json({ error: "Failed to fetch user data" });
     }
 });
