@@ -48,20 +48,23 @@ app.get('/api/start', async (req, res) => {
     const userId = req.query.uid;
 
     if (!userId) {
+        console.error("No User ID provided in the request");
         return res.status(400).json({ error: "User ID is required" });
     }
 
     try {
-        // Buscar nome do usuário no banco de dados Firebase
+        console.log(`Fetching data for User ID: ${userId}`);
         const userRef = db.ref(`usuarios/${userId}/nome`);
         const snapshot = await userRef.once('value');
 
         if (!snapshot.exists()) {
-            console.warn(`No user data found for UID: ${userId}`);
+            console.warn(`No data found for User ID: ${userId}`);
             return res.status(404).json({ error: "User not found" });
         }
 
         const studentName = snapshot.val() || "Student";
+        console.log(`User data found: ${studentName}`);
+
         const initialMessage = `Hello ${studentName}! My name is Samuel, your robot friend. Today's topic is: ${conversationDetails}. Shall we begin?`;
 
         res.json({
@@ -72,8 +75,8 @@ app.get('/api/start', async (req, res) => {
             },
         });
     } catch (error) {
-        console.error("Error fetching user data:", error.message);
-        res.status(500).json({ error: "Failed to fetch user data" });
+        console.error("Error fetching user data from Firebase:", error.message);
+        res.status(500).json({ error: "Internal Server Error" });
     }
 });
 
