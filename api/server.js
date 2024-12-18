@@ -65,8 +65,14 @@ app.get('/api/start', async (req, res) => {
 
     try {
         // Buscar o nome do usuário no Firebase
+console.log("Buscando nome do usuário no Firebase para userId:", userId);
+
         const userRef = db.ref(`usuarios/${userId}/nome`);
         const snapshot = await userRef.once('value');
+
+console.log("Snapshot existe?", snapshot.exists());
+console.log("Valor do snapshot:", snapshot.val());
+
         console.log("Checking Firebase for user ID:", userId);
 
         if (!snapshot.exists()) {
