@@ -195,34 +195,38 @@ function setupSpeechRecognition() {
     }; // <-- Fechamento correto
 }  // <-- Fechamento correto de setupSpeechRecognition
 
-      async function initializeConversation() {
+     async function initializeConversation() {
     firebase.auth().onAuthStateChanged(async (user) => {
         if (user) {
             userId = user.uid; // Pega o ID do usuário autenticado
 
             // Captura os parâmetros 'level' e 'unit' da URL
             const urlParams = new URLSearchParams(window.location.search);
-            const level = urlParams.get('level') || 'Level1'; // Valor padrão: 'Level1'
-            const unit = urlParams.get('unit') || 'Unit1';   // Valor padrão: 'Unit1'
+            const level = urlParams.get('level') || 'Level1';
+            const unit = urlParams.get('unit') || 'Unit1';
 
             try {
-                // Inicializa a conversa chamando /api/start com os parâmetros corretos
+                // Inicializa a conversa chamando /api/start
                 const response = await fetch(`/api/start?uid=${userId}&level=${level}&unit=${unit}`);
                 const data = await response.json();
 
-                chatHistory = data.chatHistory;
+                if (response.ok) {
+                    chatHistory = data.chatHistory;
 
-                // Configuração do botão "Press to Start"
-                speakButton.addEventListener("click", () => {
-                    if (speakButton.innerText === "Press to Start") {
-                        messageElement.innerText = data.response; // Exibe a mensagem inicial
-                        messageElement.style.visibility = "visible"; // Torna visível
-                        speak(data.response); // Fala a mensagem inicial
-                        speakButton.innerText = "Press to Speak";
-                    } else {
-                        recognition.start(); // Inicia o reconhecimento de voz
-                    }
-                });
+                    // Configuração do botão "Press to Start"
+                    speakButton.addEventListener("click", () => {
+                        if (speakButton.innerText === "Press to Start") {
+                            messageElement.innerText = data.response; // Exibe a mensagem inicial
+                            messageElement.style.visibility = "visible";
+                            speak(data.response); // Fala a mensagem inicial
+                            speakButton.innerText = "Press to Speak";
+                        } else {
+                            recognition.start(); // Inicia o reconhecimento de voz
+                        }
+                    });
+                } else {
+                    throw new Error("Failed to initialize conversation.");
+                }
             } catch (error) {
                 console.error("Error initializing conversation:", error);
                 messageElement.innerText = "Error initializing conversation. Try again.";
