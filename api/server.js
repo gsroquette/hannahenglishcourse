@@ -121,6 +121,10 @@ Additional information about the lesson:
 
         conversations[userId] = [contextMessage];
 
+// Adicionando logs para depurar
+console.log("ContextMessage gerado:", contextMessage);
+console.log("Contexto salvo em conversations:", conversations[userId]);
+
         const initialMessage = `Hello ${studentName}! Today's topic is: ${conversationDetails}. I'm ready to help you at your ${studentLevel}, in ${studentUnit}. Shall we begin?`;
 
         console.log("Initial message:", initialMessage);
