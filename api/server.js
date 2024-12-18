@@ -26,15 +26,19 @@ const configuration = new Configuration({
 });
 const openai = new OpenAIApi(configuration);
 
-// Carregar informações do arquivo conversa.txt
-let conversationDetails = 'General conversation';
+// Carregar conteúdo do arquivo conversa.txt
+let conversationDetails = 'General conversation'; // Valor padrão para o tema (título)
+let conversationFullContent = ''; // Conteúdo completo do conversa.txt
 try {
     const filePath = path.join(__dirname, 'conversa.txt');
     if (fs.existsSync(filePath)) {
-        conversationDetails = fs.readFileSync(filePath, 'utf-8').trim();
+        const fileContent = fs.readFileSync(filePath, 'utf-8');
+        conversationDetails = fileContent.split('\n')[0].trim(); // Apenas a primeira linha (título)
+        conversationFullContent = fileContent.trim(); // Todo o conteúdo
     }
 } catch (error) {
     console.error("Erro ao carregar conversa.txt:", error);
+    conversationFullContent = "No additional information available.";
 }
 
 // Mensagem de contexto inicial
@@ -67,6 +71,9 @@ const contextMessage = {
         - Maintain a positive and encouraging tone throughout the interaction.
         - Avoid long or complex sentences.
         - Keep the learning experience light, friendly, and productive!
+
+Additional information about the lesson:
+        ${conversationFullContent}
     `,
 };
 
