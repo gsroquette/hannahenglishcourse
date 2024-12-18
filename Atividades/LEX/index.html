@@ -169,52 +169,66 @@
             };
 
             recognition.onresult = async (event) => {
-                resetStaticTimer();
-                const userSpeech = event.results[0][0].transcript;
-                messageElement.innerText = `You said: ${userSpeech}`;
-                messageElement.style.visibility = "visible";
+    const userSpeech = event.results[0][0].transcript;
+    console.log("User speech:", userSpeech);
+    console.log("User ID:", userId);
 
-                try {
-                    const response = await fetch('/api/chat', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ uid: userId, message: userSpeech, chatHistory }),
-                    });
-                    const data = await response.json();
-                    chatHistory = data.chatHistory;
-                    messageElement.innerText = data.response;
-                    speak(data.response);
-                } catch (error) {
-                    console.error("Error communicating with the server:", error);
-                    messageElement.innerText = "Error communicating with the server.";
-                }
-            };
-        }
+    if (!userId) {
+        alert("User ID is missing. Please log in again.");
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uid: userId, message: userSpeech, chatHistory }),
+        });
+        const data = await response.json();
+        chatHistory = data.chatHistory;
+        messageElement.innerText = data.response;
+        speak(data.response);
+    } catch (error) {
+        console.error("Error communicating with the server:", error);
+        messageElement.innerText = "Error communicating with the server.";
+    }
+};
 
         async function initializeConversation() {
-            firebase.auth().onAuthStateChanged(async (user) => {
-                if (user) {
-                    userId = user.uid;
-                    const response = await fetch(`/api/start?uid=${userId}`);
-                    const data = await response.json();
-                    chatHistory = data.chatHistory;
+    firebase.auth().onAuthStateChanged(async (user) => {
+        if (user) {
+            userId = user.uid; // Pega o ID do usuário autenticado
 
-                    speakButton.addEventListener("click", () => {
-                        if (speakButton.innerText === "Press to Start") {
-                            messageElement.innerText = data.response;
-                            messageElement.style.visibility = "visible";
-                            speak(data.response);
-                            speakButton.innerText = "Press to Speak";
-                        } else {
-                            recognition.start();
-                        }
-                    });
-                } else {
-                    messageElement.innerText = "Please log in to start the conversation.";
-                    messageElement.style.visibility = "visible";
-                }
-            });
+            try {
+                // Inicializa a conversa chamando /api/start
+                const response = await fetch(`/api/start?uid=${userId}`);
+                const data = await response.json();
+
+                chatHistory = data.chatHistory;
+                messageElement.innerText = data.response; // Mensagem inicial
+                messageElement.style.visibility = "visible";
+
+                // Configuração do botão "Press to Speak"
+                speakButton.addEventListener("click", () => {
+                    if (speakButton.innerText === "Press to Start") {
+                        speak(data.response); // Fala a mensagem inicial
+                        speakButton.innerText = "Press to Speak";
+                    } else {
+                        recognition.start(); // Inicia o reconhecimento de voz
+                    }
+                });
+            } catch (error) {
+                console.error("Error initializing conversation:", error);
+                messageElement.innerText = "Error initializing conversation. Try again.";
+                messageElement.style.visibility = "visible";
+            }
+        } else {
+            // Usuário não autenticado
+            messageElement.innerText = "Please log in to start the conversation.";
+            messageElement.style.visibility = "visible";
         }
+    });
+}
 
         // Cancelar síntese ao sair da página
         document.addEventListener("visibilitychange", () => {
