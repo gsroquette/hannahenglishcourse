@@ -25,6 +25,9 @@ const configuration = new Configuration({
 });
 const openai = new OpenAIApi(configuration);
 
+// Armazena o histórico das conversas na memória do servidor
+const conversations = {};
+
 // Rota para iniciar a conversa
 app.get('/api/start', async (req, res) => {
     const userId = req.query.uid;
@@ -73,7 +76,7 @@ app.get('/api/start', async (req, res) => {
                 Your goal is to help the student practice English conversation in a focused, cheerful, and motivating way.
                 The student's English level is ${studentLevel}, the current unit is ${studentUnit}, and the lesson topic is: ${conversationDetails}.
 
-                Follow these guidelines to conduct the conversation:
+Follow these guidelines to conduct the conversation:
 
         Adapt your language to the student's level:
         - If the level is Level 1, it means that the student's English level in the CEFR is A1. Use short sentences (maximum of 3 per interaction), simple, clear and direct. Do not be verbose.
@@ -103,10 +106,9 @@ ${conversationFullContent}
             `,
         };
 
-        // Inicializar um novo histórico de conversa
-        const chatHistory = [contextMessage];
+        // Inicializar ou resetar o histórico da conversa
+        conversations[userId] = [contextMessage];
 
-        // Mensagem inicial
         const initialMessage = `Hello ${studentName}! Today's topic is: ${conversationDetails}. I'm ready to help you at your ${studentLevel}, in ${studentUnit}. Shall we begin?`;
 
         return res.json({
@@ -117,7 +119,7 @@ ${conversationFullContent}
                 unit: studentUnit,
                 fullContent: conversationFullContent,
             },
-            chatHistory, // Retorna o histórico atualizado
+            chatHistory: conversations[userId],
         });
     } catch (error) {
         res.status(500).json({ error: "Internal Server Error", details: error.message });
@@ -126,25 +128,30 @@ ${conversationFullContent}
 
 // Rota para interação com a IA
 app.post('/api/chat', async (req, res) => {
+    const userId = req.body.uid;
     const userMessage = req.body.message;
-    const chatHistory = req.body.chatHistory || []; // Recebe o histórico atualizado do cliente
 
-    if (!userMessage) {
-        return res.status(400).json({ response: "Message cannot be empty." });
+    if (!userId || !userMessage) {
+        return res.status(400).json({ response: "User ID and message are required." });
     }
 
     try {
-        chatHistory.push({ role: 'user', content: userMessage });
+        if (!conversations[userId]) {
+            return res.status(400).json({ response: "Conversation not initialized. Call /api/start first." });
+        }
+
+        // Atualizar histórico da conversa
+        conversations[userId].push({ role: 'user', content: userMessage });
 
         const completion = await openai.createChatCompletion({
             model: 'gpt-4',
-            messages: chatHistory,
+            messages: conversations[userId],
         });
 
         const responseMessage = completion.data.choices[0].message.content;
-        chatHistory.push({ role: 'assistant', content: responseMessage });
+        conversations[userId].push({ role: 'assistant', content: responseMessage });
 
-        res.json({ response: responseMessage, chatHistory }); // Retorna o histórico atualizado
+        res.json({ response: responseMessage, chatHistory: conversations[userId] });
     } catch (error) {
         console.error("Erro na API OpenAI:", error);
         res.status(500).json({ response: "Error processing the message." });
