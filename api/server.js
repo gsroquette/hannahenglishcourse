@@ -34,7 +34,10 @@ app.get('/api/start', async (req, res) => {
     const studentLevel = req.query.level || "Level1";
     const studentUnit = req.query.unit || "Unit1";
 
+    console.log("Received request with:", { userId, studentLevel, studentUnit });
+
     if (!userId) {
+        console.error("User ID is missing.");
         return res.status(400).json({ error: "User ID is required" });
     }
 
@@ -42,41 +45,44 @@ app.get('/api/start', async (req, res) => {
     let conversationFullContent = '';
 
     try {
-        // Carregar conteúdo do conversa.txt
+        // Log para verificar o caminho do arquivo
         const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataIA', 'conversa.txt');
-        console.log(`Tentando carregar: ${filePath}`);
+        console.log("Attempting to load file:", filePath);
 
         if (fs.existsSync(filePath)) {
             const fileContent = fs.readFileSync(filePath, 'utf-8');
+            console.log("File content loaded successfully:", fileContent);
+
             conversationDetails = fileContent.split('\n')[0].trim();
             conversationFullContent = fileContent.trim();
         } else {
-            console.warn("⚠️ Arquivo conversa.txt não encontrado.");
+            console.warn("⚠️ File not found:", filePath);
         }
     } catch (error) {
-        console.error("Erro ao carregar conversa.txt:", error);
+        console.error("Error loading conversation file:", error);
     }
 
     try {
         // Buscar o nome do usuário no Firebase
         const userRef = db.ref(`usuarios/${userId}/nome`);
         const snapshot = await userRef.once('value');
+        console.log("Checking Firebase for user ID:", userId);
 
         if (!snapshot.exists()) {
+            console.error("User not found in Firebase.");
             return res.status(404).json({ error: "User not found" });
         }
 
         const studentName = snapshot.val();
+        console.log("User name retrieved:", studentName);
 
-        // Criar a mensagem de contexto
+        // Criar mensagem de contexto
         const contextMessage = {
             role: "system",
-            content: `
-                You will act as Samuel, a native American, friendly, and patient robot. 
-                Your goal is to help the student practice English conversation in a focused, cheerful, and motivating way.
-                The student's English level is ${studentLevel}, the current unit is ${studentUnit}, and the lesson topic is: ${conversationDetails}.
+             content: `
+        You will act as Samuel, a native American, friendly, and patient robot. Your goal is to help the student to practice English conversation in a focused, cheerful, and motivating way. The student's English level is ${studentLevel} and the current unit is ${studentUnit}, and the current lesson topic is: ${conversationDetails}.
 
-Follow these guidelines to conduct the conversation:
+        Follow these guidelines to conduct the conversation:
 
         Adapt your language to the student's level:
         - If the level is Level 1, it means that the student's English level in the CEFR is A1. Use short sentences (maximum of 3 per interaction), simple, clear and direct. Do not be verbose.
@@ -102,14 +108,15 @@ Follow these guidelines to conduct the conversation:
         - Keep the learning experience light, friendly, and productive!
 
 Additional information about the lesson:
-${conversationFullContent}
-            `,
+        ${conversationFullContent}
+    `,
         };
 
-        // Inicializar ou resetar o histórico da conversa
         conversations[userId] = [contextMessage];
 
         const initialMessage = `Hello ${studentName}! Today's topic is: ${conversationDetails}. I'm ready to help you at your ${studentLevel}, in ${studentUnit}. Shall we begin?`;
+
+        console.log("Initial message:", initialMessage);
 
         return res.json({
             response: initialMessage,
@@ -122,7 +129,8 @@ ${conversationFullContent}
             chatHistory: conversations[userId],
         });
     } catch (error) {
-        res.status(500).json({ error: "Internal Server Error", details: error.message });
+        console.error("Error retrieving user data:", error);
+        return res.status(500).json({ error: "Internal Server Error", details: error.message });
     }
 });
 
