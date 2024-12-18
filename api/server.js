@@ -128,27 +128,34 @@ ${conversationFullContent}
 
 // Rota para interação com a IA
 app.post('/api/chat', async (req, res) => {
-    const userId = req.body.uid;
-    const userMessage = req.body.message;
+    const userId = req.body.uid; // ID do usuário
+    const userMessage = req.body.message; // Mensagem enviada pelo usuário
 
+    // Verificação: ID do usuário e mensagem são obrigatórios
     if (!userId || !userMessage) {
         return res.status(400).json({ response: "User ID and message are required." });
     }
 
     try {
+        // Garantir que a conversa esteja inicializada
         if (!conversations[userId]) {
-            return res.status(400).json({ response: "Conversation not initialized. Call /api/start first." });
+            // Inicializa o histórico se não existir
+            conversations[userId] = [{ role: 'system', content: "Conversation initialized." }];
+            console.log(`Histórico inicializado para o usuário: ${userId}`);
         }
 
         // Atualizar histórico da conversa
         conversations[userId].push({ role: 'user', content: userMessage });
 
+        // Gera resposta da IA
         const completion = await openai.createChatCompletion({
             model: 'gpt-4',
             messages: conversations[userId],
         });
 
         const responseMessage = completion.data.choices[0].message.content;
+
+        // Adiciona a resposta da IA no histórico
         conversations[userId].push({ role: 'assistant', content: responseMessage });
 
         res.json({ response: responseMessage, chatHistory: conversations[userId] });
