@@ -5,8 +5,6 @@ const fs = require('fs');
 const path = require('path');
 const { Configuration, OpenAIApi } = require('openai');
 const admin = require('firebase-admin');
-const studentLevel = req.query.level || "Level1"; // Captura o Level ou usa padrão
-const studentUnit = req.query.unit || "Unit1";   // Captura a Unit ou usa padrão
 
 // Configuração Firebase Admin
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
@@ -22,37 +20,61 @@ const PORT = process.env.PORT || 3000;
 app.use(cors({ origin: '*' }));
 app.use(bodyParser.json());
 
-// Configuração da API do OpenAI
 const configuration = new Configuration({
     apiKey: process.env.OPENAI_API_KEY,
 });
 const openai = new OpenAIApi(configuration);
 
-// Carregar conteúdo do arquivo conversa.txt
-let conversationDetails = 'General conversation'; // Valor padrão para o tema (título)
-let conversationFullContent = ''; // Conteúdo completo do conversa.txt
+// Rota para iniciar a conversa (com Firebase)
+app.get('/api/start', async (req, res) => {
+    const userId = req.query.uid;
+    const studentLevel = req.query.level || "Level1";
+    const studentUnit = req.query.unit || "Unit1";
 
-try {
-    // Construir caminho dinâmico para conversa.txt
-    const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataIA', 'conversa.txt');
-    console.log(`Tentando carregar: ${filePath}`); // Log para depuração
-    if (fs.existsSync(filePath)) {
-        const fileContent = fs.readFileSync(filePath, 'utf-8');
-        conversationDetails = fileContent.split('\n')[0].trim(); // Apenas a primeira linha (título)
-        conversationFullContent = fileContent.trim(); // Todo o conteúdo
+    if (!userId) {
+        console.error("❌ [ERRO] Nenhum User ID foi fornecido.");
+        return res.status(400).json({ error: "User ID is required" });
     }
-} catch (error) {
-    console.error("Erro ao carregar conversa.txt:", error);
-    conversationFullContent = "No additional information available.";
-}
 
-// Mensagem de contexto inicial
-const contextMessage = {
-    role: "system",
-    content: `
-        You will act as Samuel, a native American, friendly, and patient robot. Your goal is to help the student to practice English conversation in a focused, cheerful, and motivating way. The student's English level is ${studentLevel} and the current unit is ${studentUnit}, and the current lesson topic is: ${conversationDetails}.
+    let conversationDetails = 'General conversation';
+    let conversationFullContent = '';
 
-        Follow these guidelines to conduct the conversation:
+    try {
+        const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataIA', 'conversa.txt');
+        console.log(`Tentando carregar: ${filePath}`);
+
+        if (fs.existsSync(filePath)) {
+            const fileContent = fs.readFileSync(filePath, 'utf-8');
+            conversationDetails = fileContent.split('\n')[0].trim();
+            conversationFullContent = fileContent.trim();
+        } else {
+            console.warn("⚠️ Arquivo conversa.txt não encontrado.");
+        }
+    } catch (error) {
+        console.error("Erro ao carregar conversa.txt:", error);
+    }
+
+    try {
+        console.log(`🔍 Buscando dados no caminho: usuarios/${userId}/nome`);
+        const userRef = db.ref(`usuarios/${userId}/nome`);
+        const snapshot = await userRef.once('value');
+
+        if (!snapshot.exists()) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        const studentName = snapshot.val();
+        console.log(`✅ Nome do usuário encontrado: ${studentName}`);
+
+        // Atualizar contextMessage dinamicamente
+        const contextMessage = {
+            role: "system",
+            content: `
+                You will act as Samuel, a native American, friendly, and patient robot. 
+                Your goal is to help the student to practice English conversation in a focused, cheerful, and motivating way. 
+                The student's English level is ${studentLevel}, the current unit is ${studentUnit}, and the current lesson topic is: ${conversationDetails}.
+
+                Follow these guidelines to conduct the conversation:
 
         Adapt your language to the student's level:
         - If the level is Level 1, it means that the student's English level in the CEFR is A1. Use short sentences (maximum of 3 per interaction), simple, clear and direct. Do not be verbose.
@@ -78,53 +100,33 @@ const contextMessage = {
         - Keep the learning experience light, friendly, and productive!
 
 Additional information about the lesson:
-        ${conversationFullContent}
-    `,
-};
+${conversationFullContent}
+            `,
+        };
 
-// Rota para iniciar a conversa (com Firebase)
-app.get('/api/start', async (req, res) => {
-    const userId = req.query.uid; // Captura o UID
-    const studentLevel = req.query.level || "Level1"; // Captura o Level da URL ou define como padrão "Level1"
+        // Atualizar o chatHistory com o novo contexto
+        chatHistory.length = 0; // Limpar histórico antigo
+        chatHistory.push(contextMessage);
 
-    if (!userId) {
-        console.error("❌ [ERRO] Nenhum User ID foi fornecido.");
-        return res.status(400).json({ error: "User ID is required" });
-    }
-
-    try {
-        console.log(`🔍 Buscando dados no caminho: usuarios/${userId}/nome`);
-
-        // Buscar o nome do usuário no Firebase
-        const userRef = db.ref(`usuarios/${userId}/nome`);
-        const snapshot = await userRef.once('value');
-
-        if (!snapshot.exists()) {
-            console.warn(`⚠️ [AVISO] Nenhum dado encontrado para UID: ${userId}`);
-            return res.status(404).json({ error: "User not found" });
-        }
-
-        const studentName = snapshot.val();
-        console.log(`✅ [SUCESSO] Nome do usuário encontrado: ${studentName}`);
-
-        // Mensagem inicial com o nível dinâmico
-        const initialMessage = `Hello ${studentName}! My name is Samuel, your robot friend. Today's topic is: ${conversationDetails}. I'll keep the conversation at your ${studentLevel}, in ${studentUnit}. Shall we begin?`;
+        const initialMessage = `Hello ${studentName}! Today's topic is: ${conversationDetails}. I'm ready to help you at your ${studentLevel}, in ${studentUnit}. Shall we begin?`;
 
         return res.json({
             response: initialMessage,
             studentInfo: {
                 name: studentName,
-                level: studentLevel, // Retorna o nível capturado da URL
+                level: studentLevel,
+                unit: studentUnit,
+                fullContent: conversationFullContent,
             },
         });
     } catch (error) {
-        console.error("❌ [ERRO] Falha ao acessar o Firebase:", error.message);
+        console.error("❌ Erro ao acessar o Firebase:", error.message);
         res.status(500).json({ error: "Internal Server Error", details: error.message });
     }
 });
 
-// Rota para interação com a IA (OpenAI)
-const chatHistory = [contextMessage];
+// Rota para interação com a IA
+const chatHistory = []; // Historico dinâmico da conversa
 app.post('/api/chat', async (req, res) => {
     const userMessage = req.body.message;
 
@@ -150,14 +152,8 @@ app.post('/api/chat', async (req, res) => {
     }
 });
 
-// Rota padrão para teste
-app.get('/', (req, res) => {
-    res.send("Servidor rodando com sucesso!");
-});
+app.get('/', (req, res) => res.send("Servidor rodando com sucesso!"));
 
-// Inicializar servidor
-app.listen(PORT, () => {
-    console.log(`Servidor rodando na porta ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
 
 module.exports = app;
