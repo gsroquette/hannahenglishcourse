@@ -38,6 +38,20 @@
             50% { transform: scale(1.1); }
             100% { transform: scale(1); }
         }
+  #back-button {
+            margin-top: 10px;
+            background-color: black;
+            color: white;
+            font-size: 16px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            cursor: pointer;
+        }
+        #back-button:hover {
+            background-color: #333; /* Cor de destaque ao passar o mouse */
+        }
     </style>
 </head>
 <body>
@@ -45,6 +59,7 @@
     <img id="robot-img" src="../../imagens/robo1_static.png" alt="Robot">
     <p id="message" style="visibility: hidden;">Loading...</p>
     <button id="speak-button">Press to Start</button>
+    <button id="back-button">Back</button> <!-- Botão Back -->
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
@@ -63,6 +78,11 @@
             appId: "1:449818788486:web:8a49d3f68591e6fb3f0707"
         };
         firebase.initializeApp(firebaseConfig);
+
+// Configurar funcionalidade do botão "Back"
+        document.getElementById("back-button").addEventListener("click", () => {
+            window.history.back(); // Voltar para a página anterior
+        });
     </script>
 
     <script>
@@ -75,36 +95,31 @@
 
         let recognition;
         let isSpeaking = false;
-        let staticTime = 0; // Tempo acumulado em estado estático
-        let alternateTimeout; // Timeout para exibição de robo2.gif
+        let staticTime = 0;
+        let alternateTimeout;
 
         // Alternar imagem após 20 segundos de estado estático
         function startStaticImageTimer() {
             setInterval(() => {
-                if (!isSpeaking) { // Verifica se o robô não está falando
+                if (!isSpeaking) {
                     staticTime += 1;
-
-                    if (staticTime === 20) { // Após 20 segundos, alterna para robo2.gif
-                        robotImg.src = ROBOT_ALTERNATE; // Mostrar robo2.gif
-
-                        // Voltar à imagem estática após 15 segundos
+                    if (staticTime === 20) {
+                        robotImg.src = ROBOT_ALTERNATE;
                         alternateTimeout = setTimeout(() => {
-                            robotImg.src = ROBOT_STATIC; // Retorna ao robo1_static.png
-                            staticTime = 0; // Resetar o tempo estático
+                            robotImg.src = ROBOT_STATIC;
+                            staticTime = 0;
                         }, 15000);
                     }
                 }
-            }, 1000); // Verificar a cada 1 segundo
+            }, 1000);
         }
 
-        // Reiniciar o temporizador sempre que houver interação
         function resetStaticTimer() {
-            staticTime = 0; // Resetar o tempo estático
-            clearTimeout(alternateTimeout); // Cancelar troca para robo2.gif se estiver agendada
-            robotImg.src = ROBOT_STATIC; // Garantir que a imagem volte para estática
+            staticTime = 0;
+            clearTimeout(alternateTimeout);
+            robotImg.src = ROBOT_STATIC;
         }
 
-        // Função para o robô falar
         function speak(text, rate = 0.8) {
             const synth = window.speechSynthesis;
             const utterance = new SpeechSynthesisUtterance(text);
@@ -113,40 +128,50 @@
 
             utterance.onstart = () => {
                 isSpeaking = true;
-                resetStaticTimer(); // Resetar o temporizador ao falar
+                resetStaticTimer();
                 robotImg.src = ROBOT_GIF;
+                speakButton.disabled = true;
+                speakButton.innerText = "Robot is speaking...";
             };
 
             utterance.onend = () => {
                 isSpeaking = false;
                 robotImg.src = ROBOT_STATIC;
+                speakButton.disabled = false;
+                speakButton.innerText = "Press to Speak";
             };
 
             synth.speak(utterance);
         }
 
-// Verificar se o idioma "en-US" está disponível no sintetizador
-function checkSpeechSynthesisLanguage() {
-    const voices = window.speechSynthesis.getVoices();
-    const hasEnglishUS = voices.some((voice) => voice.lang === "en-US");
+        // Interromper a fala ao sair da página
+        document.addEventListener("visibilitychange", () => {
+            if (document.hidden) {
+                window.speechSynthesis.cancel();
+                console.log("Speech stopped as page is no longer visible.");
+            }
+        });
 
-    if (!hasEnglishUS) {
-        alert("English (US) voice not available on your browser. Please enable or install it for better experience.");
-        console.warn("English (US) voice not available. Default voice will be used.");
-    }
-}
+        // Verificar suporte ao idioma en-US
+        function checkSpeechSynthesisLanguage() {
+            const voices = window.speechSynthesis.getVoices();
+            const hasEnglishUS = voices.some((voice) => voice.lang === "en-US");
 
-// Garantir que as vozes estão carregadas antes de verificar
-if (speechSynthesis.onvoiceschanged !== undefined) {
-    speechSynthesis.onvoiceschanged = checkSpeechSynthesisLanguage;
-} else {
-    checkSpeechSynthesisLanguage();
-}
+            if (!hasEnglishUS) {
+                alert("English (US) voice not available. Please enable or install it.");
+                console.warn("English (US) voice not available. Default voice will be used.");
+            }
+        }
 
-        // Configurar reconhecimento de voz
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = checkSpeechSynthesisLanguage;
+        } else {
+            checkSpeechSynthesisLanguage();
+        }
+
         function setupSpeechRecognition() {
             if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
-                alert("Speech recognition is not supported in this browser. Please use Google Chrome.");
+                alert("Speech recognition is not supported in this browser.");
                 speakButton.disabled = true;
                 return;
             }
@@ -155,7 +180,6 @@ if (speechSynthesis.onvoiceschanged !== undefined) {
                 recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
                 recognition.lang = "en-US";
                 recognition.interimResults = false;
-                recognition.maxAlternatives = 1;
 
                 recognition.onstart = () => {
                     speakButton.classList.add("listening");
@@ -168,15 +192,14 @@ if (speechSynthesis.onvoiceschanged !== undefined) {
                 };
 
                 recognition.onresult = async (event) => {
-                    resetStaticTimer(); // Resetar o temporizador ao interagir por fala
+                    resetStaticTimer();
                     const userSpeech = event.results[0][0].transcript;
                     messageElement.innerText = `You said: ${userSpeech}`;
-
                     try {
                         const response = await fetch('/api/chat', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ message: userSpeech })
+                            body: JSON.stringify({ message: userSpeech }),
                         });
                         const data = await response.json();
                         messageElement.innerText = data.response;
@@ -186,65 +209,42 @@ if (speechSynthesis.onvoiceschanged !== undefined) {
                         messageElement.innerText = "Error communicating with the server.";
                     }
                 };
-
-                // Verificar permissões de microfone
-                navigator.mediaDevices.getUserMedia({ audio: true })
-                    .then(() => {
-                        console.log("Microphone permission granted.");
-                    })
-                    .catch((error) => {
-                        alert("Microphone permission denied. Please enable it in your browser settings.");
-                        console.error("Microphone access error:", error);
-                    });
             } catch (err) {
                 console.error("Error initializing speech recognition:", err);
-                alert("An error occurred while initializing speech recognition.");
+                alert("Speech recognition failed to initialize.");
             }
         }
 
-        // Inicializar conversa com o UID do usuário autenticado
         async function initializeConversation() {
             firebase.auth().onAuthStateChanged(async (user) => {
                 if (user) {
-                    const userId = user.uid; // UID do usuário logado
-                    console.log("User logged in:", userId);
-
+                    const userId = user.uid;
                     try {
                         const response = await fetch(`/api/start?uid=${userId}`);
                         const data = await response.json();
-
                         messageElement.style.visibility = "hidden";
                         messageElement.innerText = data.response;
 
                         speakButton.innerText = "Press to Start";
                         speakButton.addEventListener("click", () => {
                             if (speakButton.innerText === "Press to Start") {
-                                messageElement.style.visibility = "visible";
-                                speakButton.innerText = "Press to Speak";
                                 speak(data.response);
-                            } else if (speakButton.innerText === "Press to Speak" && recognition) {
+                                speakButton.innerText = "Press to Speak";
+                            } else if (recognition) {
                                 recognition.start();
-                                console.log("Speech recognition started.");
-                            } else {
-                                console.warn("Speech recognition not available.");
                             }
                         });
                     } catch (error) {
-                        console.error("Error fetching conversation:", error);
-                        messageElement.innerText = "Error initializing the conversation.";
+                        messageElement.innerText = "Error initializing conversation.";
                     }
-                } else {
-                    console.log("No user is logged in.");
-                    messageElement.innerText = "Please log in to start the conversation.";
                 }
             });
         }
 
-        // Inicializar aplicação
         window.onload = () => {
             setupSpeechRecognition();
             initializeConversation();
-            startStaticImageTimer(); // Iniciar o temporizador de imagem estática
+            startStaticImageTimer();
         };
     </script>
 </body>
