@@ -94,7 +94,7 @@
         let recognition;
         let isSpeaking = false;
         let staticTime = 0;
-        let alternateTimeout;
+        let alternateTimeout;       
 
         // Alternar imagem após 20 segundos de estado estático
         function startStaticImageTimer() {
@@ -220,36 +220,42 @@
             }
         }
 
-        async function initializeConversation() {
-            firebase.auth().onAuthStateChanged(async (user) => {
-                if (user) {
-                    const userId = user.uid;
-                    try {
-                        const response = await fetch(`/api/start?uid=${userId}`);
-                        const data = await response.json();
+async function initializeConversation() {
+    // Garante que a mensagem inicial está oculta ao carregar a página
+    messageElement.style.visibility = "hidden"; 
 
-                        messageElement.style.visibility = "visible";
-                        messageElement.innerText = data.response;
+    firebase.auth().onAuthStateChanged(async (user) => {
+        if (user) {
+            const userId = user.uid;
 
-                        speakButton.innerText = "Press to Start";
-                        speakButton.addEventListener("click", () => {
-                            if (speakButton.innerText === "Press to Start") {
-                                speak(data.response);
-                                speakButton.innerText = "Press to Speak";
-                            } else if (recognition) {
-                                recognition.start();
-                            }
-                        });
-                    } catch (error) {
-                        messageElement.style.visibility = "visible";
-                        messageElement.innerText = "Error initializing conversation.";
-                    }
-                } else {
+            try {
+                // Busca a mensagem inicial do servidor
+                const response = await fetch(`/api/start?uid=${userId}`);
+                const data = await response.json();
+
+                // Configura o botão "Press to Start" para exibir e falar a mensagem inicial
+                speakButton.innerText = "Press to Start";
+                speakButton.addEventListener("click", () => {
+                    // Torna o texto visível e fala a mensagem inicial
                     messageElement.style.visibility = "visible";
-                    messageElement.innerText = "Please log in to start the conversation.";
-                }
-            });
+                    messageElement.innerText = data.response;
+
+                    speak(data.response); // Chama a função para falar a mensagem
+                    speakButton.innerText = "Press to Speak"; // Atualiza o texto do botão
+                }, { once: true }); // Garante que o evento só execute uma vez
+
+            } catch (error) {
+                console.error("Error initializing conversation:", error);
+                messageElement.style.visibility = "visible";
+                messageElement.innerText = "Error initializing conversation.";
+            }
+        } else {
+            // Caso não haja usuário autenticado
+            messageElement.style.visibility = "visible";
+            messageElement.innerText = "Please log in to start the conversation.";
         }
+    });
+}
 
         window.onload = () => {
             setupSpeechRecognition();
