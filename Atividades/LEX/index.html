@@ -198,8 +198,8 @@ function setupSpeechRecognition() {
      async function initializeConversation() {
     firebase.auth().onAuthStateChanged(async (user) => {
         if (user) {
-            userId = user.uid; // Pega o ID do usuário autenticado
-            console.log("User authenticated. User ID:", userId); // Adicionado para depuração
+            const userId = user.uid; // Pega o ID do usuário autenticado
+            console.log("User authenticated. User ID:", userId); // Log para verificar o UID no console
 
             // Captura os parâmetros 'level' e 'unit' da URL
             const urlParams = new URLSearchParams(window.location.search);
@@ -207,22 +207,26 @@ function setupSpeechRecognition() {
             const unit = urlParams.get('unit') || 'Unit1';
 
             try {
-                // Chama a rota /api/start para inicializar a conversa
+                // Chama a rota /api/start para inicializar a conversa com o UID correto
                 console.log(`Calling /api/start with userId=${userId}, level=${level}, unit=${unit}`);
                 const response = await fetch(`/api/start?uid=${userId}&level=${level}&unit=${unit}`);
+                
                 if (!response.ok) throw new Error("Failed to initialize conversation.");
 
                 const data = await response.json();
+                console.log("Conversation initialized. API Response:", data); // Log para depuração
 
                 // Inicializa o histórico e oculta a mensagem até o botão ser pressionado
-                chatHistory = data.chatHistory;
+                const chatHistory = data.chatHistory;
+                const messageElement = document.getElementById("message"); // Mensagem da interface
+                const speakButton = document.getElementById("speakButton"); // Botão de fala
 
                 speakButton.addEventListener("click", () => {
                     if (speakButton.innerText === "Press to Start") {
                         // Exibe e fala a mensagem inicial
                         messageElement.innerText = data.response;
                         messageElement.style.visibility = "visible";
-                        speak(data.response);
+                        speak(data.response); // Função para leitura em voz alta
                         speakButton.innerText = "Press to Speak";
                     } else {
                         recognition.start(); // Inicia o reconhecimento de voz
@@ -235,6 +239,8 @@ function setupSpeechRecognition() {
             }
         } else {
             // Se o usuário não estiver autenticado
+            console.warn("User not logged in.");
+            const messageElement = document.getElementById("message");
             messageElement.innerText = "Please log in to start the conversation.";
             messageElement.style.visibility = "visible";
         }
