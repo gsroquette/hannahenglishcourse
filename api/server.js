@@ -72,7 +72,8 @@ const contextMessage = {
 
 // Rota para iniciar a conversa (com Firebase)
 app.get('/api/start', async (req, res) => {
-    const userId = req.query.uid;
+    const userId = req.query.uid; // Captura o UID
+    const studentLevel = req.query.level || "Level1"; // Captura o Level da URL ou define como padrão "Level1"
 
     if (!userId) {
         console.error("❌ [ERRO] Nenhum User ID foi fornecido.");
@@ -82,7 +83,7 @@ app.get('/api/start', async (req, res) => {
     try {
         console.log(`🔍 Buscando dados no caminho: usuarios/${userId}/nome`);
 
-        // Verificar a referência no Firebase
+        // Buscar o nome do usuário no Firebase
         const userRef = db.ref(`usuarios/${userId}/nome`);
         const snapshot = await userRef.once('value');
 
@@ -94,14 +95,14 @@ app.get('/api/start', async (req, res) => {
         const studentName = snapshot.val();
         console.log(`✅ [SUCESSO] Nome do usuário encontrado: ${studentName}`);
 
-        // Responder com os dados
-        const initialMessage = `Hello ${studentName}! My name is Samuel, your robot friend. Today's topic is: ${conversationDetails}. Shall we begin?`;
+        // Mensagem inicial com o nível dinâmico
+        const initialMessage = `Hello ${studentName}! My name is Samuel, your robot friend. Today's topic is: ${conversationDetails}. I'll keep the conversation at your ${studentLevel} level. Shall we begin?`;
 
         return res.json({
             response: initialMessage,
             studentInfo: {
                 name: studentName,
-                level: "Level1",
+                level: studentLevel, // Retorna o nível capturado da URL
             },
         });
     } catch (error) {
