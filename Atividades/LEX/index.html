@@ -75,6 +75,34 @@
 
         let recognition;
         let isSpeaking = false;
+        let staticTime = 0; // Tempo acumulado em estado estático
+        let alternateTimeout; // Timeout para exibição de robo2.gif
+
+        // Alternar imagem após 20 segundos de estado estático
+        function startStaticImageTimer() {
+            setInterval(() => {
+                if (!isSpeaking) { // Verifica se o robô não está falando
+                    staticTime += 1;
+
+                    if (staticTime === 20) { // Após 20 segundos, alterna para robo2.gif
+                        robotImg.src = ROBOT_ALTERNATE; // Mostrar robo2.gif
+
+                        // Voltar à imagem estática após 15 segundos
+                        alternateTimeout = setTimeout(() => {
+                            robotImg.src = ROBOT_STATIC; // Retorna ao robo1_static.png
+                            staticTime = 0; // Resetar o tempo estático
+                        }, 15000);
+                    }
+                }
+            }, 1000); // Verificar a cada 1 segundo
+        }
+
+        // Reiniciar o temporizador sempre que houver interação
+        function resetStaticTimer() {
+            staticTime = 0; // Resetar o tempo estático
+            clearTimeout(alternateTimeout); // Cancelar troca para robo2.gif se estiver agendada
+            robotImg.src = ROBOT_STATIC; // Garantir que a imagem volte para estática
+        }
 
         // Função para o robô falar
         function speak(text, rate = 0.8) {
@@ -85,6 +113,7 @@
 
             utterance.onstart = () => {
                 isSpeaking = true;
+                resetStaticTimer(); // Resetar o temporizador ao falar
                 robotImg.src = ROBOT_GIF;
             };
 
@@ -121,6 +150,7 @@
                 };
 
                 recognition.onresult = async (event) => {
+                    resetStaticTimer(); // Resetar o temporizador ao interagir por fala
                     const userSpeech = event.results[0][0].transcript;
                     messageElement.innerText = `You said: ${userSpeech}`;
 
@@ -196,6 +226,7 @@
         window.onload = () => {
             setupSpeechRecognition();
             initializeConversation();
+            startStaticImageTimer(); // Iniciar o temporizador de imagem estática
         };
     </script>
 </body>
