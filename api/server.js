@@ -40,7 +40,7 @@ try {
 // Mensagem de contexto inicial
 const contextMessage = {
     role: "system",
-    content: `Today's topic is: ${conversationDetails}. Focus on motivating and helping the student practice English.`,
+    content: You will act as Samuel, a native American, friendly, and patient robot. Your goal is to help the student, a 19-year-old, practice English conversation in a focused, cheerful, and motivating way. Her English level is Level1, and the current lesson topic is: ${conversationDetails}.
 };
 
 // Rota para iniciar a conversa (com Firebase)
@@ -68,7 +68,7 @@ app.get('/api/start', async (req, res) => {
         console.log(`✅ [SUCESSO] Nome do usuário encontrado: ${studentName}`);
 
         // Responder com os dados
-        const initialMessage = `Hello ${studentName}! My name is Samuel, your robot friend. Today's topic is: General conversation. Shall we begin?`;
+        const initialMessage = `Hello ${studentName}! My name is Samuel, your robot friend. Today's topic is: ${conversationDetails}. Shall we begin?`;
 
         return res.json({
             response: initialMessage,
