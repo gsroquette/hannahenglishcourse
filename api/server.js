@@ -7,7 +7,7 @@ const { Configuration, OpenAIApi } = require('openai');
 const admin = require('firebase-admin');
 
 // Configuração Firebase Admin
-const serviceAccount = require('./serviceAccountKey.json');
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
     databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
