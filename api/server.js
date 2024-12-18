@@ -5,6 +5,8 @@ const fs = require('fs');
 const path = require('path');
 const { Configuration, OpenAIApi } = require('openai');
 const admin = require('firebase-admin');
+const studentLevel = req.query.level || "Level1"; // Captura o Level ou usa padrão
+const studentUnit = req.query.unit || "Unit1";   // Captura a Unit ou usa padrão
 
 // Configuração Firebase Admin
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
@@ -29,8 +31,11 @@ const openai = new OpenAIApi(configuration);
 // Carregar conteúdo do arquivo conversa.txt
 let conversationDetails = 'General conversation'; // Valor padrão para o tema (título)
 let conversationFullContent = ''; // Conteúdo completo do conversa.txt
+
 try {
-    const filePath = path.join(__dirname, 'conversa.txt');
+    // Construir caminho dinâmico para conversa.txt
+    const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataIA', 'conversa.txt');
+    console.log(`Tentando carregar: ${filePath}`); // Log para depuração
     if (fs.existsSync(filePath)) {
         const fileContent = fs.readFileSync(filePath, 'utf-8');
         conversationDetails = fileContent.split('\n')[0].trim(); // Apenas a primeira linha (título)
@@ -45,7 +50,7 @@ try {
 const contextMessage = {
     role: "system",
     content: `
-        You will act as Samuel, a native American, friendly, and patient robot. Your goal is to help the student to practice English conversation in a focused, cheerful, and motivating way. Her/his English level is Level1, and the current lesson topic is: ${conversationDetails}.
+        You will act as Samuel, a native American, friendly, and patient robot. Your goal is to help the student to practice English conversation in a focused, cheerful, and motivating way. The student's English level is ${studentLevel} and the current unit is ${studentUnit}, and the current lesson topic is: ${conversationDetails}.
 
         Follow these guidelines to conduct the conversation:
 
@@ -103,7 +108,7 @@ app.get('/api/start', async (req, res) => {
         console.log(`✅ [SUCESSO] Nome do usuário encontrado: ${studentName}`);
 
         // Mensagem inicial com o nível dinâmico
-        const initialMessage = `Hello ${studentName}! My name is Samuel, your robot friend. Today's topic is: ${conversationDetails}. I'll keep the conversation at your ${studentLevel}. Shall we begin?`;
+        const initialMessage = `Hello ${studentName}! My name is Samuel, your robot friend. Today's topic is: ${conversationDetails}. I'll keep the conversation at your ${studentLevel}, in ${studentUnit}. Shall we begin?`;
 
         return res.json({
             response: initialMessage,
