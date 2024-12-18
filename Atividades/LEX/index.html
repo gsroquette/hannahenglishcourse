@@ -96,39 +96,14 @@
             synth.speak(utterance);
         }
 
-        // Inicializar conversa com o UID do usuário autenticado
-        async function initializeConversation() {
-            firebase.auth().onAuthStateChanged(async (user) => {
-                if (user) {
-                    const userId = user.uid; // UID do usuário logado
-                    console.log("User logged in:", userId);
-
-                    try {
-                        const response = await fetch(`/api/start?uid=${userId}`);
-                        const data = await response.json();
-
-                        messageElement.style.visibility = "hidden";
-                        messageElement.innerText = data.response;
-
-                        speakButton.innerText = "Press to Start";
-                        speakButton.addEventListener("click", () => {
-                            messageElement.style.visibility = "visible";
-                            speak(data.response);
-                            speakButton.innerText = "Press to Speak";
-                        }, { once: true });
-                    } catch (error) {
-                        console.error("Error fetching conversation:", error);
-                        messageElement.innerText = "Error initializing the conversation.";
-                    }
-                } else {
-                    console.log("No user is logged in.");
-                    messageElement.innerText = "Please log in to start the conversation.";
-                }
-            });
-        }
-
         // Configurar reconhecimento de voz
         function setupSpeechRecognition() {
+            if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
+                alert("Speech recognition is not supported in this browser. Please use Google Chrome.");
+                speakButton.disabled = true;
+                return;
+            }
+
             try {
                 recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
                 recognition.lang = "en-US";
@@ -163,10 +138,58 @@
                         messageElement.innerText = "Error communicating with the server.";
                     }
                 };
+
+                // Verificar permissões de microfone
+                navigator.mediaDevices.getUserMedia({ audio: true })
+                    .then(() => {
+                        console.log("Microphone permission granted.");
+                    })
+                    .catch((error) => {
+                        alert("Microphone permission denied. Please enable it in your browser settings.");
+                        console.error("Microphone access error:", error);
+                    });
             } catch (err) {
-                console.error("Speech Recognition not supported:", err);
-                alert("Speech recognition is not supported in this browser.");
+                console.error("Error initializing speech recognition:", err);
+                alert("An error occurred while initializing speech recognition.");
             }
+        }
+
+        // Inicializar conversa com o UID do usuário autenticado
+        async function initializeConversation() {
+            firebase.auth().onAuthStateChanged(async (user) => {
+                if (user) {
+                    const userId = user.uid; // UID do usuário logado
+                    console.log("User logged in:", userId);
+
+                    try {
+                        const response = await fetch(`/api/start?uid=${userId}`);
+                        const data = await response.json();
+
+                        messageElement.style.visibility = "hidden";
+                        messageElement.innerText = data.response;
+
+                        speakButton.innerText = "Press to Start";
+                        speakButton.addEventListener("click", () => {
+                            if (speakButton.innerText === "Press to Start") {
+                                messageElement.style.visibility = "visible";
+                                speakButton.innerText = "Press to Speak";
+                                speak(data.response);
+                            } else if (speakButton.innerText === "Press to Speak" && recognition) {
+                                recognition.start();
+                                console.log("Speech recognition started.");
+                            } else {
+                                console.warn("Speech recognition not available.");
+                            }
+                        });
+                    } catch (error) {
+                        console.error("Error fetching conversation:", error);
+                        messageElement.innerText = "Error initializing the conversation.";
+                    }
+                } else {
+                    console.log("No user is logged in.");
+                    messageElement.innerText = "Please log in to start the conversation.";
+                }
+            });
         }
 
         // Inicializar aplicação
