@@ -195,42 +195,50 @@
         }
 
         async function initializeConversation() {
-            firebase.auth().onAuthStateChanged(async (user) => {
-                if (user) {
-                    userId = user.uid;
+    firebase.auth().onAuthStateChanged(async (user) => {
+        if (user) {
+            userId = user.uid; // Captura o UID do usuário autenticado
+            console.log("User authenticated. User ID:", userId); // Verificação no console
 
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const level = urlParams.get('level') || 'Level1';
-                    const unit = urlParams.get('unit') || 'Unit1';
+            // Captura os parâmetros da URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const level = urlParams.get('level') || 'Level1';
+            const unit = urlParams.get('unit') || 'Unit1';
 
-                    try {
-                        const response = await fetch(`/api/start?uid=${userId}&level=${level}&unit=${unit}`);
-                        if (!response.ok) throw new Error("Failed to initialize conversation.");
+            try {
+                // Chama o servidor enviando o UID e parâmetros da URL
+                console.log(`Calling /api/start with userId=${userId}, level=${level}, unit=${unit}`);
+                const response = await fetch(`/api/start?uid=${userId}&level=${level}&unit=${unit}`);
+                
+                if (!response.ok) throw new Error("Failed to initialize conversation.");
 
-                        const data = await response.json();
-                        chatHistory = data.chatHistory;
-                        messageElement.style.visibility = "visible";
-                        messageElement.innerText = data.response;
+                const data = await response.json();
+                console.log("Server Response:", data); // Verificar a resposta do servidor
 
-                        speakButton.addEventListener("click", () => {
-                            if (speakButton.innerText === "Press to Start") {
-                                speak(data.response);
-                                speakButton.innerText = "Press to Speak";
-                            } else {
-                                recognition.start();
-                            }
-                        });
-                    } catch (error) {
-                        console.error("Error initializing conversation:", error);
-                        messageElement.innerText = "Error initializing conversation. Try again.";
-                        messageElement.style.visibility = "visible";
+                chatHistory = data.chatHistory; // Histórico inicial da conversa
+                messageElement.style.visibility = "visible";
+                messageElement.innerText = data.response;
+
+                speakButton.addEventListener("click", () => {
+                    if (speakButton.innerText === "Press to Start") {
+                        speak(data.response); // Fala a mensagem inicial
+                        speakButton.innerText = "Press to Speak";
+                    } else {
+                        recognition.start(); // Inicia o reconhecimento de voz
                     }
-                } else {
-                    messageElement.innerText = "Please log in to start the conversation.";
-                    messageElement.style.visibility = "visible";
-                }
-            });
+                });
+            } catch (error) {
+                console.error("Error initializing conversation:", error);
+                messageElement.innerText = "Error initializing conversation. Try again.";
+                messageElement.style.visibility = "visible";
+            }
+        } else {
+            console.warn("User is not logged in.");
+            messageElement.innerText = "Please log in to start the conversation.";
+            messageElement.style.visibility = "visible";
         }
+    });
+}
 
         document.addEventListener("visibilitychange", () => {
             if (document.hidden) window.speechSynthesis.cancel();
