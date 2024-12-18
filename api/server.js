@@ -96,7 +96,7 @@ app.get('/api/start', async (req, res) => {
         console.log(`✅ [SUCESSO] Nome do usuário encontrado: ${studentName}`);
 
         // Mensagem inicial com o nível dinâmico
-        const initialMessage = `Hello ${studentName}! My name is Samuel, your robot friend. Today's topic is: ${conversationDetails}. I'll keep the conversation at your ${studentLevel} level. Shall we begin?`;
+        const initialMessage = `Hello ${studentName}! My name is Samuel, your robot friend. Today's topic is: ${conversationDetails}. I'll keep the conversation at your ${studentLevel}. Shall we begin?`;
 
         return res.json({
             response: initialMessage,
