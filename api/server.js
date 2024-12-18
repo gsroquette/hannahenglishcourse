@@ -154,6 +154,7 @@ app.post('/api/chat', async (req, res) => {
 
         // Atualizar histórico da conversa
         conversations[userId].push({ role: 'user', content: userMessage });
+        console.log("Conversation history being sent to GPT-4:", conversations[userId]);
 
         // Gera resposta da IA
         const completion = await openai.createChatCompletion({
