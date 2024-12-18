@@ -50,11 +50,11 @@
             cursor: pointer;
         }
         #back-button:hover {
-            background-color: #333; /* Cor de destaque ao passar o mouse */
+            background-color: #333;
         }
-button {
-    margin: 10px; /* Espaçamento entre botões */
-}
+        button {
+            margin: 10px; /* Espaçamento entre botões */
+        }
     </style>
 </head>
 <body>
@@ -62,14 +62,13 @@ button {
     <img id="robot-img" src="../../imagens/robo1_static.png" alt="Robot">
     <p id="message" style="visibility: hidden;">Loading...</p>
     <button id="speak-button">Press to Start</button>
-    <button id="back-button">Back</button> <!-- Botão Back -->
+    <button id="back-button">Back</button>
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
-    <!-- Firebase Configuration -->
     <script>
         const firebaseConfig = {
             apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
@@ -82,28 +81,31 @@ button {
         };
         firebase.initializeApp(firebaseConfig);
 
-        // Configurar funcionalidade do botão "Back"
-        document.getElementById("back-button").addEventListener("click", () => {
-            window.history.back(); // Voltar para a página anterior
-        });
+        // Elementos DOM
+        const messageElement = document.getElementById("message");
+        const robotImg = document.getElementById("robot-img");
+        const speakButton = document.getElementById("speak-button");
+        const backButton = document.getElementById("back-button");
 
         const ROBOT_GIF = "../../imagens/robo1.gif";
         const ROBOT_STATIC = "../../imagens/robo1_static.png";
         const ROBOT_ALTERNATE = "../../imagens/robo2.gif";
-        const messageElement = document.getElementById("message");
-        const robotImg = document.getElementById("robot-img");
-        const speakButton = document.getElementById("speak-button");
 
         let recognition;
         let isSpeaking = false;
         let staticTime = 0;
-        let alternateTimeout;       
+        let alternateTimeout;
+        let userId = null;
+        let chatHistory = [];
 
-        // Alternar imagem após 20 segundos de estado estático
+        // Botão de voltar
+        backButton.addEventListener("click", () => window.history.back());
+
+        // Alternar imagem após 20 segundos de inatividade
         function startStaticImageTimer() {
             setInterval(() => {
                 if (!isSpeaking) {
-                    staticTime += 1;
+                    staticTime++;
                     if (staticTime === 20) {
                         robotImg.src = ROBOT_ALTERNATE;
                         alternateTimeout = setTimeout(() => {
@@ -121,6 +123,7 @@ button {
             robotImg.src = ROBOT_STATIC;
         }
 
+        // Síntese de voz
         function speak(text, rate = 0.8) {
             const synth = window.speechSynthesis;
             const utterance = new SpeechSynthesisUtterance(text);
@@ -134,7 +137,6 @@ button {
                 speakButton.disabled = true;
                 speakButton.innerText = "Robot is speaking...";
             };
-
             utterance.onend = () => {
                 isSpeaking = false;
                 robotImg.src = ROBOT_STATIC;
@@ -145,31 +147,7 @@ button {
             synth.speak(utterance);
         }
 
-        // Interromper a fala ao sair da página
-        document.addEventListener("visibilitychange", () => {
-            if (document.hidden) {
-                window.speechSynthesis.cancel();
-                console.log("Speech stopped as page is no longer visible.");
-            }
-        });
-
-        // Verificar suporte ao idioma en-US
-        function checkSpeechSynthesisLanguage() {
-            const voices = window.speechSynthesis.getVoices();
-            const hasEnglishUS = voices.some((voice) => voice.lang === "en-US");
-
-            if (!hasEnglishUS) {
-                alert("English (US) voice not available. Please enable or install it.");
-                console.warn("English (US) voice not available. Default voice will be used.");
-            }
-        }
-
-        if (speechSynthesis.onvoiceschanged !== undefined) {
-            speechSynthesis.onvoiceschanged = checkSpeechSynthesisLanguage;
-        } else {
-            checkSpeechSynthesisLanguage();
-        }
-
+        // Reconhecimento de voz
         function setupSpeechRecognition() {
             if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
                 alert("Speech recognition is not supported in this browser.");
@@ -177,89 +155,71 @@ button {
                 return;
             }
 
-            try {
-                recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-                recognition.lang = "en-US";
-                recognition.interimResults = false;
+            recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = "en-US";
 
-                recognition.onstart = () => {
-                    speakButton.classList.add("listening");
-                    speakButton.innerText = "Listening...";
-                };
+            recognition.onstart = () => {
+                speakButton.classList.add("listening");
+                speakButton.innerText = "Listening...";
+            };
 
-                recognition.onend = () => {
-                    speakButton.classList.remove("listening");
-                    speakButton.innerText = "Press to Speak";
-                };
+            recognition.onend = () => {
+                speakButton.classList.remove("listening");
+                speakButton.innerText = "Press to Speak";
+            };
 
-                recognition.onresult = async (event) => {
-                    resetStaticTimer();
-                    const userSpeech = event.results[0][0].transcript;
-
-                    messageElement.style.visibility = "visible";
-                    messageElement.innerText = `You said: ${userSpeech}`;
-
-                    try {
-                        const response = await fetch('/api/chat', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ message: userSpeech }),
-                        });
-                        const data = await response.json();
-
-                        messageElement.style.visibility = "visible";
-                        messageElement.innerText = data.response;
-
-                        speak(data.response);
-                    } catch (error) {
-                        console.error("Error communicating with the server:", error);
-                        messageElement.style.visibility = "visible";
-                        messageElement.innerText = "Error communicating with the server.";
-                    }
-                };
-            } catch (err) {
-                console.error("Error initializing speech recognition:", err);
-                alert("Speech recognition failed to initialize.");
-            }
-        }
-
-async function initializeConversation() {
-    messageElement.style.visibility = "hidden"; // Garante que a mensagem está oculta inicialmente
-
-    firebase.auth().onAuthStateChanged(async (user) => {
-        if (user) {
-            const userId = user.uid;
-
-            try {
-                // Busca a mensagem inicial do servidor
-                const response = await fetch(`/api/start?uid=${userId}`);
-                const data = await response.json();
-
-                // Configura o botão "Press to Start" para exibir e falar a mensagem inicial
-                speakButton.innerText = "Press to Start";
-                speakButton.addEventListener("click", () => {
-                    if (speakButton.innerText === "Press to Start") {
-                        messageElement.style.visibility = "visible";
-                        messageElement.innerText = data.response;
-
-                        speak(data.response); // Fala a mensagem inicial
-                        speakButton.innerText = "Press to Speak"; // Atualiza o texto do botão
-                    } else if (speakButton.innerText === "Press to Speak") {
-                        // Inicia reconhecimento de voz
-                        recognition.start();
-                    }
-                });
-            } catch (error) {
-                console.error("Error initializing conversation:", error);
+            recognition.onresult = async (event) => {
+                resetStaticTimer();
+                const userSpeech = event.results[0][0].transcript;
+                messageElement.innerText = `You said: ${userSpeech}`;
                 messageElement.style.visibility = "visible";
-                messageElement.innerText = "Error initializing conversation.";
-            }
-        } else {
-            messageElement.style.visibility = "visible";
-            messageElement.innerText = "Please log in to start the conversation.";
+
+                try {
+                    const response = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ uid: userId, message: userSpeech, chatHistory }),
+                    });
+                    const data = await response.json();
+                    chatHistory = data.chatHistory;
+                    messageElement.innerText = data.response;
+                    speak(data.response);
+                } catch (error) {
+                    console.error("Error communicating with the server:", error);
+                    messageElement.innerText = "Error communicating with the server.";
+                }
+            };
         }
-    });
-}
+
+        async function initializeConversation() {
+            firebase.auth().onAuthStateChanged(async (user) => {
+                if (user) {
+                    userId = user.uid;
+                    const response = await fetch(`/api/start?uid=${userId}`);
+                    const data = await response.json();
+                    chatHistory = data.chatHistory;
+
+                    speakButton.addEventListener("click", () => {
+                        if (speakButton.innerText === "Press to Start") {
+                            messageElement.innerText = data.response;
+                            messageElement.style.visibility = "visible";
+                            speak(data.response);
+                            speakButton.innerText = "Press to Speak";
+                        } else {
+                            recognition.start();
+                        }
+                    });
+                } else {
+                    messageElement.innerText = "Please log in to start the conversation.";
+                    messageElement.style.visibility = "visible";
+                }
+            });
+        }
+
+        // Cancelar síntese ao sair da página
+        document.addEventListener("visibilitychange", () => {
+            if (document.hidden) window.speechSynthesis.cancel();
+        });
 
         window.onload = () => {
             setupSpeechRecognition();
