@@ -25,8 +25,6 @@ const configuration = new Configuration({
 });
 const openai = new OpenAIApi(configuration);
 
-let chatHistory = []; // Histórico da conversa
-
 // Rota para iniciar a conversa
 app.get('/api/start', async (req, res) => {
     const userId = req.query.uid;
@@ -43,10 +41,14 @@ app.get('/api/start', async (req, res) => {
     try {
         // Carregar conteúdo do conversa.txt
         const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataIA', 'conversa.txt');
+        console.log(`Tentando carregar: ${filePath}`);
+
         if (fs.existsSync(filePath)) {
             const fileContent = fs.readFileSync(filePath, 'utf-8');
             conversationDetails = fileContent.split('\n')[0].trim();
             conversationFullContent = fileContent.trim();
+        } else {
+            console.warn("⚠️ Arquivo conversa.txt não encontrado.");
         }
     } catch (error) {
         console.error("Erro ao carregar conversa.txt:", error);
@@ -71,7 +73,7 @@ app.get('/api/start', async (req, res) => {
                 Your goal is to help the student practice English conversation in a focused, cheerful, and motivating way.
                 The student's English level is ${studentLevel}, the current unit is ${studentUnit}, and the lesson topic is: ${conversationDetails}.
 
-Follow these guidelines to conduct the conversation:
+                Follow these guidelines to conduct the conversation:
 
         Adapt your language to the student's level:
         - If the level is Level 1, it means that the student's English level in the CEFR is A1. Use short sentences (maximum of 3 per interaction), simple, clear and direct. Do not be verbose.
@@ -101,9 +103,10 @@ ${conversationFullContent}
             `,
         };
 
-        // Reinicializar chatHistory com a nova mensagem de contexto
-        chatHistory = [contextMessage];
+        // Inicializar um novo histórico de conversa
+        const chatHistory = [contextMessage];
 
+        // Mensagem inicial
         const initialMessage = `Hello ${studentName}! Today's topic is: ${conversationDetails}. I'm ready to help you at your ${studentLevel}, in ${studentUnit}. Shall we begin?`;
 
         return res.json({
@@ -114,6 +117,7 @@ ${conversationFullContent}
                 unit: studentUnit,
                 fullContent: conversationFullContent,
             },
+            chatHistory, // Retorna o histórico atualizado
         });
     } catch (error) {
         res.status(500).json({ error: "Internal Server Error", details: error.message });
@@ -123,6 +127,7 @@ ${conversationFullContent}
 // Rota para interação com a IA
 app.post('/api/chat', async (req, res) => {
     const userMessage = req.body.message;
+    const chatHistory = req.body.chatHistory || []; // Recebe o histórico atualizado do cliente
 
     if (!userMessage) {
         return res.status(400).json({ response: "Message cannot be empty." });
@@ -139,8 +144,9 @@ app.post('/api/chat', async (req, res) => {
         const responseMessage = completion.data.choices[0].message.content;
         chatHistory.push({ role: 'assistant', content: responseMessage });
 
-        res.json({ response: responseMessage });
+        res.json({ response: responseMessage, chatHistory }); // Retorna o histórico atualizado
     } catch (error) {
+        console.error("Erro na API OpenAI:", error);
         res.status(500).json({ response: "Error processing the message." });
     }
 });
