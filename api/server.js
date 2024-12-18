@@ -153,11 +153,12 @@ app.post('/api/chat', async (req, res) => {
 
     try {
         // Garantir que a conversa esteja inicializada
-        if (!conversations[userId]) {
-            // Inicializa o histórico se não existir
-            conversations[userId] = [{ role: 'system', content: "Conversation initialized." }];
-            console.log(`Histórico inicializado para o usuário: ${userId}`);
-        }
+      if (!conversations[userId]) {
+    console.warn(`Histórico não encontrado para o usuário ${userId}. Inicializando com contexto padrão.`);
+    conversations[userId] = [{ role: 'system', content: "Conversation initialized." }];
+} else {
+    console.log(`Histórico encontrado para o usuário ${userId}:`, conversations[userId]);
+}
 
         // Atualizar histórico da conversa
         conversations[userId].push({ role: 'user', content: userMessage });
