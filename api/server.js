@@ -7,8 +7,8 @@ const { Configuration, OpenAIApi } = require('openai');
 const admin = require('firebase-admin');
 
 // Configuração Firebase Admin
-console.log("FIREBASE_SERVICE_ACCOUNT:", process.env.FIREBASE_SERVICE_ACCOUNT);
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+console.log("FIREBASE_SERVICE_ACCOUNT:", process.env.FIREBASE_SERVICE_ACCOUNT || "NÃO DEFINIDO");
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || '{}');
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
     databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
@@ -38,7 +38,7 @@ app.get('/api/start', async (req, res) => {
     console.log("Received request with:", { userId, studentLevel, studentUnit });
 
     if (!userId) {
-        console.error("User ID is missing.");
+        console.error("❌ User ID is missing.");
         return res.status(400).json({ error: "User ID is required" });
     }
 
@@ -46,51 +46,51 @@ app.get('/api/start', async (req, res) => {
     let conversationFullContent = '';
 
     try {
-        // Log para verificar o caminho do arquivo
+        // Verificar o caminho do arquivo
         const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataIA', 'conversa.txt');
-       console.log(`Attempting to load file: ${filePath}`);
-      console.log(`Tentando carregar o arquivo em: ${filePath}`);
+        console.log(`🔍 Tentando carregar o arquivo em: ${filePath}`);
 
-        if (fs.existsSync(filePath)) {
+        if (!fs.existsSync(filePath)) {
+            console.error(`⚠️ Arquivo não encontrado: ${filePath}`);
+            return res.status(404).json({ error: `Arquivo não encontrado em ${filePath}` });
+        }
+
+        try {
             const fileContent = fs.readFileSync(filePath, 'utf-8');
-            console.log("File content loaded successfully:", fileContent);
+            console.log("📄 Conteúdo do arquivo carregado com sucesso:", fileContent);
 
             conversationDetails = fileContent.split('\n')[0].trim();
             conversationFullContent = fileContent.trim();
-        } else {
-            console.warn("⚠️ File not found:", filePath);
+        } catch (error) {
+            console.error(`❌ Erro ao carregar o arquivo ${filePath}:`, error.message);
+            return res.status(500).json({ error: "Erro ao carregar o arquivo", details: error.message });
         }
     } catch (error) {
-        console.error("Error loading conversation file:", error);
+        console.error("❌ Erro no bloco de carregamento do arquivo:", error.message);
+        return res.status(500).json({ error: "Erro interno ao processar arquivo", details: error.message });
     }
 
     try {
         // Buscar o nome do usuário no Firebase
-console.log("Buscando nome do usuário no Firebase para userId:", userId);
-console.log(`Received request with: userId=${userId}, level=${studentLevel}, unit=${studentUnit}`);
-
+        console.log(`🔍 Buscando nome do usuário no Firebase para userId: ${userId}`);
         const userRef = db.ref(`usuarios/${userId}/nome`);
-console.log(`Searching Firebase path: usuarios/${userId}/nome`);
+        console.log(`🔍 Caminho do Firebase: usuarios/${userId}/nome`);
+
         const snapshot = await userRef.once('value');
-console.log("Firebase Snapshot:", snapshot.exists() ? snapshot.val() : "Not Found");
-
-console.log(`Snapshot exists: ${snapshot.exists()}`);
-console.log(`Snapshot value: ${snapshot.val()}`);
-
-        console.log(`Checking Firebase for user ID: ${userId}`);
+        console.log(`📊 Firebase Snapshot: ${snapshot.exists() ? snapshot.val() : "Não encontrado"}`);
 
         if (!snapshot.exists()) {
-            console.error("User not found in Firebase.");
-            return res.status(404).json({ error: "User not found" });
+            console.error("❌ Usuário não encontrado no Firebase.");
+            return res.status(404).json({ error: "Usuário não encontrado" });
         }
 
         const studentName = snapshot.val();
-        console.log("User name retrieved:", studentName);
+        console.log(`✅ Nome do usuário recuperado: ${studentName}`);
 
         // Criar mensagem de contexto
         const contextMessage = {
             role: "system",
-             content: ` 
+            content: ` 
          You will act as Samuel, a native American, friendly, and patient robot. Your goal is to help the student to practice English conversation in a focused, cheerful, and motivating way. The student's name is ${studentName}. Always address the student by their name in every response (e.g., "Hello Carla!"). The student's English level is ${studentLevel} and the current unit is ${studentUnit}, and the current lesson topic is: ${conversationDetails}.
 
         Start the conversation by applying the lesson
@@ -127,13 +127,11 @@ Additional information about the lesson:
 
         conversations[userId] = [contextMessage];
 
-// Adicionando logs para depurar
-console.log(`ContextMessage gerado: ${JSON.stringify(contextMessage)}`);
-console.log(`Contexto salvo em conversations para userId=${userId}: ${JSON.stringify(conversations[userId])}`);
+        console.log(`📝 Contexto gerado para userId=${userId}: ${JSON.stringify(contextMessage)}`);
 
         const initialMessage = `Hello ${studentName}! Today's topic is: ${conversationDetails}. I'm ready to help you at your ${studentLevel}, in ${studentUnit}. Shall we begin?`;
 
-        console.log(`Initial message: ${initialMessage}`);
+        console.log(`💬 Mensagem inicial: ${initialMessage}`);
 
         return res.json({
             response: initialMessage,
@@ -146,35 +144,32 @@ console.log(`Contexto salvo em conversations para userId=${userId}: ${JSON.strin
             chatHistory: conversations[userId],
         });
     } catch (error) {
-        console.error("Error retrieving user data:", error);
-        return res.status(500).json({ error: "Internal Server Error", details: error.message });
+        console.error(`❌ Erro ao recuperar dados do usuário: ${error.message}`);
+        return res.status(500).json({ error: "Erro interno ao recuperar dados do usuário", details: error.message });
     }
 });
 
 // Rota para interação com a IA
 app.post('/api/chat', async (req, res) => {
-    const userId = req.body.uid; // ID do usuário
-    const userMessage = req.body.message; // Mensagem enviada pelo usuário
+    const userId = req.body.uid;
+    const userMessage = req.body.message;
 
-    // Verificação: ID do usuário e mensagem são obrigatórios
     if (!userId || !userMessage) {
+        console.error("❌ User ID ou mensagem ausente.");
         return res.status(400).json({ response: "User ID and message are required." });
     }
 
     try {
-        // Garantir que a conversa esteja inicializada
-      if (!conversations[userId]) {
-    console.warn(`Histórico não encontrado para o usuário ${userId}. Inicializando com contexto padrão.`);
-    conversations[userId] = [{ role: 'system', content: "Conversation initialized." }];
-} else {
-    console.log(`Histórico encontrado para o usuário ${userId}: ${JSON.stringify(conversations[userId])}`);
-}
+        if (!conversations[userId]) {
+            console.warn(`⚠️ Histórico não encontrado para o usuário ${userId}. Inicializando contexto padrão.`);
+            conversations[userId] = [{ role: 'system', content: "Conversation initialized." }];
+        } else {
+            console.log(`✅ Histórico encontrado para userId=${userId}: ${JSON.stringify(conversations[userId])}`);
+        }
 
-        // Atualizar histórico da conversa
         conversations[userId].push({ role: 'user', content: userMessage });
-        console.log("Conversation history being sent to GPT-4:", conversations[userId]);
+        console.log("📨 Histórico atualizado com mensagem do usuário:", conversations[userId]);
 
-        // Gera resposta da IA
         const completion = await openai.createChatCompletion({
             model: 'gpt-4',
             messages: conversations[userId],
@@ -182,18 +177,19 @@ app.post('/api/chat', async (req, res) => {
 
         const responseMessage = completion.data.choices[0].message.content;
 
-        // Adiciona a resposta da IA no histórico
         conversations[userId].push({ role: 'assistant', content: responseMessage });
+
+        console.log("💬 Resposta da IA adicionada ao histórico:", responseMessage);
 
         res.json({ response: responseMessage, chatHistory: conversations[userId] });
     } catch (error) {
-      console.error(`Erro na API OpenAI para userId=${userId}:`, error.response ? error.response.data : error.message);
-        res.status(500).json({ response: "Error processing the message." });
+        console.error(`❌ Erro na API OpenAI para userId=${userId}:`, error.response ? error.response.data : error.message);
+        res.status(500).json({ response: "Erro ao processar a mensagem." });
     }
 });
 
 app.get('/', (req, res) => res.send("Servidor rodando com sucesso!"));
 
-app.listen(PORT, () => console.log(Servidor rodando na porta ${PORT}));
+app.listen(PORT, () => console.log(`🚀 Servidor rodando na porta ${PORT}`));
 
 module.exports = app;
