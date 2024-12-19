@@ -35,63 +35,67 @@ app.get('/api/start', async (req, res) => {
     const studentLevel = req.query.level || "Level1";
     const studentUnit = req.query.unit || "Unit1";
 
-    console.log("Received request with:", { userId, studentLevel, studentUnit });
+    console.log("✅ Request recebido com os seguintes parâmetros:", { userId, studentLevel, studentUnit });
 
+    // Verificação de ID do usuário
     if (!userId) {
-        console.error("❌ User ID is missing.");
-        return res.status(400).json({ error: "User ID is required" });
+        console.error("❌ User ID está ausente.");
+        return res.status(400).json({ error: "User ID is required." });
     }
 
     let conversationDetails = 'General conversation';
     let conversationFullContent = '';
 
     try {
-        // Verificar o caminho do arquivo
+        // Caminho do arquivo
         const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataIA', 'conversa.txt');
-        console.log(`🔍 Tentando carregar o arquivo em: ${filePath}`);
+        console.log(`🔍 Verificando existência do arquivo em: ${filePath}`);
 
+        // Verificar se o arquivo existe
         if (!fs.existsSync(filePath)) {
             console.error(`⚠️ Arquivo não encontrado: ${filePath}`);
             return res.status(404).json({ error: `Arquivo não encontrado em ${filePath}` });
         }
 
+        // Tentar ler o conteúdo do arquivo
         try {
             const fileContent = fs.readFileSync(filePath, 'utf-8');
-            console.log("📄 Conteúdo do arquivo carregado com sucesso:", fileContent);
+            console.log("📄 Arquivo carregado com sucesso. Conteúdo inicial:", fileContent);
 
             conversationDetails = fileContent.split('\n')[0].trim();
             conversationFullContent = fileContent.trim();
         } catch (error) {
-            console.error(`❌ Erro ao carregar o arquivo ${filePath}:`, error.message);
-            return res.status(500).json({ error: "Erro ao carregar o arquivo", details: error.message });
+            console.error(`❌ Erro ao ler o arquivo ${filePath}:`, error.message);
+            return res.status(500).json({ error: "Erro ao carregar o arquivo.", details: error.message });
         }
     } catch (error) {
-        console.error("❌ Erro no bloco de carregamento do arquivo:", error.message);
-        return res.status(500).json({ error: "Erro interno ao processar arquivo", details: error.message });
+        console.error("❌ Erro inesperado ao carregar o arquivo:", error.message);
+        return res.status(500).json({ error: "Erro interno ao processar arquivo.", details: error.message });
     }
 
     try {
-        // Buscar o nome do usuário no Firebase
+        // Buscar nome do usuário no Firebase
         console.log(`🔍 Buscando nome do usuário no Firebase para userId: ${userId}`);
         const userRef = db.ref(`usuarios/${userId}/nome`);
         console.log(`🔍 Caminho do Firebase: usuarios/${userId}/nome`);
 
         const snapshot = await userRef.once('value');
-        console.log(`📊 Firebase Snapshot: ${snapshot.exists() ? snapshot.val() : "Não encontrado"}`);
+        console.log(`📊 Snapshot do Firebase: ${snapshot.exists() ? snapshot.val() : "Não encontrado"}`);
 
+        // Verificar se o usuário existe no Firebase
         if (!snapshot.exists()) {
             console.error("❌ Usuário não encontrado no Firebase.");
-            return res.status(404).json({ error: "Usuário não encontrado" });
+            return res.status(404).json({ error: "Usuário não encontrado." });
         }
 
         const studentName = snapshot.val();
-        console.log(`✅ Nome do usuário recuperado: ${studentName}`);
+        console.log(`✅ Nome do usuário recuperado do Firebase: ${studentName}`);
 
-        // Criar mensagem de contexto
+        // Criar mensagem de contexto para o GPT-4
         const contextMessage = {
             role: "system",
-            content: ` 
-         You will act as Samuel, a native American, friendly, and patient robot. Your goal is to help the student to practice English conversation in a focused, cheerful, and motivating way. The student's name is ${studentName}. Always address the student by their name in every response (e.g., "Hello Carla!"). The student's English level is ${studentLevel} and the current unit is ${studentUnit}, and the current lesson topic is: ${conversationDetails}.
+              content: `
+          You will act as Samuel, a native American, friendly, and patient robot. Your goal is to help the student to practice English conversation in a focused, cheerful, and motivating way. The student's name is ${studentName}. Always address the student by their name in every response (e.g., "Hello Carla!"). The student's English level is ${studentLevel} and the current unit is ${studentUnit}, and the current lesson topic is: ${conversationDetails}.
 
         Start the conversation by applying the lesson
 
@@ -122,16 +126,17 @@ app.get('/api/start', async (req, res) => {
 
 Additional information about the lesson:
         ${conversationFullContent}
-   `,
+    `,
         };
 
+        // Salvar o contexto na memória do servidor
         conversations[userId] = [contextMessage];
+        console.log(`📝 Contexto gerado e salvo para userId=${userId}:`, JSON.stringify(contextMessage));
 
-        console.log(`📝 Contexto gerado para userId=${userId}: ${JSON.stringify(contextMessage)}`);
-
+        // Mensagem inicial para o aluno
         const initialMessage = `Hello ${studentName}! Today's topic is: ${conversationDetails}. I'm ready to help you at your ${studentLevel}, in ${studentUnit}. Shall we begin?`;
 
-        console.log(`💬 Mensagem inicial: ${initialMessage}`);
+        console.log(`💬 Mensagem inicial enviada ao aluno: ${initialMessage}`);
 
         return res.json({
             response: initialMessage,
@@ -144,8 +149,8 @@ Additional information about the lesson:
             chatHistory: conversations[userId],
         });
     } catch (error) {
-        console.error(`❌ Erro ao recuperar dados do usuário: ${error.message}`);
-        return res.status(500).json({ error: "Erro interno ao recuperar dados do usuário", details: error.message });
+        console.error(`❌ Erro inesperado ao recuperar dados do usuário: ${error.message}`);
+        return res.status(500).json({ error: "Erro interno ao recuperar dados do usuário.", details: error.message });
     }
 });
 
@@ -154,37 +159,57 @@ app.post('/api/chat', async (req, res) => {
     const userId = req.body.uid;
     const userMessage = req.body.message;
 
+    console.log(`🔍 Requisição recebida para interação com a IA. userId=${userId}, mensagem="${userMessage}"`);
+
+    // Validação: verificar se userId e userMessage estão presentes
     if (!userId || !userMessage) {
-        console.error("❌ User ID ou mensagem ausente.");
+        console.error("❌ Parâmetros ausentes: User ID ou mensagem estão faltando.");
         return res.status(400).json({ response: "User ID and message are required." });
     }
 
     try {
+        // Verificar se o histórico existe para o usuário
         if (!conversations[userId]) {
             console.warn(`⚠️ Histórico não encontrado para o usuário ${userId}. Inicializando contexto padrão.`);
-            conversations[userId] = [{ role: 'system', content: "Conversation initialized." }];
+            conversations[userId] = [
+                {
+                    role: 'system',
+                    content: "Conversation initialized. Provide guidance based on previous context.",
+                },
+            ];
         } else {
-            console.log(`✅ Histórico encontrado para userId=${userId}: ${JSON.stringify(conversations[userId])}`);
+            console.log(`✅ Histórico encontrado para userId=${userId}:`, JSON.stringify(conversations[userId]));
         }
 
+        // Adicionar a mensagem do usuário ao histórico
         conversations[userId].push({ role: 'user', content: userMessage });
-        console.log("📨 Histórico atualizado com mensagem do usuário:", conversations[userId]);
+        console.log("📨 Mensagem do usuário adicionada ao histórico:", userMessage);
 
+        // Chamada para a API OpenAI
+        console.log("🔄 Enviando histórico atualizado para a API OpenAI...");
         const completion = await openai.createChatCompletion({
             model: 'gpt-4',
             messages: conversations[userId],
         });
 
+        // Processar resposta da OpenAI
         const responseMessage = completion.data.choices[0].message.content;
+        console.log("✅ Resposta gerada pela OpenAI:", responseMessage);
 
+        // Adicionar a resposta ao histórico
         conversations[userId].push({ role: 'assistant', content: responseMessage });
-
         console.log("💬 Resposta da IA adicionada ao histórico:", responseMessage);
 
+        // Responder ao cliente
         res.json({ response: responseMessage, chatHistory: conversations[userId] });
     } catch (error) {
-        console.error(`❌ Erro na API OpenAI para userId=${userId}:`, error.response ? error.response.data : error.message);
-        res.status(500).json({ response: "Erro ao processar a mensagem." });
+        console.error(`❌ Erro durante a interação com a API OpenAI para userId=${userId}:`, error.response ? error.response.data : error.message);
+
+        // Retornar erro ao cliente
+        res.status(500).json({
+            response: "Erro ao processar a mensagem.",
+            details: error.response ? error.response.data : error.message,
+        });
     }
 });
 
