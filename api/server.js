@@ -120,15 +120,13 @@ app.post('/api/chat', async (req, res) => {
         // Inicializa o contexto se não existir
         if (!conversations[userId]) {
             console.warn(`⚠️ Contexto não encontrado para userId=${userId}. Inicializando...`);
-           role: "system",
-    content: `
-        You are Samuel, a friendly and patient robot who helps students practice English conversation.
-        The student's name is ${studentName}. Address them by their name (e.g., "Hello ${studentName}!").
-        The student's level is ${studentLevel}, and the topic is: ${conversationDetails}.
-        Focus on the topic and keep interactions short and clear.
-        Provide helpful corrections and encouragement.
-    `,
-};
+            const contextMessage = {
+                role: "system",
+                content: `
+                    You are Samuel, a native, friendly, and patient English teacher.
+                    Guide the student through today's lesson and keep the conversation focused on the topic.
+                `,
+            };
             conversations[userId] = [contextMessage];
         }
 
