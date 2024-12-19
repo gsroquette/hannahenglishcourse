@@ -111,7 +111,6 @@ app.post('/api/chat', async (req, res) => {
 
     console.log(`🔍 Requisição recebida para interação com a IA. userId=${userId}, mensagem="${userMessage}"`);
 
-    // Validação: verificar se userId e userMessage estão presentes
     if (!userId || !userMessage) {
         console.error("❌ Parâmetros ausentes: User ID ou mensagem estão faltando.");
         return res.status(400).json({ response: "User ID and message are required." });
@@ -121,14 +120,7 @@ app.post('/api/chat', async (req, res) => {
         // Verificar se o histórico existe para o usuário
         if (!conversations[userId]) {
             console.warn(`⚠️ Histórico não encontrado para o usuário ${userId}. Inicializando contexto padrão.`);
-            conversations[userId] = [
-                {
-                    role: 'system',
-                    content: "Conversation initialized. Provide guidance based on previous context.",
-                },
-            ];
-        } else {
-            console.log(`✅ Histórico encontrado para userId=${userId}:`, JSON.stringify(conversations[userId]));
+            return res.status(400).json({ response: "Context not initialized. Please restart the conversation." });
         }
 
         // Adicionar a mensagem do usuário ao histórico
