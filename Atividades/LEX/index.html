@@ -194,52 +194,67 @@ function speak(text, rate = 0.8) {
             };
         }
 
-        async function initializeConversation() {
+       async function initializeConversation() {
     firebase.auth().onAuthStateChanged(async (user) => {
         if (user) {
             userId = user.uid; // Captura o UID do usuário autenticado
-            console.log("User authenticated. User ID:", userId); // Verificação no console
+            console.log("✅ User authenticated. User ID:", userId); // Log para verificar autenticação
 
             // Captura os parâmetros da URL
             const urlParams = new URLSearchParams(window.location.search);
             const level = urlParams.get('level') || 'Level1';
             const unit = urlParams.get('unit') || 'Unit1';
 
- console.log("Sending to /api/start:", { uid: userId, level, unit }); // Log completo
+            console.log(`📤 Enviando para /api/start com userId=${userId}, level=${level}, unit=${unit}`); // Log para depuração
 
             try {
+                // Desativar o botão até a inicialização completar
+                speakButton.disabled = true;
+                speakButton.innerText = "Initializing conversation...";
+
                 // Chama o servidor enviando o UID e parâmetros da URL
-               console.log("Sending to /api/start:", { uid: userId, level, unit }); // Log completo
-               console.log(`Calling /api/start with userId=${userId}, level=${level}, unit=${unit}`);
-               const response = await fetch(`/api/start?uid=${userId}&level=${level}&unit=${unit}`);
-                
-                if (!response.ok) throw new Error("Failed to initialize conversation.");
+                const response = await fetch(`/api/start?uid=${userId}&level=${level}&unit=${unit}`);
+
+                if (!response.ok) {
+                    throw new Error(`Erro do servidor: ${response.status} ${response.statusText}`);
+                }
 
                 const data = await response.json();
-                console.log("Server Response:", data); // Verificar a resposta do servidor
-                console.log("Conversation initialized. API Response:", data); // Log para depuração
+                console.log("✅ Resposta do servidor recebida:", data); // Log para depuração
 
                 chatHistory = data.chatHistory; // Histórico inicial da conversa
-                messageElement.style.visibility = "visible";
+                messageElement.style.visibility = "hidden"; // Esconde a mensagem inicial até o clique
                 messageElement.innerText = data.response;
 
+                // Configurar ação do botão de fala
                 speakButton.addEventListener("click", () => {
                     if (speakButton.innerText === "Press to Start") {
+                        messageElement.style.visibility = "visible"; // Mostra a mensagem inicial
                         speak(data.response); // Fala a mensagem inicial
                         speakButton.innerText = "Press to Speak";
                     } else {
                         recognition.start(); // Inicia o reconhecimento de voz
                     }
                 });
+
+                // Reativar o botão após inicialização
+                speakButton.disabled = false;
+                speakButton.innerText = "Press to Start";
+
             } catch (error) {
-                console.error("Error initializing conversation:", error);
-                messageElement.innerText = "Error initializing conversation. Try again.";
+                console.error("❌ Erro durante a inicialização da conversa:", error);
+
+                // Exibir mensagem de erro ao usuário
                 messageElement.style.visibility = "visible";
+                messageElement.innerText = "Error initializing conversation. Please try again.";
+                speakButton.disabled = false;
+                speakButton.innerText = "Press to Start";
             }
         } else {
-            console.warn("User is not logged in.");
-            messageElement.innerText = "Please log in to start the conversation.";
+            console.warn("⚠️ Usuário não está logado.");
             messageElement.style.visibility = "visible";
+            messageElement.innerText = "Please log in to start the conversation.";
+            speakButton.disabled = true; // Desativar o botão se o usuário não está logado
         }
     });
 }
