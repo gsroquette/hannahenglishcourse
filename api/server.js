@@ -95,6 +95,8 @@ console.log("Valor do snapshot:", snapshot.val());
 
         Follow these guidelines to conduct the conversation:
 
+        Always address the student by name (e.g., "Hello Carla!").
+
         Adapt your language to the student's level:
         - If the level is Level 1, it means that the student's English level in the CEFR is A1. Use short sentences (maximum of 3 per interaction), simple, clear and direct. Do not be verbose.
         - If the level is Level 2, it means that the student's English level in the CEFR is A2. Use short sentences (maximum of 3 per interaction), keeping them simple and clear. Do not be verbose.
