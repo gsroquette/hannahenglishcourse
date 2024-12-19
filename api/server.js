@@ -37,7 +37,6 @@ app.get('/api/start', async (req, res) => {
 
     console.log("✅ Request recebido com os seguintes parâmetros:", { userId, studentLevel, studentUnit });
 
-    // Verificação de ID do usuário
     if (!userId) {
         console.error("❌ User ID está ausente.");
         return res.status(400).json({ error: "User ID is required." });
@@ -47,30 +46,18 @@ app.get('/api/start', async (req, res) => {
     let conversationFullContent = '';
 
     try {
-        // Caminho do arquivo
         const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataIA', 'conversa.txt');
-        console.log(`🔍 Verificando existência do arquivo em: ${filePath}`);
-
-        // Verificar se o arquivo existe
-        if (!fs.existsSync(filePath)) {
-            console.error(`⚠️ Arquivo não encontrado: ${filePath}`);
-            return res.status(404).json({ error: `Arquivo não encontrado em ${filePath}` });
+        if (fs.existsSync(filePath)) {
+            const fileContent = fs.readFileSync(filePath, 'utf-8');
+            conversationDetails = fileContent.split('\n')[0].trim();
+            conversationFullContent = fileContent.trim();
         }
-
-        // Ler o conteúdo do arquivo
-        const fileContent = fs.readFileSync(filePath, 'utf-8');
-        console.log("📄 Arquivo carregado com sucesso. Conteúdo inicial:", fileContent);
-
-        conversationDetails = fileContent.split('\n')[0].trim();
-        conversationFullContent = fileContent.trim();
     } catch (error) {
         console.error(`❌ Erro ao carregar o arquivo: ${error.message}`);
         return res.status(500).json({ error: "Erro ao carregar o arquivo.", details: error.message });
     }
 
     try {
-        // Buscar nome do usuário no Firebase
-        console.log(`🔍 Buscando nome do usuário no Firebase para userId: ${userId}`);
         const userRef = db.ref(`usuarios/${userId}/nome`);
         const snapshot = await userRef.once('value');
 
@@ -80,45 +67,27 @@ app.get('/api/start', async (req, res) => {
         }
 
         const studentName = snapshot.val();
-        console.log(`✅ Nome do usuário recuperado do Firebase: ${studentName}`);
 
-        // Criar mensagem de contexto para o GPT-4
+        // Contexto para a IA
         const contextMessage = {
             role: "system",
             content: `
-                You will act as Samuel, a native American, friendly, and patient robot.
-                Your goal is to help the student to practice English conversation in a focused, cheerful, and motivating way.
-                The student's name is ${studentName}. Always address the student by their name in every response (e.g., "Hello ${studentName}!").
-                The student's English level is ${studentLevel}, and the current unit is ${studentUnit}.
-                The current lesson topic is: ${conversationDetails}.
-
-                Follow these guidelines:
-                - Use language appropriate for the student's level:
-                    - If the level is Level 1, it means that the student's English level in the CEFR is A1. Use short sentences (maximum of 3 per interaction), simple, clear, and direct. Do not be verbose.
-                    - If the level is Level 2, it means that the student's English level in the CEFR is A2. Use short sentences (maximum of 3 per interaction), keeping them simple and clear. Do not be verbose.
-                    - If the level is Level 3, it means that the student's English level in the CEFR is B1. Use short sentences (maximum of 4 per interaction). Avoid being verbose.
-                    - If the level is Level 4, it means that the student's English level in the CEFR is B2. Avoid being verbose.
-                - Always focus on the lesson topic.
-                - Encourage the student and provide helpful corrections.
-
-                Additional information about the lesson:
-                ${conversationFullContent}
+                You will act as Samuel, a friendly, native English-speaking robot.
+                The student's name is ${studentName}, their level is ${studentLevel}, and the current unit is ${studentUnit}.
+                The lesson topic is: ${conversationDetails}.
+                Your job is to guide the student through the lesson while encouraging and correcting them.
             `,
         };
 
-        // Salvar o contexto na memória do servidor
+        // Salva o contexto no histórico
         if (!conversations[userId]) {
-            conversations[userId] = [contextMessage]; // Salva o contexto inicial apenas uma vez.
-            console.log(`📝 Contexto inicial salvo para userId=${userId}:`, JSON.stringify(contextMessage));
-        } else {
-            console.log(`🔄 Contexto existente encontrado para userId=${userId}.`);
+            conversations[userId] = [contextMessage];
+            console.log(`📝 Contexto inicial salvo para userId=${userId}`);
         }
 
-        // Mensagem inicial para o aluno
         const initialMessage = `Hello ${studentName}! Today's topic is: ${conversationDetails}. I'm ready to help you at your ${studentLevel}, in ${studentUnit}. Shall we begin?`;
 
-        console.log(`💬 Mensagem inicial enviada ao aluno: ${initialMessage}`);
-
+        // Retorna o histórico com o contexto
         return res.json({
             response: initialMessage,
             studentInfo: {
@@ -130,8 +99,8 @@ app.get('/api/start', async (req, res) => {
             chatHistory: conversations[userId],
         });
     } catch (error) {
-        console.error(`❌ Erro inesperado ao recuperar dados do usuário: ${error.message}`);
-        return res.status(500).json({ error: "Erro interno ao recuperar dados do usuário.", details: error.message });
+        console.error(`❌ Erro inesperado ao configurar o contexto: ${error.message}`);
+        return res.status(500).json({ error: "Erro ao inicializar a conversa.", details: error.message });
     }
 });
 
