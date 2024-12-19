@@ -148,58 +148,59 @@
         }
 
         // Reconhecimento de voz
-        function setupSpeechRecognition() {
-            if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
-                alert("Speech recognition is not supported in this browser.");
-                speakButton.disabled = true;
-                return;
-            }
-
-            recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-            recognition.lang = "en-US";
-
-            recognition.onstart = () => {
-                speakButton.classList.add("listening");
-                speakButton.innerText = "Listening...";
-            };
-
-            recognition.onend = () => {
-                speakButton.classList.remove("listening");
-                speakButton.innerText = "Press to Speak";
-            };
-
-         recognition.onresult = async (event) => {
-    const userSpeech = event.results[0][0].transcript;
-    console.log("User speech:", userSpeech);
-
-    if (!userId) {
-        alert("User ID is missing. Please log in again.");
+function setupSpeechRecognition() {
+    if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
+        alert("Speech recognition is not supported in this browser.");
+        speakButton.disabled = true;
         return;
     }
 
-    try {
-        const response = await fetch('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ uid: userId, message: userSpeech, chatHistory }),
-        });
-        const data = await response.json();
+    recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = "en-US";
 
-        if (!data.response) {
-            console.error("Erro: Resposta da IA ausente.");
+    recognition.onstart = () => {
+        speakButton.classList.add("listening");
+        speakButton.innerText = "Listening...";
+    };
+
+    recognition.onend = () => {
+        speakButton.classList.remove("listening");
+        speakButton.innerText = "Press to Speak";
+    };
+
+    recognition.onresult = async (event) => {
+        const userSpeech = event.results[0][0].transcript;
+        console.log("User speech:", userSpeech);
+
+        if (!userId) {
+            alert("User ID is missing. Please log in again.");
             return;
         }
 
-        chatHistory = data.chatHistory; // Atualiza o histórico completo
-        messageElement.innerText = data.response;
-        speak(data.response); // Fala a resposta gerada
-    } catch (error) {
-        console.error("Error communicating with the server:", error);
-        messageElement.innerText = "Error communicating with the server.";
-    }
-}; // Fechamento do reconhecimento de voz
+        try {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uid: userId, message: userSpeech, chatHistory }),
+            });
+            const data = await response.json();
 
-    async function initializeConversation() {
+            if (!data.response) {
+                console.error("Erro: Resposta da IA ausente.");
+                return;
+            }
+
+            chatHistory = data.chatHistory; // Atualiza o histórico completo
+            messageElement.innerText = data.response;
+            speak(data.response); // Fala a resposta gerada
+        } catch (error) {
+            console.error("Error communicating with the server:", error);
+            messageElement.innerText = "Error communicating with the server.";
+        }
+    };
+}
+
+async function initializeConversation() {
     firebase.auth().onAuthStateChanged(async (user) => {
         if (user) {
             userId = user.uid;
