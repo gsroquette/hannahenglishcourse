@@ -165,6 +165,15 @@ app.post('/api/chat', async (req, res) => {
         return res.status(400).json({ response: "User ID and message are required." });
     }
 
+  // Reforce o contexto inicial
+    if (!conversations[userId]) {
+        console.warn(`Histórico não encontrado para o usuário ${userId}. Criando novo histórico.`);
+        conversations[userId] = [contextMessage];
+    } else if (!conversations[userId].some(msg => msg.role === "system")) {
+        console.warn("Contexto inicial ausente. Reforçando o contexto no histórico.");
+        conversations[userId].unshift(contextMessage);
+    }
+
     try {
         // Garantir que a conversa esteja inicializada
       if (!conversations[userId]) {
