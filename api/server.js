@@ -117,41 +117,35 @@ app.post('/api/chat', async (req, res) => {
     }
 
     try {
-        // Verificar se o histórico existe para o usuário
+        // Inicializa o contexto se não existir
         if (!conversations[userId]) {
-            console.warn(`⚠️ Histórico não encontrado para o usuário ${userId}. Inicializando contexto padrão.`);
-            return res.status(400).json({ response: "Context not initialized. Please restart the conversation." });
+            console.warn(`⚠️ Contexto não encontrado para userId=${userId}. Inicializando...`);
+            const contextMessage = {
+                role: "system",
+                content: `
+                    You are Samuel, a native, friendly, and patient English teacher.
+                    Guide the student through today's lesson and keep the conversation focused on the topic.
+                `,
+            };
+            conversations[userId] = [contextMessage];
         }
 
-        // Adicionar a mensagem do usuário ao histórico
+        // Adiciona a mensagem do usuário ao histórico
         conversations[userId].push({ role: 'user', content: userMessage });
-        console.log("📨 Mensagem do usuário adicionada ao histórico:", userMessage);
 
-        // Chamada para a API OpenAI
-        console.log("🔄 Enviando histórico atualizado para a API OpenAI...");
+        // Chama a OpenAI com o histórico atualizado
         const completion = await openai.createChatCompletion({
             model: 'gpt-4',
             messages: conversations[userId],
         });
 
-        // Processar resposta da OpenAI
         const responseMessage = completion.data.choices[0].message.content;
-        console.log("✅ Resposta gerada pela OpenAI:", responseMessage);
-
-        // Adicionar a resposta ao histórico
         conversations[userId].push({ role: 'assistant', content: responseMessage });
-        console.log("💬 Resposta da IA adicionada ao histórico:", responseMessage);
 
-        // Responder ao cliente
         res.json({ response: responseMessage, chatHistory: conversations[userId] });
     } catch (error) {
-        console.error(`❌ Erro durante a interação com a API OpenAI para userId=${userId}:`, error.response ? error.response.data : error.message);
-
-        // Retornar erro ao cliente
-        res.status(500).json({
-            response: "Erro ao processar a mensagem.",
-            details: error.response ? error.response.data : error.message,
-        });
+        console.error("❌ Erro durante a interação com a IA:", error.message);
+        res.status(500).json({ response: "Erro ao processar a mensagem.", details: error.message });
     }
 });
 
