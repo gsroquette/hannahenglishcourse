@@ -125,6 +125,12 @@ Additional information about the lesson:
 
         conversations[userId] = [contextMessage];
 
+// Adicione o lembrete sobre o nome
+conversations[userId].push({
+    role: "user",
+    content: `Remember, my name is ${studentName}.`
+});
+
 // Adicionando logs para depurar
 console.log("ContextMessage gerado:", contextMessage);
 console.log("Contexto salvo em conversations:", conversations[userId]);
