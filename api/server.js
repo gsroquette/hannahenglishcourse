@@ -49,6 +49,7 @@ app.get('/api/start', async (req, res) => {
         // Log para verificar o caminho do arquivo
         const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataIA', 'conversa.txt');
         console.log("Attempting to load file:", filePath);
+        console.log("Tentando carregar o arquivo em:", filePath);
 
         if (fs.existsSync(filePath)) {
             const fileContent = fs.readFileSync(filePath, 'utf-8');
