@@ -165,7 +165,7 @@ app.post('/api/chat', async (req, res) => {
         return res.status(400).json({ response: "User ID and message are required." });
     }
 
-  // Reforce o contexto inicial
+    // Reforce o contexto inicial, se necessário
     if (!conversations[userId]) {
         console.warn(`Histórico não encontrado para o usuário ${userId}. Criando novo histórico.`);
         conversations[userId] = [contextMessage];
@@ -175,13 +175,34 @@ app.post('/api/chat', async (req, res) => {
     }
 
     try {
-        // Garantir que a conversa esteja inicializada
-      if (!conversations[userId]) {
-    console.warn(`Histórico não encontrado para o usuário ${userId}. Inicializando com contexto padrão.`);
-    conversations[userId] = [{ role: 'system', content: "Conversation initialized." }];
-} else {
-    console.log(`Histórico encontrado para o usuário ${userId}:`, conversations[userId]);
-}
+        // Atualizar histórico da conversa com a mensagem do usuário
+        conversations[userId].push({ role: 'user', content: userMessage });
+        console.log("Histórico atualizado para envio ao OpenAI:", conversations[userId]);
+
+        // Gera resposta da IA
+        const completion = await openai.createChatCompletion({
+            model: 'gpt-4',
+            messages: conversations[userId],
+        });
+
+        // Validar a resposta da IA
+        if (!completion.data || !completion.data.choices || !completion.data.choices[0]) {
+            console.error("Resposta inválida da API OpenAI:", completion);
+            return res.status(500).json({ response: "Error processing the OpenAI response." });
+        }
+
+        const responseMessage = completion.data.choices[0].message.content;
+
+        // Adicionar a resposta da IA ao histórico
+        conversations[userId].push({ role: 'assistant', content: responseMessage });
+
+        // Retornar a resposta ao cliente
+        res.json({ response: responseMessage, chatHistory: conversations[userId] });
+    } catch (error) {
+        console.error("Erro na API OpenAI ou no servidor:", error);
+        res.status(500).json({ error: "Internal Server Error", details: error.message });
+    }
+});
 
         // Atualizar histórico da conversa
         conversations[userId].push({ role: 'user', content: userMessage });
@@ -192,6 +213,12 @@ app.post('/api/chat', async (req, res) => {
             model: 'gpt-4',
             messages: conversations[userId],
         });
+
+// Valide se a resposta é válida
+if (!completion.data || !completion.data.choices || !completion.data.choices[0]) {
+    console.error("Resposta inválida da API OpenAI:", completion);
+    return res.status(500).json({ response: "Error processing the OpenAI response." });
+}
 
         const responseMessage = completion.data.choices[0].message.content;
 
