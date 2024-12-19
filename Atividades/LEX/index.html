@@ -59,10 +59,10 @@
 </head>
 <body>
     <h1>Talk to Robot Samuel</h1>
-<img id="robot-img" src="../../imagens/robo1_static.png" alt="Robot">
-<p id="message" style="visibility: hidden;"></p> <!-- Mensagem inicial oculta -->
-<button id="speak-button">Press to Start</button>
-<button id="back-button">Back</button>
+    <img id="robot-img" src="../../imagens/robo1_static.png" alt="Robot">
+    <p id="message" style="visibility: hidden;">Loading...</p>
+    <button id="speak-button">Press to Start</button>
+    <button id="back-button">Back</button>
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
@@ -123,29 +123,29 @@
             robotImg.src = ROBOT_STATIC;
         }
 
-       // Função para exibir e falar o texto
-function speak(text, rate = 0.8) {
-    const synth = window.speechSynthesis;
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "en-US";
-    utterance.rate = rate;
+        // Síntese de voz
+        function speak(text, rate = 0.8) {
+            const synth = window.speechSynthesis;
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = "en-US";
+            utterance.rate = rate;
 
-    utterance.onstart = () => {
-        isSpeaking = true;
-        messageElement.style.visibility = "visible"; // Exibir mensagem ao falar
-        messageElement.innerText = text; // Atualizar o texto da mensagem
-        speakButton.disabled = true; // Desabilitar o botão enquanto fala
-        speakButton.innerText = "Robot is speaking...";
-    };
+            utterance.onstart = () => {
+                isSpeaking = true;
+                resetStaticTimer();
+                robotImg.src = ROBOT_GIF;
+                speakButton.disabled = true;
+                speakButton.innerText = "Robot is speaking...";
+            };
+            utterance.onend = () => {
+                isSpeaking = false;
+                robotImg.src = ROBOT_STATIC;
+                speakButton.disabled = false;
+                speakButton.innerText = "Press to Speak";
+            };
 
-    utterance.onend = () => {
-        isSpeaking = false;
-        speakButton.disabled = false; // Reabilitar o botão após falar
-        speakButton.innerText = "Press to Speak";
-    };
-
-    synth.speak(utterance);
-}
+            synth.speak(utterance);
+        }
 
         // Reconhecimento de voz
         function setupSpeechRecognition() {
@@ -194,67 +194,52 @@ function speak(text, rate = 0.8) {
             };
         }
 
-       async function initializeConversation() {
+        async function initializeConversation() {
     firebase.auth().onAuthStateChanged(async (user) => {
         if (user) {
             userId = user.uid; // Captura o UID do usuário autenticado
-            console.log("✅ User authenticated. User ID:", userId); // Log para verificar autenticação
+            console.log("User authenticated. User ID:", userId); // Verificação no console
 
             // Captura os parâmetros da URL
             const urlParams = new URLSearchParams(window.location.search);
             const level = urlParams.get('level') || 'Level1';
             const unit = urlParams.get('unit') || 'Unit1';
 
-            console.log(`📤 Enviando para /api/start com userId=${userId}, level=${level}, unit=${unit}`); // Log para depuração
+ console.log("Sending to /api/start:", { uid: userId, level, unit }); // Log completo
 
             try {
-                // Desativar o botão até a inicialização completar
-                speakButton.disabled = true;
-                speakButton.innerText = "Initializing conversation...";
-
                 // Chama o servidor enviando o UID e parâmetros da URL
-                const response = await fetch(`/api/start?uid=${userId}&level=${level}&unit=${unit}`);
-
-                if (!response.ok) {
-                    throw new Error(`Erro do servidor: ${response.status} ${response.statusText}`);
-                }
+               console.log("Sending to /api/start:", { uid: userId, level, unit }); // Log completo
+               console.log(`Calling /api/start with userId=${userId}, level=${level}, unit=${unit}`);
+               const response = await fetch(`/api/start?uid=${userId}&level=${level}&unit=${unit}`);
+                
+                if (!response.ok) throw new Error("Failed to initialize conversation.");
 
                 const data = await response.json();
-                console.log("✅ Resposta do servidor recebida:", data); // Log para depuração
+                console.log("Server Response:", data); // Verificar a resposta do servidor
+                console.log("Conversation initialized. API Response:", data); // Log para depuração
 
                 chatHistory = data.chatHistory; // Histórico inicial da conversa
-                messageElement.style.visibility = "hidden"; // Esconde a mensagem inicial até o clique
+                messageElement.style.visibility = "visible";
                 messageElement.innerText = data.response;
 
-                // Configurar ação do botão de fala
                 speakButton.addEventListener("click", () => {
                     if (speakButton.innerText === "Press to Start") {
-                        messageElement.style.visibility = "visible"; // Mostra a mensagem inicial
                         speak(data.response); // Fala a mensagem inicial
                         speakButton.innerText = "Press to Speak";
                     } else {
                         recognition.start(); // Inicia o reconhecimento de voz
                     }
                 });
-
-                // Reativar o botão após inicialização
-                speakButton.disabled = false;
-                speakButton.innerText = "Press to Start";
-
             } catch (error) {
-                console.error("❌ Erro durante a inicialização da conversa:", error);
-
-                // Exibir mensagem de erro ao usuário
+                console.error("Error initializing conversation:", error);
+                messageElement.innerText = "Error initializing conversation. Try again.";
                 messageElement.style.visibility = "visible";
-                messageElement.innerText = "Error initializing conversation. Please try again.";
-                speakButton.disabled = false;
-                speakButton.innerText = "Press to Start";
             }
         } else {
-            console.warn("⚠️ Usuário não está logado.");
-            messageElement.style.visibility = "visible";
+            console.warn("User is not logged in.");
             messageElement.innerText = "Please log in to start the conversation.";
-            speakButton.disabled = true; // Desativar o botão se o usuário não está logado
+            messageElement.style.visibility = "visible";
         }
     });
 }
