@@ -69,7 +69,7 @@ app.get('/api/start', async (req, res) => {
 console.log("Buscando nome do usuário no Firebase para userId:", userId);
 console.log("Received request with:", { userId, studentLevel, studentUnit });
 
-        const userRef = db.ref(usuarios/${userId}/nome);
+        const userRef = db.ref(`usuarios/${userId}/nome`);
 console.log("Searching Firebase path:", usuarios/${userId}/nome);
         const snapshot = await userRef.once('value');
 console.log("Firebase Snapshot:", snapshot.exists() ? snapshot.val() : "Not Found");
@@ -90,7 +90,7 @@ console.log("Valor do snapshot:", snapshot.val());
         // Criar mensagem de contexto
         const contextMessage = {
             role: "system",
-             content: 
+             content: ` 
          You will act as Samuel, a native American, friendly, and patient robot. Your goal is to help the student to practice English conversation in a focused, cheerful, and motivating way. The student's name is ${studentName}. Always address the student by their name in every response (e.g., "Hello Carla!"). The student's English level is ${studentLevel} and the current unit is ${studentUnit}, and the current lesson topic is: ${conversationDetails}.
 
         Start the conversation by applying the lesson
@@ -131,7 +131,7 @@ Additional information about the lesson:
 console.log("ContextMessage gerado:", contextMessage);
 console.log("Contexto salvo em conversations:", conversations[userId]);
 
-        const initialMessage = Hello ${studentName}! Today's topic is: ${conversationDetails}. I'm ready to help you at your ${studentLevel}, in ${studentUnit}. Shall we begin?;
+        const initialMessage = `Hello ${studentName}! Today's topic is: ${conversationDetails}. I'm ready to help you at your ${studentLevel}, in ${studentUnit}. Shall we begin?`;
 
         console.log("Initial message:", initialMessage);
 
