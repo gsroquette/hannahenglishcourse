@@ -163,10 +163,41 @@
             synth.speak(utterance);
         }
 
-        // Reconhecimento de voz
+function preloadVoices() {
+    return new Promise((resolve) => {
+        const synth = window.speechSynthesis;
+        let voices = synth.getVoices();
+        if (voices.length) {
+            resolve(voices);
+            return;
+        }
+
+        const interval = setInterval(() => {
+            voices = synth.getVoices();
+            if (voices.length) {
+                clearInterval(interval);
+                resolve(voices);
+            }
+        }, 10);
+    });
+}
+
+window.onload = async () => {
+    await preloadVoices(); // Precarrega vozes no Safari
+    setupSpeechRecognition(); // Configura reconhecimento de voz
+    initializeConversation(); // Inicializa a conversa
+    startStaticImageTimer(); // Inicia timer de inatividade
+};
+
+       // Reconhecimento de voz
 function setupSpeechRecognition() {
+ if (!navigator.permissions) {
+        alert("Please ensure microphone and speech permissions are enabled for this site.");
+    }
+
+    // Verifica se o navegador suporta reconhecimento de voz
     if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
-        alert("Speech recognition is not supported in this browser.");
+        alert("Speech recognition is not supported in this browser or device. Please use Chrome or a compatible browser.");
         speakButton.disabled = true;
         return;
     }
@@ -184,13 +215,22 @@ function setupSpeechRecognition() {
         speakButton.innerText = "Press to Speak";
     };
 
+    recognition.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+        if (event.error === "not-allowed") {
+            alert("Microphone access is blocked. Please enable microphone permissions in your browser settings.");
+        } else {
+            alert(`Speech recognition error: ${event.error}`);
+        }
+    };
+
     recognition.onresult = async (event) => {
         const userSpeech = event.results[0][0].transcript;
         console.log("User speech:", userSpeech);
 
- // Exibe o texto capturado da fala do usuário no elemento de mensagem
-    messageElement.style.visibility = "visible";
-    messageElement.innerText = `You said: "${userSpeech}"`; // Exibe a fala capturada
+        // Exibe o texto capturado da fala do usuário
+        messageElement.style.visibility = "visible";
+        messageElement.innerText = `You said: "${userSpeech}"`;
 
         if (!userId) {
             alert("User ID is missing. Please log in again.");
@@ -206,7 +246,7 @@ function setupSpeechRecognition() {
             const data = await response.json();
 
             if (!data.response) {
-                console.error("Erro: Resposta da IA ausente.");
+                console.error("Error: Missing response from server.");
                 return;
             }
 
@@ -218,6 +258,21 @@ function setupSpeechRecognition() {
             messageElement.innerText = "Error communicating with the server.";
         }
     };
+
+    // Verifica se o idioma está configurado corretamente
+    if (!recognition.lang || recognition.lang !== "en-US") {
+        alert("Speech recognition requires English (US) language support. Please configure your device settings.");
+    }
+
+    // Solicita permissão explícita para o microfone
+    navigator.mediaDevices.getUserMedia({ audio: true })
+        .then((stream) => {
+            console.log("Microphone access granted.");
+        })
+        .catch((error) => {
+            console.error("Microphone access denied:", error);
+            alert("Please allow microphone access for speech recognition to work.");
+        });
 }
 
 async function initializeConversation() {
