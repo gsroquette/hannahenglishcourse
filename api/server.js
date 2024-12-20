@@ -168,9 +168,32 @@ app.post('/api/chat', async (req, res) => {
                 console.log(`✅ Nome do usuário recuperado do Firebase para userId=${userId}: ${studentName}`);
             }
 
+            // Definições padrão de nível, unidade e conteúdo
             const studentLevel = "Level1"; // Nível genérico
             const studentUnit = "Unit1";  // Unidade genérica
-            const conversationDetails = "General conversation"; // Tópico genérico
+            let conversationDetails = "General conversation"; // Tópico genérico
+            let conversationFullContent = ""; // Conteúdo genérico
+
+            // Carrega informações adicionais do arquivo conversa.txt
+            try {
+                const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataA', 'conversa.txt');
+                console.log(`🔍 Tentando carregar o arquivo de conversa: ${filePath}`);
+
+                if (!fs.existsSync(filePath)) {
+                    console.warn(`⚠️ Arquivo não encontrado no caminho: ${filePath}. Usando tópico genérico.`);
+                } else {
+                    const fileContent = fs.readFileSync(filePath, 'utf-8').trim();
+                    if (!fileContent) {
+                        console.error("❌ O arquivo conversa.txt está vazio. Usando tópico genérico.");
+                    } else {
+                        conversationDetails = fileContent.split('\n')[0].trim(); // Primeira linha como tópico
+                        conversationFullContent = fileContent; // Conteúdo completo
+                        console.log(`✅ Arquivo carregado com sucesso. Tópico: "${conversationDetails}"`);
+                    }
+                }
+            } catch (error) {
+                console.error(`❌ Erro ao carregar o arquivo conversa.txt: ${error.message}. Usando tópico genérico.`);
+            }
 
             // Cria o contexto inicial com os dados
             const contextMessage = {
@@ -192,7 +215,9 @@ Focus on the topic and keep it engaging:
 - Praise correct answers and offer constructive feedback on mistakes.
 
 Maintain a positive, light, and productive learning tone.
-                  
+
+Additional information about the lesson:
+${conversationFullContent}
                 `,
             };
             conversations[userId] = [contextMessage];
