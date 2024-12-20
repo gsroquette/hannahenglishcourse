@@ -211,17 +211,16 @@ window.onload = async () => {
 };
 
 // Reconhecimento de voz
-function setupSpeechRecognition() {
+async function setupSpeechRecognition() {
     // Solicita permissão explícita para o microfone antes de configurar o reconhecimento
-    navigator.mediaDevices.getUserMedia({ audio: true })
-        .then((stream) => {
-            console.log("Microphone access granted.");
-        })
-        .catch((error) => {
-            console.error("Microphone access denied:", error);
-            alert("Please allow microphone access for speech recognition to work.");
-            return;
-        });
+    try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+        console.log("Microphone access granted.");
+    } catch (error) {
+        console.error("Microphone access denied:", error);
+        alert("Please allow microphone access for speech recognition to work.");
+        return; // Interrompe a execução se o microfone não for permitido
+    }
 
     // Verifica se o navegador suporta reconhecimento de voz
     if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
@@ -230,18 +229,17 @@ function setupSpeechRecognition() {
         return;
     }
 
+    // Evita múltiplas instâncias de recognition
+    if (recognition) {
+        recognition.abort();
+        recognition = null;
+    }
+
     recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
 
-    // Tenta configurar o idioma, com fallback
-    const supportedLanguages = ["en-US", "en-GB", "en"]; // Lista de idiomas aceitos
-    recognition.lang = supportedLanguages.find(lang => {
-        try {
-            recognition.lang = lang;
-            return true;
-        } catch (e) {
-            return false;
-        }
-    }) || "en-US"; // Fallback para "en-US"
+    // Configura o idioma com fallback
+    const supportedLanguages = ["en-US", "en-GB", "en"];
+    recognition.lang = supportedLanguages.find(lang => lang === "en-US") || "en-US";
 
     recognition.onstart = () => {
         speakButton.classList.add("listening");
@@ -259,6 +257,8 @@ function setupSpeechRecognition() {
             alert("Microphone access is blocked. Please enable microphone permissions in your browser settings.");
         } else if (event.error === "no-speech") {
             alert("No speech detected. Please try again.");
+        } else if (event.error === "service-not-allowed") {
+            alert("Speech recognition is not allowed on this browser or device. Please check your settings or try a different browser.");
         } else {
             alert(`Speech recognition error: ${event.error}`);
         }
