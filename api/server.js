@@ -74,14 +74,17 @@ app.get('/api/start', async (req, res) => {
     try {
         // Carrega informações adicionais do arquivo
         const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataIA', 'conversa.txt');
-        if (!fs.existsSync(filePath)) {
-            console.warn(`⚠️ Arquivo não encontrado: ${filePath}`);
-            console.error(`❌ Arquivo não encontrado: ${filePath}`);
-            return res.status(404).json({ error: "Data file not found for the conversation. Please verify the path." });
+        if (fs.existsSync(filePath)) {
+            const fileContent = fs.readFileSync(filePath, 'utf-8').trim();
+            if (fileContent) {
+                conversationDetails = fileContent.split('\n')[0].trim(); // Primeira linha como tópico
+                conversationFullContent = fileContent; // Conteúdo completo
+            } else {
+                console.warn("⚠️ O arquivo conversa.txt está vazio. Usando valores padrão.");
+            }
+        } else {
+            console.warn(`⚠️ Arquivo não encontrado: ${filePath}. Usando valores padrão.`);
         }
-        const fileContent = fs.readFileSync(filePath, 'utf-8');
-        conversationDetails = fileContent.split('\n')[0].trim(); // Primeira linha como tópico
-        conversationFullContent = fileContent.trim(); // Conteúdo completo
     } catch (error) {
         console.error(`❌ Erro ao carregar o arquivo: ${error.message}`);
         return res.status(500).json({ error: "Erro ao carregar o arquivo.", details: error.message });
@@ -94,7 +97,7 @@ app.get('/api/start', async (req, res) => {
 
         if (!snapshot.exists()) {
             console.error(`❌ Usuário não encontrado no Firebase para userId=${userId}.`);
-            return res.status(404).json({ error: "Usuário não encontrado." });
+            return res.status(404).json({ error: "Usuário não encontrado no banco de dados." });
         }
 
         const studentName = snapshot.val();
@@ -135,7 +138,7 @@ app.get('/api/start', async (req, res) => {
             chatHistory: conversations[userId],
         });
     } catch (error) {
-        console.error(`❌ Erro ao configurar o contexto para userId=${userId}:`, error);
+        console.error(`❌ Erro ao configurar o contexto para userId=${userId}:`, error.message);
         return res.status(500).json({ error: "Erro ao inicializar a conversa.", details: error.message });
     }
 });
