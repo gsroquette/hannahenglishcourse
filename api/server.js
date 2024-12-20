@@ -29,6 +29,19 @@ const openai = new OpenAIApi(configuration);
 // Armazena o histórico das conversas na memória do servidor
 const conversations = {};
 
+// Função para criar o contexto inicial
+function createInitialContext(studentName, studentLevel, studentUnit, conversationDetails) {
+    return {
+        role: "system",
+        content: `
+            You are Samuel, a native, friendly, and patient English teacher.
+            Guide ${studentName}, who is currently at ${studentLevel} studying ${studentUnit}.
+            The focus of today's conversation is "${conversationDetails}".
+            Keep the interaction engaging and educational.
+        `,
+    };
+}
+
 // Rota para iniciar a conversa
 app.get('/api/start', async (req, res) => {
     const userId = req.query.uid;
