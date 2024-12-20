@@ -264,41 +264,47 @@ async function setupSpeechRecognition() {
         }
     };
 
-    recognition.onresult = async (event) => {
-        const userSpeech = event.results[0][0].transcript;
-        console.log("User speech:", userSpeech);
+   recognition.onresult = async (event) => {
+    const userSpeech = event.results[0][0].transcript;
+    console.log("User speech:", userSpeech);
 
-        // Exibe o texto capturado da fala do usuário
-        messageElement.style.visibility = "visible";
-        messageElement.innerText = `You said: "${userSpeech}"`;
+    // Exibe o texto capturado da fala do usuário
+    messageElement.style.visibility = "visible";
+    messageElement.innerText = `You said: "${userSpeech}"`;
 
-        if (!userId) {
-            alert("User ID is missing. Please log in again.");
+    if (!userId) {
+        alert("User ID is missing. Please log in again.");
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uid: userId, message: userSpeech, chatHistory }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error("Erro do servidor:", errorData);
+            messageElement.innerText = `Server error: ${errorData.details || "Unexpected error"}`;
             return;
         }
 
-        try {
-            const response = await fetch('/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ uid: userId, message: userSpeech, chatHistory }),
-            });
-            const data = await response.json();
-
-            if (!data.response) {
-                console.error("Error: Missing response from server.");
-                return;
-            }
-
-            chatHistory = data.chatHistory; // Atualiza o histórico completo
-            messageElement.innerText = data.response;
-            speak(data.response); // Fala a resposta gerada
-        } catch (error) {
-            console.error("Error communicating with the server:", error);
-            messageElement.innerText = "Error communicating with the server.";
+        const data = await response.json();
+        if (!data.response) {
+            console.error("Resposta ausente do servidor.");
+            return;
         }
-    };
-}
+
+        chatHistory = data.chatHistory; // Atualiza o histórico completo
+        messageElement.innerText = data.response;
+        speak(data.response); // Fala a resposta gerada
+    } catch (error) {
+        console.error("Erro ao se comunicar com o servidor:", error);
+        messageElement.innerText = "Erro ao se comunicar com o servidor.";
+    }
+};
 
 async function initializeConversation() {
     firebase.auth().onAuthStateChanged(async (user) => {
