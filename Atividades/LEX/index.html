@@ -323,53 +323,62 @@ async function setupSpeechRecognition() {
     };
 }
 
-async function initializeConversation() {
-    firebase.auth().onAuthStateChanged(async (user) => {
-        if (user) {
-            userId = user.uid;
-            console.log("User authenticated. User ID:", userId);
+ async function initializeConversation() {
+        firebase.auth().onAuthStateChanged(async (user) => {
+            if (user) {
+                userId = user.uid;
+                console.log("User authenticated. User ID:", userId);
 
-            const urlParams = new URLSearchParams(window.location.search);
-            const level = urlParams.get('level') || 'Level1';
-            const unit = urlParams.get('unit') || 'Unit1';
+                const urlParams = new URLSearchParams(window.location.search);
+                const level = urlParams.get('level') || 'Level1';
+                const unit = urlParams.get('unit') || 'Unit1';
 
-            try {
-                const response = await fetch(`/api/start?uid=${userId}&level=${level}&unit=${unit}`);
-                if (!response.ok) throw new Error("Failed to initialize conversation.");
+                try {
+                    const response = await fetch(`/api/start?uid=${userId}&level=${level}&unit=${unit}`);
+                    if (!response.ok) throw new Error("Failed to initialize conversation.");
 
-                const data = await response.json();
-                console.log("Server Response:", data);
+                    const data = await response.json();
+                    console.log("Server Response:", data);
 
-                chatHistory = data.chatHistory || [];
-                messageElement.innerText = data.response;
+                    chatHistory = data.chatHistory || [];
+                    messageElement.innerText = data.response;
 
-                messageElement.style.visibility = "hidden"; // Mensagem inicial será exibida após o clique
-if (!speakButton.hasAttribute('data-initialized')) {
-    speakButton.setAttribute('data-initialized', 'true');
+                    messageElement.style.visibility = "hidden"; // Mensagem inicial será exibida após o clique
 
-    speakButton.addEventListener("click", () => {
-        if (speakButton.innerText === "Press to Start") {
-            messageElement.style.visibility = "visible";
-            speak(chatHistory[0]?.content || "Let's start the conversation!");
-            speakButton.innerText = "Press to Speak";
-        } else {
-            try {
-                recognition.start();
-            } catch (error) {
-                console.error("Erro ao iniciar o reconhecimento de voz:", error);
-                messageElement.innerText = "Erro ao iniciar o reconhecimento de voz.";
+                    if (!speakButton.hasAttribute('data-initialized')) {
+                        speakButton.setAttribute('data-initialized', 'true');
+
+                        speakButton.addEventListener("click", () => {
+                            if (speakButton.innerText === "Press to Start") {
+                                messageElement.style.visibility = "visible";
+                                speak(chatHistory[0]?.content || "Let's start the conversation!");
+                                speakButton.innerText = "Press to Speak";
+                            } else {
+                                try {
+                                    recognition.start();
+                                } catch (error) {
+                                    console.error("Erro ao iniciar o reconhecimento de voz:", error);
+                                    messageElement.innerText = "Erro ao iniciar o reconhecimento de voz.";
+                                }
+                            }
+                        });
+                    }
+                } catch (error) {
+                    console.error("Error initializing conversation:", error);
+                    messageElement.innerText = "An unexpected error occurred. Try again later.";
+                }
+            } else {
+                console.warn("User is not logged in.");
+                messageElement.innerText = "Please log in to start the conversation.";
+                messageElement.style.visibility = "visible";
             }
-        }
-    });
-}
+        });
+    }
 
-// Configuração inicial quando a página carrega
-document.addEventListener("visibilitychange", () => {
-    if (document.hidden) window.speechSynthesis.cancel(); // Cancela a fala se a aba for minimizada
-});
-    </script>
+    // Configuração inicial quando a página carrega
+    document.addEventListener("visibilitychange", () => {
+        if (document.hidden) window.speechSynthesis.cancel(); // Cancela a fala se a aba for minimizada
+    });
+</script>
 </body>
 </html>
-
-
-           
