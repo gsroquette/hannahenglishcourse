@@ -74,17 +74,14 @@ app.get('/api/start', async (req, res) => {
     try {
         // Carrega informações adicionais do arquivo
         const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataIA', 'conversa.txt');
-        if (fs.existsSync(filePath)) {
-            const fileContent = fs.readFileSync(filePath, 'utf-8').trim();
-            if (fileContent) {
-                conversationDetails = fileContent.split('\n')[0].trim(); // Primeira linha como tópico
-                conversationFullContent = fileContent; // Conteúdo completo
-            } else {
-                console.warn("⚠️ O arquivo conversa.txt está vazio. Usando valores padrão.");
-            }
-        } else {
-            console.warn(`⚠️ Arquivo não encontrado: ${filePath}. Usando valores padrão.`);
+        if (!fs.existsSync(filePath)) {
+            console.warn(`⚠️ Arquivo não encontrado: ${filePath}`);
+            console.error(`❌ Arquivo não encontrado: ${filePath}`);
+            return res.status(404).json({ error: "Data file not found for the conversation. Please verify the path." });
         }
+        const fileContent = fs.readFileSync(filePath, 'utf-8');
+        conversationDetails = fileContent.split('\n')[0].trim(); // Primeira linha como tópico
+        conversationFullContent = fileContent.trim(); // Conteúdo completo
     } catch (error) {
         console.error(`❌ Erro ao carregar o arquivo: ${error.message}`);
         return res.status(500).json({ error: "Erro ao carregar o arquivo.", details: error.message });
@@ -97,7 +94,7 @@ app.get('/api/start', async (req, res) => {
 
         if (!snapshot.exists()) {
             console.error(`❌ Usuário não encontrado no Firebase para userId=${userId}.`);
-            return res.status(404).json({ error: "Usuário não encontrado no banco de dados." });
+            return res.status(404).json({ error: "Usuário não encontrado." });
         }
 
         const studentName = snapshot.val();
@@ -138,7 +135,7 @@ app.get('/api/start', async (req, res) => {
             chatHistory: conversations[userId],
         });
     } catch (error) {
-        console.error(`❌ Erro ao configurar o contexto para userId=${userId}:`, error.message);
+        console.error(`❌ Erro ao configurar o contexto para userId=${userId}:`, error);
         return res.status(500).json({ error: "Erro ao inicializar a conversa.", details: error.message });
     }
 });
@@ -178,26 +175,27 @@ app.post('/api/chat', async (req, res) => {
             let conversationFullContent = ""; // Conteúdo genérico
 
             // Carrega informações adicionais do arquivo conversa.txt
-            try {
-                const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataIA', 'conversa.txt');
-                console.log(`🔍 Tentando carregar o arquivo de conversa: ${filePath}`);
+          try {
+    // Define o caminho dinâmico para o arquivo conversa.txt
+    const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataIA', 'conversa.txt');
+    console.log(`🔍 Tentando carregar o arquivo de conversa: ${filePath}`);
 
-                if (!fs.existsSync(filePath)) {
-                    console.warn(`⚠️ Arquivo não encontrado no caminho: ${filePath}. Usando tópico genérico.`);
-                } else {
-                    const fileContent = fs.readFileSync(filePath, 'utf-8').trim();
-                    if (!fileContent) {
-                        console.error("❌ O arquivo conversa.txt está vazio. Usando tópico genérico.");
-                    } else {
-                        // Define o tópico e conteúdo completo do arquivo
-                        conversationDetails = fileContent.split('\n')[0].trim(); // Primeira linha como tópico
-                        conversationFullContent = fileContent; // Conteúdo completo
-                        console.log(`✅ Arquivo carregado com sucesso. Tópico: "${conversationDetails}"`);
-                    }
-                }
-            } catch (error) {
-                console.error(`❌ Erro ao carregar o arquivo conversa.txt: ${error.message}. Usando tópico genérico.`);
-            }
+    if (!fs.existsSync(filePath)) {
+        console.warn(`⚠️ Arquivo não encontrado no caminho: ${filePath}. Usando tópico genérico.`);
+    } else {
+        const fileContent = fs.readFileSync(filePath, 'utf-8').trim();
+        if (!fileContent) {
+            console.error("❌ O arquivo conversa.txt está vazio. Usando tópico genérico.");
+        } else {
+            // Define o tópico e conteúdo completo do arquivo
+            conversationDetails = fileContent.split('\n')[0].trim(); // Primeira linha como tópico
+            conversationFullContent = fileContent; // Conteúdo completo
+            console.log(`✅ Arquivo carregado com sucesso. Tópico: "${conversationDetails}"`);
+        }
+    }
+} catch (error) {
+    console.error(`❌ Erro ao carregar o arquivo conversa.txt: ${error.message}. Usando tópico genérico.`);
+}
 
             // Cria o contexto inicial com os dados
             const contextMessage = {
@@ -238,16 +236,11 @@ ${conversationFullContent}
 
         // Chama a OpenAI com o histórico atualizado
         const completion = await openai.createChatCompletion({
-            model: 'gpt-4o-latest',
-            messages: conversations[userId],
-        });
+    model: 'gpt-4o', // Alterar para GPT-4o
+    messages: conversations[userId],
+});
 
-        // Verifica a resposta da OpenAI
-        const responseMessage = completion?.data?.choices?.[0]?.message?.content;
-        if (!responseMessage) {
-            console.error("❌ Resposta vazia da IA.");
-            return res.status(500).json({ response: "Erro ao gerar a resposta da IA." });
-        }
+        const responseMessage = completion.data.choices[0].message.content;
 
         // Adiciona a resposta da IA ao histórico
         conversations[userId].push({ role: 'assistant', content: responseMessage });
@@ -255,7 +248,7 @@ ${conversationFullContent}
         // Retorna a resposta e o histórico atualizado
         res.json({ response: responseMessage, chatHistory: conversations[userId] });
     } catch (error) {
-        console.error(`❌ Erro durante a interação com a IA para userId=${userId}:`, error.message);
+        console.error(`❌ Erro durante a interação com a IA para userId=${userId}:`, error.message, error.stack);
         res.status(500).json({ response: "Erro ao processar a mensagem.", details: error.message });
     }
 });
