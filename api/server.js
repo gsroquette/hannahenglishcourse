@@ -67,8 +67,8 @@ app.get('/api/start', async (req, res) => {
             return res.status(404).json({ error: "Data file not found for the conversation. Please verify the path." });
         }
         const fileContent = fs.readFileSync(filePath, 'utf-8');
-        conversationDetails = fileContent.split('\n')[0].trim();
-        conversationFullContent = fileContent.trim();
+        conversationDetails = fileContent.split('\n')[0].trim(); // Primeira linha como tópico
+        conversationFullContent = fileContent.trim(); // Conteúdo completo
     } catch (error) {
         console.error(`❌ Erro ao carregar o arquivo: ${error.message}`);
         return res.status(500).json({ error: "Erro ao carregar o arquivo.", details: error.message });
@@ -86,7 +86,7 @@ app.get('/api/start', async (req, res) => {
 
         const studentName = snapshot.val();
 
-        // Cria o contexto inicial usando uma função
+        // Cria o contexto inicial usando a função
         const contextMessage = createInitialContext(studentName, studentLevel, studentUnit, conversationDetails);
 
         // Mensagem inicial
@@ -96,6 +96,7 @@ app.get('/api/start', async (req, res) => {
         if (!conversations[userId]) {
             // Caso o contexto não exista, inicialize-o
             conversations[userId] = [
+                { studentName, studentLevel, studentUnit }, // Salva detalhes do aluno
                 contextMessage,
                 { role: "assistant", content: initialMessage }, // Mensagem inicial como parte do histórico
             ];
@@ -145,13 +146,14 @@ app.post('/api/chat', async (req, res) => {
         if (!conversations[userId]) {
             console.warn(`⚠️ Contexto ausente para userId=${userId}. Criando um novo contexto.`);
 
-            // Configura valores padrão, caso necessário
-            const studentName = "Student"; // Valor genérico
-            const studentLevel = "Level1"; // Valor genérico
-            const studentUnit = "Unit1";  // Valor genérico
+            // Recupera os dados do aluno, se disponíveis
+            const userData = conversations[userId]?.[0] || {}; // Tenta obter os dados do aluno
+            const studentName = userData.studentName || "Student"; // Nome genérico se não existir
+            const studentLevel = userData.studentLevel || "Level1"; // Nível genérico
+            const studentUnit = userData.studentUnit || "Unit1";  // Unidade genérica
             const conversationDetails = "General conversation"; // Tópico genérico
 
-            // Cria o contexto inicial com o texto necessário
+            // Cria o contexto inicial com os dados
             const contextMessage = {
                 role: "system",
                 content: `
@@ -159,7 +161,6 @@ app.post('/api/chat', async (req, res) => {
                     Guide ${studentName}, who is currently at ${studentLevel} studying ${studentUnit}.
                     The focus of today's conversation is "${conversationDetails}".
                     Keep the interaction engaging and educational.
-                    Guide the student through today's lesson and keep the conversation focused on the topic.
                 `,
             };
             conversations[userId] = [contextMessage];
