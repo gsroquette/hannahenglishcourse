@@ -175,27 +175,26 @@ app.post('/api/chat', async (req, res) => {
             let conversationFullContent = ""; // Conteúdo genérico
 
             // Carrega informações adicionais do arquivo conversa.txt
-          try {
-    // Define o caminho dinâmico para o arquivo conversa.txt
-    const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataIA', 'conversa.txt');
-    console.log(`🔍 Tentando carregar o arquivo de conversa: ${filePath}`);
+            try {
+                const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataIA', 'conversa.txt');
+                console.log(`🔍 Tentando carregar o arquivo de conversa: ${filePath}`);
 
-    if (!fs.existsSync(filePath)) {
-        console.warn(`⚠️ Arquivo não encontrado no caminho: ${filePath}. Usando tópico genérico.`);
-    } else {
-        const fileContent = fs.readFileSync(filePath, 'utf-8').trim();
-        if (!fileContent) {
-            console.error("❌ O arquivo conversa.txt está vazio. Usando tópico genérico.");
-        } else {
-            // Define o tópico e conteúdo completo do arquivo
-            conversationDetails = fileContent.split('\n')[0].trim(); // Primeira linha como tópico
-            conversationFullContent = fileContent; // Conteúdo completo
-            console.log(`✅ Arquivo carregado com sucesso. Tópico: "${conversationDetails}"`);
-        }
-    }
-} catch (error) {
-    console.error(`❌ Erro ao carregar o arquivo conversa.txt: ${error.message}. Usando tópico genérico.`);
-}
+                if (!fs.existsSync(filePath)) {
+                    console.warn(`⚠️ Arquivo não encontrado no caminho: ${filePath}. Usando tópico genérico.`);
+                } else {
+                    const fileContent = fs.readFileSync(filePath, 'utf-8').trim();
+                    if (!fileContent) {
+                        console.error("❌ O arquivo conversa.txt está vazio. Usando tópico genérico.");
+                    } else {
+                        // Define o tópico e conteúdo completo do arquivo
+                        conversationDetails = fileContent.split('\n')[0].trim(); // Primeira linha como tópico
+                        conversationFullContent = fileContent; // Conteúdo completo
+                        console.log(`✅ Arquivo carregado com sucesso. Tópico: "${conversationDetails}"`);
+                    }
+                }
+            } catch (error) {
+                console.error(`❌ Erro ao carregar o arquivo conversa.txt: ${error.message}. Usando tópico genérico.`);
+            }
 
             // Cria o contexto inicial com os dados
             const contextMessage = {
@@ -236,11 +235,16 @@ ${conversationFullContent}
 
         // Chama a OpenAI com o histórico atualizado
         const completion = await openai.createChatCompletion({
-        model: 'gpt-4o-latest', 
-    messages: conversations[userId],
-});
+            model: 'gpt-4o-latest',
+            messages: conversations[userId],
+        });
 
-        const responseMessage = completion.data.choices[0].message.content;
+        // Verifica a resposta da OpenAI
+        const responseMessage = completion?.data?.choices?.[0]?.message?.content;
+        if (!responseMessage) {
+            console.error("❌ Resposta vazia da IA.");
+            return res.status(500).json({ response: "Erro ao gerar a resposta da IA." });
+        }
 
         // Adiciona a resposta da IA ao histórico
         conversations[userId].push({ role: 'assistant', content: responseMessage });
@@ -248,7 +252,7 @@ ${conversationFullContent}
         // Retorna a resposta e o histórico atualizado
         res.json({ response: responseMessage, chatHistory: conversations[userId] });
     } catch (error) {
-        console.error(`❌ Erro durante a interação com a IA para userId=${userId}:`, error.message, error.stack);
+        console.error(`❌ Erro durante a interação com a IA para userId=${userId}:`, error.message);
         res.status(500).json({ response: "Erro ao processar a mensagem.", details: error.message });
     }
 });

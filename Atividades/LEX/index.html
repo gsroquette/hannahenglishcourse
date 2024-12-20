@@ -210,14 +210,13 @@ window.onload = async () => {
     startStaticImageTimer(); // Inicia timer de inatividade
 };
 
-// Reconhecimento de voz
 async function setupSpeechRecognition() {
     // Solicita permissão explícita para o microfone antes de configurar o reconhecimento
     try {
         await navigator.mediaDevices.getUserMedia({ audio: true });
-        console.log("Microphone access granted.");
+        console.log("✅ Microphone access granted.");
     } catch (error) {
-        console.error("Microphone access denied:", error);
+        console.error("❌ Microphone access denied:", error);
         alert("Please allow microphone access for speech recognition to work.");
         return; // Interrompe a execução se o microfone não for permitido
     }
@@ -252,59 +251,77 @@ async function setupSpeechRecognition() {
     };
 
     recognition.onerror = (event) => {
-        console.error("Speech recognition error:", event.error);
-        if (event.error === "not-allowed") {
-            alert("Microphone access is blocked. Please enable microphone permissions in your browser settings.");
-        } else if (event.error === "no-speech") {
-            alert("No speech detected. Please try again.");
-        } else if (event.error === "service-not-allowed") {
-            alert("Speech recognition is not allowed on this browser or device. Please check your settings or try a different browser.");
-        } else {
-            alert(`Speech recognition error: ${event.error}`);
+        console.error("❌ Speech recognition error:", event.error);
+        switch (event.error) {
+            case "not-allowed":
+                alert("Microphone access is blocked. Please enable microphone permissions in your browser settings.");
+                break;
+            case "no-speech":
+                alert("No speech detected. Please try again.");
+                break;
+            case "service-not-allowed":
+                alert("Speech recognition is not allowed on this browser or device. Please check your settings or try a different browser.");
+                break;
+            default:
+                alert(`Speech recognition error: ${event.error}`);
         }
     };
 
- recognition.onresult = async (event) => {
-    try {
-        const userSpeech = event.results[0][0].transcript;
-        console.log("User speech:", userSpeech);
+    recognition.onresult = async (event) => {
+        try {
+            const userSpeech = event.results[0][0].transcript;
+            console.log("🎤 User speech:", userSpeech);
 
-        // Exibe o texto capturado da fala do usuário
-        messageElement.style.visibility = "visible";
-        messageElement.innerText = `You said: "${userSpeech}"`;
+            // Exibe o texto capturado da fala do usuário
+            messageElement.style.visibility = "visible";
+            messageElement.innerText = `You said: "${userSpeech}"`;
 
-        if (!userId) {
-            alert("User ID is missing. Please log in again.");
-            return;
+            if (!userId) {
+                alert("User ID is missing. Please log in again.");
+                console.error("❌ User ID está ausente. Operação abortada.");
+                return;
+            }
+
+            // Faz a requisição para o backend
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uid: userId, message: userSpeech, chatHistory }),
+            });
+
+            if (!response.ok) {
+                let errorData;
+                try {
+                    errorData = await response.json(); // Tenta interpretar o erro do servidor
+                } catch (parseError) {
+                    console.error("Erro ao interpretar o erro do servidor:", parseError);
+                }
+
+                console.error("❌ Erro do servidor:", errorData || "Detalhes indisponíveis.");
+                messageElement.innerText = `Server error: ${errorData?.details || "Unexpected error"}`;
+                return;
+            }
+
+            const data = await response.json();
+            if (!data.response) {
+                console.error("❌ Resposta do servidor ausente ou inválida.");
+                messageElement.innerText = "No valid response from the server. Please try again.";
+                return;
+            }
+
+            // Atualiza o histórico de conversas
+            chatHistory = data.chatHistory || [];
+            messageElement.innerText = data.response;
+
+            // Reproduz a resposta usando síntese de voz
+            speak(data.response);
+
+        } catch (error) {
+            console.error("❌ Erro ao se comunicar com o servidor:", error);
+            messageElement.innerText = "An error occurred while communicating with the server. Please try again.";
         }
-
-        const response = await fetch('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ uid: userId, message: userSpeech, chatHistory }),
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            console.error("Erro do servidor:", errorData);
-            messageElement.innerText = `Server error: ${errorData.details || "Unexpected error"}`;
-            return;
-        }
-
-        const data = await response.json();
-        if (!data.response) {
-            console.error("Resposta ausente do servidor.");
-            return;
-        }
-
-        chatHistory = data.chatHistory; // Atualiza o histórico completo
-        messageElement.innerText = data.response;
-        speak(data.response); // Fala a resposta gerada
-    } catch (error) {
-        console.error("Erro ao se comunicar com o servidor:", error);
-        messageElement.innerText = "Erro ao se comunicar com o servidor.";
-    }
-};
+    };
+}
 
 async function initializeConversation() {
     firebase.auth().onAuthStateChanged(async (user) => {
