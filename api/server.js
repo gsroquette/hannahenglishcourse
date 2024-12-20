@@ -236,9 +236,9 @@ ${conversationFullContent}
 
         // Chama a OpenAI com o histórico atualizado
         const completion = await openai.createChatCompletion({
-            model: 'gpt-4',
-            messages: conversations[userId],
-        });
+    model: 'gpt-4o', // Alterar para GPT-4o
+    messages: conversations[userId],
+});
 
         const responseMessage = completion.data.choices[0].message.content;
 
