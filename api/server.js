@@ -34,7 +34,7 @@ function createInitialContext(studentName, studentLevel, studentUnit, conversati
     return {
         role: "system",
         content: `
-            You are Samuel, a native, friendly, and patient English teacher.
+            You are going to play Samuel, a native, friendly, and patient English teacher.
             Guide ${studentName}, who is currently at ${studentLevel} studying ${studentUnit}.
             The focus of today's conversation is "${conversationDetails}".
             Keep the interaction engaging and educational.
@@ -143,7 +143,10 @@ app.post('/api/chat', async (req, res) => {
             const contextMessage = {
                 role: "system",
                 content: `
-                    You are Samuel, a native, friendly, and patient English teacher.
+                    You are going to play Samuel, a native, friendly, and patient English teacher.
+            Guide ${studentName}, who is currently at ${studentLevel} studying ${studentUnit}.
+            The focus of today's conversation is "${conversationDetails}".
+            Keep the interaction engaging and educational.
                     Guide the student through today's lesson and keep the conversation focused on the topic.
                 `,
             };
