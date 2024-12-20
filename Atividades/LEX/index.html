@@ -137,31 +137,39 @@
             return true;
         }
 
-        // Síntese de voz
-        function speak(text, rate = 0.8) {
-            if (!checkVoiceSupport()) return;
+     // Síntese de voz
+function speak(text, rate = 0.8) {
+    const synth = window.speechSynthesis;
+    const utterance = new SpeechSynthesisUtterance(text);
 
-            const synth = window.speechSynthesis;
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = "en-US";
-            utterance.rate = rate;
+    // Seleciona a voz "en-US" ou usa um fallback
+    const voice = getVoiceOrFallback("en-US");
+    if (voice) {
+        utterance.voice = voice;
+    } else {
+        console.warn("No suitable voice found. Using default settings.");
+    }
 
-            utterance.onstart = () => {
-                isSpeaking = true;
-                resetStaticTimer();
-                robotImg.src = ROBOT_GIF;
-                speakButton.disabled = true;
-                speakButton.innerText = "Robot is speaking...";
-            };
-            utterance.onend = () => {
-                isSpeaking = false;
-                robotImg.src = ROBOT_STATIC;
-                speakButton.disabled = false;
-                speakButton.innerText = "Press to Speak";
-            };
+    utterance.lang = voice?.lang || "en-US";
+    utterance.rate = rate;
 
-            synth.speak(utterance);
-        }
+    utterance.onstart = () => {
+        isSpeaking = true;
+        resetStaticTimer();
+        robotImg.src = ROBOT_GIF;
+        speakButton.disabled = true;
+        speakButton.innerText = "Robot is speaking...";
+    };
+
+    utterance.onend = () => {
+        isSpeaking = false;
+        robotImg.src = ROBOT_STATIC;
+        speakButton.disabled = false;
+        speakButton.innerText = "Press to Speak";
+    };
+
+    synth.speak(utterance);
+}
 
 function preloadVoices() {
     return new Promise((resolve) => {
@@ -182,6 +190,19 @@ function preloadVoices() {
     });
 }
 
+function getVoiceOrFallback(lang = "en-US") {
+    const synth = window.speechSynthesis;
+    const voices = synth.getVoices();
+    const selectedVoice = voices.find(voice => voice.lang === lang);
+
+    if (!selectedVoice) {
+        console.warn(`Voice for language '${lang}' not found. Using default voice.`);
+        return voices[0]; // Retorna a primeira voz disponível como fallback
+    }
+
+    return selectedVoice;
+}
+
 window.onload = async () => {
     await preloadVoices(); // Precarrega vozes no Safari
     setupSpeechRecognition(); // Configura reconhecimento de voz
@@ -189,9 +210,9 @@ window.onload = async () => {
     startStaticImageTimer(); // Inicia timer de inatividade
 };
 
-       // Reconhecimento de voz
+// Reconhecimento de voz
 function setupSpeechRecognition() {
- if (!navigator.permissions) {
+    if (!navigator.permissions) {
         alert("Please ensure microphone and speech permissions are enabled for this site.");
     }
 
