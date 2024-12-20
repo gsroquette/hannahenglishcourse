@@ -64,7 +64,7 @@ app.get('/api/start', async (req, res) => {
         if (!fs.existsSync(filePath)) {
             console.warn(`⚠️ Arquivo não encontrado: ${filePath}`);
             console.error(`❌ Arquivo não encontrado: ${filePath}`);
-return res.status(404).json({ error: "Data file not found for the conversation. Please verify the path." });
+            return res.status(404).json({ error: "Data file not found for the conversation. Please verify the path." });
         }
         const fileContent = fs.readFileSync(filePath, 'utf-8');
         conversationDetails = fileContent.split('\n')[0].trim();
@@ -92,13 +92,17 @@ return res.status(404).json({ error: "Data file not found for the conversation. 
         // Mensagem inicial
         const initialMessage = `Hello ${studentName}! Today's topic is: ${conversationDetails}. I'm ready to help you at your ${studentLevel}, in ${studentUnit}. Shall we begin?`;
 
-        // Salva o contexto no histórico
+        // Salva ou atualiza o contexto no histórico
         if (!conversations[userId]) {
+            // Caso o contexto não exista, inicialize-o
             conversations[userId] = [
                 contextMessage,
                 { role: "assistant", content: initialMessage }, // Mensagem inicial como parte do histórico
             ];
             console.log(`📝 Contexto inicial salvo para userId=${userId}`);
+        } else {
+            // Atualize o contexto existente com o novo
+            conversations[userId].unshift(contextMessage);
         }
 
         // Limita o tamanho do histórico
@@ -140,13 +144,21 @@ app.post('/api/chat', async (req, res) => {
         // Inicializa o contexto se não existir
         if (!conversations[userId]) {
             console.warn(`⚠️ Contexto ausente para userId=${userId}. Criando um novo contexto.`);
+
+            // Configura valores padrão, caso necessário
+            const studentName = "Student"; // Valor genérico
+            const studentLevel = "Level1"; // Valor genérico
+            const studentUnit = "Unit1";  // Valor genérico
+            const conversationDetails = "General conversation"; // Tópico genérico
+
+            // Cria o contexto inicial com o texto necessário
             const contextMessage = {
                 role: "system",
                 content: `
                     You are going to play Samuel, a native, friendly, and patient English teacher.
-            Guide Gustavo, who is currently at Level1.
-            The focus of today's conversation is verb to be.
-            Keep the interaction engaging and educational.
+                    Guide ${studentName}, who is currently at ${studentLevel} studying ${studentUnit}.
+                    The focus of today's conversation is "${conversationDetails}".
+                    Keep the interaction engaging and educational.
                     Guide the student through today's lesson and keep the conversation focused on the topic.
                 `,
             };
