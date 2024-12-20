@@ -148,111 +148,95 @@
         }
 
         // Reconhecimento de voz
-function setupSpeechRecognition() {
-    if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
-        alert("Speech recognition is not supported in this browser.");
-        speakButton.disabled = true;
-        return;
-    }
-
-    recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-    recognition.lang = "en-US";
-
-    recognition.onstart = () => {
-        speakButton.classList.add("listening");
-        speakButton.innerText = "Listening...";
-    };
-
-    recognition.onend = () => {
-        speakButton.classList.remove("listening");
-        speakButton.innerText = "Press to Speak";
-    };
-
-    recognition.onresult = async (event) => {
-        const userSpeech = event.results[0][0].transcript;
-        console.log("User speech:", userSpeech);
-
-        if (!userId) {
-            alert("User ID is missing. Please log in again.");
-            return;
-        }
-
-        try {
-            const response = await fetch('/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ uid: userId, message: userSpeech, chatHistory }),
-            });
-            const data = await response.json();
-
-            if (!data.response) {
-                console.error("Erro: Resposta da IA ausente.");
+        function setupSpeechRecognition() {
+            if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
+                alert("Speech recognition is not supported in this browser.");
+                speakButton.disabled = true;
                 return;
             }
 
-            chatHistory = data.chatHistory; // Atualiza o histórico completo
-            messageElement.innerText = data.response;
-            speak(data.response); // Fala a resposta gerada
-        } catch (error) {
-            console.error("Error communicating with the server:", error);
-            messageElement.innerText = "Error communicating with the server.";
-        }
-    };
-}
+            recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = "en-US";
 
-async function initializeConversation() {
+            recognition.onstart = () => {
+                speakButton.classList.add("listening");
+                speakButton.innerText = "Listening...";
+            };
+
+            recognition.onend = () => {
+                speakButton.classList.remove("listening");
+                speakButton.innerText = "Press to Speak";
+            };
+
+            recognition.onresult = async (event) => {
+                const userSpeech = event.results[0][0].transcript;
+                console.log("User speech:", userSpeech);
+
+                if (!userId) {
+                    alert("User ID is missing. Please log in again.");
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ uid: userId, message: userSpeech, chatHistory }),
+                    });
+                    const data = await response.json();
+                    chatHistory = data.chatHistory;
+                    messageElement.innerText = data.response;
+                    speak(data.response);
+                } catch (error) {
+                    console.error("Error communicating with the server:", error);
+                    messageElement.innerText = "Error communicating with the server.";
+                }
+            };
+        }
+
+        async function initializeConversation() {
     firebase.auth().onAuthStateChanged(async (user) => {
         if (user) {
-            userId = user.uid;
-            console.log("User authenticated. User ID:", userId);
+            userId = user.uid; // Captura o UID do usuário autenticado
+            console.log("User authenticated. User ID:", userId); // Verificação no console
 
+            // Captura os parâmetros da URL
             const urlParams = new URLSearchParams(window.location.search);
             const level = urlParams.get('level') || 'Level1';
             const unit = urlParams.get('unit') || 'Unit1';
 
+ console.log("Sending to /api/start:", { uid: userId, level, unit }); // Log completo
+
             try {
-                // Chama a API `/api/start` para iniciar a conversa
-                const response = await fetch(`/api/start?uid=${userId}&level=${level}&unit=${unit}`);
+                // Chama o servidor enviando o UID e parâmetros da URL
+               console.log("Sending to /api/start:", { uid: userId, level, unit }); // Log completo
+               console.log(`Calling /api/start with userId=${userId}, level=${level}, unit=${unit}`);
+               const response = await fetch(`/api/start?uid=${userId}&level=${level}&unit=${unit}`);
+                
                 if (!response.ok) throw new Error("Failed to initialize conversation.");
 
                 const data = await response.json();
-                console.log("Server Response:", data);
+                console.log("Server Response:", data); // Verificar a resposta do servidor
+                console.log("Conversation initialized. API Response:", data); // Log para depuração
 
-                // Atualiza o histórico e exibe a mensagem inicial
-                chatHistory = data.chatHistory || [];
+                chatHistory = data.chatHistory; // Histórico inicial da conversa
+                messageElement.style.visibility = "visible";
                 messageElement.innerText = data.response;
 
-                // Esconde a mensagem inicial até que o usuário clique no botão
-                messageElement.style.visibility = "hidden";
-
-                // Inicializa o botão de fala apenas uma vez
-                if (!speakButton.hasAttribute('data-initialized')) {
-                    speakButton.setAttribute('data-initialized', 'true');
-
-                    // Mostra e fala a mensagem inicial ao carregar a página
-                    messageElement.style.visibility = "visible";
-                    speak(data.response);
-
-                    speakButton.addEventListener("click", () => {
-                        // Alterna entre iniciar fala ou reconhecimento de voz
-                        if (speakButton.innerText === "Press to Start") {
-                            messageElement.style.visibility = "visible";
-                            speak(data.response); // Fala a mensagem inicial
-                            speakButton.innerText = "Press to Speak";
-                        } else {
-                            recognition.start();
-                        }
-                    });
-                }
+                speakButton.addEventListener("click", () => {
+                    if (speakButton.innerText === "Press to Start") {
+                        speak(data.response); // Fala a mensagem inicial
+                        speakButton.innerText = "Press to Speak";
+                    } else {
+                        recognition.start(); // Inicia o reconhecimento de voz
+                    }
+                });
             } catch (error) {
-                // Trata erros de inicialização
                 console.error("Error initializing conversation:", error);
-                messageElement.innerText = "Failed to initialize conversation. Please try again later.";
-                speakButton.disabled = true;
+                messageElement.innerText = "Error initializing conversation. Try again.";
                 messageElement.style.visibility = "visible";
             }
         } else {
-            // Exibe mensagem para usuários não autenticados
             console.warn("User is not logged in.");
             messageElement.innerText = "Please log in to start the conversation.";
             messageElement.style.visibility = "visible";
@@ -260,16 +244,15 @@ async function initializeConversation() {
     });
 }
 
-// Configuração inicial quando a página carrega
-document.addEventListener("visibilitychange", () => {
-    if (document.hidden) window.speechSynthesis.cancel(); // Cancela a fala se a aba for minimizada
-});
+        document.addEventListener("visibilitychange", () => {
+            if (document.hidden) window.speechSynthesis.cancel();
+        });
 
-window.onload = () => {
-    setupSpeechRecognition(); // Configura o reconhecimento de voz
-    initializeConversation(); // Inicializa a conversa
-    startStaticImageTimer(); // Inicia o timer de inatividade para troca de imagem
-};
+        window.onload = () => {
+            setupSpeechRecognition();
+            initializeConversation();
+            startStaticImageTimer();
+        };
     </script>
 </body>
 </html>                                                     
