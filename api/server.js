@@ -50,7 +50,8 @@ app.get('/api/start', async (req, res) => {
         const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataIA', 'conversa.txt');
         if (!fs.existsSync(filePath)) {
             console.warn(`⚠️ Arquivo não encontrado: ${filePath}`);
-            return res.status(404).json({ error: `Arquivo não encontrado: ${filePath}` });
+            console.error(`❌ Arquivo não encontrado: ${filePath}`);
+return res.status(404).json({ error: "Data file not found for the conversation. Please verify the path." });
         }
         const fileContent = fs.readFileSync(filePath, 'utf-8');
         conversationDetails = fileContent.split('\n')[0].trim();
