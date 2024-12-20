@@ -177,7 +177,7 @@ app.post('/api/chat', async (req, res) => {
             // Carrega informações adicionais do arquivo conversa.txt
           try {
     // Define o caminho dinâmico para o arquivo conversa.txt
-    const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataA', 'conversa.txt');
+    const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataIA', 'conversa.txt');
     console.log(`🔍 Tentando carregar o arquivo de conversa: ${filePath}`);
 
     if (!fs.existsSync(filePath)) {
