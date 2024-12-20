@@ -32,8 +32,8 @@ const conversations = {};
 // Função para criar o contexto inicial
 function createInitialContext(studentName, studentLevel, studentUnit, conversationDetails) {
     return {
-      role: "system",
-content: `
+        role: "system",
+        content: `
 You are Samuel, a friendly, patient, and motivating virtual friend. 
 Your goal is to help ${studentName} practice English conversation. Always address them by their name (e.g., "Hello, ${studentName}!"). 
 They are currently at ${studentLevel}. Today's lesson topic is "${conversationDetails}".
@@ -51,8 +51,11 @@ Focus on the topic and keep it engaging:
 
 Maintain a positive, light, and productive learning tone.
 
+Additional information:
+- Ensure corrections are encouraging and motivating.
+- Avoid distractions from the main lesson topic.
 `,
-};
+    };
 }
 
 // Rota para iniciar a conversa
