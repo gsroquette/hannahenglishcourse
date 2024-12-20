@@ -212,9 +212,16 @@ window.onload = async () => {
 
 // Reconhecimento de voz
 function setupSpeechRecognition() {
-    if (!navigator.permissions) {
-        alert("Please ensure microphone and speech permissions are enabled for this site.");
-    }
+    // Solicita permissão explícita para o microfone antes de configurar o reconhecimento
+    navigator.mediaDevices.getUserMedia({ audio: true })
+        .then((stream) => {
+            console.log("Microphone access granted.");
+        })
+        .catch((error) => {
+            console.error("Microphone access denied:", error);
+            alert("Please allow microphone access for speech recognition to work.");
+            return;
+        });
 
     // Verifica se o navegador suporta reconhecimento de voz
     if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
@@ -224,7 +231,17 @@ function setupSpeechRecognition() {
     }
 
     recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-    recognition.lang = "en-US";
+
+    // Tenta configurar o idioma, com fallback
+    const supportedLanguages = ["en-US", "en-GB", "en"]; // Lista de idiomas aceitos
+    recognition.lang = supportedLanguages.find(lang => {
+        try {
+            recognition.lang = lang;
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }) || "en-US"; // Fallback para "en-US"
 
     recognition.onstart = () => {
         speakButton.classList.add("listening");
@@ -240,6 +257,8 @@ function setupSpeechRecognition() {
         console.error("Speech recognition error:", event.error);
         if (event.error === "not-allowed") {
             alert("Microphone access is blocked. Please enable microphone permissions in your browser settings.");
+        } else if (event.error === "no-speech") {
+            alert("No speech detected. Please try again.");
         } else {
             alert(`Speech recognition error: ${event.error}`);
         }
@@ -279,21 +298,6 @@ function setupSpeechRecognition() {
             messageElement.innerText = "Error communicating with the server.";
         }
     };
-
-    // Verifica se o idioma está configurado corretamente
-    if (!recognition.lang || recognition.lang !== "en-US") {
-        alert("Speech recognition requires English (US) language support. Please configure your device settings.");
-    }
-
-    // Solicita permissão explícita para o microfone
-    navigator.mediaDevices.getUserMedia({ audio: true })
-        .then((stream) => {
-            console.log("Microphone access granted.");
-        })
-        .catch((error) => {
-            console.error("Microphone access denied:", error);
-            alert("Please allow microphone access for speech recognition to work.");
-        });
 }
 
 async function initializeConversation() {
