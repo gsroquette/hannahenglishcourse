@@ -41,31 +41,30 @@ function createInitialContext(studentName, studentLevel, studentUnit, conversati
 
 // Atualização no endpoint /api/start para validar e limpar o histórico
 app.get('/api/start', async (req, res) => {
-    const userId = req.query.uid;
-    const studentLevel = req.query.level || "1";
-    const studentUnit = req.query.unit || "1";
-
-    console.log("✅ Request recebido com os seguintes parâmetros:", { userId, studentLevel, studentUnit });
-
-    if (!userId) {
-        console.error("❌ User ID está ausente.");
-        return res.status(400).json({ error: "User ID is required." });
-    }
-
-    let conversationDetails = 'General conversation';
-    let conversationFullContent = '';
-
     try {
+        const userId = req.query.uid;
+        const studentLevel = req.query.level || "1";
+        const studentUnit = req.query.unit || "1";
+
+        console.log("✅ Request recebido com os seguintes parâmetros:", { userId, studentLevel, studentUnit });
+
+        if (!userId) {
+            console.error("❌ User ID está ausente.");
+            return res.status(400).json({ error: "User ID is required." });
+        }
+
+        let conversationDetails = 'General conversation';
+        let conversationFullContent = '';
+
         // Caminho do arquivo conversa.txt
         const filePath = path.join(__dirname, '..', `Level${studentLevel}`, `Unit${studentUnit}`, 'DataIA', 'conversa.txt');
         console.log(`📂 Tentando acessar o arquivo: ${filePath}`);
 
+        // Verifica se o arquivo existe e carrega o conteúdo
         if (fs.existsSync(filePath)) {
-            // Lê o conteúdo do arquivo
             const fileContent = fs.readFileSync(filePath, 'utf-8').trim();
             console.log("✅ Arquivo conversa.txt carregado com sucesso.");
 
-            // Primeira linha é o tópico, e o restante é o conteúdo completo
             const lines = fileContent.split('\n');
             if (lines.length > 0) {
                 conversationDetails = lines[0].trim();
@@ -77,63 +76,7 @@ app.get('/api/start', async (req, res) => {
         } else {
             console.warn(`⚠️ Arquivo conversa.txt não encontrado: ${filePath}. Usando 'General conversation'.`);
         }
-    } catch (error) {
-        console.error(`❌ Erro ao carregar o arquivo conversa.txt: ${error.message}`);
-        return res.status(500).json({ error: "Erro ao carregar o arquivo de conversa.", details: error.message });
-    }
 
-    try {
-        // Recupera o nome do aluno no Firebase
-        const userRef = db.ref(`usuarios/${userId}/nome`);
-        const snapshot = await userRef.once('value'); // Aqui o await está dentro de uma função async
-
-        if (!snapshot.exists()) {
-            console.error(`❌ Usuário não encontrado no Firebase para userId=${userId}.`);
-            return res.status(404).json({ error: "Usuário não encontrado." });
-        }
-
-        const studentName = snapshot.val();
-        console.log(`✅ Nome do usuário recuperado: ${studentName}`);
-
-        // Cria o contexto inicial
-        const contextMessage = createInitialContext(studentName, studentLevel, studentUnit, conversationDetails);
-
-        // Mensagem inicial
-        const initialMessage = `Hello ${studentName}! Today's topic is: ${conversationDetails}. I'm ready to help you at your ${studentLevel}, in ${studentUnit}. Shall we begin?`;
-
-        // Salva ou atualiza o contexto no histórico
-        if (!conversations[userId]) {
-            conversations[userId] = [
-                { studentName, studentLevel, studentUnit },
-                contextMessage,
-                { role: "assistant", content: initialMessage },
-            ];
-            console.log(`📝 Contexto inicial salvo para userId=${userId}`);
-        } else {
-            conversations[userId].unshift(contextMessage);
-        }
-
-        // Valida e limpa o histórico
-        validateAndTrimHistory(userId);
-
-        // Retorna a resposta e o histórico
-        return res.json({
-            response: initialMessage,
-            studentInfo: {
-                name: studentName,
-                level: studentLevel,
-                unit: studentUnit,
-                fullContent: conversationFullContent,
-            },
-            chatHistory: conversations[userId],
-        });
-    } catch (error) {
-        console.error(`❌ Erro ao configurar o contexto para userId=${userId}: ${error.message}`);
-        return res.status(500).json({ error: "Erro ao inicializar a conversa.", details: error.message });
-    }
-});
-
-    try {
         // Recupera o nome do aluno no Firebase
         const userRef = db.ref(`usuarios/${userId}/nome`);
         const snapshot = await userRef.once('value');
@@ -179,7 +122,7 @@ app.get('/api/start', async (req, res) => {
             chatHistory: conversations[userId],
         });
     } catch (error) {
-        console.error(`❌ Erro ao configurar o contexto para userId=${userId}: ${error.message}`);
+        console.error(`❌ Erro ao inicializar a conversa: ${error.message}`);
         return res.status(500).json({ error: "Erro ao inicializar a conversa.", details: error.message });
     }
 });
