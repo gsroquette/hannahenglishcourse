@@ -54,6 +54,8 @@ Focus on the topic and keep it engaging:
 
 Maintain a positive, light, and productive learning tone.
 
+Additional information about the lesson:
+${conversationFullContent}
 `,
 };
 }
