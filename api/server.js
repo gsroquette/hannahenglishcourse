@@ -208,8 +208,8 @@ app.post('/api/chat', async (req, res) => {
                 console.log(`✅ Nome do usuário recuperado do Firebase para userId=${userId}: ${studentName}`);
             }
 
-            const studentLevel = "Level1"; // Nível genérico ou extraído
-            const studentUnit = "Unit1"; // Unidade genérica ou extraída
+            const studentLevel = req.body.level || "Level1"; // Nível extraído ou genérico
+            const studentUnit = req.body.unit || "Unit1";   // Unidade extraída ou genérica
             const { topic: conversationDetails, fullContent: conversationFullContent } = loadConversationDetails(studentLevel, studentUnit);
 
             // Cria o contexto inicial com os dados
