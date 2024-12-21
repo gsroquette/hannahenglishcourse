@@ -42,8 +42,8 @@ function createInitialContext(studentName, studentLevel, studentUnit, conversati
 // Atualização no endpoint /api/start para validar e limpar o histórico
 app.get('/api/start', async (req, res) => {
     const userId = req.query.uid;
-    const studentLevel = req.query.level || "Level1";
-    const studentUnit = req.query.unit || "Unit1";
+    const studentLevel = req.query.level || "1";
+    const studentUnit = req.query.unit || "1";
 
     console.log("✅ Request recebido com os seguintes parâmetros:", { userId, studentLevel, studentUnit });
 
@@ -57,8 +57,8 @@ app.get('/api/start', async (req, res) => {
 
     try {
         // Caminho do arquivo conversa.txt
-        const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataIA', 'conversa.txt');
-        console.log(`📂 Verificando existência do arquivo: ${filePath}`);
+        const filePath = path.join(__dirname, '..', `Level${studentLevel}`, `Unit${studentUnit}`, 'DataIA', 'conversa.txt');
+        console.log(`📂 Tentando acessar o arquivo: ${filePath}`);
 
         if (fs.existsSync(filePath)) {
             // Lê o conteúdo do arquivo
@@ -99,7 +99,7 @@ app.get('/api/start', async (req, res) => {
         const contextMessage = createInitialContext(studentName, studentLevel, studentUnit, conversationDetails);
 
         // Mensagem inicial
-        const initialMessage = `Hello ${studentName}! Today's topic is: ${conversationDetails}. I'm ready to help you at your ${studentLevel}, in ${studentUnit}. Shall we begin?`;
+        const initialMessage = `Hello ${studentName}! Today's topic is: ${conversationDetails}. I'm ready to help you at your Level ${studentLevel}, in Unit ${studentUnit}. Shall we begin?`;
 
         // Salva ou atualiza o contexto no histórico
         if (!conversations[userId]) {
