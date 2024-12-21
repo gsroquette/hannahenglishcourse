@@ -56,23 +56,34 @@ app.get('/api/start', async (req, res) => {
     let conversationFullContent = '';
 
     try {
-        // Carrega informações adicionais do arquivo
+        // Caminho do arquivo conversa.txt
         const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataIA', 'conversa.txt');
-        if (!fs.existsSync(filePath)) {
-            console.warn(`⚠️ Arquivo não encontrado: ${filePath}`);
-            console.error(`❌ Arquivo não encontrado: ${filePath}`);
-            return res.status(404).json({ error: "Data file not found for the conversation. Please verify the path." });
+        console.log(`📂 Verificando existência do arquivo: ${filePath}`);
+
+        if (fs.existsSync(filePath)) {
+            // Lê o conteúdo do arquivo
+            const fileContent = fs.readFileSync(filePath, 'utf-8').trim();
+            console.log("✅ Arquivo conversa.txt carregado com sucesso.");
+
+            // Primeira linha é o tópico, e o restante é o conteúdo completo
+            const lines = fileContent.split('\n');
+            if (lines.length > 0) {
+                conversationDetails = lines[0].trim();
+                conversationFullContent = fileContent;
+                console.log(`📝 Tópico extraído: "${conversationDetails}"`);
+            } else {
+                console.warn("⚠️ O arquivo conversa.txt está vazio. Usando 'General conversation'.");
+            }
+        } else {
+            console.warn(`⚠️ Arquivo conversa.txt não encontrado: ${filePath}. Usando 'General conversation'.`);
         }
-        const fileContent = fs.readFileSync(filePath, 'utf-8');
-        conversationDetails = fileContent.split('\n')[0].trim(); // Primeira linha como tópico
-        conversationFullContent = fileContent.trim(); // Conteúdo completo
     } catch (error) {
-        console.error(`❌ Erro ao carregar o arquivo: ${error.message}`);
-        return res.status(500).json({ error: "Erro ao carregar o arquivo.", details: error.message });
+        console.error(`❌ Erro ao carregar o arquivo conversa.txt: ${error.message}`);
+        return res.status(500).json({ error: "Erro ao carregar o arquivo de conversa.", details: error.message });
     }
 
     try {
-        // Busca o nome do aluno no Firebase
+        // Recupera o nome do aluno no Firebase
         const userRef = db.ref(`usuarios/${userId}/nome`);
         const snapshot = await userRef.once('value');
 
@@ -82,9 +93,9 @@ app.get('/api/start', async (req, res) => {
         }
 
         const studentName = snapshot.val();
-        console.log(`✅ Nome do usuário recuperado do Firebase: ${studentName}`);
+        console.log(`✅ Nome do usuário recuperado: ${studentName}`);
 
-        // Cria o contexto inicial usando a função
+        // Cria o contexto inicial
         const contextMessage = createInitialContext(studentName, studentLevel, studentUnit, conversationDetails);
 
         // Mensagem inicial
@@ -93,9 +104,9 @@ app.get('/api/start', async (req, res) => {
         // Salva ou atualiza o contexto no histórico
         if (!conversations[userId]) {
             conversations[userId] = [
-                { studentName, studentLevel, studentUnit }, // Salva detalhes do aluno
+                { studentName, studentLevel, studentUnit },
                 contextMessage,
-                { role: "assistant", content: initialMessage }, // Mensagem inicial como parte do histórico
+                { role: "assistant", content: initialMessage },
             ];
             console.log(`📝 Contexto inicial salvo para userId=${userId}`);
         } else {
@@ -105,7 +116,7 @@ app.get('/api/start', async (req, res) => {
         // Valida e limpa o histórico
         validateAndTrimHistory(userId);
 
-        // Retorna a mensagem inicial e o histórico para o frontend
+        // Retorna a resposta e o histórico
         return res.json({
             response: initialMessage,
             studentInfo: {
@@ -117,7 +128,7 @@ app.get('/api/start', async (req, res) => {
             chatHistory: conversations[userId],
         });
     } catch (error) {
-        console.error(`❌ Erro ao configurar o contexto para userId=${userId}:`, error);
+        console.error(`❌ Erro ao configurar o contexto para userId=${userId}: ${error.message}`);
         return res.status(500).json({ error: "Erro ao inicializar a conversa.", details: error.message });
     }
 });
