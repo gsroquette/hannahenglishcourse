@@ -42,8 +42,8 @@ function createInitialContext(studentName, studentLevel, studentUnit, conversati
 // Atualização no endpoint /api/start para validar e limpar o histórico
 app.get('/api/start', async (req, res) => {
     const userId = req.query.uid;
-    const studentLevel = req.query.level || "Level1";
-    const studentUnit = req.query.unit || "Unit1";
+    const studentLevel = req.query.level || "1";
+    const studentUnit = req.query.unit || "1";
 
     console.log("✅ Request recebido com os seguintes parâmetros:", { userId, studentLevel, studentUnit });
 
@@ -65,11 +65,13 @@ app.get('/api/start', async (req, res) => {
             const fileContent = fs.readFileSync(filePath, 'utf-8').trim();
             console.log("✅ Arquivo conversa.txt carregado com sucesso.");
 
-            // Primeira linha é o tópico, e o restante é o conteúdo completo
+            // Divide o conteúdo em linhas
             const lines = fileContent.split('\n');
             if (lines.length > 0) {
-                conversationDetails = lines[0].trim(); // Extrai o tópico
-                conversationFullContent = fileContent; // Conteúdo completo
+                // Define a primeira linha como tópico
+                conversationDetails = lines[0].trim();
+                // Define todo o conteúdo do arquivo
+                conversationFullContent = fileContent;
                 console.log(`📝 Tópico extraído: "${conversationDetails}"`);
             } else {
                 console.warn("⚠️ O arquivo conversa.txt está vazio. Usando 'General conversation'.");
@@ -99,7 +101,7 @@ app.get('/api/start', async (req, res) => {
         const contextMessage = createInitialContext(studentName, studentLevel, studentUnit, conversationDetails);
 
         // Mensagem inicial
-        const initialMessage = `Hello ${studentName}! Today's topic is: "${conversationDetails}". I'm ready to help you at your ${studentLevel}, in ${studentUnit}. Shall we begin?`;
+        const initialMessage = `Hello ${studentName}! Today's topic is: ${conversationDetails}. I'm ready to help you at your ${studentLevel}, in ${studentUnit}. Shall we begin?`;
 
         // Salva ou atualiza o contexto no histórico
         if (!conversations[userId]) {
