@@ -57,7 +57,7 @@ app.get('/api/start', async (req, res) => {
 
     try {
         // Caminho do arquivo conversa.txt
-        const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataIA', 'conversa.txt');
+        const filePath = path.join(__dirname, '..', `Level${studentLevel}`, `Unit${studentUnit}`, 'DataIA', 'conversa.txt');
         console.log(`📂 Tentando acessar o arquivo: ${filePath}`);
 
         if (fs.existsSync(filePath)) {
@@ -65,12 +65,10 @@ app.get('/api/start', async (req, res) => {
             const fileContent = fs.readFileSync(filePath, 'utf-8').trim();
             console.log("✅ Arquivo conversa.txt carregado com sucesso.");
 
-            // Divide o conteúdo em linhas
+            // Primeira linha é o tópico, e o restante é o conteúdo completo
             const lines = fileContent.split('\n');
             if (lines.length > 0) {
-                // Define a primeira linha como tópico
                 conversationDetails = lines[0].trim();
-                // Define todo o conteúdo do arquivo
                 conversationFullContent = fileContent;
                 console.log(`📝 Tópico extraído: "${conversationDetails}"`);
             } else {
@@ -87,7 +85,7 @@ app.get('/api/start', async (req, res) => {
     try {
         // Recupera o nome do aluno no Firebase
         const userRef = db.ref(`usuarios/${userId}/nome`);
-        const snapshot = await userRef.once('value');
+        const snapshot = await userRef.once('value'); // Aqui o await está dentro de uma função async
 
         if (!snapshot.exists()) {
             console.error(`❌ Usuário não encontrado no Firebase para userId=${userId}.`);
