@@ -57,7 +57,7 @@ app.get('/api/start', async (req, res) => {
 
     try {
         // Caminho do arquivo conversa.txt
-        const filePath = path.join(__dirname, '..', `Level${studentLevel}`, `Unit${studentUnit}`, 'DataIA', 'conversa.txt');
+     const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataIA', 'conversa.txt');
         console.log(`📂 Tentando acessar o arquivo: ${filePath}`);
 
         if (fs.existsSync(filePath)) {
@@ -99,7 +99,7 @@ app.get('/api/start', async (req, res) => {
         const contextMessage = createInitialContext(studentName, studentLevel, studentUnit, conversationDetails);
 
         // Mensagem inicial
-        const initialMessage = `Hello ${studentName}! Today's topic is: ${conversationDetails}. I'm ready to help you at your Level ${studentLevel}, in Unit ${studentUnit}. Shall we begin?`;
+        const initialMessage = `Hello ${studentName}! Today's topic is: ${conversationDetails}. I'm ready to help you at your ${studentLevel}, in ${studentUnit}. Shall we begin?`;
 
         // Salva ou atualiza o contexto no histórico
         if (!conversations[userId]) {
