@@ -55,7 +55,7 @@ Maintain a positive, light, and productive learning tone.
 };
 }
 
-// Rota para iniciar a conversa
+// Atualização no endpoint /api/start para validar e limpar o histórico
 app.get('/api/start', async (req, res) => {
     const userId = req.query.uid;
     const studentLevel = req.query.level || "Level1";
@@ -118,10 +118,8 @@ app.get('/api/start', async (req, res) => {
             conversations[userId].unshift(contextMessage);
         }
 
-        // Limita o tamanho do histórico
-        if (conversations[userId].length > 20) {
-            conversations[userId] = conversations[userId].slice(-20);
-        }
+        // Valida e limpa o histórico
+        validateAndTrimHistory(userId);
 
         // Retorna a mensagem inicial e o histórico para o frontend
         return res.json({
@@ -140,7 +138,25 @@ app.get('/api/start', async (req, res) => {
     }
 });
 
-// Rota para interação com a IA
+// Função para validar e limpar o histórico de mensagens
+function validateAndTrimHistory(userId) {
+    // Certifica-se de que o histórico existe e é um array
+    if (!Array.isArray(conversations[userId])) {
+        conversations[userId] = [];
+    }
+
+    // Filtra mensagens inválidas (sem role ou content)
+    conversations[userId] = conversations[userId].filter(message => {
+        return message && typeof message.role === 'string' && typeof message.content === 'string';
+    });
+
+    // Limita o histórico a no máximo 20 mensagens
+    if (conversations[userId].length > 20) {
+        conversations[userId] = conversations[userId].slice(-20);
+    }
+}
+
+// Atualização no endpoint /api/chat para validar e limpar o histórico
 app.post('/api/chat', async (req, res) => {
     const userId = req.body.uid;
     const userMessage = req.body.message;
@@ -174,71 +190,31 @@ app.post('/api/chat', async (req, res) => {
             let conversationDetails = "General conversation"; // Tópico genérico
             let conversationFullContent = ""; // Conteúdo genérico
 
-            // Carrega informações adicionais do arquivo conversa.txt
-          try {
-    // Define o caminho dinâmico para o arquivo conversa.txt
-    const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataIA', 'conversa.txt');
-    console.log(`🔍 Tentando carregar o arquivo de conversa: ${filePath}`);
-
-    if (!fs.existsSync(filePath)) {
-        console.warn(`⚠️ Arquivo não encontrado no caminho: ${filePath}. Usando tópico genérico.`);
-    } else {
-        const fileContent = fs.readFileSync(filePath, 'utf-8').trim();
-        if (!fileContent) {
-            console.error("❌ O arquivo conversa.txt está vazio. Usando tópico genérico.");
-        } else {
-            // Define o tópico e conteúdo completo do arquivo
-            conversationDetails = fileContent.split('\n')[0].trim(); // Primeira linha como tópico
-            conversationFullContent = fileContent; // Conteúdo completo
-            console.log(`✅ Arquivo carregado com sucesso. Tópico: "${conversationDetails}"`);
-        }
-    }
-} catch (error) {
-    console.error(`❌ Erro ao carregar o arquivo conversa.txt: ${error.message}. Usando tópico genérico.`);
-}
-
             // Cria o contexto inicial com os dados
             const contextMessage = {
                 role: "system",
                 content: `
                     You are Samuel, a friendly, patient, and motivating virtual robot friend. 
 Your goal is to help ${studentName} practice English. Always address them by their name. 
-They are currently at ${studentLevel}. Today's lesson topic is "${conversationDetails}". Begin the first speech by saying 'let's begin
-(student's name) the lesson!' and begin the lesson promptly.
+They are currently at ${studentLevel}. Today's lesson topic is "${conversationDetails}".
 
-   Adapt your language to the student's level:
-        - If the level is Level 1, it means that the student's English level in the CEFR is A1. Use short sentences (maximum of 3 per interaction), simple, clear and direct. Do not be verbose.
-        - If the level is Level 2, it means that the student's English level in the CEFR is A2. Use short sentences (maximum of 3 per interaction), keeping them simple and clear. Do not be verbose.
-        - If the level is Level 3, it means that the student's English level in the CEFR is B1. Use short sentences (maximum of 4 per interaction). Avoid being verbose.
-        - If the level is Level 4, it means that the student's English level in the CEFR is B2. Avoid being verbose.
-
-Focus on the topic and keep it engaging:
-- Keep the conversation centered on "${conversationDetails}".
-- Politely ask the student to speak English if they switch to another language.
-- Praise correct answers and offer constructive feedback on mistakes.
-
-Maintain a positive, light, and productive learning tone.
-
-Additional information about the lesson:
-${conversationFullContent}
+Adapt your language to the student's level and keep the conversation centered on "${conversationDetails}".
                 `,
             };
             conversations[userId] = [contextMessage];
         }
 
+        // Valida e limpa o histórico antes de adicionar nova mensagem
+       validateAndTrimHistory(userId);
+
         // Adiciona a mensagem do usuário ao histórico
         conversations[userId].push({ role: 'user', content: userMessage });
 
-        // Limita o tamanho do histórico
-        if (conversations[userId].length > 20) { // Mantém no máximo 20 mensagens
-            conversations[userId] = conversations[userId].slice(-20);
-        }
-
         // Chama a OpenAI com o histórico atualizado
         const completion = await openai.createChatCompletion({
-    model: 'gpt-4o', // Alterar para GPT-4o
-    messages: conversations[userId],
-});
+            model: 'gpt-4', // Modelo utilizado
+            messages: conversations[userId], // Histórico validado
+        });
 
         const responseMessage = completion.data.choices[0].message.content;
 
