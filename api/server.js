@@ -45,7 +45,7 @@ ${conversationFullContent}
 
 // Função para carregar o tópico e conteúdo do arquivo conversa.txt
 function loadConversationDetails(level, unit) {
-    const filePath = path.join(__dirname, '..', `Level${level}`, `Unit${unit}`, 'DataIA', 'conversa.txt');
+           const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataIA', 'conversa.txt');
     console.log(`📂 Tentando acessar o arquivo: ${filePath}`);
 
     if (fs.existsSync(filePath)) {
