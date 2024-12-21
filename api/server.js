@@ -61,49 +61,86 @@ function loadConversationDetails(level, unit) {
 }
 
 // Endpoint /api/start
+// Atualização no endpoint /api/start para corrigir o caminho do arquivo
 app.get('/api/start', async (req, res) => {
     try {
         const userId = req.query.uid;
-        const studentLevel = req.query.level || "1";
-        const studentUnit = req.query.unit || "1";
+        const studentLevel = req.query.level || "Level1"; // Corrigido para incluir "Level" no valor padrão
+        const studentUnit = req.query.unit || "Unit1";   // Corrigido para incluir "Unit" no valor padrão
 
         console.log("✅ Request recebido com os seguintes parâmetros:", { userId, studentLevel, studentUnit });
 
         if (!userId) {
+            console.error("❌ User ID está ausente.");
             return res.status(400).json({ error: "User ID is required." });
         }
 
-        const { topic, fullContent } = loadConversationDetails(studentLevel, studentUnit);
+        let conversationDetails = 'General conversation';
+        let conversationFullContent = '';
 
+        // Caminho do arquivo conversa.txt corrigido
+        const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataIA', 'conversa.txt');
+        console.log(`📂 Tentando acessar o arquivo: ${filePath}`);
+
+        // Verifica se o arquivo existe e carrega o conteúdo
+        if (fs.existsSync(filePath)) {
+            const fileContent = fs.readFileSync(filePath, 'utf-8').trim();
+            console.log("✅ Arquivo conversa.txt carregado com sucesso.");
+
+            const lines = fileContent.split('\n');
+            if (lines.length > 0) {
+                conversationDetails = lines[0].trim();
+                conversationFullContent = fileContent;
+                console.log(`📝 Tópico extraído: "${conversationDetails}"`);
+            } else {
+                console.warn("⚠️ O arquivo conversa.txt está vazio. Usando 'General conversation'.");
+            }
+        } else {
+            console.warn(`⚠️ Arquivo conversa.txt não encontrado: ${filePath}. Usando 'General conversation'.`);
+        }
+
+        // Recupera o nome do aluno no Firebase
         const userRef = db.ref(`usuarios/${userId}/nome`);
         const snapshot = await userRef.once('value');
 
         if (!snapshot.exists()) {
+            console.error(`❌ Usuário não encontrado no Firebase para userId=${userId}.`);
             return res.status(404).json({ error: "Usuário não encontrado." });
         }
 
         const studentName = snapshot.val();
         console.log(`✅ Nome do usuário recuperado: ${studentName}`);
 
-        const contextMessage = createInitialContext(studentName, studentLevel, studentUnit, topic, fullContent);
+        // Cria o contexto inicial
+        const contextMessage = createInitialContext(studentName, studentLevel, studentUnit, conversationDetails);
 
-        const initialMessage = `Hello ${studentName}! Today's topic is: ${topic}. I'm ready to help you at your ${studentLevel}, in ${studentUnit}. Shall we begin?`;
+        // Mensagem inicial
+        const initialMessage = `Hello ${studentName}! Today's topic is: ${conversationDetails}. I'm ready to help you at your ${studentLevel}, in ${studentUnit}. Shall we begin?`;
 
+        // Salva ou atualiza o contexto no histórico
         if (!conversations[userId]) {
             conversations[userId] = [
                 { studentName, studentLevel, studentUnit },
                 contextMessage,
                 { role: "assistant", content: initialMessage },
             ];
+            console.log(`📝 Contexto inicial salvo para userId=${userId}`);
         } else {
             conversations[userId].unshift(contextMessage);
         }
 
+        // Valida e limpa o histórico
         validateAndTrimHistory(userId);
 
+        // Retorna a resposta e o histórico
         return res.json({
             response: initialMessage,
-            studentInfo: { name: studentName, level: studentLevel, unit: studentUnit, fullContent },
+            studentInfo: {
+                name: studentName,
+                level: studentLevel,
+                unit: studentUnit,
+                fullContent: conversationFullContent,
+            },
             chatHistory: conversations[userId],
         });
     } catch (error) {
