@@ -220,7 +220,7 @@ app.post('/api/chat', async (req, res) => {
 
         // Chama a OpenAI com o histórico atualizado
         const completion = await openai.createChatCompletion({
-            model: 'gpt-4',
+            model: 'chatgpt-4o-latest',
             messages: conversations[userId],
         });
 
