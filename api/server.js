@@ -164,24 +164,47 @@ function validateAndTrimHistory(userId) {
     }
 }
 
-// Endpoint /api/chat
+// Endpoint POST /api/chat para interagir com a IA
 app.post('/api/chat', async (req, res) => {
+    const userId = req.body.uid;
+    const userMessage = req.body.message;
+
+    console.log(`🔍 Requisição recebida para interação com a IA. userId=${userId}, mensagem="${userMessage}"`);
+
+    // Valida os parâmetros recebidos
+    if (typeof userId !== 'string' || !userId.trim() || typeof userMessage !== 'string' || !userMessage.trim()) {
+        console.error("❌ Parâmetros ausentes ou inválidos: User ID ou mensagem estão faltando.");
+        return res.status(400).json({ response: "User ID and message are required and must be valid strings." });
+    }
+
     try {
-        const userId = req.body.uid;
-        const userMessage = req.body.message;
-
-        console.log(`🔍 Requisição recebida para interação com a IA. userId=${userId}, mensagem="${userMessage}"`);
-
-        if (!userId || !userMessage) {
-            return res.status(400).json({ response: "User ID and message are required." });
-        }
-
+        // Inicializa o contexto se não existir
         if (!conversations[userId]) {
-            return res.status(404).json({ response: "Conversation not initialized. Start a new session." });
+            console.warn(`⚠️ Contexto ausente para userId=${userId}. Criando um novo contexto.`);
+
+            const userRef = db.ref(`usuarios/${userId}/nome`);
+            const snapshot = await userRef.once('value');
+            let studentName = "Student";
+
+            if (snapshot.exists()) {
+                studentName = snapshot.val();
+            }
+
+            const contextMessage = {
+                role: "system",
+                content: `You are Samuel, a friendly robot helping students with their English practice.`,
+            };
+
+            conversations[userId] = [contextMessage];
         }
 
+        // Valida e limpa o histórico antes de adicionar nova mensagem
+        validateAndTrimHistory(userId);
+
+        // Adiciona a mensagem do usuário ao histórico
         conversations[userId].push({ role: 'user', content: userMessage });
 
+        // Chama a OpenAI para obter a resposta
         const completion = await openai.createChatCompletion({
             model: 'gpt-4',
             messages: conversations[userId],
@@ -189,12 +212,14 @@ app.post('/api/chat', async (req, res) => {
 
         const responseMessage = completion.data.choices[0].message.content;
 
+        // Adiciona a resposta da IA ao histórico
         conversations[userId].push({ role: 'assistant', content: responseMessage });
 
-        return res.json({ response: responseMessage, chatHistory: conversations[userId] });
+        // Retorna a resposta
+        res.json({ response: responseMessage, chatHistory: conversations[userId] });
     } catch (error) {
-        console.error(`❌ Erro durante a interação com a IA: ${error.message}`);
-        return res.status(500).json({ response: "Erro ao processar a mensagem.", details: error.message });
+        console.error(`❌ Erro durante a interação com a IA para userId=${userId}: ${error.message}`);
+        res.status(500).json({ response: "Erro ao processar a mensagem.", details: error.message });
     }
 });
 
