@@ -188,13 +188,15 @@ app.post('/api/chat', async (req, res) => {
 
             if (snapshot.exists()) {
                 studentName = snapshot.val();
+                console.log(`✅ Nome do usuário recuperado do Firebase para userId=${userId}: ${studentName}`);
             }
 
-            const contextMessage = {
-                role: "system",
-                content: `You are Samuel, a friendly robot helping students with their English practice.`,
-            };
+            const studentLevel = "Level1"; // Nível genérico ou extraído
+            const studentUnit = "Unit1"; // Unidade genérica ou extraída
+            const { topic: conversationDetails, fullContent: conversationFullContent } = loadConversationDetails(studentLevel, studentUnit);
 
+            // Cria o contexto inicial com os dados
+            const contextMessage = createInitialContext(studentName, studentLevel, studentUnit, conversationDetails, conversationFullContent);
             conversations[userId] = [contextMessage];
         }
 
@@ -204,7 +206,7 @@ app.post('/api/chat', async (req, res) => {
         // Adiciona a mensagem do usuário ao histórico
         conversations[userId].push({ role: 'user', content: userMessage });
 
-        // Chama a OpenAI para obter a resposta
+        // Chama a OpenAI com o histórico atualizado
         const completion = await openai.createChatCompletion({
             model: 'gpt-4',
             messages: conversations[userId],
