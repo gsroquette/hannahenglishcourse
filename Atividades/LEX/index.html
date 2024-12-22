@@ -133,43 +133,47 @@ function trimChatHistory() {
         let hasWarnedUserAboutLang = false; // Variável para evitar mensagens repetidas
 let voicesLoaded = false; // Variável para controlar se as vozes foram carregadas
 
+// Função para carregar as vozes disponíveis
 function loadVoices() {
     const synth = window.speechSynthesis;
     let voicesLoaded = false;
 
-    // Exibe mensagem inicial enquanto as vozes carregam
-    speakButton.disabled = true;
-    speakButton.innerText = "Loading Voices...";
-
-    const checkVoicesLoaded = () => {
-        const voices = synth.getVoices();
-        if (voices.length > 0) {
-            voicesLoaded = true;
-            clearInterval(fallbackInterval); // Cancela o fallback
-            console.log("✅ Voices successfully loaded:", voices);
-            speakButton.disabled = false;
-            speakButton.innerText = "Press to Start";
-        }
-    };
-
-    // Adiciona evento para navegadores que suportam `onvoiceschanged`
-    if ('onvoiceschanged' in synth) {
-        synth.onvoiceschanged = checkVoicesLoaded;
+    // Verifica se o navegador suporta `onvoiceschanged`
+    if (typeof synth.onvoiceschanged !== "undefined") {
+        synth.onvoiceschanged = () => {
+            const voices = synth.getVoices();
+            if (voices.length > 0) {
+                voicesLoaded = true;
+                console.log("✅ Vozes carregadas:", voices);
+                speakButton.disabled = false; // Habilita o botão
+                speakButton.innerText = "Press to Start";
+            }
+        };
+    } else {
+        // Navegadores que não suportam o evento assumem que as vozes estão carregadas
+        voicesLoaded = true;
+        console.warn("⚠️ Navegador não suporta 'onvoiceschanged'. Assumindo vozes carregadas.");
+        speakButton.disabled = false; // Habilita o botão
+        speakButton.innerText = "Press to Start";
     }
 
-    // Fallback para verificar vozes periodicamente
-    const fallbackInterval = setInterval(checkVoicesLoaded, 500);
-
-    // Timeout para evitar loops infinitos
+    // Fallback: Se o evento não for disparado, tenta carregar as vozes diretamente após um tempo
     setTimeout(() => {
         if (!voicesLoaded) {
-            clearInterval(fallbackInterval); // Para o fallback
-            console.error("⚠️ Voices did not load within the expected time.");
-            alert("Voices did not load. Please check your browser's compatibility.");
-            speakButton.disabled = true;
-            speakButton.innerText = "Retrying Voices...";
+            const voices = synth.getVoices();
+            if (voices.length > 0) {
+                voicesLoaded = true;
+                console.log("✅ Fallback: Vozes carregadas:", voices);
+                speakButton.disabled = false;
+                speakButton.innerText = "Press to Start";
+            } else {
+                console.error("⚠️ Falha ao carregar vozes. Verifique a compatibilidade do navegador.");
+                alert("Failed to load voices. Please check browser compatibility.");
+                speakButton.disabled = true;
+                speakButton.innerText = "Retrying Voices...";
+            }
         }
-    }, 15000); // Timeout estendido para 15 segundos
+    }, 5000); // Espera até 5 segundos antes de tentar o fallback
 }
 
 function getAvailableVoice(lang) {
