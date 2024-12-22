@@ -138,42 +138,37 @@ function loadVoices() {
     const synth = window.speechSynthesis;
     let voicesLoaded = false;
 
-    // Verifica se o navegador suporta `onvoiceschanged`
-    if (typeof synth.onvoiceschanged !== "undefined") {
-        synth.onvoiceschanged = () => {
-            const voices = synth.getVoices();
-            if (voices.length > 0) {
-                voicesLoaded = true;
-                console.log("✅ Vozes carregadas:", voices);
-                speakButton.disabled = false; // Habilita o botão
-                speakButton.innerText = "Press to Start";
-            }
-        };
-    } else {
-        // Navegadores que não suportam o evento assumem que as vozes estão carregadas
-        voicesLoaded = true;
-        console.warn("⚠️ Navegador não suporta 'onvoiceschanged'. Assumindo vozes carregadas.");
-        speakButton.disabled = false; // Habilita o botão
-        speakButton.innerText = "Press to Start";
+    // Função auxiliar para verificar e carregar vozes
+    function checkVoices() {
+        const voices = synth.getVoices();
+        if (voices.length > 0) {
+            voicesLoaded = true;
+            console.log("✅ Vozes carregadas:", voices);
+            speakButton.disabled = false; // Habilita o botão
+            speakButton.innerText = "Press to Start";
+            return true; // Vozes carregadas com sucesso
+        }
+        return false; // Nenhuma voz carregada ainda
     }
 
-    // Fallback: Se o evento não for disparado, tenta carregar as vozes diretamente após um tempo
-    setTimeout(() => {
-        if (!voicesLoaded) {
-            const voices = synth.getVoices();
-            if (voices.length > 0) {
-                voicesLoaded = true;
-                console.log("✅ Fallback: Vozes carregadas:", voices);
-                speakButton.disabled = false;
-                speakButton.innerText = "Press to Start";
-            } else {
-                console.error("⚠️ Falha ao carregar vozes. Verifique a compatibilidade do navegador.");
-                alert("Failed to load voices. Please check browser compatibility.");
-                speakButton.disabled = true;
-                speakButton.innerText = "Retrying Voices...";
+    // Evento para navegadores que suportam `onvoiceschanged`
+    if (typeof synth.onvoiceschanged !== "undefined") {
+        synth.onvoiceschanged = () => {
+            if (checkVoices()) {
+                synth.onvoiceschanged = null; // Remove o evento após carregar as vozes
             }
+        };
+    }
+
+    // Fallback: tenta carregar vozes diretamente após um atraso
+    setTimeout(() => {
+        if (!voicesLoaded && !checkVoices()) {
+            console.error("⚠️ Falha ao carregar vozes. Verifique o suporte do navegador.");
+            alert("Failed to load voices. Please check browser compatibility.");
+            speakButton.disabled = true;
+            speakButton.innerText = "Retrying Voices...";
         }
-    }, 5000); // Espera até 5 segundos antes de tentar o fallback
+    }, 5000); // Timeout de 5 segundos
 }
 
 function getAvailableVoice(lang) {
