@@ -123,7 +123,22 @@
             robotImg.src = ROBOT_STATIC;
         }
 
-        let hasWarnedUserAboutLang = false; // Variável para evitar mensagens repetidas
+       let hasWarnedUserAboutLang = false; // Variável para evitar mensagens repetidas
+let voicesLoaded = false; // Variável para controlar se as vozes foram carregadas
+
+// Evento para carregar as vozes disponíveis
+function loadVoices() {
+    const synth = window.speechSynthesis;
+
+    if (synth.onvoiceschanged !== undefined) {
+        synth.onvoiceschanged = () => {
+            voicesLoaded = true; // Marca como carregado quando as vozes estiverem disponíveis
+            console.log("Vozes carregadas:", synth.getVoices());
+        };
+    } else {
+        voicesLoaded = true; // Assume que as vozes já estão carregadas em navegadores sem suporte ao evento
+    }
+}
 
 function getAvailableVoice(lang) {
     const voices = window.speechSynthesis.getVoices();
@@ -131,6 +146,12 @@ function getAvailableVoice(lang) {
 }
 
 function speak(text, rate = 0.8, lang = "en-US") {
+    if (!voicesLoaded) {
+        console.warn("Vozes ainda não carregadas. Tentando novamente.");
+        window.speechSynthesis.onvoiceschanged = () => speak(text, rate, lang); // Rechama a função assim que as vozes carregarem
+        return;
+    }
+
     const synth = window.speechSynthesis;
     const availableVoice = getAvailableVoice(lang);
 
@@ -160,6 +181,9 @@ function speak(text, rate = 0.8, lang = "en-US") {
 
     synth.speak(utterance);
 }
+
+// Chamando o evento para carregar vozes
+loadVoices();
 
         // Reconhecimento de voz
 function setupSpeechRecognition() {
