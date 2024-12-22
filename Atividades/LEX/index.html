@@ -141,44 +141,35 @@ function loadVoices() {
     speakButton.disabled = true;
     speakButton.innerText = "Loading Voices...";
 
-    // Evento `onvoiceschanged` para carregar vozes (suporte em navegadores modernos)
-    const handleVoicesChanged = () => {
-        const voices = synth.getVoices();
-        if (voices.length > 0) {
-            voicesLoaded = true;
-            console.log("✅ Voices successfully loaded:", voices);
-            speakButton.disabled = false; // Habilita o botão
-            speakButton.innerText = "Press to Start";
-
-            // Remove o evento após carregar as vozes
-            synth.onvoiceschanged = null;
-        }
-    };
-
-    synth.onvoiceschanged = handleVoicesChanged;
-
-    // Fallback contínuo para navegadores que não acionam `onvoiceschanged` (iOS/Safari)
-    const fallbackInterval = setInterval(() => {
+    const checkVoicesLoaded = () => {
         const voices = synth.getVoices();
         if (voices.length > 0) {
             voicesLoaded = true;
             clearInterval(fallbackInterval); // Cancela o fallback
-            console.log("✅ Fallback: Voices successfully loaded.");
+            console.log("✅ Voices successfully loaded:", voices);
             speakButton.disabled = false;
             speakButton.innerText = "Press to Start";
         }
-    }, 500); // Verifica a cada 500ms
+    };
 
-    // Timeout para evitar loops infinitos e fornecer feedback ao usuário
+    // Adiciona evento para navegadores que suportam `onvoiceschanged`
+    if ('onvoiceschanged' in synth) {
+        synth.onvoiceschanged = checkVoicesLoaded;
+    }
+
+    // Fallback para verificar vozes periodicamente
+    const fallbackInterval = setInterval(checkVoicesLoaded, 500);
+
+    // Timeout para evitar loops infinitos
     setTimeout(() => {
         if (!voicesLoaded) {
-            clearInterval(fallbackInterval); // Cancela o fallback
+            clearInterval(fallbackInterval); // Para o fallback
             console.error("⚠️ Voices did not load within the expected time.");
             alert("Voices did not load. Please check your browser's compatibility.");
             speakButton.disabled = true;
             speakButton.innerText = "Retrying Voices...";
         }
-    }, 10000); // 10 segundos de timeout
+    }, 15000); // Timeout estendido para 15 segundos
 }
 
 function getAvailableVoice(lang) {
