@@ -141,28 +141,39 @@ function loadVoices() {
     speakButton.disabled = true;
     speakButton.innerText = "Loading Voices...";
 
-    // Verifica continuamente as vozes até que estejam disponíveis
-    const fallbackInterval = setInterval(() => {
+    // Tenta carregar as vozes com `onvoiceschanged` (para a maioria dos navegadores)
+    synth.onvoiceschanged = () => {
         const voices = synth.getVoices();
         if (voices.length > 0) {
             voicesLoaded = true;
-            clearInterval(fallbackInterval);
             console.log("✅ Vozes carregadas com sucesso:", voices);
             speakButton.disabled = false; // Habilita o botão
             speakButton.innerText = "Press to Start";
         }
+    };
+
+    // Fallback para navegadores que não acionam `onvoiceschanged` (ex: iOS Safari)
+    const fallbackInterval = setInterval(() => {
+        const voices = synth.getVoices();
+        if (voices.length > 0) {
+            voicesLoaded = true;
+            clearInterval(fallbackInterval); // Para o fallback
+            console.log("✅ Fallback: Vozes carregadas com sucesso.");
+            speakButton.disabled = false;
+            speakButton.innerText = "Press to Start";
+        }
     }, 500); // Verifica a cada 500ms
 
-    // Timeout final para evitar loops infinitos
+    // Timeout para evitar loops infinitos
     setTimeout(() => {
         if (!voicesLoaded) {
             clearInterval(fallbackInterval);
             console.error("⚠️ As vozes não carregaram dentro do tempo esperado.");
-            alert("Vozes não carregaram. Verifique se o dispositivo suporta síntese de voz.");
+            alert("As vozes não carregaram. Verifique a compatibilidade do navegador.");
             speakButton.disabled = true;
             speakButton.innerText = "Retrying Voices...";
         }
-    }, 10000); // Timeout de 10 segundos
+    }, 10000); // 10 segundos de timeout
 }
 
 function getAvailableVoice(lang) {
