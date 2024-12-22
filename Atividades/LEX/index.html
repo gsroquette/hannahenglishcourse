@@ -97,8 +97,16 @@
         let alternateTimeout;
         let userId = null;
         let chatHistory = [];
+       
+const MAX_HISTORY = 20; // Limita o histórico a 20 mensagens
 
-        // Botão de voltar
+function trimChatHistory() {
+    if (chatHistory.length > MAX_HISTORY) {
+        chatHistory = chatHistory.slice(-MAX_HISTORY); // Mantém as últimas 20 mensagens
+    }
+}
+
+ // Botão de voltar
         backButton.addEventListener("click", () => window.history.back());
 
         // Alternar imagem após 20 segundos de inatividade
@@ -166,26 +174,24 @@ function getAvailableVoice(lang) {
     return voices.find(voice => voice.lang === lang) || voices[0];
 }
 
+let isSpeaking = false; // Controle de estado de fala
+
 function speak(text, rate = 0.8, lang = "en-US") {
+    if (isSpeaking) return; // Previne chamadas simultâneas
+    isSpeaking = true;
+
     if (!voicesLoaded) {
-        console.warn("Vozes ainda não carregadas. Tentando novamente.");
-        window.speechSynthesis.onvoiceschanged = () => speak(text, rate, lang); // Rechama a função assim que as vozes carregarem
+        console.warn("Voices not loaded yet. Trying again.");
+        window.speechSynthesis.onvoiceschanged = () => speak(text, rate, lang);
+        isSpeaking = false; // Libera o estado de fala caso falhe
         return;
     }
 
     const synth = window.speechSynthesis;
     const availableVoice = getAvailableVoice(lang);
 
-    // Verifica se a voz `en-US` está disponível
-    if (availableVoice.lang !== lang && !hasWarnedUserAboutLang) {
-        alert(
-            `The English (US) language pack is not installed or available on your device. Please install it for the best experience. Defaulting to ${availableVoice.lang}.`
-        );
-        hasWarnedUserAboutLang = true; // Garante que a mensagem aparece apenas uma vez
-    }
-
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = availableVoice.lang; // Usa o idioma encontrado
+    utterance.lang = availableVoice.lang;
     utterance.voice = availableVoice;
     utterance.rate = rate;
 
@@ -201,6 +207,7 @@ function speak(text, rate = 0.8, lang = "en-US") {
         fallbackTimer = setTimeout(() => {
             speakButton.disabled = false;
             speakButton.innerText = "Press to Speak";
+            isSpeaking = false; // Libera o estado de fala
         }, estimatedDuration);
     };
 
@@ -208,6 +215,7 @@ function speak(text, rate = 0.8, lang = "en-US") {
         clearTimeout(fallbackTimer); // Cancela o fallback se o evento onend for acionado
         speakButton.disabled = false;
         speakButton.innerText = "Press to Speak";
+        isSpeaking = false; // Libera o estado de fala
     };
 
     synth.speak(utterance);
@@ -224,26 +232,32 @@ function setupSpeechRecognition() {
         return;
     }
 
+    let isListening = false; // Variável para controlar o estado de escuta
+
     recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
     recognition.lang = "en-US";
 
     recognition.onstart = () => {
+        isListening = true; // Define que está escutando
         speakButton.classList.add("listening");
         speakButton.innerText = "Listening...";
+        console.log("Recognition started.");
     };
 
     recognition.onend = () => {
+        isListening = false; // Define que parou de escutar
         speakButton.classList.remove("listening");
         speakButton.innerText = "Press to Speak";
+        console.log("Recognition ended.");
     };
 
     recognition.onresult = async (event) => {
         const userSpeech = event.results[0][0].transcript;
         console.log("User speech:", userSpeech);
 
- // Exibe o texto capturado da fala do usuário no elemento de mensagem
-    messageElement.style.visibility = "visible";
-    messageElement.innerText = `You said: "${userSpeech}"`; // Exibe a fala capturada
+        // Exibe o texto capturado da fala do usuário no elemento de mensagem
+        messageElement.style.visibility = "visible";
+        messageElement.innerText = `You said: "${userSpeech}"`;
 
         if (!userId) {
             alert("User ID is missing. Please log in again.");
@@ -251,6 +265,7 @@ function setupSpeechRecognition() {
         }
 
         try {
+            recognition.stop(); // Garante que o reconhecimento pare antes de processar a resposta
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -259,18 +274,35 @@ function setupSpeechRecognition() {
             const data = await response.json();
 
             if (!data.response) {
-                console.error("Erro: Resposta da IA ausente.");
+                console.error("Error: Response from AI is missing.");
                 return;
             }
 
-            chatHistory = data.chatHistory; // Atualiza o histórico completo
+            // Atualiza o histórico e fala a resposta
+            chatHistory.push({ role: "user", content: userSpeech });
+            trimChatHistory();
+
+            chatHistory.push({ role: "assistant", content: data.response });
+            trimChatHistory();
+
             messageElement.innerText = data.response;
-            speak(data.response); // Fala a resposta gerada
+            speak(data.response); // Chama o sintetizador para falar a resposta
         } catch (error) {
             console.error("Error communicating with the server:", error);
             messageElement.innerText = "Error communicating with the server.";
         }
     };
+
+    speakButton.addEventListener("click", () => {
+        if (isListening || isSpeaking) {
+            console.log("Recognition or speaking is already in progress.");
+            return; // Previne múltiplas chamadas do reconhecimento ou sobreposição com a fala
+        }
+
+        if (speakButton.innerText === "Press to Speak") {
+            recognition.start(); // Inicia o reconhecimento de voz
+        }
+    });
 }
 
 async function initializeConversation() {
