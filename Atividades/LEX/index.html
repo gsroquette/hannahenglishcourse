@@ -137,27 +137,28 @@ let voicesLoaded = false; // Variável para controlar se as vozes foram carregad
 function loadVoices() {
     const synth = window.speechSynthesis;
 
-    if (synth.onvoiceschanged !== undefined) {
-        synth.onvoiceschanged = () => {
+    const loadVoicesAsync = () => {
+        const voices = synth.getVoices();
+        if (voices.length > 0) {
             voicesLoaded = true;
-            console.log("Vozes carregadas:", synth.getVoices());
-        };
+            console.log("Vozes carregadas:", voices);
+        } else {
+            console.warn("Nenhuma voz carregada. Tentando novamente...");
+            setTimeout(loadVoicesAsync, 200); // Tenta novamente após 200ms
+        }
+    };
+
+    if (synth.onvoiceschanged !== undefined) {
+        synth.onvoiceschanged = loadVoicesAsync;
     } else {
-        // Repetir até as vozes serem carregadas
-        const interval = setInterval(() => {
-            if (synth.getVoices().length > 0) {
-                voicesLoaded = true;
-                clearInterval(interval);
-                console.log("Vozes carregadas:", synth.getVoices());
-            }
-        }, 100);
+        loadVoicesAsync(); // Inicia a lógica de carregamento manualmente
     }
 
-    // Força o carregamento em dispositivos iOS
+    // Fallback após 3 segundos para evitar que o botão fique travado
     setTimeout(() => {
         if (!voicesLoaded) {
-            console.warn("Vozes ainda não carregaram, mas o timeout forçou o fallback.");
-            voicesLoaded = true; // Força `voicesLoaded` após 3 segundos
+            console.warn("Timeout forçando fallback: vozes não carregadas.");
+            voicesLoaded = true; // Força o estado de carregado para não bloquear
         }
     }, 3000);
 }
@@ -327,17 +328,17 @@ async function initializeConversation() {
                 if (!speakButton.hasAttribute('data-initialized')) {
                     speakButton.setAttribute('data-initialized', 'true');
 
-                    speakButton.addEventListener("click", () => {
-    if (!voicesLoaded) { // Verifica se as vozes já foram carregadas
-        alert("Voices are still loading. Please wait a few seconds and try again.");
-        return;
+ speakButton.addEventListener("click", () => {
+    if (!voicesLoaded) {
+        console.warn("Vozes ainda não carregadas, mas permitindo interação.");
+        alert("Voices are still loading. The robot may not speak properly yet.");
     }
 
     if (speakButton.innerText === "Press to Start") {
         messageElement.style.visibility = "visible";
-        speak(data.response); // Fala a mensagem inicial
+        speak(data.response || "Hello! I'm here to help you."); // Mensagem inicial padrão
         speakButton.innerText = "Press to Speak";
-    } else {
+    } else if (!isSpeaking && !isListening) {
         recognition.start(); // Inicia o reconhecimento de voz
     }
 });
