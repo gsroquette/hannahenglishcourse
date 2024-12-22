@@ -134,34 +134,49 @@ function trimChatHistory() {
 let voicesLoaded = false; // Variável para controlar se as vozes foram carregadas
 
 // Evento para carregar as vozes disponíveis
+let voicesLoaded = false; // Variável global para controlar o carregamento de vozes
+
 function loadVoices() {
     const synth = window.speechSynthesis;
 
-    const loadVoicesAsync = () => {
+    function checkVoices() {
         const voices = synth.getVoices();
         if (voices.length > 0) {
             voicesLoaded = true;
-            console.log("Vozes carregadas:", voices);
+            console.log("Vozes carregadas com sucesso:", voices);
+            speakButton.disabled = false; // Habilita o botão após carregar
+            speakButton.innerText = "Press to Start";
         } else {
-            console.warn("Nenhuma voz carregada. Tentando novamente...");
-            setTimeout(loadVoicesAsync, 200); // Tenta novamente após 200ms
+            console.warn("Ainda aguardando o carregamento das vozes...");
         }
-    };
-
-    if (synth.onvoiceschanged !== undefined) {
-        synth.onvoiceschanged = loadVoicesAsync;
-    } else {
-        loadVoicesAsync(); // Inicia a lógica de carregamento manualmente
     }
 
-    // Fallback após 3 segundos para evitar que o botão fique travado
+    // Garante o carregamento contínuo até que as vozes estejam disponíveis
+    synth.onvoiceschanged = checkVoices;
+
+    // Fallback caso onvoiceschanged não funcione
+    const interval = setInterval(() => {
+        if (voicesLoaded) {
+            clearInterval(interval); // Para o fallback quando as vozes carregarem
+        } else {
+            checkVoices();
+        }
+    }, 200);
+
+    // Timeout para forçar o carregamento após 5 segundos
     setTimeout(() => {
         if (!voicesLoaded) {
-            console.warn("Timeout forçando fallback: vozes não carregadas.");
-            voicesLoaded = true; // Força o estado de carregado para não bloquear
+            alert("Vozes não carregaram dentro do tempo esperado. Tente recarregar a página.");
         }
-    }, 3000);
+    }, 5000);
 }
+
+// Desabilita o botão inicialmente
+speakButton.disabled = true;
+speakButton.innerText = "Loading Voices...";
+
+// Chama o carregamento das vozes
+loadVoices();
 
 function getAvailableVoice(lang) {
     const voices = window.speechSynthesis.getVoices();
