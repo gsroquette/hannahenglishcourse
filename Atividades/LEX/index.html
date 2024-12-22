@@ -133,47 +133,45 @@ function trimChatHistory() {
        let hasWarnedUserAboutLang = false; // Variável para evitar mensagens repetidas
 let voicesLoaded = false; // Variável para controlar se as vozes foram carregadas
 
-// Evento para carregar as vozes disponíveis
-let voicesLoaded = false; // Variável global para controlar o carregamento de vozes
-
 function loadVoices() {
     const synth = window.speechSynthesis;
 
-    function checkVoices() {
+    synth.onvoiceschanged = () => {
         const voices = synth.getVoices();
         if (voices.length > 0) {
             voicesLoaded = true;
             console.log("Vozes carregadas com sucesso:", voices);
-            speakButton.disabled = false; // Habilita o botão após carregar
+            speakButton.disabled = false; // Habilita o botão
             speakButton.innerText = "Press to Start";
-        } else {
-            console.warn("Ainda aguardando o carregamento das vozes...");
         }
-    }
+    };
 
-    // Garante o carregamento contínuo até que as vozes estejam disponíveis
-    synth.onvoiceschanged = checkVoices;
-
-    // Fallback caso onvoiceschanged não funcione
+    // Fallback caso onvoiceschanged não funcione (intervalo contínuo)
     const interval = setInterval(() => {
         if (voicesLoaded) {
-            clearInterval(interval); // Para o fallback quando as vozes carregarem
-        } else {
-            checkVoices();
+            clearInterval(interval); // Para o fallback
+        } else if (synth.getVoices().length > 0) {
+            voicesLoaded = true;
+            console.log("Fallback carregou vozes.");
+            speakButton.disabled = false;
+            speakButton.innerText = "Press to Start";
         }
     }, 200);
 
-    // Timeout para forçar o carregamento após 5 segundos
-    setTimeout(() => {
-        if (!voicesLoaded) {
-            alert("Vozes não carregaram dentro do tempo esperado. Tente recarregar a página.");
-        }
-    }, 5000);
-}
+    // Timeout para forçar alerta caso as vozes não carreguem
+setTimeout(() => {
+    if (!voicesLoaded) {
+        console.warn("Vozes não carregaram dentro do tempo esperado.");
+        alert("Vozes não carregaram dentro do tempo esperado. Por favor, recarregue a página.");
+        speakButton.disabled = true; // Mantém o botão desabilitado
+        speakButton.innerText = "Error: Voices not loaded";
+    }
+}, 5000);
 
 // Desabilita o botão inicialmente
 speakButton.disabled = true;
 speakButton.innerText = "Loading Voices...";
+loadVoices(); // As vozes serão carregadas e o botão será habilitado na função
 
 // Chama o carregamento das vozes
 loadVoices();
@@ -307,16 +305,20 @@ function setupSpeechRecognition() {
     };
 
     speakButton.addEventListener("click", () => {
-        if (isListening || isSpeaking) {
-            console.log("Recognition or speaking is already in progress.");
-            return; // Previne múltiplas chamadas do reconhecimento ou sobreposição com a fala
-        }
+    if (!voicesLoaded) {
+        alert("Voices are still loading. Please wait.");
+        return;
+    }
 
-        if (speakButton.innerText === "Press to Speak") {
-            recognition.start(); // Inicia o reconhecimento de voz
-        }
-    });
-}
+    if (isSpeaking || isListening) {
+        console.log("Robot is already busy speaking or listening.");
+        return; // Evita múltiplas ações simultâneas
+    }
+
+    if (speakButton.innerText === "Press to Speak") {
+        recognition.start(); // Inicia o reconhecimento de voz
+    }
+});
 
 async function initializeConversation() {
     firebase.auth().onAuthStateChanged(async (user) => {
@@ -340,29 +342,37 @@ async function initializeConversation() {
 
                 messageElement.style.visibility = "hidden"; // Mensagem inicial será exibida após o clique
 
+                // Verifica se as vozes estão carregadas e atualiza o estado do botão
+                if (!voicesLoaded) {
+                    speakButton.disabled = true;
+                    speakButton.innerText = "Loading Voices...";
+                } else {
+                    speakButton.disabled = false;
+                    speakButton.innerText = "Press to Start";
+                }
+
                 if (!speakButton.hasAttribute('data-initialized')) {
                     speakButton.setAttribute('data-initialized', 'true');
 
- speakButton.addEventListener("click", () => {
-    if (!voicesLoaded) {
-        console.warn("Vozes ainda não carregadas, mas permitindo interação.");
-        alert("Voices are still loading. The robot may not speak properly yet.");
-    }
+                    speakButton.addEventListener("click", () => {
+                        if (!voicesLoaded) {
+                            alert("Voices are still loading. Please wait.");
+                            return; // Impede interação até que as vozes estejam carregadas
+                        }
 
-    if (speakButton.innerText === "Press to Start") {
-        messageElement.style.visibility = "visible";
-        speak(data.response || "Hello! I'm here to help you."); // Mensagem inicial padrão
-        speakButton.innerText = "Press to Speak";
-    } else if (!isSpeaking && !isListening) {
-        recognition.start(); // Inicia o reconhecimento de voz
-    }
-});
-
+                        if (speakButton.innerText === "Press to Start") {
+                            messageElement.style.visibility = "visible";
+                            speak(data.response || "Hello! I'm here to help you."); // Mensagem inicial padrão
+                            speakButton.innerText = "Press to Speak";
+                        } else if (!isSpeaking && !isListening) {
+                            recognition.start(); // Inicia o reconhecimento de voz
+                        }
+                    });
                 }
             } catch (error) {
-               console.error("Error initializing conversation:", error);
-               messageElement.innerText = "An unexpected error occurred. Try again later.";
-               speakButton.disabled = true;
+                console.error("Error initializing conversation:", error);
+                messageElement.innerText = "An unexpected error occurred. Try again later.";
+                speakButton.disabled = true;
                 messageElement.innerText = "Error initializing conversation. Please refresh and try again.";
                 messageElement.style.visibility = "visible";
             }
