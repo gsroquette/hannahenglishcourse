@@ -123,29 +123,43 @@
             robotImg.src = ROBOT_STATIC;
         }
 
-        // Síntese de voz
-        function speak(text, rate = 0.8) {
-            const synth = window.speechSynthesis;
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = "en-US";
-            utterance.rate = rate;
+        let hasWarnedUserAboutLang = false; // Variável para evitar mensagens repetidas
 
-            utterance.onstart = () => {
-                isSpeaking = true;
-                resetStaticTimer();
-                robotImg.src = ROBOT_GIF;
-                speakButton.disabled = true;
-                speakButton.innerText = "Robot is speaking...";
-            };
-            utterance.onend = () => {
-                isSpeaking = false;
-                robotImg.src = ROBOT_STATIC;
-                speakButton.disabled = false;
-                speakButton.innerText = "Press to Speak";
-            };
+function getAvailableVoice(lang) {
+    const voices = window.speechSynthesis.getVoices();
+    return voices.find(voice => voice.lang === lang) || voices[0]; // Retorna a voz desejada ou a primeira disponível
+}
 
-            synth.speak(utterance);
-        }
+function speak(text, rate = 0.8, lang = "en-US") {
+    const synth = window.speechSynthesis;
+    const availableVoice = getAvailableVoice(lang);
+
+    // Verifica se a voz `en-US` está disponível
+    if (availableVoice.lang !== lang && !hasWarnedUserAboutLang) {
+        alert(
+            `The English (US) language pack is not installed or available on your device. Please install it for the best experience. Defaulting to ${availableVoice.lang}.`
+        );
+        hasWarnedUserAboutLang = true; // Garante que a mensagem aparece apenas uma vez
+    }
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = availableVoice.lang; // Usa o idioma encontrado
+    utterance.voice = availableVoice;
+    utterance.rate = rate;
+
+    utterance.onstart = () => {
+        console.log(`Speaking with voice: ${availableVoice.name} (${availableVoice.lang})`);
+        speakButton.disabled = true;
+        speakButton.innerText = "Robot is speaking...";
+    };
+
+    utterance.onend = () => {
+        speakButton.disabled = false;
+        speakButton.innerText = "Press to Speak";
+    };
+
+    synth.speak(utterance);
+}
 
         // Reconhecimento de voz
 function setupSpeechRecognition() {
