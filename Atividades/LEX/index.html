@@ -132,17 +132,30 @@ function loadVoices() {
 
     if (synth.onvoiceschanged !== undefined) {
         synth.onvoiceschanged = () => {
-            voicesLoaded = true; // Marca como carregado quando as vozes estiverem disponíveis
+            voicesLoaded = true;
             console.log("Vozes carregadas:", synth.getVoices());
         };
     } else {
-        voicesLoaded = true; // Assume que as vozes já estão carregadas em navegadores sem suporte ao evento
+        // Repetir até as vozes serem carregadas
+        const interval = setInterval(() => {
+            if (synth.getVoices().length > 0) {
+                voicesLoaded = true;
+                clearInterval(interval);
+                console.log("Vozes carregadas:", synth.getVoices());
+            }
+        }, 100);
     }
 }
 
 function getAvailableVoice(lang) {
     const voices = window.speechSynthesis.getVoices();
-    return voices.find(voice => voice.lang === lang) || voices[0]; // Retorna a voz desejada ou a primeira disponível
+
+    // Priorizar vozes que contêm "en-US" no iOS
+    const iosVoices = voices.filter(voice => voice.lang.includes("en") && voice.name.includes("Siri"));
+    if (iosVoices.length > 0) return iosVoices[0];
+
+    // Fallback para a lógica existente
+    return voices.find(voice => voice.lang === lang) || voices[0];
 }
 
 function speak(text, rate = 0.8, lang = "en-US") {
@@ -268,14 +281,20 @@ async function initializeConversation() {
                     speakButton.setAttribute('data-initialized', 'true');
 
                     speakButton.addEventListener("click", () => {
-                        if (speakButton.innerText === "Press to Start") {
-                            messageElement.style.visibility = "visible";
-                            speak(data.response); // Fala a mensagem inicial
-                            speakButton.innerText = "Press to Speak";
-                        } else {
-                            recognition.start();
-                        }
-                    });
+    if (!voicesLoaded) { // Verifica se as vozes já foram carregadas
+        alert("Voices are still loading. Please wait a moment and try again.");
+        return;
+    }
+
+    if (speakButton.innerText === "Press to Start") {
+        messageElement.style.visibility = "visible";
+        speak(data.response); // Fala a mensagem inicial
+        speakButton.innerText = "Press to Speak";
+    } else {
+        recognition.start(); // Inicia o reconhecimento de voz
+    }
+});
+
                 }
             } catch (error) {
                console.error("Error initializing conversation:", error);
