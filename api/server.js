@@ -83,14 +83,14 @@ function loadConversationDetails(level, unit) {
 app.get('/api/start', async (req, res) => {
     try {
         const userId = req.query.uid;
-        const studentLevel = req.query.level || "Level1"; // Valor padrão para Level
-        const studentUnit = req.query.unit || "Unit1";   // Valor padrão para Unit
+        const studentLevel = req.query.level || "Level1"; // Corrigido para incluir "Level" no valor padrão
+        const studentUnit = req.query.unit || "Unit1";   // Corrigido para incluir "Unit" no valor padrão
 
-        console.log("✅ Request recebido com os parâmetros:", { userId, studentLevel, studentUnit });
+        console.log("✅ Request recebido com os seguintes parâmetros:", { userId, studentLevel, studentUnit });
 
         if (!userId) {
-            console.error("❌ User ID ausente.");
-            return res.status(400).json({ error: "User ID é obrigatório." });
+            console.error("❌ User ID está ausente.");
+            return res.status(400).json({ error: "User ID is required." });
         }
 
         let conversationDetails = 'General conversation';
@@ -100,6 +100,7 @@ app.get('/api/start', async (req, res) => {
         const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataIA', 'conversa.txt');
         console.log(`📂 Tentando acessar o arquivo: ${filePath}`);
 
+        // Verifica se o arquivo existe e carrega o conteúdo
         if (fs.existsSync(filePath)) {
             const fileContent = fs.readFileSync(filePath, 'utf-8').trim();
             console.log("✅ Arquivo conversa.txt carregado com sucesso.");
@@ -116,39 +117,40 @@ app.get('/api/start', async (req, res) => {
             console.warn(`⚠️ Arquivo conversa.txt não encontrado: ${filePath}. Usando 'General conversation'.`);
         }
 
+        // Recupera o nome do aluno no Firebase
         const userRef = db.ref(`usuarios/${userId}/nome`);
         const snapshot = await userRef.once('value');
 
         if (!snapshot.exists()) {
-            console.error(`❌ Usuário não encontrado no Firebase para UID=${userId}.`);
-            return res.status(404).json({ error: "Usuário não encontrado no banco de dados." });
+            console.error(`❌ Usuário não encontrado no Firebase para userId=${userId}.`);
+            return res.status(404).json({ error: "Usuário não encontrado." });
         }
 
         const studentName = snapshot.val();
-        if (!studentName) {
-            console.warn(`⚠️ Nome do usuário ausente para UID=${userId}.`);
-            return res.status(400).json({ error: "Nome do usuário não encontrado no banco de dados." });
-        }
-
         console.log(`✅ Nome do usuário recuperado: ${studentName}`);
 
-        const contextMessage = createInitialContext(studentName, studentLevel, studentUnit, conversationDetails, conversationFullContent);
+        // Cria o contexto inicial
+        const contextMessage = createInitialContext(studentName, studentLevel, studentUnit, conversationDetails);
 
+        // Mensagem inicial
         const initialMessage = `Hello ${studentName}! Today's topic is: ${conversationDetails}. I'm ready to help you at your ${studentLevel}, in ${studentUnit}. Shall we begin?`;
 
+        // Salva ou atualiza o contexto no histórico
         if (!conversations[userId]) {
             conversations[userId] = [
                 { studentName, studentLevel, studentUnit },
                 contextMessage,
                 { role: "assistant", content: initialMessage },
             ];
-            console.log(`📝 Contexto inicial salvo para UID=${userId}`);
+            console.log(`📝 Contexto inicial salvo para userId=${userId}`);
         } else {
             conversations[userId].unshift(contextMessage);
         }
 
+        // Valida e limpa o histórico
         validateAndTrimHistory(userId);
 
+        // Retorna a resposta e o histórico
         return res.json({
             response: initialMessage,
             studentInfo: {
