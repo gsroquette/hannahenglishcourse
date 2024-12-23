@@ -130,13 +130,24 @@ let voicesLoaded = false; // Variável para controlar se as vozes foram carregad
 function loadVoices() {
     const synth = window.speechSynthesis;
 
+    function checkVoices() {
+        const voices = synth.getVoices();
+        if (voices.length > 0) {
+            voicesLoaded = true;
+            console.log("Vozes carregadas:", voices);
+        } else {
+            console.warn("Vozes ainda não carregadas. Repetindo tentativa...");
+            setTimeout(checkVoices, 500); // Tenta novamente após 500ms
+        }
+    }
+
     if (synth.onvoiceschanged !== undefined) {
         synth.onvoiceschanged = () => {
-            voicesLoaded = true; // Marca como carregado quando as vozes estiverem disponíveis
-            console.log("Vozes carregadas:", synth.getVoices());
+            voicesLoaded = true;
+            console.log("Vozes carregadas (evento onvoiceschanged):", synth.getVoices());
         };
     } else {
-        voicesLoaded = true; // Assume que as vozes já estão carregadas em navegadores sem suporte ao evento
+        checkVoices(); // Para navegadores que não suportam onvoiceschanged
     }
 }
 
@@ -147,13 +158,14 @@ function getAvailableVoice(lang) {
 
 // Função para fala do robô
 function speak(text, rate = 0.8, lang = "en-US") {
+    const synth = window.speechSynthesis;
+
     if (!voicesLoaded) {
         console.warn("Vozes ainda não carregadas. Tentando novamente.");
-        window.speechSynthesis.onvoiceschanged = () => speak(text, rate, lang); // Rechama a função assim que as vozes carregarem
+        setTimeout(() => speak(text, rate, lang), 500); // Tenta novamente após 500ms
         return;
     }
 
-    const synth = window.speechSynthesis;
     const availableVoice = getAvailableVoice(lang);
 
     if (availableVoice.lang !== lang && !hasWarnedUserAboutLang) {
@@ -169,15 +181,15 @@ function speak(text, rate = 0.8, lang = "en-US") {
     utterance.rate = rate;
 
     utterance.onstart = () => {
-        isSpeaking = true; // Marca que está falando
-        resetStaticTimer(); // Reseta o timer de inatividade
-        robotImg.src = ROBOT_GIF; // Troca para GIF ativo
+        isSpeaking = true;
+        resetStaticTimer();
+        robotImg.src = ROBOT_GIF;
         console.log("Robot started speaking...");
     };
 
     utterance.onend = () => {
-        isSpeaking = false; // Finaliza o estado de fala
-        robotImg.src = ROBOT_STATIC; // Retorna à imagem estática
+        isSpeaking = false;
+        robotImg.src = ROBOT_STATIC;
         console.log("Robot finished speaking...");
     };
 
