@@ -7,13 +7,21 @@ const { Configuration, OpenAIApi } = require('openai');
 const admin = require('firebase-admin');
 
 // Configuração Firebase Admin
-console.log("FIREBASE_SERVICE_ACCOUNT:", process.env.FIREBASE_SERVICE_ACCOUNT || "NÃO DEFINIDO");
+console.log("FIREBASE_SERVICE_ACCOUNT:", process.env.FIREBASE_SERVICE_ACCOUNT || "NÃO DEFINIDO"); // Verifica o valor da variável de ambiente
+
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || '{}');
-admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
-});
-const db = admin.database();
+
+try {
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+    });
+    console.log("Firebase inicializado com sucesso!");
+} catch (error) {
+    console.error("Erro ao inicializar o Firebase:", error.message); // Exibe erro se o JSON for inválido ou incompleto
+}
+
+const db = admin.database(); // Inicializa o banco de dados Firebase
 
 const app = express();
 const PORT = process.env.PORT || 3000;
