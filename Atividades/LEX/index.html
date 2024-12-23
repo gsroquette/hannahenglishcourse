@@ -129,25 +129,34 @@ let voicesLoaded = false; // Variável para controlar se as vozes foram carregad
 // Evento para carregar as vozes disponíveis
 function loadVoices() {
     const synth = window.speechSynthesis;
+    let attempts = 0; // Contador de tentativas
+    const maxAttempts = 20; // Número máximo de tentativas
+    const intervalTime = 250; // Intervalo entre as tentativas (em ms)
 
     function checkVoices() {
         const voices = synth.getVoices();
         if (voices.length > 0) {
             voicesLoaded = true;
-            console.log("Vozes carregadas:", voices);
+            console.log("Vozes carregadas com sucesso:", voices);
         } else {
-            console.warn("Vozes ainda não carregadas. Repetindo tentativa...");
-            setTimeout(checkVoices, 500); // Tenta novamente após 500ms
+            attempts++;
+            if (attempts >= maxAttempts) {
+                console.error("Erro: Não foi possível carregar as vozes após várias tentativas.");
+                return; // Interrompe as tentativas
+            }
+            setTimeout(checkVoices, intervalTime); // Tenta novamente após o intervalo
         }
     }
 
-    if (synth.onvoiceschanged !== undefined) {
+    // Tenta carregar vozes ao inicializar
+    checkVoices();
+
+    // Adiciona suporte ao evento onvoiceschanged, caso o navegador o dispare
+    if (typeof synth.onvoiceschanged !== "undefined") {
         synth.onvoiceschanged = () => {
             voicesLoaded = true;
             console.log("Vozes carregadas (evento onvoiceschanged):", synth.getVoices());
         };
-    } else {
-        checkVoices(); // Para navegadores que não suportam onvoiceschanged
     }
 }
 
@@ -161,8 +170,8 @@ function speak(text, rate = 0.8, lang = "en-US") {
     const synth = window.speechSynthesis;
 
     if (!voicesLoaded) {
-        console.warn("Vozes ainda não carregadas. Tentando novamente.");
-        setTimeout(() => speak(text, rate, lang), 500); // Tenta novamente após 500ms
+        console.warn("As vozes ainda não foram carregadas. Tentando novamente...");
+        setTimeout(() => speak(text, rate, lang), 500); // Aguarda e tenta novamente
         return;
     }
 
