@@ -55,13 +55,6 @@
         button {
             margin: 10px;
         }
-#robot-img {
-    position: relative;
-    z-index: 10; /* Sempre visível acima de outros elementos */
-    visibility: visible; /* Garante que está visível */
-    opacity: 1; /* Garante que está 100% visível */
-    display: block; /* Evita que seja tratado como inline */
-}
     </style>
 </head>
 <body>
@@ -155,7 +148,7 @@ function getAvailableVoice(lang) {
 function speak(text, rate = 0.8, lang = "en-US") {
     if (!voicesLoaded) {
         console.warn("Vozes ainda não carregadas. Tentando novamente.");
-        window.speechSynthesis.onvoiceschanged = () => speak(text, rate, lang);
+        window.speechSynthesis.onvoiceschanged = () => speak(text, rate, lang); // Rechama a função assim que as vozes carregarem
         return;
     }
 
@@ -175,24 +168,16 @@ function speak(text, rate = 0.8, lang = "en-US") {
     utterance.voice = availableVoice;
     utterance.rate = rate;
 
-  // Evento quando o sintetizador começa a falar
-utterance.onstart = () => {
-    console.log(`Speaking with voice: ${availableVoice.name} (${availableVoice.lang})`);
-    setRobotImage(ROBOT_GIF); // Alterna para o gif principal
-    speakButton.disabled = true;
-    speakButton.innerText = "Robot is speaking...";
-    isSpeaking = true; // Indica que o robô está falando
-    resetStaticTimer(); // Reseta o timer de inatividade
-};
+    utterance.onstart = () => {
+        console.log(`Speaking with voice: ${availableVoice.name} (${availableVoice.lang})`);
+        speakButton.disabled = true;
+        speakButton.innerText = "Robot is speaking...";
+    };
 
-// Evento quando o sintetizador termina de falar
-utterance.onend = () => {
-    setRobotImage(ROBOT_STATIC); // Retorna para a imagem estática
-    speakButton.disabled = false;
-    speakButton.innerText = "Press to Speak";
-    isSpeaking = false; // Indica que o robô parou de falar
-    startStaticImageTimer(); // Reinicia o timer de inatividade
-};
+    utterance.onend = () => {
+        speakButton.disabled = false;
+        speakButton.innerText = "Press to Speak";
+    };
 
     synth.speak(utterance);
 }
@@ -200,29 +185,7 @@ utterance.onend = () => {
 // Chamando o evento para carregar vozes
 loadVoices();
 
-// Função para alterar a imagem do robô
-function setRobotImage(imagePath) {
-    console.log(`Changing robot image to: ${imagePath}`);
-    // Oculta a imagem antes de trocar o src
-    robotImg.style.visibility = "hidden";
-
-    // Troca o src e torna a imagem visível após carregada
-    robotImg.onload = () => {
-        console.log(`Image successfully loaded: ${imagePath}`);
-        robotImg.style.visibility = "visible"; // Torna a imagem visível novamente
-    };
-
-    robotImg.src = imagePath; // Atualiza o src
-}
-
-    // Força o redesenho do navegador
-    robotImg.style.display = "none";
-    setTimeout(() => {
-        robotImg.style.display = "block";
-    }, 50);
-}
-
-        // Reconhecimento de voz
+       // Reconhecimento de voz
 function setupSpeechRecognition() {
     if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
         alert("Speech recognition is not supported in this browser.");
@@ -234,11 +197,13 @@ function setupSpeechRecognition() {
     recognition.lang = "en-US";
 
     recognition.onstart = () => {
+        robotImg.src = ROBOT_GIF; // Muda para GIF durante o reconhecimento de voz
         speakButton.classList.add("listening");
         speakButton.innerText = "Listening...";
     };
 
     recognition.onend = () => {
+        robotImg.src = ROBOT_STATIC; // Volta para a imagem estática após o reconhecimento terminar
         speakButton.classList.remove("listening");
         speakButton.innerText = "Press to Speak";
     };
@@ -247,9 +212,9 @@ function setupSpeechRecognition() {
         const userSpeech = event.results[0][0].transcript;
         console.log("User speech:", userSpeech);
 
- // Exibe o texto capturado da fala do usuário no elemento de mensagem
-    messageElement.style.visibility = "visible";
-    messageElement.innerText = `You said: "${userSpeech}"`; // Exibe a fala capturada
+        // Exibe o texto capturado da fala do usuário no elemento de mensagem
+        messageElement.style.visibility = "visible";
+        messageElement.innerText = `You said: "${userSpeech}"`; // Exibe a fala capturada
 
         if (!userId) {
             alert("User ID is missing. Please log in again.");
@@ -271,10 +236,14 @@ function setupSpeechRecognition() {
 
             chatHistory = data.chatHistory; // Atualiza o histórico completo
             messageElement.innerText = data.response;
+            
+            robotImg.src = ROBOT_GIF; // Muda para GIF durante a fala do robô
             speak(data.response); // Fala a resposta gerada
         } catch (error) {
             console.error("Error communicating with the server:", error);
             messageElement.innerText = "Error communicating with the server.";
+        } finally {
+            robotImg.src = ROBOT_STATIC; // Retorna para a imagem estática após a fala do robô
         }
     };
 }
