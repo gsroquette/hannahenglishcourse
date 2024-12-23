@@ -97,25 +97,29 @@
         let userId = null;
         let chatHistory = [];
 
-const MAX_HISTORY = 20; // Limita o histórico a 20 mensagens
+        const MAX_HISTORY = 20; // Limita o histórico a 20 mensagens
 
-function trimChatHistory() {
-    if (chatHistory.length > MAX_HISTORY) {
-        chatHistory = chatHistory.slice(-MAX_HISTORY); // Mantém as últimas 20 mensagens
-    }
-}
+        function trimChatHistory() {
+            if (chatHistory.length > MAX_HISTORY) {
+                chatHistory = chatHistory.slice(-MAX_HISTORY); // Mantém as últimas 20 mensagens
+            }
+        }
 
- // Botão de voltar
+        // Botão de voltar
         backButton.addEventListener("click", () => window.history.back());
 
         // Alternar imagem após 20 segundos de inatividade
         function startStaticImageTimer() {
+            console.log("Iniciando o timer de inatividade...");
             setInterval(() => {
                 if (!isSpeaking) {
                     staticTime++;
+                    console.log("Tempo estático: ", staticTime);
                     if (staticTime === 20) {
+                        console.log("Alterando imagem para ROBOT_ALTERNATE...");
                         robotImg.src = ROBOT_ALTERNATE;
                         alternateTimeout = setTimeout(() => {
+                            console.log("Revertendo imagem para ROBOT_STATIC...");
                             robotImg.src = ROBOT_STATIC;
                             staticTime = 0;
                         }, 15000);
@@ -126,266 +130,284 @@ function trimChatHistory() {
 
         function resetStaticTimer() {
             staticTime = 0;
+            console.log("Resetando o timer de inatividade...");
             clearTimeout(alternateTimeout);
             robotImg.src = ROBOT_STATIC;
         }
 
         let hasWarnedUserAboutLang = false; // Variável para evitar mensagens repetidas
-let voicesLoaded = false; // Variável para controlar se as vozes foram carregadas
+        let voicesLoaded = false; // Variável para controlar se as vozes foram carregadas
 
-// Função para carregar as vozes disponíveis
-function loadVoices() {
-    const synth = window.speechSynthesis;
-    let voicesLoaded = false;
+        function loadVoices() {
+            const synth = window.speechSynthesis;
+            let voicesLoaded = false;
 
-    // Função auxiliar para verificar e carregar vozes
-    function checkVoices() {
-        const voices = synth.getVoices();
-        if (voices.length > 0) {
-            voicesLoaded = true;
-            console.log("✅ Vozes carregadas:", voices);
-            speakButton.disabled = false; // Habilita o botão
-            speakButton.innerText = "Press to Start";
-            return true; // Vozes carregadas com sucesso
-        }
-        return false; // Nenhuma voz carregada ainda
-    }
-
-    // Evento para navegadores que suportam `onvoiceschanged`
-    if (typeof synth.onvoiceschanged !== "undefined") {
-        synth.onvoiceschanged = () => {
-            if (checkVoices()) {
-                synth.onvoiceschanged = null; // Remove o evento após carregar as vozes
+            function checkAndLoadVoices() {
+                const voices = synth.getVoices();
+                console.log("Verificando vozes disponíveis...");
+                if (voices.length > 0) {
+                    voicesLoaded = true;
+                    console.log("✅ Vozes carregadas com sucesso:", voices);
+                    speakButton.disabled = false;
+                    speakButton.innerText = "Press to Start";
+                }
             }
-        };
-    }
 
-    // Fallback: tenta carregar vozes diretamente após um atraso
-    setTimeout(() => {
-        if (!voicesLoaded && !checkVoices()) {
-            console.error("⚠️ Falha ao carregar vozes. Verifique o suporte do navegador.");
-            alert("Failed to load voices. Please check browser compatibility.");
-            speakButton.disabled = true;
-            speakButton.innerText = "Retrying Voices...";
-        }
-    }, 5000); // Timeout de 5 segundos
-}
+            // Verifica as vozes imediatamente
+            checkAndLoadVoices();
 
-function getAvailableVoice(lang) {
-    const voices = window.speechSynthesis.getVoices();
+            // Configura evento para navegadores que suportam onvoiceschanged
+            if (typeof synth.onvoiceschanged !== "undefined") {
+                synth.onvoiceschanged = () => {
+                    console.log("Evento onvoiceschanged disparado.");
+                    checkAndLoadVoices();
+                };
+            }
 
-    // Priorizar vozes que contêm "en-US" no iOS
-    const iosVoices = voices.filter(voice => voice.lang.includes("en") && voice.name.includes("Siri"));
-    if (iosVoices.length > 0) return iosVoices[0];
+            // Fallback: tenta carregar vozes diretamente em intervalos
+            const fallbackInterval = setInterval(() => {
+                if (voicesLoaded) {
+                    clearInterval(fallbackInterval);
+                } else {
+                    console.log("Fallback: tentando carregar vozes novamente...");
+                    checkAndLoadVoices();
+                }
+            }, 500); // Tenta a cada 500ms
 
-    // Fallback para a lógica existente
-    return voices.find(voice => voice.lang === lang) || voices[0];
-}
-
-// Declare 'isSpeaking' globalmente (apenas uma vez)
-let isSpeaking = false; // Controle de estado de fala
-
-function speak(text, rate = 0.8, lang = "en-US") {
-    if (isSpeaking) return; // Previne chamadas simultâneas
-    isSpeaking = true;
-
-    if (!voicesLoaded) {
-        console.warn("Voices not loaded yet. Trying again.");
-        window.speechSynthesis.onvoiceschanged = () => speak(text, rate, lang);
-        isSpeaking = false; // Libera o estado de fala caso falhe
-        return;
-    }
-
-    const synth = window.speechSynthesis;
-    const availableVoice = getAvailableVoice(lang);
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = availableVoice.lang;
-    utterance.voice = availableVoice;
-    utterance.rate = rate;
-
-    let fallbackTimer;
-
-    utterance.onstart = () => {
-        console.log(`Speaking with voice: ${availableVoice.name} (${availableVoice.lang})`);
-        speakButton.disabled = true;
-        speakButton.innerText = "Robot is speaking...";
-
-        // Fallback para redefinir o botão após o tempo estimado de fala
-          const estimatedDuration = text.length / 15 * 1000; // Estima 15 caracteres por segundo
-        fallbackTimer = setTimeout(() => {
-            speakButton.disabled = false;
-            speakButton.innerText = "Press to Speak";
-            isSpeaking = false; // Libera o estado de fala
-        }, estimatedDuration);
-    };
-
-    utterance.onend = () => {
-        clearTimeout(fallbackTimer); // Cancela o fallback se o evento onend for acionado
-        speakButton.disabled = false;
-        speakButton.innerText = "Press to Speak";
-        isSpeaking = false; // Libera o estado de fala
-    };
-
-    synth.speak(utterance);
-}
-
-// Ajuste na função de reconhecimento de voz
-function setupSpeechRecognition() {
-    if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
-        alert("Speech recognition is not supported in this browser.");
-        speakButton.disabled = true;
-        return;
-    }
-
-    let isListening = false; // Variável para controlar o estado de escuta
-
-    recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-    recognition.lang = "en-US";
-
-    recognition.onstart = () => {
-        isListening = true; // Define que está escutando
-        speakButton.classList.add("listening");
-        speakButton.innerText = "Listening...";
-        console.log("Recognition started.");
-    };
-
-    recognition.onend = () => {
-        isListening = false; // Define que parou de escutar
-        speakButton.classList.remove("listening");
-        speakButton.innerText = "Press to Speak";
-        console.log("Recognition ended.");
-    };
-
-    recognition.onresult = async (event) => {
-        const userSpeech = event.results[0][0].transcript;
-        console.log("User speech:", userSpeech);
-
-        // Exibe o texto capturado da fala do usuário no elemento de mensagem
-        messageElement.style.visibility = "visible";
-        messageElement.innerText = `You said: "${userSpeech}"`;
-
-        if (!userId) {
-            alert("User ID is missing. Please log in again.");
-            return;
+            // Cancela o intervalo após 10 segundos para evitar loop infinito
+            setTimeout(() => {
+                if (!voicesLoaded) {
+                    clearInterval(fallbackInterval);
+                    console.error("⚠️ Não foi possível carregar as vozes dentro do tempo esperado.");
+                    alert("Failed to load voices. Please check your browser.");
+                    speakButton.disabled = true;
+                    speakButton.innerText = "Retrying...";
+                }
+            }, 10000); // 10 segundos
         }
 
-        try {
-            recognition.stop(); // Garante que o reconhecimento pare antes de processar a resposta
-            const response = await fetch('/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ uid: userId, message: userSpeech, chatHistory }),
-            });
-            const data = await response.json();
+        function getAvailableVoice(lang) {
+            console.log("Obtendo voz disponível para o idioma:", lang);
+            const voices = window.speechSynthesis.getVoices();
 
-            if (!data.response) {
-                console.error("Error: Response from AI is missing.");
+            // Priorizar vozes que contêm "en-US" no iOS
+            const iosVoices = voices.filter(voice => voice.lang.includes("en") && voice.name.includes("Siri"));
+            if (iosVoices.length > 0) {
+                console.log("Voz encontrada no iOS:", iosVoices[0]);
+                return iosVoices[0];
+            }
+
+            // Fallback para a lógica existente
+            const voice = voices.find(voice => voice.lang === lang) || voices[0];
+            console.log("Voz padrão encontrada:", voice);
+            return voice;
+        }
+
+        let isSpeaking = false; // Controle de estado de fala
+
+        function speak(text, rate = 0.8, lang = "en-US") {
+            if (isSpeaking) {
+                console.warn("Já está falando. Ignorando nova solicitação.");
+                return; // Previne chamadas simultâneas
+            }
+            isSpeaking = true;
+
+            if (!voicesLoaded) {
+                console.warn
+("Voices not loaded yet. Trying again.");
+                window.speechSynthesis.onvoiceschanged = () => speak(text, rate, lang);
+                isSpeaking = false; // Libera o estado de fala caso falhe
                 return;
             }
 
-            // Atualiza o histórico e fala a resposta
-            chatHistory.push({ role: "user", content: userSpeech });
-            trimChatHistory();
+            const synth = window.speechSynthesis;
+            const availableVoice = getAvailableVoice(lang);
 
-            chatHistory.push({ role: "assistant", content: data.response });
-            trimChatHistory();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = availableVoice.lang;
+            utterance.voice = availableVoice;
+            utterance.rate = rate;
 
-            messageElement.innerText = data.response;
-            speak(data.response); // Chama o sintetizador para falar a resposta
-        } catch (error) {
-            console.error("Error communicating with the server:", error);
-            messageElement.innerText = "Error communicating with the server.";
-        }
-    };
+            let fallbackTimer;
 
-    speakButton.addEventListener("click", () => {
-        if (!voicesLoaded) {
-            alert("Voices are still loading. Please wait.");
-            return;
-        }
-
-        if (isSpeaking || isListening) {
-            alert("The robot is currently busy. Please wait for it to finish.");
-            console.log("Robot is already busy speaking or listening.");
-            return; // Evita múltiplas ações simultâneas
-        }
-
-        if (speakButton.innerText === "Press to Speak") {
-            recognition.start(); // Inicia o reconhecimento de voz
-        }
-    });
-}
-
-async function initializeConversation() {
-    firebase.auth().onAuthStateChanged(async (user) => {
-        if (user) {
-            userId = user.uid;
-            console.log("User authenticated. User ID:", userId);
-
-            const urlParams = new URLSearchParams(window.location.search);
-            const level = urlParams.get('level') || 'Level1';
-            const unit = urlParams.get('unit') || 'Unit1';
-
-            try {
-                const response = await fetch(`/api/start?uid=${userId}&level=${level}&unit=${unit}`);
-                if (!response.ok) throw new Error("Failed to initialize conversation.");
-
-                const data = await response.json();
-                console.log("Server Response:", data);
-
-                chatHistory = data.chatHistory || [];
-                messageElement.innerText = data.response;
-
-                messageElement.style.visibility = "hidden"; // Mensagem inicial será exibida após o clique
-
-                if (!speakButton.hasAttribute('data-initialized')) {
-                    speakButton.setAttribute('data-initialized', 'true');
-
-                    speakButton.addEventListener("click", () => {
-                        if (!voicesLoaded) {
-                            alert("Voices are still loading. Please wait.");
-                            return; // Impede interação até que as vozes estejam carregadas
-                        }
-
-                        if (speakButton.innerText === "Press to Start") {
-                            messageElement.style.visibility = "visible";
-                            speak(data.response || "Hello! I'm here to help you."); // Mensagem inicial padrão
-                            speakButton.innerText = "Press to Speak";
-                        } else if (!isSpeaking && !isListening) {
-                            recognition.start(); // Inicia o reconhecimento de voz
-                        }
-                    });
-                }
-            } catch (error) {
-                console.error("Error initializing conversation:", error);
-                messageElement.innerText = "An unexpected error occurred. Try again later.";
+            utterance.onstart = () => {
+                console.log(`Iniciando fala com voz: ${availableVoice.name} (${availableVoice.lang})`);
                 speakButton.disabled = true;
-                messageElement.style.visibility = "visible";
-            }
-        } else {
-            console.warn("User is not logged in.");
-            messageElement.innerText = "Please log in to start the conversation.";
-            messageElement.style.visibility = "visible";
+                speakButton.innerText = "Robot is speaking...";
+
+                // Fallback para redefinir o botão após o tempo estimado de fala
+                const estimatedDuration = text.length / 15 * 1000; // Estima 15 caracteres por segundo
+                fallbackTimer = setTimeout(() => {
+                    speakButton.disabled = false;
+                    speakButton.innerText = "Press to Speak";
+                    isSpeaking = false; // Libera o estado de fala
+                }, estimatedDuration);
+            };
+
+            utterance.onend = () => {
+                clearTimeout(fallbackTimer); // Cancela o fallback se o evento onend for acionado
+                speakButton.disabled = false;
+                speakButton.innerText = "Press to Speak";
+                isSpeaking = false; // Libera o estado de fala
+                console.log("Fala concluída.");
+            };
+
+            synth.speak(utterance);
         }
-    });
-}
 
-// Configuração inicial quando a página carrega
-document.addEventListener("visibilitychange", () => {
-    if (document.hidden) window.speechSynthesis.cancel(); // Cancela a fala se a aba for minimizada
-});
+        function setupSpeechRecognition() {
+            if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
+                alert("Speech recognition is not supported in this browser.");
+                speakButton.disabled = true;
+                return;
+            }
 
-window.onload = () => {
-    // Verifica se o dispositivo é iOS e exibe o alerta
-    if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-        alert("Please ensure your device is not in silent mode and the volume is turned up.");
-    }
+            let isListening = false; // Variável para controlar o estado de escuta
 
-    setupSpeechRecognition(); // Configura o reconhecimento de voz
-    initializeConversation(); // Inicializa a conversa
-    startStaticImageTimer(); // Inicia o timer de inatividade para troca de imagem
-};
+            recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = "en-US";
+
+            recognition.onstart = () => {
+                isListening = true; // Define que está escutando
+                speakButton.classList.add("listening");
+                speakButton.innerText = "Listening...";
+                console.log("Reconhecimento de fala iniciado.");
+            };
+
+            recognition.onend = () => {
+                isListening = false; // Define que parou de escutar
+                speakButton.classList.remove("listening");
+                speakButton.innerText = "Press to Speak";
+                console.log("Reconhecimento de fala encerrado.");
+            };
+
+            recognition.onresult = async (event) => {
+                const userSpeech = event.results[0][0].transcript;
+                console.log("Fala do usuário capturada:", userSpeech);
+
+                // Exibe o texto capturado da fala do usuário no elemento de mensagem
+                messageElement.style.visibility = "visible";
+                messageElement.innerText = `You said: "${userSpeech}"`;
+
+                if (!userId) {
+                    alert("User ID is missing. Please log in again.");
+                    return;
+                }
+
+                try {
+                    recognition.stop(); // Garante que o reconhecimento pare antes de processar a resposta
+                    const response = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ uid: userId, message: userSpeech, chatHistory }),
+                    });
+                    const data = await response.json();
+
+                    if (!data.response) {
+                        console.error("Erro: Resposta do servidor ausente.");
+                        return;
+                    }
+
+                    // Atualiza o histórico e fala a resposta
+                    chatHistory.push({ role: "user", content: userSpeech });
+                    trimChatHistory();
+
+                    chatHistory.push({ role: "assistant", content: data.response });
+                    trimChatHistory();
+
+                    messageElement.innerText = data.response;
+                    speak(data.response); // Chama o sintetizador para falar a resposta
+                } catch (error) {
+                    console.error("Erro ao comunicar com o servidor:", error);
+                    messageElement.innerText = "Erro ao comunicar com o servidor.";
+                }
+            };
+
+            speakButton.addEventListener("click", () => {
+                if (!voicesLoaded) {
+                    alert("As vozes ainda estão carregando. Por favor, aguarde.");
+                    return;
+                }
+
+                if (isSpeaking || isListening) {
+                    alert("O robô está ocupado. Por favor, aguarde.");
+                    console.log("O robô já está ocupado falando ou escutando.");
+                    return; // Evita múltiplas ações simultâneas
+                }
+
+                if (speakButton.innerText === "Press to Speak") {
+                    recognition.start(); // Inicia o reconhecimento de voz
+                }
+            });
+        }
+
+        async function initializeConversation() {
+            firebase.auth().onAuthStateChanged(async (user) => {
+                if (user) {
+                    userId = user.uid;
+                    console.log("Usuário autenticado. ID do usuário:", userId);
+
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const level = urlParams.get('level') || 'Level1';
+                    const unit = urlParams.get('unit') || 'Unit1';
+
+                    try {
+                        const response = await fetch(`/api/start?uid=${userId}&level=${level}&unit=${unit}`);
+                        if (!response.ok) throw new Error("Erro ao inicializar a conversa.");
+
+                        const data = await response.json();
+                        console.log("Resposta do servidor:", data);
+
+                        chatHistory = data.chatHistory || [];
+                        messageElement.innerText = data.response;
+
+                        messageElement.style.visibility = "hidden"; // Mensagem inicial será exibida após o clique
+
+                        if (!speakButton.hasAttribute('data-initialized')) {
+                            speakButton.setAttribute('data-initialized', 'true');
+
+                            speakButton.addEventListener("click", () => {
+                                if (!voicesLoaded) {
+                                    alert("As vozes ainda estão carregando. Por favor, aguarde.");
+                                    return; // Impede interação até que as vozes estejam carregadas
+                                }
+
+                                if (speakButton.innerText === "Press to Start") {
+                                    messageElement.style.visibility = "visible";
+                                    speak(data.response || "Hello! I'm here to help you."); // Mensagem inicial padrão
+                                    speakButton.innerText = "Press to Speak";
+                                } else if (!isSpeaking && !isListening) {
+                                    recognition.start(); // Inicia o reconhecimento de voz
+                                }
+                            });
+                        }
+                    } catch (error) {
+                        console.error("Erro ao inicializar a conversa:", error);
+                        messageElement.innerText = "Ocorreu um erro inesperado. Tente novamente mais tarde.";
+                        speakButton.disabled = true;
+                        messageElement.style.visibility = "visible";
+                    }
+                } else {
+                    console.warn("Usuário não está logado.");
+                    messageElement.innerText = "Por favor, faça login para começar.";
+                    messageElement.style.visibility = "visible";
+                }
+            });
+        }
+
+        document.addEventListener("visibilitychange", () => {
+            if (document.hidden) window.speechSynthesis.cancel(); // Cancela a fala se a aba for minimizada
+        });
+
+        window.onload = () => {
+            if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+                alert("Por favor, verifique se seu dispositivo não está no modo silencioso e o volume está ativado.");
+            }
+
+            setupSpeechRecognition(); // Configura o reconhecimento de voz
+            initializeConversation(); // Inicializa a conversa
+            startStaticImageTimer(); // Inicia o timer de inatividade para troca de imagem
+        };
     </script>
 </body>
 </html>
