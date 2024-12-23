@@ -70,278 +70,200 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
     <script>
-        const firebaseConfig = {
-            apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
-            authDomain: "hannahenglishcourse.firebaseapp.com",
-            databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
-            projectId: "hannahenglishcourse",
-            storageBucket: "hannahenglishcourse.appspot.com",
-            messagingSenderId: "449818788486",
-            appId: "1:449818788486:web:8a49d3f68591e6fb3f0707"
-        };
-        firebase.initializeApp(firebaseConfig);
+    const firebaseConfig = {
+        apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+        authDomain: "hannahenglishcourse.firebaseapp.com",
+        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "hannahenglishcourse",
+        storageBucket: "hannahenglishcourse.appspot.com",
+        messagingSenderId: "449818788486",
+        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707"
+    };
+    firebase.initializeApp(firebaseConfig);
 
-        // Elementos DOM
-        const messageElement = document.getElementById("message");
-        const robotImg = document.getElementById("robot-img");
-        const speakButton = document.getElementById("speak-button");
-        const backButton = document.getElementById("back-button");
+    // Elementos DOM
+    const messageElement = document.getElementById("message");
+    const robotImg = document.getElementById("robot-img");
+    const speakButton = document.getElementById("speak-button");
+    const backButton = document.getElementById("back-button");
 
-        const ROBOT_GIF = "../../imagens/robo1.gif";
-        const ROBOT_STATIC = "../../imagens/robo1_static.png";
-        const ROBOT_ALTERNATE = "../../imagens/robo2.gif";
+    const ROBOT_GIF = "../../imagens/robo1.gif";
+    const ROBOT_STATIC = "../../imagens/robo1_static.png";
+    const ROBOT_ALTERNATE = "../../imagens/robo2.gif";
 
-        let recognition;
-        let isSpeaking = false;
-        let staticTime = 0;
-        let alternateTimeout = null;
-        let staticInterval = null;
-        let userId = null;
-        let chatHistory = [];
+    let recognition;
+    let isSpeaking = false; // Controla se o robô está ativo (falando ou reconhecendo voz)
+    let staticTime = 0; // Contador para medir o tempo de inatividade
+    let alternateTimeout; // Timeout para exibir o robo2.gif
+    let staticInterval; // Intervalo para monitorar a inatividade
+    let userId = null;
+    let chatHistory = [];
 
-        // Botão de voltar
-        backButton.addEventListener("click", () => window.history.back());
+    // Botão de voltar
+    backButton.addEventListener("click", () => window.history.back());
 
-        // Inicia o contador de inatividade para alternar para robo2.gif
-function startStaticImageTimer() {
-    clearInterval(staticInterval); // Certifica que apenas um intervalo está ativo
+    // Inicia o monitoramento de inatividade
+    function startStaticImageTimer() {
+        clearInterval(staticInterval); // Garante que apenas um intervalo está ativo
+        staticInterval = setInterval(() => {
+            // Verifica se o robô está na imagem estática e não está falando/reconhecendo
+            if (!isSpeaking && robotImg.src.includes("robo1_static.png")) {
+                staticTime++; // Incrementa o contador de inatividade
+                console.log(`Tempo de inatividade: ${staticTime} segundos`);
 
-    staticInterval = setInterval(() => {
-        if (robotImg.src.includes("robo1_static.png")) {
-            staticTime++;
-            console.log(`Contagem de inatividade: ${staticTime} segundos`);
-
-            if (staticTime === 20) {
-                setRobotImage(ROBOT_ALTERNATE); // Troca para robo2.gif
-                alternateTimeout = setTimeout(() => {
-                    resetStaticTimer(); // Volta para a imagem estática após exibir o robo2.gif
-                }, 15000); // Exibe robo2.gif por 15 segundos
+                if (staticTime === 20) {
+                    console.log("Exibindo robo2.gif após 20 segundos de inatividade.");
+                    robotImg.src = ROBOT_ALTERNATE; // Exibe o robo2.gif
+                    alternateTimeout = setTimeout(() => {
+                        console.log("Voltando para robo1_static.png após exibir robo2.gif.");
+                        resetStaticTimer(); // Volta para a imagem estática após 15 segundos
+                    }, 15000); // Exibe o robo2.gif por 15 segundos
+                }
+            } else {
+                staticTime = 0; // Reseta o contador de inatividade se o robô não estiver na imagem estática
             }
+        }, 1000); // Verifica a cada segundo
+    }
+
+    // Reinicia o temporizador de inatividade
+    function resetStaticTimer() {
+        staticTime = 0; // Zera o contador de inatividade
+        clearTimeout(alternateTimeout); // Limpa qualquer timeout ativo
+        robotImg.src = ROBOT_STATIC; // Garante que a imagem volta para estática
+    }
+
+    // Controle centralizado para imagens do robô
+    function setRobotImage(imageSrc) {
+        if (robotImg.src !== imageSrc) {
+            robotImg.src = imageSrc; // Atualiza a imagem do robô
+
+            // Reinicia o temporizador se o robô estiver ativo
+            if (imageSrc === ROBOT_GIF) {
+                resetStaticTimer(); // Zera o contador de inatividade
+            }
+        }
+    }
+
+    let hasWarnedUserAboutLang = false; // Variável para evitar mensagens repetidas
+    let voicesLoaded = false; // Variável para controlar se as vozes foram carregadas
+
+    // Evento para carregar as vozes disponíveis
+    function loadVoices() {
+        const synth = window.speechSynthesis;
+
+        if (synth.onvoiceschanged !== undefined) {
+            synth.onvoiceschanged = () => {
+                voicesLoaded = true; // Marca como carregado quando as vozes estiverem disponíveis
+                console.log("Vozes carregadas:", synth.getVoices());
+            };
         } else {
-            staticTime = 0; // Zera o contador se não for a imagem estática
-        }
-    }, 1000); // Verifica a cada segundo
-}
-
-       // Reinicia o temporizador para inatividade
-function resetStaticTimer() {
-    staticTime = 0;
-    clearTimeout(alternateTimeout);
-    setRobotImage(ROBOT_STATIC); // Volta para imagem estática
-}
-
-       let hasWarnedUserAboutLang = false; // Variável para evitar mensagens repetidas
-       let voicesLoaded = false; // Variável para controlar se as vozes foram carregadas
-
-// Evento para carregar as vozes disponíveis
-function loadVoices() {
-    const synth = window.speechSynthesis;
-
-    if (synth.onvoiceschanged !== undefined) {
-        synth.onvoiceschanged = () => {
-            voicesLoaded = true; // Marca como carregado quando as vozes estiverem disponíveis
-            console.log("Vozes carregadas:", synth.getVoices());
-        };
-    } else {
-        voicesLoaded = true; // Assume que as vozes já estão carregadas em navegadores sem suporte ao evento
-    }
-}
-
-function getAvailableVoice(lang) {
-    const voices = window.speechSynthesis.getVoices();
-    return voices.find(voice => voice.lang === lang) || voices[0]; // Retorna a voz desejada ou a primeira disponível
-}
-
-// Fala com o robô (síntese de voz)
-function speak(text, rate = 0.8, lang = "en-US") {
-    if (!voicesLoaded) {
-        console.warn("Vozes ainda não carregadas. Tentando novamente.");
-        window.speechSynthesis.onvoiceschanged = () => speak(text, rate, lang);
-        return;
-    }
-
-    const synth = window.speechSynthesis;
-    const availableVoice = getAvailableVoice(lang);
-
-    if (availableVoice.lang !== lang && !hasWarnedUserAboutLang) {
-        alert(`The English (US) language pack is not installed or available on your device. Defaulting to ${availableVoice.lang}.`);
-        hasWarnedUserAboutLang = true;
-    }
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = availableVoice.lang;
-    utterance.voice = availableVoice;
-    utterance.rate = rate;
-
-    utterance.onstart = () => {
-        setRobotImage(ROBOT_GIF); // Garante que o GIF aparece ao começar a falar
-        speakButton.disabled = true;
-        speakButton.innerText = "Robot is speaking...";
-    };
-
-    utterance.onend = () => {
-        setRobotImage(ROBOT_STATIC); // Volta para estático ao terminar a fala
-        speakButton.disabled = false;
-        speakButton.innerText = "Press to Speak";
-    };
-
-    synth.speak(utterance);
-}
-
-// Chamando o evento para carregar vozes
-loadVoices();
-
-// Modifique a função centralizada para gerenciar o timer
-function setRobotImage(imageSrc) {
-    if (!robotImg.src.includes(imageSrc)) { // Verifica se a imagem já não está definida
-        robotImg.src = imageSrc;
-
-        // Zera o temporizador de inatividade se a imagem ativa for um GIF
-        if (imageSrc === ROBOT_GIF || imageSrc === ROBOT_ALTERNATE) {
-            resetStaticTimer(); // Reinicia o temporizador
+            voicesLoaded = true; // Assume que as vozes já estão carregadas em navegadores sem suporte ao evento
         }
     }
-}
 
-      // Reconhecimento de voz
-function setupSpeechRecognition() {
-    if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
-        alert("Speech recognition is not supported in this browser.");
-        speakButton.disabled = true;
-        return;
+    function getAvailableVoice(lang) {
+        const voices = window.speechSynthesis.getVoices();
+        return voices.find(voice => voice.lang === lang) || voices[0]; // Retorna a voz desejada ou a primeira disponível
     }
 
-    recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-    recognition.lang = "en-US";
-
-  recognition.onstart = () => {
-    console.log("Reconhecimento iniciado. Trocando para robo1.gif.");
-    setRobotImage(ROBOT_GIF); // Troca para robo1.gif
-    speakButton.classList.add("listening");
-    speakButton.innerText = "Listening...";
-};
-
-recognition.onend = () => {
-    console.log("Reconhecimento finalizado. Voltando para robo1_static.png.");
-    setRobotImage(ROBOT_STATIC); // Volta para a imagem estática
-    speakButton.classList.remove("listening");
-    speakButton.innerText = "Press to Speak";
-};
-
-utterance.onstart = () => {
-    console.log("Síntese de fala iniciada. Trocando para robo1.gif.");
-    setRobotImage(ROBOT_GIF); // Troca para robo1.gif durante a fala
-    speakButton.disabled = true;
-    speakButton.innerText = "Robot is speaking...";
-};
-
-utterance.onend = () => {
-    console.log("Síntese de fala finalizada. Voltando para robo1_static.png.");
-    setRobotImage(ROBOT_STATIC); // Volta para a imagem estática após a fala
-    speakButton.disabled = false;
-    speakButton.innerText = "Press to Speak";
-};
-
-    recognition.onresult = async (event) => {
-        const userSpeech = event.results[0][0].transcript;
-        console.log("User speech:", userSpeech);
-
-        // Exibe o texto capturado da fala do usuário no elemento de mensagem
-        messageElement.style.visibility = "visible";
-        messageElement.innerText = `You said: "${userSpeech}"`;
-
-        if (!userId) {
-            alert("User ID is missing. Please log in again.");
+    // Fala com o robô (síntese de voz)
+    function speak(text, rate = 0.8, lang = "en-US") {
+        if (!voicesLoaded) {
+            console.warn("Vozes ainda não carregadas. Tentando novamente.");
+            window.speechSynthesis.onvoiceschanged = () => speak(text, rate, lang);
             return;
         }
 
-        try {
-            const response = await fetch('/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ uid: userId, message: userSpeech, chatHistory }),
-            });
-            const data = await response.json();
+        const synth = window.speechSynthesis;
+        const availableVoice = getAvailableVoice(lang);
 
-            if (!data.response) {
-                console.error("Erro: Resposta da IA ausente.");
-                return;
-            }
-
-            chatHistory = data.chatHistory;
-            messageElement.innerText = data.response;
-
-            setRobotImage(ROBOT_GIF); // Garante que o GIF aparece durante a fala
-            speak(data.response); // Inicia a síntese de fala
-        } catch (error) {
-            console.error("Error communicating with the server:", error);
-            messageElement.innerText = "Error communicating with the server.";
-        } finally {
-            setRobotImage(ROBOT_STATIC); // Garante que volta para estático ao final
+        if (availableVoice.lang !== lang && !hasWarnedUserAboutLang) {
+            alert(`The English (US) language pack is not installed or available on your device. Defaulting to ${availableVoice.lang}.`);
+            hasWarnedUserAboutLang = true;
         }
-    };
-}
 
-async function initializeConversation() {
-    firebase.auth().onAuthStateChanged(async (user) => {
-        if (user) {
-            userId = user.uid;
-            console.log("User authenticated. User ID:", userId);
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = availableVoice.lang;
+        utterance.voice = availableVoice;
+        utterance.rate = rate;
 
-            const urlParams = new URLSearchParams(window.location.search);
-            const level = urlParams.get('level') || 'Level1';
-            const unit = urlParams.get('unit') || 'Unit1';
+        utterance.onstart = () => {
+            console.log("Iniciando a fala do robô.");
+            isSpeaking = true; // Marca o robô como ativo
+            setRobotImage(ROBOT_GIF); // Troca para robo1.gif
+            speakButton.disabled = true;
+            speakButton.innerText = "Robot is speaking...";
+        };
+
+        utterance.onend = () => {
+            console.log("Fala do robô finalizada.");
+            isSpeaking = false; // Marca o robô como inativo
+            setRobotImage(ROBOT_STATIC); // Volta para a imagem estática
+            speakButton.disabled = false;
+            speakButton.innerText = "Press to Speak";
+        };
+
+        synth.speak(utterance);
+    }
+
+    // Configura o reconhecimento de voz
+    function setupSpeechRecognition() {
+        if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
+            alert("Speech recognition is not supported in this browser.");
+            speakButton.disabled = true;
+            return;
+        }
+
+        recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        recognition.lang = "en-US";
+
+        recognition.onstart = () => {
+            console.log("Reconhecimento de voz iniciado.");
+            isSpeaking = true; // Marca o robô como ativo
+            setRobotImage(ROBOT_GIF); // Troca para robo1.gif
+            speakButton.classList.add("listening");
+            speakButton.innerText = "Listening...";
+        };
+
+        recognition.onend = () => {
+            console.log("Reconhecimento de voz finalizado.");
+            isSpeaking = false; // Marca o robô como inativo
+            setRobotImage(ROBOT_STATIC); // Volta para a imagem estática
+            speakButton.classList.remove("listening");
+            speakButton.innerText = "Press to Speak";
+        };
+
+        recognition.onresult = async (event) => {
+            const userSpeech = event.results[0][0].transcript;
+            console.log(`Você disse: "${userSpeech}"`);
+            messageElement.style.visibility = "visible";
+            messageElement.innerText = `You said: "${userSpeech}"`;
 
             try {
-                const response = await fetch(`/api/start?uid=${userId}&level=${level}&unit=${unit}`);
-                if (!response.ok) throw new Error("Failed to initialize conversation.");
-
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ uid: userId, message: userSpeech, chatHistory }),
+                });
                 const data = await response.json();
-                console.log("Server Response:", data);
 
-                chatHistory = data.chatHistory || [];
-                messageElement.innerText = data.response;
-
-                messageElement.style.visibility = "hidden"; // Mensagem inicial será exibida após o clique
-
-                if (!speakButton.hasAttribute('data-initialized')) {
-                    speakButton.setAttribute('data-initialized', 'true');
-
-                    speakButton.addEventListener("click", () => {
-                        if (speakButton.innerText === "Press to Start") {
-                            messageElement.style.visibility = "visible";
-                            speak(data.response); // Fala a mensagem inicial
-                            speakButton.innerText = "Press to Speak";
-                        } else {
-                            recognition.start();
-                        }
-                    });
+                if (data.response) {
+                    chatHistory = data.chatHistory;
+                    messageElement.innerText = data.response;
+                    speak(data.response); // O robô responde falando
                 }
             } catch (error) {
-               console.error("Error initializing conversation:", error);
-               messageElement.innerText = "An unexpected error occurred. Try again later.";
-               speakButton.disabled = true;
-                messageElement.innerText = "Error initializing conversation. Please refresh and try again.";
-                messageElement.style.visibility = "visible";
+                console.error("Erro ao se comunicar com o servidor:", error);
+                messageElement.innerText = "Error communicating with the server.";
             }
-        } else {
-            console.warn("User is not logged in.");
-            messageElement.innerText = "Please log in to start the conversation.";
-            messageElement.style.visibility = "visible";
-        }
-    });
-}
+        };
+    }
 
-// Configuração inicial quando a página carrega
-document.addEventListener("visibilitychange", () => {
-    if (document.hidden) window.speechSynthesis.cancel(); // Cancela a fala se a aba for minimizada
-});
-
-window.onload = () => {
-    setupSpeechRecognition(); // Configura o reconhecimento de voz
-    initializeConversation(); // Inicializa a conversa
-    startStaticImageTimer(); // Inicia o timer de inatividade para troca de imagem
-};
-    </script>
+    // Configuração inicial
+    window.onload = () => {
+        setupSpeechRecognition(); // Configura o reconhecimento de voz
+        startStaticImageTimer(); // Inicia o timer de inatividade
+    };
+</script>
 </body>
 </html>                                                     
