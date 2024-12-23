@@ -169,30 +169,38 @@ function getAvailableVoice(lang) {
 function speak(text, rate = 0.8, lang = "en-US") {
     const synth = window.speechSynthesis;
 
-    if (!voicesLoaded) {
-        console.warn("As vozes ainda não foram carregadas. Tentando novamente...");
-        setTimeout(() => speak(text, rate, lang), 500); // Aguarda e tenta novamente
+    // Obter lista de vozes
+    const voices = synth.getVoices();
+    if (voices.length === 0) {
+        console.warn("Nenhuma voz carregada. Tentando novamente...");
+        setTimeout(() => speak(text, rate, lang), 500); // Rechama a função
         return;
     }
 
-    const voices = synth.getVoices();
-    const voice = voices.find(v => v.lang === lang) || voices[0]; // Pega a voz correta ou a primeira disponível
+    // Selecionar a voz correta
+    const selectedVoice = voices.find(voice => voice.lang === lang) || voices[0];
+    console.log(`Usando voz: ${selectedVoice.name} (${selectedVoice.lang})`);
 
+    // Configurar a fala
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.voice = voice;
-    utterance.lang = lang;
+    utterance.voice = selectedVoice;
+    utterance.lang = selectedVoice.lang;
     utterance.rate = rate;
 
+    // Eventos da fala
     utterance.onstart = () => {
-        console.log("Robot started speaking...");
-        robotImg.src = ROBOT_GIF;
+        console.log("Fala iniciada...");
+        isSpeaking = true;
+        robotImg.src = ROBOT_GIF; // Mostra o GIF ativo
     };
 
     utterance.onend = () => {
-        console.log("Robot finished speaking...");
-        robotImg.src = ROBOT_STATIC;
+        console.log("Fala finalizada...");
+        isSpeaking = false;
+        robotImg.src = ROBOT_STATIC; // Retorna à imagem estática
     };
 
+    // Iniciar a fala
     synth.speak(utterance);
 }
 
