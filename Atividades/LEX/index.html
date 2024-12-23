@@ -139,52 +139,54 @@
         let voicesLoaded = false; // Variável para controlar se as vozes foram carregadas
 
         function loadVoices() {
-            const synth = window.speechSynthesis;
-            let voicesLoaded = false;
+    const synth = window.speechSynthesis;
 
-            function checkAndLoadVoices() {
-                const voices = synth.getVoices();
-                console.log("Verificando vozes disponíveis...");
-                if (voices.length > 0) {
-                    voicesLoaded = true;
-                    console.log("✅ Vozes carregadas com sucesso:", voices);
-                    speakButton.disabled = false;
-                    speakButton.innerText = "Press to Start";
-                }
-            }
-
-            // Verifica as vozes imediatamente
-            checkAndLoadVoices();
-
-            // Configura evento para navegadores que suportam onvoiceschanged
-            if (typeof synth.onvoiceschanged !== "undefined") {
-                synth.onvoiceschanged = () => {
-                    console.log("Evento onvoiceschanged disparado.");
-                    checkAndLoadVoices();
-                };
-            }
-
-            // Fallback: tenta carregar vozes diretamente em intervalos
-            const fallbackInterval = setInterval(() => {
-                if (voicesLoaded) {
-                    clearInterval(fallbackInterval);
-                } else {
-                    console.log("Fallback: tentando carregar vozes novamente...");
-                    checkAndLoadVoices();
-                }
-            }, 500); // Tenta a cada 500ms
-
-            // Cancela o intervalo após 10 segundos para evitar loop infinito
-            setTimeout(() => {
-                if (!voicesLoaded) {
-                    clearInterval(fallbackInterval);
-                    console.error("⚠️ Não foi possível carregar as vozes dentro do tempo esperado.");
-                    alert("Failed to load voices. Please check your browser.");
-                    speakButton.disabled = true;
-                    speakButton.innerText = "Retrying...";
-                }
-            }, 10000); // 10 segundos
+    function checkAndLoadVoices() {
+        const voices = synth.getVoices();
+        console.log("Verificando vozes disponíveis...", voices);
+        if (voices.length > 0) {
+            voicesLoaded = true;
+            console.log("✅ Vozes carregadas com sucesso:", voices);
+            speakButton.disabled = false;
+            speakButton.innerText = "Press to Start";
+        } else {
+            console.log("❌ Nenhuma voz encontrada. Continuando a verificar...");
         }
+    }
+
+    // Verifica imediatamente
+    checkAndLoadVoices();
+
+    // Configura evento para navegadores que suportam onvoiceschanged
+    if (typeof synth.onvoiceschanged !== "undefined") {
+        synth.onvoiceschanged = () => {
+            console.log("Evento onvoiceschanged disparado.");
+            checkAndLoadVoices();
+        };
+    }
+
+    // Fallback com tentativas repetidas
+    const fallbackInterval = setInterval(() => {
+        if (voicesLoaded) {
+            console.log("✅ Vozes carregadas pelo fallback.");
+            clearInterval(fallbackInterval);
+        } else {
+            console.log("Fallback: Tentando carregar vozes...");
+            checkAndLoadVoices();
+        }
+    }, 500);
+
+    // Timeout após 10 segundos
+    setTimeout(() => {
+        if (!voicesLoaded) {
+            clearInterval(fallbackInterval);
+            console.error("⚠️ Timeout: Não foi possível carregar as vozes.");
+            alert("Voices failed to load. Please refresh the page or check your browser settings.");
+            speakButton.disabled = true;
+            speakButton.innerText = "Retrying...";
+        }
+    }, 10000);
+}
 
         function getAvailableVoice(lang) {
             console.log("Obtendo voz disponível para o idioma:", lang);
@@ -323,23 +325,25 @@
                 }
             };
 
-            speakButton.addEventListener("click", () => {
-                if (!voicesLoaded) {
-                    alert("As vozes ainda estão carregando. Por favor, aguarde.");
-                    return;
-                }
+         speakButton.addEventListener("click", () => {
+    console.log("Botão pressionado. Verificando estado...");
+    if (!voicesLoaded) {
+        alert("As vozes ainda estão carregando. Por favor, aguarde.");
+        console.log("❌ As vozes ainda não estão prontas.");
+        return;
+    }
 
-                if (isSpeaking || isListening) {
-                    alert("O robô está ocupado. Por favor, aguarde.");
-                    console.log("O robô já está ocupado falando ou escutando.");
-                    return; // Evita múltiplas ações simultâneas
-                }
+    if (isSpeaking || isListening) {
+        alert("O robô está ocupado. Por favor, aguarde.");
+        console.log("❌ O robô já está falando ou escutando.");
+        return; // Evita múltiplas ações simultâneas
+    }
 
-                if (speakButton.innerText === "Press to Speak") {
-                    recognition.start(); // Inicia o reconhecimento de voz
-                }
-            });
-        }
+    if (speakButton.innerText === "Press to Speak") {
+        console.log("Iniciando reconhecimento de fala...");
+        recognition.start();
+    }
+});
 
         async function initializeConversation() {
             firebase.auth().onAuthStateChanged(async (user) => {
