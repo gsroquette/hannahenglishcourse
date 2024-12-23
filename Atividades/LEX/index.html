@@ -95,33 +95,33 @@
         let isSpeaking = false;
         let staticTime = 0;
         let alternateTimeout;
-        let gifInterval;
         let userId = null;
         let chatHistory = [];
 
         // Botão de voltar
         backButton.addEventListener("click", () => window.history.back());
-        
-    function startStaticImageTimer() {
-    clearInterval(gifInterval); // Evita múltiplos intervalos
-    gifInterval = setInterval(() => {
-        staticTime++;
-        if (staticTime === 30) { // Após 30 segundos de inatividade
-            robotImg.src = ROBOT_ALTERNATE; // Exibe o GIF alternativo
-            alternateTimeout = setTimeout(() => {
-                robotImg.src = ROBOT_STATIC; // Volta para a imagem estática após 15 segundos
-                staticTime = 0; // Reseta o contador
-                clearTimeout(alternateTimeout); // Limpa o timeout
-            }, 15000); // Tempo para exibir o GIF alternativo
-        }
-    }, 1000); // Incrementa o contador a cada segundo
-}
 
-function resetStaticTimer() {
-    staticTime = 0; // Reseta o contador
-    clearTimeout(alternateTimeout); // Limpa o timeout alternativo
-    robotImg.src = ROBOT_STATIC; // Retorna à imagem estática
-}
+        // Alternar imagem após 20 segundos de inatividade
+        function startStaticImageTimer() {
+            setInterval(() => {
+                if (!isSpeaking) {
+                    staticTime++;
+                    if (staticTime === 20) {
+                        robotImg.src = ROBOT_ALTERNATE;
+                        alternateTimeout = setTimeout(() => {
+                            robotImg.src = ROBOT_STATIC;
+                            staticTime = 0;
+                        }, 15000);
+                    }
+                }
+            }, 1000);
+        }
+
+        function resetStaticTimer() {
+            staticTime = 0;
+            clearTimeout(alternateTimeout);
+            robotImg.src = ROBOT_STATIC;
+        }
 
        let hasWarnedUserAboutLang = false; // Variável para evitar mensagens repetidas
 let voicesLoaded = false; // Variável para controlar se as vozes foram carregadas
@@ -155,50 +155,37 @@ function speak(text, rate = 0.8, lang = "en-US") {
     const synth = window.speechSynthesis;
     const availableVoice = getAvailableVoice(lang);
 
+    // Verifica se a voz `en-US` está disponível
     if (availableVoice.lang !== lang && !hasWarnedUserAboutLang) {
-        alert(`The English (US) language pack is not installed or available on your device. Please install it for the best experience. Defaulting to ${availableVoice.lang}.`);
-        hasWarnedUserAboutLang = true;
+        alert(
+            `The English (US) language pack is not installed or available on your device. Please install it for the best experience. Defaulting to ${availableVoice.lang}.`
+        );
+        hasWarnedUserAboutLang = true; // Garante que a mensagem aparece apenas uma vez
     }
 
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = availableVoice.lang;
+    utterance.lang = availableVoice.lang; // Usa o idioma encontrado
     utterance.voice = availableVoice;
     utterance.rate = rate;
 
-   utterance.onstart = () => {
-    console.log("Iniciando fala do robô...");
-    console.log("Configurando imagem para ROBOT_GIF:", ROBOT_GIF);
-    
-    speakButton.disabled = true;
-    speakButton.innerText = "Robot is speaking...";
-    
-    // Força o recarregamento da imagem para garantir que o GIF seja carregado
-    robotImg.src = `${ROBOT_GIF}?timestamp=${new Date().getTime()}`;
-    console.log("Imagem trocada para:", robotImg.src); // Loga o caminho configurado
-    
-    clearInterval(gifInterval); // Pausa o temporizador de inatividade
-    resetStaticTimer(); // Reseta o temporizador
-};
+    // Evento quando o sintetizador começa a falar
+    utterance.onstart = () => {
+        console.log(`Speaking with voice: ${availableVoice.name} (${availableVoice.lang})`);
+        setRobotImage(ROBOT_GIF); // Alterna para o gif principal
+        speakButton.disabled = true;
+        speakButton.innerText = "Robot is speaking...";
+        isSpeaking = true; // Indica que o robô está falando
+        resetStaticTimer(); // Reseta o timer de inatividade
+    };
 
-utterance.onend = () => {
-    console.log("Fala do robô terminou.");
-    
-    speakButton.disabled = false;
-    speakButton.innerText = "Press to Speak";
-    
-    // Troca para a imagem estática após o término
-    robotImg.src = `${ROBOT_STATIC}?timestamp=${new Date().getTime()}`;
-    console.log("Imagem trocada para:", robotImg.src);
-    
-    startStaticImageTimer(); // Reinicia o temporizador de inatividade
-};
-
-robotImg.onload = () => {
-    console.log("Imagem carregada com sucesso:", robotImg.src);
-};
-robotImg.onerror = () => {
-    console.error("Erro ao carregar a imagem:", robotImg.src);
-};
+    // Evento quando o sintetizador termina de falar
+    utterance.onend = () => {
+        setRobotImage(ROBOT_STATIC); // Retorna para a imagem estática
+        speakButton.disabled = false;
+        speakButton.innerText = "Press to Speak";
+        isSpeaking = false; // Indica que o robô parou de falar
+        startStaticImageTimer(); // Reinicia o timer de inatividade
+    };
 
     synth.speak(utterance);
 }
@@ -319,10 +306,9 @@ document.addEventListener("visibilitychange", () => {
 });
 
 window.onload = () => {
-    setupSpeechRecognition();
-    initializeConversation();
-    startStaticImageTimer();
-    speakButton.focus(); // Foca no botão ao carregar a página
+    setupSpeechRecognition(); // Configura o reconhecimento de voz
+    initializeConversation(); // Inicializa a conversa
+    startStaticImageTimer(); // Inicia o timer de inatividade para troca de imagem
 };
     </script>
 </body>
