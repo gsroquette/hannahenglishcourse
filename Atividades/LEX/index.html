@@ -94,37 +94,44 @@
         let recognition;
         let isSpeaking = false;
         let staticTime = 0;
-        let alternateTimeout;
+        let alternateTimeout = null;
+        let staticInterval = null;
         let userId = null;
         let chatHistory = [];
 
         // Botão de voltar
         backButton.addEventListener("click", () => window.history.back());
 
-        // Alternar imagem após 20 segundos de inatividade
-        function startStaticImageTimer() {
-            setInterval(() => {
-                if (!isSpeaking) {
-                    staticTime++;
-                    if (staticTime === 20) {
-                        robotImg.src = ROBOT_ALTERNATE;
-                        alternateTimeout = setTimeout(() => {
-                            robotImg.src = ROBOT_STATIC;
-                            staticTime = 0;
-                        }, 15000);
-                    }
-                }
-            }, 1000);
-        }
+        // Inicia o contador de inatividade para alternar para robo2.gif
+function startStaticImageTimer() {
+    clearInterval(staticInterval); // Certifica que apenas um intervalo está ativo
 
-        function resetStaticTimer() {
-            staticTime = 0;
-            clearTimeout(alternateTimeout);
-            robotImg.src = ROBOT_STATIC;
+    staticInterval = setInterval(() => {
+        if (robotImg.src.includes("robo1_static.png")) {
+            staticTime++;
+            console.log(`Contagem de inatividade: ${staticTime} segundos`);
+
+            if (staticTime === 20) {
+                setRobotImage(ROBOT_ALTERNATE); // Troca para robo2.gif
+                alternateTimeout = setTimeout(() => {
+                    resetStaticTimer(); // Volta para a imagem estática após exibir o robo2.gif
+                }, 15000); // Exibe robo2.gif por 15 segundos
+            }
+        } else {
+            staticTime = 0; // Zera o contador se não for a imagem estática
         }
+    }, 1000); // Verifica a cada segundo
+}
+
+       // Reinicia o temporizador para inatividade
+function resetStaticTimer() {
+    staticTime = 0;
+    clearTimeout(alternateTimeout);
+    setRobotImage(ROBOT_STATIC); // Volta para imagem estática
+}
 
        let hasWarnedUserAboutLang = false; // Variável para evitar mensagens repetidas
-let voicesLoaded = false; // Variável para controlar se as vozes foram carregadas
+       let voicesLoaded = false; // Variável para controlar se as vozes foram carregadas
 
 // Evento para carregar as vozes disponíveis
 function loadVoices() {
@@ -184,10 +191,16 @@ function speak(text, rate = 0.8, lang = "en-US") {
 // Chamando o evento para carregar vozes
 loadVoices();
 
-// Controle centralizado para imagens do robô
+// Modifique a função centralizada para gerenciar o timer
 function setRobotImage(imageSrc) {
     if (robotImg.src !== imageSrc) {
+        robotImg.src = ""; // Força a reinicialização do GIF
         robotImg.src = imageSrc;
+
+        // Zera a contagem se o robô estiver ativo (robo1.gif ou robo2.gif)
+        if (imageSrc === ROBOT_GIF) {
+            resetStaticTimer(); // Zera a contagem de inatividade
+        }
     }
 }
 
@@ -203,16 +216,16 @@ function setupSpeechRecognition() {
     recognition.lang = "en-US";
 
     recognition.onstart = () => {
-        setRobotImage(ROBOT_GIF); // Muda para GIF durante o reconhecimento de voz
-        speakButton.classList.add("listening");
-        speakButton.innerText = "Listening...";
-    };
+    setRobotImage(ROBOT_GIF); // Troca para robo1.gif
+    speakButton.classList.add("listening");
+    speakButton.innerText = "Listening...";
+};
 
-    recognition.onend = () => {
-        setRobotImage(ROBOT_STATIC); // Volta para a imagem estática após o reconhecimento terminar
-        speakButton.classList.remove("listening");
-        speakButton.innerText = "Press to Speak";
-    };
+recognition.onend = () => {
+    setRobotImage(ROBOT_STATIC); // Volta para a imagem estática
+    speakButton.classList.remove("listening");
+    speakButton.innerText = "Press to Speak";
+};
 
     recognition.onresult = async (event) => {
         const userSpeech = event.results[0][0].transcript;
