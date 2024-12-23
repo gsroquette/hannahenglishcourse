@@ -59,6 +59,13 @@
 </head>
 <body>
     <h1>Talk to Robot Samuel</h1>
+
+<div style="margin-top: 20px; text-align: center;">
+    <label for="voice-speed">Playback Speed:</label>
+    <input id="voice-speed" type="range" min="0.5" max="2" step="0.1" value="1" style="width: 200px;">
+    <span id="speed-display">1x</span>
+</div>
+
     <img id="robot-img" src="../../imagens/robo1_static.png" alt="Robot">
     <p id="message" style="visibility: hidden;">Loading...</p>
     <button id="speak-button" style="display: none;">Press to Start</button>
@@ -86,6 +93,15 @@
         const robotImg = document.getElementById("robot-img");
         const speakButton = document.getElementById("speak-button");
         const backButton = document.getElementById("back-button");
+
+// Elementos DOM para o slider
+const speedSlider = document.getElementById("voice-speed");
+const speedDisplay = document.getElementById("speed-display");
+
+// Atualiza a exibição da velocidade quando o slider é movido
+speedSlider.addEventListener("input", () => {
+    const speed = speedSlider.value;
+    speedDisplay.textContent = `${speed}x`;
 
         const ROBOT_GIF = "../../imagens/robo1.gif";
         const ROBOT_STATIC = "../../imagens/robo1_static.png";
@@ -166,14 +182,15 @@ function getAvailableVoice(lang) {
 }
 
 // Função para fala do robô
-function speak(text, rate = 0.8, lang = "en-US") {
+// Função de fala com suporte ao controle de velocidade
+function speak(text, rate = 1, lang = "en-US") {
     const synth = window.speechSynthesis;
 
     // Obter lista de vozes
     const voices = synth.getVoices();
     if (voices.length === 0) {
         console.warn("Nenhuma voz carregada. Tentando novamente...");
-        setTimeout(() => speak(text, rate, lang), 500); // Rechama a função
+        setTimeout(() => speak(text, rate, lang), 500);
         return;
     }
 
@@ -185,20 +202,39 @@ function speak(text, rate = 0.8, lang = "en-US") {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.voice = selectedVoice;
     utterance.lang = selectedVoice.lang;
-    utterance.rate = rate;
 
-    // Eventos da fala
+    // **Integrar o controle de velocidade**
+    // Use a velocidade atual do slider, mas mantenha um valor padrão caso o slider não esteja disponível
+    const speed = parseFloat(speedSlider?.value) || rate; 
+    utterance.rate = speed;
+
+    // Eventos de início e término da fala
     utterance.onstart = () => {
         console.log("Fala iniciada...");
         isSpeaking = true;
-        robotImg.src = ROBOT_GIF; // Mostra o GIF ativo
+
+        // Troca para a imagem animada do robô
+        robotImg.src = ROBOT_GIF;
     };
 
     utterance.onend = () => {
         console.log("Fala finalizada...");
         isSpeaking = false;
-        robotImg.src = ROBOT_STATIC; // Retorna à imagem estática
+
+        // Retorna à imagem estática do robô
+        robotImg.src = ROBOT_STATIC;
     };
+
+    // Lida com erros de fala (caso ocorram)
+    utterance.onerror = (error) => {
+        console.error("Erro durante a fala:", error);
+    };
+
+    // **Configuração para evitar sobreposição de fala**
+    if (synth.speaking) {
+        console.warn("Já estou falando, cancelando a fala anterior...");
+        synth.cancel(); // Cancela qualquer fala anterior
+    }
 
     // Iniciar a fala
     synth.speak(utterance);
