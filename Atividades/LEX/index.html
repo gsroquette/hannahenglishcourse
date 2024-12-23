@@ -89,30 +89,33 @@
         firebase.initializeApp(firebaseConfig);
 
         // Elementos DOM
-        const messageElement = document.getElementById("message");
-        const robotImg = document.getElementById("robot-img");
-        const speakButton = document.getElementById("speak-button");
-        const backButton = document.getElementById("back-button");
+const messageElement = document.getElementById("message");
+const robotImg = document.getElementById("robot-img");
+const speakButton = document.getElementById("speak-button");
+const backButton = document.getElementById("back-button");
 
 // Elementos DOM para o slider
 const speedSlider = document.getElementById("voice-speed");
 const speedDisplay = document.getElementById("speed-display");
 
-        const ROBOT_GIF = "../../imagens/robo1.gif";
-        const ROBOT_STATIC = "../../imagens/robo1_static.png";
-        const ROBOT_ALTERNATE = "../../imagens/robo2.gif";
+// Constantes para as imagens do robô
+const ROBOT_GIF = "../../imagens/robo1.gif";
+const ROBOT_STATIC = "../../imagens/robo1_static.png";
+const ROBOT_ALTERNATE = "../../imagens/robo2.gif";
+
+// Variáveis globais
+let recognition; // Para o reconhecimento de voz
+let isSpeaking = false; // Indica se o robô está falando
+let staticTime = 0; // Tempo de inatividade
+let alternateTimeout; // Timeout para alternar imagens
+let userId = null; // ID do usuário
+let chatHistory = []; // Histórico do chat
 
 // Atualiza a exibição da velocidade quando o slider é movido
 speedSlider.addEventListener("input", () => {
     const speed = speedSlider.value;
-    speedDisplay.textContent = `${speed}x`;
-
-        let recognition;
-        let isSpeaking = false;
-        let staticTime = 0;
-        let alternateTimeout;
-        let userId = null;
-        let chatHistory = [];
+    speedDisplay.textContent = `${speed}x`; // Atualiza a exibição da velocidade
+});
 
         // Botão de voltar
         backButton.addEventListener("click", () => window.history.back());
@@ -181,62 +184,37 @@ function getAvailableVoice(lang) {
     return voices.find(voice => voice.lang === lang) || voices[0]; // Retorna a voz desejada ou a primeira disponível
 }
 
-// Função para fala do robô
 // Função de fala com suporte ao controle de velocidade
 function speak(text, rate = 1, lang = "en-US") {
     const synth = window.speechSynthesis;
-
-    // Obter lista de vozes
     const voices = synth.getVoices();
+
     if (voices.length === 0) {
         console.warn("Nenhuma voz carregada. Tentando novamente...");
         setTimeout(() => speak(text, rate, lang), 500);
         return;
     }
 
-    // Selecionar a voz correta
     const selectedVoice = voices.find(voice => voice.lang === lang) || voices[0];
-    console.log(`Usando voz: ${selectedVoice.name} (${selectedVoice.lang})`);
-
-    // Configurar a fala
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.voice = selectedVoice;
     utterance.lang = selectedVoice.lang;
 
-    // **Integrar o controle de velocidade**
-    // Use a velocidade atual do slider, mas mantenha um valor padrão caso o slider não esteja disponível
-    const speed = parseFloat(speedSlider?.value) || rate; 
+    // Controle de velocidade com o slider
+    const speed = parseFloat(speedSlider.value) || rate;
     utterance.rate = speed;
 
-    // Eventos de início e término da fala
     utterance.onstart = () => {
-        console.log("Fala iniciada...");
         isSpeaking = true;
-
-        // Troca para a imagem animada do robô
-        robotImg.src = ROBOT_GIF;
+        robotImg.src = ROBOT_GIF; // Troca para o GIF animado
     };
 
     utterance.onend = () => {
-        console.log("Fala finalizada...");
         isSpeaking = false;
-
-        // Retorna à imagem estática do robô
-        robotImg.src = ROBOT_STATIC;
+        robotImg.src = ROBOT_STATIC; // Retorna para a imagem estática
     };
 
-    // Lida com erros de fala (caso ocorram)
-    utterance.onerror = (error) => {
-        console.error("Erro durante a fala:", error);
-    };
-
-    // **Configuração para evitar sobreposição de fala**
-    if (synth.speaking) {
-        console.warn("Já estou falando, cancelando a fala anterior...");
-        synth.cancel(); // Cancela qualquer fala anterior
-    }
-
-    // Iniciar a fala
+    if (synth.speaking) synth.cancel(); // Evita sobreposição de fala
     synth.speak(utterance);
 }
 
