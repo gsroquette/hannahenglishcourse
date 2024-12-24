@@ -170,6 +170,60 @@ let alternateTimeout; // Timeout para alternar imagens
 let userId = null; // ID do usuário
 let chatHistory = []; // Histórico do chat
 
+// Fallback para navegadores sem suporte ao SpeechRecognition
+        function checkSpeechRecognitionSupport() {
+            if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
+                fallbackInput.style.display = 'block';
+                speakButton.style.display = 'none';
+                messageElement.innerText = "Speech recognition is not supported. Please type your response below.";
+                messageElement.style.visibility = 'visible';
+                return false;
+            }
+            return true;
+        }
+
+        // Configuração do reconhecimento de voz
+        function setupSpeechRecognition() {
+            if (!checkSpeechRecognitionSupport()) return;
+
+            recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = "en-US";
+
+            recognition.onstart = () => {
+                isSpeaking = true;
+                robotImg.src = "../../imagens/robo1.gif";
+                speakButton.classList.add("listening");
+                speakButton.innerText = "Listening...";
+            };
+
+            recognition.onend = () => {
+                isSpeaking = false;
+                robotImg.src = "../../imagens/robo1_static.png";
+                speakButton.classList.remove("listening");
+                speakButton.innerText = "Press to Speak";
+            };
+
+            recognition.onresult = async (event) => {
+                const userSpeech = event.results[0][0].transcript;
+                messageElement.style.visibility = "visible";
+                messageElement.innerText = `You said: "${userSpeech}"`;
+                // Enviar mensagem ao servidor ou processar resposta
+                console.log("User speech:", userSpeech);
+            };
+        }
+
+        // Fallback: Envio de mensagem digitada
+        sendButton.addEventListener('click', () => {
+            const userMessage = userInput.value.trim();
+            if (userMessage) {
+                messageElement.style.visibility = "visible";
+                messageElement.innerText = `You said: "${userMessage}"`;
+                userInput.value = "";
+                // Enviar mensagem ao servidor ou processar resposta
+                console.log("User typed:", userMessage);
+            }
+        });
+
 // Função para atualizar o preenchimento e exibição do slider
 function updateSliderBackground() {
     const value = ((speedSlider.value - speedSlider.min) / (speedSlider.max - speedSlider.min)) * 100;
@@ -406,7 +460,23 @@ document.addEventListener("visibilitychange", () => {
 });
 
 window.onload = () => {
-    setupSpeechRecognition(); // Configura o reconhecimento de voz
+    // Verifica suporte ao reconhecimento de voz
+    if (checkSpeechRecognitionSupport()) {
+        setupSpeechRecognition(); // Configura o reconhecimento de voz
+        speakButton.style.display = 'block'; // Exibe o botão de fala
+
+        speakButton.addEventListener("click", () => {
+            if (speakButton.innerText === "Press to Start") {
+                messageElement.style.visibility = "visible";
+                speakButton.innerText = "Press to Speak";
+            } else {
+                recognition.start(); // Inicia o reconhecimento de voz
+            }
+        });
+    } else {
+        fallbackInput.style.display = 'block'; // Exibe o fallback de texto
+    }
+
     initializeConversation(); // Inicializa a conversa
     startStaticImageTimer(); // Inicia o timer de inatividade para troca de imagem
 };
