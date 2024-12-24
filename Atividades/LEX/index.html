@@ -129,6 +129,10 @@ input[type="range"]::-moz-range-thumb {
     <p id="message" style="visibility: hidden;">Loading...</p>
     <button id="speak-button" style="display: none;">Press to Start</button>
     <button id="back-button">Back</button>
+<div id="fallback-input" style="display: none; margin-top: 20px;">
+    <input type="text" id="user-input" placeholder="Type your message...">
+    <button id="send-button">Send</button>
+</div>
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
@@ -172,15 +176,16 @@ let chatHistory = []; // Histórico do chat
 
 // Fallback para navegadores sem suporte ao SpeechRecognition
         function checkSpeechRecognitionSupport() {
-            if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
-                fallbackInput.style.display = 'block';
-                speakButton.style.display = 'none';
-                messageElement.innerText = "Speech recognition is not supported. Please type your response below.";
-                messageElement.style.visibility = 'visible';
-                return false;
-            }
-            return true;
-        }
+    if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
+        const fallbackInput = document.getElementById("fallback-input");
+        if (fallbackInput) fallbackInput.style.display = 'block';
+        speakButton.style.display = 'none';
+        messageElement.innerText = "Speech recognition is not supported. Please type your response below.";
+        messageElement.style.visibility = 'visible';
+        return false;
+    }
+    return true;
+}
 
         // Configuração do reconhecimento de voz
         function setupSpeechRecognition() {
@@ -459,6 +464,26 @@ document.addEventListener("visibilitychange", () => {
     if (document.hidden) window.speechSynthesis.cancel(); // Cancela a fala se a aba for minimizada
 });
 
+  // Configuração inicial quando a página carrega
+    document.addEventListener("DOMContentLoaded", () => {
+        const fallbackInput = document.getElementById("fallback-input");
+        const userInput = document.getElementById("user-input");
+        const sendButton = document.getElementById("send-button");
+
+        if (sendButton) {
+            sendButton.addEventListener("click", () => {
+                const userMessage = userInput.value.trim();
+                if (userMessage) {
+                    messageElement.style.visibility = "visible";
+                    messageElement.innerText = `You said: "${userMessage}"`;
+                    userInput.value = "";
+                    console.log("User typed:", userMessage);
+                    // Aqui você pode enviar a mensagem ao servidor, se necessário
+                }
+            });
+        }
+    });
+
 window.onload = () => {
     // Verifica suporte ao reconhecimento de voz
     if (checkSpeechRecognitionSupport()) {
@@ -474,7 +499,9 @@ window.onload = () => {
             }
         });
     } else {
-        fallbackInput.style.display = 'block'; // Exibe o fallback de texto
+        // Ativa fallback de texto
+        const fallbackInput = document.getElementById("fallback-input");
+        if (fallbackInput) fallbackInput.style.display = 'block';
     }
 
     initializeConversation(); // Inicializa a conversa
