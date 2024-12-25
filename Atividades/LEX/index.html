@@ -289,61 +289,85 @@ ensureVoicesLoaded(() => {
 });
 
         // Configuração do Reconhecimento de Voz
-      function setupSpeechRecognition() {
+function setupSpeechRecognition() {
     if (!checkSpeechRecognitionSupport()) return;
 
     recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
     recognition.lang = "en-US";
 
-    recognition.onstart = () => {
-        isSpeaking = true; // Indica que o usuário está falando
-        resetStaticTimer(); // Reseta o temporizador de inatividade
-        speakButton.classList.add("listening");
-        speakButton.innerText = "Listening...";
-        console.log("User is speaking...");
-    };
+    // Verifica permissão do microfone antes de configurar os eventos
+    if ('permissions' in navigator) {
+        navigator.permissions.query({ name: 'microphone' }).then(permissionStatus => {
+            if (permissionStatus.state === 'denied') {
+                messageElement.style.visibility = 'visible';
+                messageElement.innerText = "Microphone access is blocked. Please enable microphone permissions in your browser settings.";
+                speakButton.style.display = 'none';
+                console.warn("Microphone permission is blocked.");
+                return; // Impede a configuração do reconhecimento de voz
+            } else {
+                console.log("Microphone permission granted.");
+                initializeRecognitionEvents(); // Configura os eventos do reconhecimento
+            }
+        }).catch(err => {
+            console.error("Error checking microphone permissions:", err);
+            initializeRecognitionEvents(); // Continua mesmo se houver erro ao verificar permissões
+        });
+    } else {
+        console.warn("Permissions API is not supported in this browser.");
+        initializeRecognitionEvents(); // Configura os eventos diretamente se a API não for suportada
+    }
 
-    recognition.onend = () => {
-        isSpeaking = false; // Finaliza o estado de fala do usuário
-        speakButton.classList.remove("listening");
-        speakButton.innerText = "Press to Speak";
-        console.log("User finished speaking.");
-    };
+    function initializeRecognitionEvents() {
+        recognition.onstart = () => {
+            isSpeaking = true; // Indica que o usuário está falando
+            resetStaticTimer(); // Reseta o temporizador de inatividade
+            speakButton.classList.add("listening");
+            speakButton.innerText = "Listening...";
+            console.log("User is speaking...");
+        };
 
-    recognition.onresult = async (event) => {
-        const userSpeech = event.results[0][0].transcript;
-        messageElement.style.visibility = "visible";
-        messageElement.innerText = `You said: "${userSpeech}"`;
-        console.log("User speech:", userSpeech);
+        recognition.onend = () => {
+            isSpeaking = false; // Finaliza o estado de fala do usuário
+            speakButton.classList.remove("listening");
+            speakButton.innerText = "Press to Speak";
+            console.log("User finished speaking.");
+        };
 
-        if (!userId) {
-            alert("User ID is missing. Please log in again.");
-            return;
-        }
+        recognition.onresult = async (event) => {
+            const userSpeech = event.results[0][0].transcript;
+            messageElement.style.visibility = "visible";
+            messageElement.innerText = `You said: "${userSpeech}"`;
+            console.log("User speech:", userSpeech);
 
-        try {
-            const response = await fetch('/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ uid: userId, message: userSpeech, chatHistory }),
-            });
-            const data = await response.json();
-
-            if (!data.response) {
-                console.error("Error: Missing response from AI.");
+            if (!userId) {
+                alert("User ID is missing. Please log in again.");
                 return;
             }
 
-            chatHistory = data.chatHistory;
-            messageElement.innerText = data.response;
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ uid: userId, message: userSpeech, chatHistory }),
+                });
+                const data = await response.json();
 
-            // Chamando a função de fala com resposta da IA
-            speak(data.response);
-        } catch (error) {
-            console.error("Error communicating with the server:", error);
-            messageElement.innerText = "Error communicating with the server.";
-        }
-    };
+                if (!data.response) {
+                    console.error("Error: Missing response from AI.");
+                    return;
+                }
+
+                chatHistory = data.chatHistory;
+                messageElement.innerText = data.response;
+
+                // Chamando a função de fala com resposta da IA
+                speak(data.response);
+            } catch (error) {
+                console.error("Error communicating with the server:", error);
+                messageElement.innerText = "Error communicating with the server.";
+            }
+        };
+    }
 }
 
         // Fallback para Mensagem Digitada
