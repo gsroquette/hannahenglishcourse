@@ -295,10 +295,7 @@ function setupSpeechRecognition() {
     recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
     recognition.lang = "en-US";
 
-    let recognitionStarted = false; // Para monitorar se o reconhecimento iniciou
-
     recognition.onstart = () => {
-        recognitionStarted = true; // O reconhecimento iniciou
         isSpeaking = true; // Indica que o usuário está falando
         resetStaticTimer(); // Reseta o temporizador de inatividade
         speakButton.classList.add("listening");
@@ -348,21 +345,36 @@ function setupSpeechRecognition() {
         }
     };
 
-    // Adicione um listener ao botão para monitorar o clique
     speakButton.addEventListener("click", () => {
-        recognitionStarted = false; // Reinicia o estado
-        recognition.start(); // Tenta iniciar o reconhecimento de voz
+        if (speakButton.innerText === "Press to Start") {
+            // Estado inicial, exibe a mensagem inicial e troca o estado do botão
+            messageElement.style.visibility = "visible";
+            messageElement.innerText = "Samuel is talking...";
+            speakButton.innerText = "Press to Speak";
+        } else if (speakButton.innerText === "Press to Speak") {
+            // Verifica se o reconhecimento de voz inicia
+            let recognitionStarted = false;
 
-        // Define um tempo limite para verificar se o reconhecimento iniciou
-        setTimeout(() => {
-            if (!recognitionStarted) {
-                // Caso o reconhecimento não tenha iniciado, exiba a mensagem
-                messageElement.style.visibility = "visible";
-                messageElement.innerText =
-                    "Voice recognition did not start. Please check if the browser's speech recognition and microphone are enabled.";
-                console.warn("Speech recognition failed to start.");
-            }
-        }, 2000); // 2 segundos para detectar a falha
+            recognition.start();
+
+            setTimeout(() => {
+                if (!recognitionStarted) {
+                    // Mostra a mensagem de erro se o reconhecimento não iniciar
+                    messageElement.style.visibility = "visible";
+                    messageElement.innerText = "Voice recognition did not start. Please check if the browser's speech recognition and microphone are enabled.";
+                    console.warn("Speech recognition failed to start.");
+                }
+            }, 2000);
+
+            recognition.onstart = () => {
+                recognitionStarted = true; // Marca que o reconhecimento iniciou
+                isSpeaking = true; // Indica que o usuário está falando
+                resetStaticTimer(); // Reseta o temporizador de inatividade
+                speakButton.classList.add("listening");
+                speakButton.innerText = "Listening...";
+                console.log("User is speaking...");
+            };
+        }
     });
 }
 
