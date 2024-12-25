@@ -214,6 +214,36 @@
             return true;
         }
 
+// Função para TTS (Text-to-Speech)
+function speak(text, rate = 1, lang = "en-US") {
+    const synth = window.speechSynthesis;
+    const voices = synth.getVoices();
+
+    if (voices.length === 0) {
+        console.warn("Nenhuma voz disponível. Tentando novamente...");
+        setTimeout(() => speak(text, rate, lang), 500);
+        return;
+    }
+
+    const selectedVoice = voices.find(voice => voice.lang === lang) || voices[0];
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.voice = selectedVoice;
+    utterance.lang = selectedVoice.lang;
+    utterance.rate = rate;
+
+    utterance.onstart = () => {
+        isSpeaking = true;
+        robotImg.src = ROBOT_GIF; // Muda para GIF durante a fala
+    };
+
+    utterance.onend = () => {
+        isSpeaking = false;
+        robotImg.src = ROBOT_STATIC; // Retorna à imagem estática
+    };
+
+    synth.speak(utterance);
+}
+
         // Configuração do Reconhecimento de Voz
         function setupSpeechRecognition() {
             if (!checkSpeechRecognitionSupport()) return;
@@ -320,7 +350,12 @@
                             speakButton.addEventListener("click", () => {
                                 if (speakButton.innerText === "Press to Start") {
                                     messageElement.style.visibility = "visible";
-                                    speak(data.response);
+                                    if (data.response) {
+    speak(data.response);
+} else {
+    console.error("Erro: Resposta da IA ausente.");
+    messageElement.innerText = "No response received from the server.";
+}
                                     speakButton.innerText = "Press to Speak";
                                 } else {
                                     recognition.start();
