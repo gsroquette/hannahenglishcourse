@@ -295,87 +295,75 @@ function setupSpeechRecognition() {
     recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
     recognition.lang = "en-US";
 
-    // Verifica permissão do microfone antes de configurar os eventos
-    if ('permissions' in navigator) {
-        navigator.permissions.query({ name: 'microphone' }).then(permissionStatus => {
-            if (permissionStatus.state === 'denied') {
-                // Bloqueia o uso do botão de fala e exibe uma mensagem
-                messageElement.style.visibility = 'visible';
-                messageElement.innerText = "Microphone access is blocked. Please enable microphone permissions in your browser settings.";
-                speakButton.style.display = 'none';
-                console.warn("Microphone permission is blocked.");
-            } else if (permissionStatus.state === 'prompt') {
-                // Adiciona um aviso caso o navegador esteja aguardando permissão
-                messageElement.style.visibility = 'visible';
-                messageElement.innerText = "Microphone access needs to be granted. Please allow microphone access.";
-                console.warn("Microphone permission is pending.");
-            } else {
-                // Permissão concedida, configura os eventos normalmente
-                initializeRecognitionEvents();
-            }
-        }).catch(err => {
-            console.error("Error checking microphone permissions:", err);
-            // Em caso de erro, assume que as permissões precisam ser verificadas manualmente
-            messageElement.style.visibility = 'visible';
-            messageElement.innerText = "Unable to verify microphone permissions. Please check your browser settings.";
-        });
-    } else {
-        console.warn("Permissions API is not supported in this browser.");
-        // Continua com a configuração normal, mas avisa o usuário se algo falhar
-        initializeRecognitionEvents();
-    }
+    let recognitionStarted = false; // Para monitorar se o reconhecimento iniciou
 
-    function initializeRecognitionEvents() {
-        recognition.onstart = () => {
-            isSpeaking = true; // Indica que o usuário está falando
-            resetStaticTimer(); // Reseta o temporizador de inatividade
-            speakButton.classList.add("listening");
-            speakButton.innerText = "Listening...";
-            console.log("User is speaking...");
-        };
+    recognition.onstart = () => {
+        recognitionStarted = true; // O reconhecimento iniciou
+        isSpeaking = true; // Indica que o usuário está falando
+        resetStaticTimer(); // Reseta o temporizador de inatividade
+        speakButton.classList.add("listening");
+        speakButton.innerText = "Listening...";
+        console.log("User is speaking...");
+    };
 
-        recognition.onend = () => {
-            isSpeaking = false; // Finaliza o estado de fala do usuário
-            speakButton.classList.remove("listening");
-            speakButton.innerText = "Press to Speak";
-            console.log("User finished speaking.");
-        };
+    recognition.onend = () => {
+        isSpeaking = false; // Finaliza o estado de fala do usuário
+        speakButton.classList.remove("listening");
+        speakButton.innerText = "Press to Speak";
+        console.log("User finished speaking.");
+    };
 
-        recognition.onresult = async (event) => {
-            const userSpeech = event.results[0][0].transcript;
-            messageElement.style.visibility = "visible";
-            messageElement.innerText = `You said: "${userSpeech}"`;
-            console.log("User speech:", userSpeech);
+    recognition.onresult = async (event) => {
+        const userSpeech = event.results[0][0].transcript;
+        messageElement.style.visibility = "visible";
+        messageElement.innerText = `You said: "${userSpeech}"`;
+        console.log("User speech:", userSpeech);
 
-            if (!userId) {
-                alert("User ID is missing. Please log in again.");
+        if (!userId) {
+            alert("User ID is missing. Please log in again.");
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uid: userId, message: userSpeech, chatHistory }),
+            });
+            const data = await response.json();
+
+            if (!data.response) {
+                console.error("Error: Missing response from AI.");
                 return;
             }
 
-            try {
-                const response = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ uid: userId, message: userSpeech, chatHistory }),
-                });
-                const data = await response.json();
+            chatHistory = data.chatHistory;
+            messageElement.innerText = data.response;
 
-                if (!data.response) {
-                    console.error("Error: Missing response from AI.");
-                    return;
-                }
+            // Chamando a função de fala com resposta da IA
+            speak(data.response);
+        } catch (error) {
+            console.error("Error communicating with the server:", error);
+            messageElement.innerText = "Error communicating with the server.";
+        }
+    };
 
-                chatHistory = data.chatHistory;
-                messageElement.innerText = data.response;
+    // Adicione um listener ao botão para monitorar o clique
+    speakButton.addEventListener("click", () => {
+        recognitionStarted = false; // Reinicia o estado
+        recognition.start(); // Tenta iniciar o reconhecimento de voz
 
-                // Chamando a função de fala com resposta da IA
-                speak(data.response);
-            } catch (error) {
-                console.error("Error communicating with the server:", error);
-                messageElement.innerText = "Error communicating with the server.";
+        // Define um tempo limite para verificar se o reconhecimento iniciou
+        setTimeout(() => {
+            if (!recognitionStarted) {
+                // Caso o reconhecimento não tenha iniciado, exiba a mensagem
+                messageElement.style.visibility = "visible";
+                messageElement.innerText =
+                    "Voice recognition did not start. Please check if the browser's speech recognition and microphone are enabled.";
+                console.warn("Speech recognition failed to start.");
             }
-        };
-    }
+        }, 2000); // 2 segundos para detectar a falha
+    });
 }
 
         // Fallback para Mensagem Digitada
