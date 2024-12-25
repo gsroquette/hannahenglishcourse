@@ -250,60 +250,62 @@ function speak(text, rate = 1, lang = "en-US") {
 }
 
         // Configuração do Reconhecimento de Voz
-        function setupSpeechRecognition() {
-            if (!checkSpeechRecognitionSupport()) return;
+      function setupSpeechRecognition() {
+    if (!checkSpeechRecognitionSupport()) return;
 
-            recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-            recognition.lang = "en-US";
+    recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = "en-US";
 
-            recognition.onstart = () => {
-                isSpeaking = true;
-                resetStaticTimer();
-                robotImg.src = ROBOT_GIF;
-                speakButton.classList.add("listening");
-                speakButton.innerText = "Listening...";
-            };
+    recognition.onstart = () => {
+        isSpeaking = true; // Indica que o usuário está falando
+        resetStaticTimer(); // Reseta o temporizador de inatividade
+        speakButton.classList.add("listening");
+        speakButton.innerText = "Listening...";
+        console.log("User is speaking...");
+    };
 
-            recognition.onend = () => {
-                isSpeaking = false;
-                robotImg.src = ROBOT_STATIC;
-                speakButton.classList.remove("listening");
-                speakButton.innerText = "Press to Speak";
-            };
+    recognition.onend = () => {
+        isSpeaking = false; // Finaliza o estado de fala do usuário
+        speakButton.classList.remove("listening");
+        speakButton.innerText = "Press to Speak";
+        console.log("User finished speaking.");
+    };
 
-            recognition.onresult = async (event) => {
-                const userSpeech = event.results[0][0].transcript;
-                messageElement.style.visibility = "visible";
-                messageElement.innerText = `You said: "${userSpeech}"`;
-                console.log("User speech:", userSpeech);
+    recognition.onresult = async (event) => {
+        const userSpeech = event.results[0][0].transcript;
+        messageElement.style.visibility = "visible";
+        messageElement.innerText = `You said: "${userSpeech}"`;
+        console.log("User speech:", userSpeech);
 
-                if (!userId) {
-                    alert("User ID is missing. Please log in again.");
-                    return;
-                }
-
-                try {
-                    const response = await fetch('/api/chat', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ uid: userId, message: userSpeech, chatHistory }),
-                    });
-                    const data = await response.json();
-
-                    if (!data.response) {
-                        console.error("Error: Missing response from AI.");
-                        return;
-                    }
-
-                    chatHistory = data.chatHistory;
-                    messageElement.innerText = data.response;
-                    speak(data.response);
-                } catch (error) {
-                    console.error("Error communicating with the server:", error);
-                    messageElement.innerText = "Error communicating with the server.";
-                }
-            };
+        if (!userId) {
+            alert("User ID is missing. Please log in again.");
+            return;
         }
+
+        try {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uid: userId, message: userSpeech, chatHistory }),
+            });
+            const data = await response.json();
+
+            if (!data.response) {
+                console.error("Error: Missing response from AI.");
+                return;
+            }
+
+            chatHistory = data.chatHistory;
+            messageElement.innerText = data.response;
+
+            // Chamando a função de fala com resposta da IA
+            speak(data.response);
+        } catch (error) {
+            console.error("Error communicating with the server:", error);
+            messageElement.innerText = "Error communicating with the server.";
+        }
+    };
+}
 
         // Fallback para Mensagem Digitada
         document.addEventListener("DOMContentLoaded", () => {
