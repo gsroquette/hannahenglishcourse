@@ -163,18 +163,17 @@
         let alternateTimeout;
         let userId = null;
         let chatHistory = [];
+       
+// Atualizar Slider de Velocidade
+function updateSliderBackground() {
+    const value = ((speedSlider.value - speedSlider.min) / (speedSlider.max - speedSlider.min)) * 100;
+    speedSlider.style.setProperty("--progress", `${value}%`);
+    speedDisplay.textContent = `${speedSlider.value}x`;
+}
+speedSlider.addEventListener("input", updateSliderBackground);
 
-        // Atualizar Slider de Velocidade
-        function updateSliderBackground() {
-            const value = ((speedSlider.value - speedSlider.min) / (speedSlider.max - speedSlider.min)) * 100;
-            speedSlider.style.setProperty("--progress", `${value}%`);
-            speedDisplay.textContent = `${speedSlider.value}x`;
-        }
-
-        speedSlider.addEventListener("input", updateSliderBackground);
-
-        // Inicializar Slider ao Carregar
-        window.addEventListener("DOMContentLoaded", updateSliderBackground);
+// Inicializar Slider ao Carregar
+window.addEventListener("DOMContentLoaded", updateSliderBackground);
 
         // Botão de Voltar
         backButton.addEventListener("click", () => window.history.back());
@@ -215,13 +214,13 @@
         }
 
 // Função para TTS (Text-to-Speech)
-function speak(text, rate = 1, lang = "en-US") {
+function speak(text, lang = "en-US") {
     const synth = window.speechSynthesis;
     const voices = synth.getVoices();
 
     if (voices.length === 0) {
         console.warn("Nenhuma voz disponível. Tentando novamente...");
-        setTimeout(() => speak(text, rate, lang), 500);
+        setTimeout(() => speak(text, lang), 500);
         return;
     }
 
@@ -231,8 +230,8 @@ function speak(text, rate = 1, lang = "en-US") {
     utterance.lang = selectedVoice.lang;
 
     // Captura dinamicamente o valor do seletor de velocidade
-    const playbackSpeed = parseFloat(document.getElementById("voice-speed").value);
-    utterance.rate = playbackSpeed || rate; // Usa o valor do seletor ou a taxa padrão
+    const playbackSpeed = parseFloat(speedSlider.value);
+    utterance.rate = playbackSpeed || 1;
 
     utterance.onstart = () => {
         isSpeaking = true;
@@ -251,6 +250,26 @@ function speak(text, rate = 1, lang = "en-US") {
     if (synth.speaking) synth.cancel(); // Cancela qualquer fala em andamento
     synth.speak(utterance);
 }
+
+function ensureVoicesLoaded(callback) {
+    const synth = window.speechSynthesis;
+    let attempts = 0;
+
+    function checkVoices() {
+        if (synth.getVoices().length > 0 || attempts > 10) {
+            callback();
+        } else {
+            attempts++;
+            setTimeout(checkVoices, 200);
+        }
+    }
+    checkVoices();
+}
+
+// Certifique-se de carregar as vozes antes de iniciar
+ensureVoicesLoaded(() => {
+    console.log("Vozes carregadas!");
+});
 
         // Configuração do Reconhecimento de Voz
       function setupSpeechRecognition() {
