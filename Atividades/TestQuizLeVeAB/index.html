@@ -226,18 +226,47 @@ function goBack() {
             .then((snapshot) => {
                 if (snapshot.exists()) {
                     const progress = snapshot.val();
-                    const nextFaseKey = `fase${parseInt(fase, 10) + 1}`;
 
-                    if (progress[nextFaseKey]) {
-                        // Próxima fase desbloqueada, permite navegação
-                        window.history.back();
+                    if (fase === "last") {
+                        // Verificar próxima unidade
+                        const nextUnit = `Unit${parseInt(unit.replace("Unit", "")) + 1}`;
+                        const nextPhaseKey = `${nextUnit}/fase1`;
+
+                        firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`)
+                            .get()
+                            .then((unitSnapshot) => {
+                                if (unitSnapshot.exists() && unitSnapshot.val().fase1) {
+                                    window.history.back(); // Navegação permitida
+                                } else {
+                                    // Unidade bloqueada
+                                    confirmBackNavigation("The next unit is locked. Do you still want to go back?");
+                                }
+                            });
+                    } else if (fase === "end") {
+                        // Verificar próximo nível
+                        const nextLevel = `Level${parseInt(level.replace("Level", "")) + 1}`;
+                        const nextPhaseKey = `${nextLevel}/Unit1/fase1`;
+
+                        firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`)
+                            .get()
+                            .then((levelSnapshot) => {
+                                if (levelSnapshot.exists() && levelSnapshot.val().fase1) {
+                                    window.history.back(); // Navegação permitida
+                                } else {
+                                    // Nível bloqueado
+                                    confirmBackNavigation("The next level is locked. Do you still want to go back?");
+                                }
+                            });
                     } else {
-                        // Próxima fase bloqueada, solicita confirmação
-                        const confirmNavigation = confirm(
-                            "The next phase is locked. Do you still want to go back?"
-                        );
-                        if (confirmNavigation) {
+                        // Lógica padrão para fases numéricas
+                        const nextFaseKey = `fase${parseInt(fase, 10) + 1}`;
+
+                        if (progress[nextFaseKey]) {
+                            // Próxima fase desbloqueada, permite navegação
                             window.history.back();
+                        } else {
+                            // Próxima fase bloqueada, solicita confirmação
+                            confirmBackNavigation("The next phase is locked. Do you still want to go back?");
                         }
                     }
                 } else {
@@ -249,6 +278,13 @@ function goBack() {
                 alert("An error occurred while verifying progress. Please try again.");
             });
     });
+}
+
+function confirmBackNavigation(message) {
+    const confirmNavigation = confirm(message);
+    if (confirmNavigation) {
+        window.history.back();
+    }
 }
 
 // Função para exibir erros ao usuário
