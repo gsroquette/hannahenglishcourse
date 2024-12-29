@@ -469,19 +469,30 @@ function checkAnswer(selectedAnswer) {
 
 // Verifica se o quiz foi concluído
 function checkCompletion() {
+    if (totalQuestions === 0) {
+        console.error("No questions available to calculate completion.");
+        return;
+    }
+
     const grade = Math.round((correctAnswers / totalQuestions) * 100);
     console.log("Grade calculated:", grade, "Correct Answers:", correctAnswers, "Total Questions:", totalQuestions);
 
-    ensureUserIsAuthenticated((userId) => {
-        saveGrade(userId, grade); // Salva a nota
-        updateProgressInDatabase(userId, grade); // Atualiza o progresso
-    });
+    ensureUserIsAuthenticated(async (userId) => {
+        try {
+            await saveGrade(userId, grade); // Salva a nota no banco de dados
+            await updateProgressInDatabase(userId, grade); // Atualiza o progresso
+        } catch (error) {
+            console.error("Error saving grade or updating progress:", error);
+            showModal("An error occurred while saving your progress. Please try again.");
+            return;
+        }
 
-    if (grade >= 70) {
-        showModal("Congratulations! You passed!");
-    } else {
-        showModal("You did not pass. Try again!");
-    }
+        // Exibe o modal baseado na nota
+        const message = grade >= 70 
+            ? "Congratulations! You passed!" 
+            : "You did not pass. Try again!";
+        showModal(message);
+    });
 }
 
 // Atualiza o progresso no banco de dados
@@ -489,24 +500,31 @@ async function updateProgressInDatabase(userId, grade) {
     const { level, unit } = getParamsFromURL();
     console.log("Updating progress for:", { level, unit, grade });
 
-    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-
     try {
         if (grade >= 70) {
             const currentPhase = getPhaseFromURL();
+            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
             if (currentPhase === "last") {
+                // Desbloqueia a próxima unidade
                 const nextUnit = `Unit${parseInt(unit.replace("Unit", "")) + 1}`;
                 await dbRef.parent.child(nextUnit).set({ fase1: true });
                 console.log(`Next unit unlocked: ${nextUnit}`);
             } else if (currentPhase === "end") {
+                // Desbloqueia o próximo nível
                 const nextLevel = `Level${parseInt(level.replace("Level", "")) + 1}`;
-                await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+                await firebase.database()
+                    .ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`)
+                    .set({ fase1: true });
                 console.log(`Next level unlocked: ${nextLevel}`);
             } else {
+                // Desbloqueia a próxima fase
                 const nextPhase = `fase${parseInt(currentPhase) + 1}`;
                 await dbRef.update({ [nextPhase]: true });
                 console.log(`Next phase unlocked: ${nextPhase}`);
             }
+        } else {
+            console.log("Grade below passing threshold; no progress updated.");
         }
     } catch (error) {
         console.error("Error updating progress:", error);
@@ -515,19 +533,24 @@ async function updateProgressInDatabase(userId, grade) {
 }
 
 // Salva a nota do usuário
-function saveGrade(userId, grade) {
+async function saveGrade(userId, grade) {
     const { level, unit } = getParamsFromURL();
     const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
 
-    dbRef.child("nota5")
-        .once("value")
-        .then((snapshot) => {
-            const existingGrade = snapshot.val();
+    try {
+        const snapshot = await dbRef.child("nota5").once("value");
+        const existingGrade = snapshot.val();
 
-            if (!existingGrade || grade > existingGrade) {
-                dbRef.update({ nota5: grade });
-            }
-        });
+        if (!existingGrade || grade > existingGrade) {
+            await dbRef.update({ nota5: grade });
+            console.log(`Grade updated to: ${grade}`);
+        } else {
+            console.log("Existing grade is higher or equal; no update needed.");
+        }
+    } catch (error) {
+        console.error("Error saving grade:", error);
+        handleError("Failed to save grade. Please try again.");
+    }
 }
 
 function generatePDF() {
@@ -599,8 +622,9 @@ function generatePDF() {
 function showModal(message) {
     console.log("Displaying modal with message:", message);
     const modal = document.getElementById("completion-modal");
-    if (!modal) {
-        console.error("Modal element not found!");
+    const overlay = document.getElementById("overlay");
+    if (!modal || !overlay) {
+        console.error("Modal or overlay element not found!");
         return;
     }
     modal.innerHTML = `
@@ -611,11 +635,14 @@ function showModal(message) {
         <button onclick="closeModal()">Close</button>
     `;
     modal.style.display = "block";
+    overlay.style.display = "block";
 }
 
 function closeModal() {
     const modal = document.getElementById("completion-modal");
-    modal.style.display = "none";
+    const overlay = document.getElementById("overlay");
+    if (modal) modal.style.display = "none";
+    if (overlay) overlay.style.display = "none";
 }
 
 // Obter parâmetros da URL
