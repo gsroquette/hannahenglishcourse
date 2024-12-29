@@ -174,108 +174,159 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
-    <script>
-        const firebaseConfig = {
-            apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
-            authDomain: "hannahenglishcourse.firebaseapp.com",
-            projectId: "hannahenglishcourse",
-            storageBucket: "hannahenglishcourse.appspot.com",
-            messagingSenderId: "449818788486",
-            appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
-            measurementId: "G-07VVJG9LRS",
-            databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+        authDomain: "hannahenglishcourse.firebaseapp.com",
+        projectId: "hannahenglishcourse",
+        storageBucket: "hannahenglishcourse.appspot.com",
+        messagingSenderId: "449818788486",
+        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+        measurementId: "G-07VVJG9LRS",
+        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+
+    // Extract parameters from URL
+    function getParamsFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        return {
+            level: params.get('level'),
+            unit: params.get('unit'),
+            fase: params.get('fase'),
         };
+    }
 
-        firebase.initializeApp(firebaseConfig);
-
-        function goBack() {
-            window.history.back();
-        }
-
-        function playVideo() {
-            const video = document.getElementById('video');
-            const cover = document.getElementById('videoCover');
-            
-            // Reproduz o vídeo e esconde a capa
-            video.play();
-            cover.classList.add('hidden');
-
-            // Atualiza o progresso no Firebase após clicar no play
-            ensureUserIsAuthenticated(updateNextPhase);
-        }
-
-        document.getElementById('video').addEventListener('ended', () => {
-            // Ao finalizar o vídeo, exibe o modal
-            showModal();
+    // Ensure user authentication
+    function ensureUserIsAuthenticated(callback) {
+        firebase.auth().onAuthStateChanged(function (user) {
+            if (user) {
+                callback(user.uid);
+            } else {
+                console.error("User is not authenticated.");
+                alert("You need to be logged in to proceed.");
+            }
         });
+    }
 
-        function showModal() {
-            document.getElementById('completion-modal').style.display = 'block';
-            document.getElementById('overlay').style.display = 'block';
+    // Update the next phase, unit, or level
+    async function updateNextPhase(userId) {
+        const { level, unit, fase } = getParamsFromURL();
+        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+        try {
+            if (fase === "last") {
+                const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+                await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
+            } else if (fase === "end") {
+                const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+                await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+            } else {
+                const nextFase = parseInt(fase, 10) + 1;
+                await dbRef.update({ [`fase${fase}`]: true, [`fase${nextFase}`]: true });
+            }
+        } catch (error) {
+            console.error("Error updating the next phase:", error);
         }
+    }
 
-        function closeModal() {
-            document.getElementById('completion-modal').style.display = 'none';
-            document.getElementById('overlay').style.display = 'none';
-        }
+    // Mark the current phase as completed
+    function markPhaseCompleted() {
+        ensureUserIsAuthenticated((userId) => {
+            updateNextPhase(userId);
+        });
+    }
 
-        function ensureUserIsAuthenticated(callback) {
-            firebase.auth().onAuthStateChanged(function(user) {
-                if (user) {
-                    callback(user.uid);
-                } else {
-                    console.error("Usuário não autenticado");
-                }
-            });
-        }
+    // Play the video and remove the cover
+    function playVideo() {
+        const video = document.getElementById('video');
+        const cover = document.getElementById('videoCover');
+        video.play();
+        cover.classList.add('hidden');
+        ensureUserIsAuthenticated(updateNextPhase);
+    }
 
-        async function updateNextPhase(userId) {
-            const currentPhase = getPhaseFromURL();
-            const { level, unit } = getLevelAndUnitFromURL();
+    // Handle video ending
+    document.getElementById('video').addEventListener('ended', () => {
+        markPhaseCompleted();
+        showModal();
+    });
+
+    // Show completion modal
+    function showModal() {
+        document.getElementById('overlay').style.display = 'block';
+        document.getElementById('completion-modal').style.display = 'block';
+    }
+
+    // Close completion modal
+    function closeModal() {
+        document.getElementById('completion-modal').style.display = 'none';
+        document.getElementById('overlay').style.display = 'none';
+    }
+
+    // Validate navigation on "Back" button
+    function goBack() {
+        const { level, unit, fase } = getParamsFromURL();
+        ensureUserIsAuthenticated((userId) => {
             const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-            
-            try {
-                if (currentPhase === "last") {
-                    const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-                    await dbRef.child(nextUnit).set({ fase1: true });
-                } else if (currentPhase === "end") {
-                    const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
-                    await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+            dbRef.get().then((snapshot) => {
+                if (snapshot.exists()) {
+                    const progress = snapshot.val();
+                    const nextFaseKey = `fase${parseInt(fase, 10) + 1}`;
+                    if (progress[nextFaseKey]) {
+                        window.history.back();
+                    } else {
+                        const confirmNavigation = confirm("The next phase is locked. Do you still want to go back?");
+                        if (confirmNavigation) {
+                            window.history.back();
+                        }
+                    }
                 } else {
-                    const nextPhase = parseInt(currentPhase) + 1;
-                    await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
+                    alert("Progress could not be verified. Please try again later.");
                 }
-            } catch (error) {
-                console.error("Erro ao atualizar o progresso da fase:", error);
-            }
+            }).catch((error) => {
+                console.error("Error checking progress:", error);
+                alert("An error occurred while verifying progress. Please try again.");
+            });
+        });
+    }
+
+    // Load dynamic content
+    async function loadContent() {
+        const { level, unit } = getParamsFromURL();
+        if (!level || !unit) {
+            console.error("Parameters 'level' or 'unit' are missing in the URL.");
+            document.getElementById('lyrics-container').textContent = "Content could not be loaded.";
+            return;
         }
 
-        function getPhaseFromURL() {
-            const params = new URLSearchParams(window.location.search);
-            return params.get('fase');
+        const basePath = `../../../../${level}/${unit}/DataVideo/`;
+        try {
+            const lyricsResponse = await fetch(`${basePath}letra.txt`);
+            if (!lyricsResponse.ok) throw new Error(`Error loading lyrics file: ${basePath}letra.txt`);
+            document.getElementById('lyrics-container').textContent = await lyricsResponse.text();
+        } catch (error) {
+            console.error("Error loading lyrics:", error);
+            document.getElementById('lyrics-container').textContent = "Lyrics could not be loaded.";
         }
 
-        function getLevelAndUnitFromURL() {
-            const url = window.location.pathname;
-            const parts = url.split('/');
-            const level = parts[1];
-            const unit = parts[2];
-            return { level, unit };
+        try {
+            const video = document.getElementById('video');
+            video.querySelector('source').src = `${basePath}video.mp4`;
+            video.load();
+        } catch (error) {
+            console.error("Error loading video:", error);
         }
 
-        // Carrega a letra da música ou história do arquivo letra.txt
-        async function loadLyrics() {
-            try {
-                const response = await fetch('letra.txt');
-                const lyrics = await response.text();
-                document.getElementById('lyrics-container').textContent = lyrics;
-            } catch (error) {
-                console.error("Erro ao carregar o arquivo letra.txt", error);
-                document.getElementById('lyrics-container').textContent = "Content could not be loaded.";
-            }
+        try {
+            document.getElementById('videoCover').style.backgroundImage = `url('${basePath}capa.jpg')`;
+        } catch (error) {
+            console.error("Error loading video cover:", error);
         }
+    }
 
-        loadLyrics();
-    </script>
+    document.addEventListener('DOMContentLoaded', loadContent);
+</script>
 </body>
 </html>
