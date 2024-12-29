@@ -272,40 +272,41 @@
     </style>
 </head>
 <body>
-<button class="back-button" onclick="goBack()">Back</button>
-</button>
-<button id="pdfButton" class="pdf-btn" onclick="generatePDF()" style="display: none;">Generate PDF</button>
-     
-<h1>Hannah Matching Game</h1>
+    <button class="back-button" onclick="goBack()">Back</button>
+    <button id="pdfButton" class="pdf-btn" onclick="generatePDF()" style="display: none;">Generate PDF</button>
 
-<div class="container">
-    <div class="list-container">
-        <div class="list" id="lessons">
-            <!-- Lessons will be loaded here dynamically -->
+    <h1>Hannah Matching Game</h1>
+
+    <div class="container">
+        <div class="list-container">
+            <div class="list" id="lessons">
+                <!-- Lessons will be loaded here dynamically -->
+            </div>
+
+            <div class="list" id="explanations">
+                <!-- Explanations will be loaded here dynamically -->
+            </div>
         </div>
 
-        <div class="list" id="explanations">
-            <!-- Explanations will be loaded here dynamically -->
+        <!-- Modal de conclusão -->
+        <div id="overlay" style="display: none;"></div>
+        <div id="completion-modal" style="display: none;">
+            <h2>Phase Completed!</h2>
+            <p>Congratulations! You have completed this phase.</p>
+            <button onclick="closeModal()">Close</button>
         </div>
+
+        <!-- Container para mostrar a imagem e o texto -->
+        <div class="image-container" id="image-container">
+            <button class="close-btn" onclick="closeImage()">×</button>
+            <img id="lesson-image" src="" alt="Lesson Image">
+            <h2 id="lesson-title"></h2>
+            <p id="lesson-text"></p>
+        </div>
+
+        <button class="restart-btn" onclick="restartGame()">Restart Game</button>
+        <div id="try-again" class="try-again" style="display:none;">Try Again!</div>
     </div>
-<!-- Modal de conclusão -->
-<div id="overlay" style="display: none;"></div>
-<div id="completion-modal" style="display: none;">
-    <h2>Phase Completed!</h2>
-    <p>Congratulations! You have completed this phase.</p>
-    <button onclick="closeModal()">Close</button>
-</div>
-
-<!-- Container para mostrar a imagem e o texto -->
-<div class="image-container" id="image-container">
-    <button class="close-btn" onclick="closeImage()">×</button>
-    <img id="lesson-image" src="" alt="Lesson Image">
-    <h2 id="lesson-title"></h2>
-    <p id="lesson-text"></p>
-</div>
-
-<button class="restart-btn" onclick="restartGame()">Restart Game</button>
-<div id="try-again" class="try-again" style="display:none;">Try Again!</div>
 
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
@@ -328,36 +329,46 @@
     // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
 
+function ensureUserIsAuthenticated(callback) {
+    firebase.auth().onAuthStateChanged(function (user) {
+        if (user) {
+            callback(user.uid);
+        } else {
+            console.error("User is not authenticated.");
+            alert("You need to be logged in to proceed.");
+        }
+    });
+}
+
  // Function to handle "Back" navigation
-    function goBack() {
-        const { level, unit, fase } = getParamsFromURL();
+  function goBack() {
+    const { level, unit, fase } = getParamsFromURL();
 
-        ensureUserIsAuthenticated((userId) => {
-            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+    ensureUserIsAuthenticated((userId) => {
+        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
 
-            dbRef.get().then((snapshot) => {
-                if (snapshot.exists()) {
-                    const progress = snapshot.val();
-                    const nextFaseKey = `fase${parseInt(fase, 10) + 1}`;
+        dbRef.get().then((snapshot) => {
+            if (snapshot.exists()) {
+                const progress = snapshot.val();
+                const nextFaseKey = `fase${parseInt(fase, 10) + 1}`;
 
-                    // Check if the next phase is unlocked
-                    if (progress[nextFaseKey]) {
-                        window.history.back();
-                    } else {
-                        const confirmNavigation = confirm("The next phase is locked. Do you still want to go back?");
-                        if (confirmNavigation) {
-                            window.history.back();
-                        }
-                    }
+                if (progress[nextFaseKey]) {
+                    window.history.back();
                 } else {
-                    alert("Progress could not be verified. Please try again later.");
+                    const confirmNavigation = confirm("The next phase is locked. Do you still want to go back?");
+                    if (confirmNavigation) {
+                        window.history.back();
+                    }
                 }
-            }).catch((error) => {
-                console.error("Error checking progress:", error);
-                alert("An error occurred while verifying progress. Please try again.");
-            });
+            } else {
+                alert("Progress could not be verified. Please try again later.");
+            }
+        }).catch((error) => {
+            console.error("Error checking progress:", error);
+            alert("An error occurred while verifying progress. Please try again.");
         });
-    }
+    });
+}
 
     // Show the PDF button for specific roles
     firebase.auth().onAuthStateChanged((user) => {
