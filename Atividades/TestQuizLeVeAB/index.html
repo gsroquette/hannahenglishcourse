@@ -549,24 +549,71 @@ async function updateProgressInDatabase(userId, grade) {
     }
 }
 
+async function loadGrade(userId) {
+    const { level, unit } = getParamsFromURL();
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/Quiz test - question and image`);
+    const gradeDisplay = document.getElementById("grade-display");
+
+    try {
+        const snapshot = await dbRef.once("value");
+        const grade = snapshot.val();
+
+        if (grade !== null) {
+            gradeDisplay.style.display = "block"; 
+            gradeDisplay.innerHTML = `Your Grade: ${grade}%`;
+
+            // Estilo da nota
+            if (grade < 70) {
+                gradeDisplay.classList.add("grade-style-red");
+                gradeDisplay.classList.remove("grade-style");
+            } else {
+                gradeDisplay.classList.add("grade-style");
+                gradeDisplay.classList.remove("grade-style-red");
+            }
+
+            // Verifica se o aluno está vinculado a um professor
+            const isLinked = await isStudentLinkedToProfessor(userId);
+            if (isLinked) {
+                gradeDisplay.innerHTML += "<br><span style='color: red;'>Only your teacher can modify this grade</span>";
+            }
+        } else {
+            gradeDisplay.style.display = "none"; // Oculta se não houver nota
+        }
+    } catch (error) {
+        console.error("Error loading grade:", error);
+    }
+}
+
 // Salva a nota do usuário
 async function saveGrade(userId, grade) {
     const { level, unit } = getParamsFromURL();
-    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/Quiz test - question and image`);
 
     try {
-        const snapshot = await dbRef.child("Quiz test - question and image").once("value");
+        const snapshot = await dbRef.once("value");
         const existingGrade = snapshot.val();
 
-        if (!existingGrade || grade > existingGrade) {
-            await dbRef.update({ "Quiz test - question and image": grade });
-            console.log(`Grade updated to: ${grade}`);
+        if (!existingGrade || existingGrade === 0) {
+            // Se a nota não existir ou for 0, permite salvar
+            await dbRef.set(grade);
+            console.log("Grade saved successfully:", grade);
         } else {
-            console.log("Existing grade is higher or equal; no update needed.");
+            // Nota já existe, exibe mensagem no console
+            console.log("Grade already exists and cannot be changed by the student.");
         }
     } catch (error) {
         console.error("Error saving grade:", error);
-        handleError("Failed to save grade. Please try again.");
+    }
+}
+
+async function isStudentLinkedToProfessor(userId) {
+    const dbRef = firebase.database().ref(`usuarios/${userId}/professor`);
+    try {
+        const snapshot = await dbRef.once("value");
+        return snapshot.exists(); // Retorna true se o nó professor existir
+    } catch (error) {
+        console.error("Error checking professor linkage:", error);
+        return false;
     }
 }
 
