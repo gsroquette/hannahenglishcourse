@@ -251,7 +251,7 @@
     </style>
 </head>
 <body>
-<button onclick="window.history.back()" class="back-btn">Back</button>
+<button class="back-button" onclick="goBack()">Back</button>
 </button>
 <button id="pdfButton" class="pdf-btn" onclick="generatePDF()" style="display: none;">Generate PDF</button>
      
@@ -306,6 +306,37 @@
 
     // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
+
+ // Function to handle "Back" navigation
+    function goBack() {
+        const { level, unit, fase } = getParamsFromURL();
+
+        ensureUserIsAuthenticated((userId) => {
+            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+            dbRef.get().then((snapshot) => {
+                if (snapshot.exists()) {
+                    const progress = snapshot.val();
+                    const nextFaseKey = `fase${parseInt(fase, 10) + 1}`;
+
+                    // Check if the next phase is unlocked
+                    if (progress[nextFaseKey]) {
+                        window.history.back();
+                    } else {
+                        const confirmNavigation = confirm("The next phase is locked. Do you still want to go back?");
+                        if (confirmNavigation) {
+                            window.history.back();
+                        }
+                    }
+                } else {
+                    alert("Progress could not be verified. Please try again later.");
+                }
+            }).catch((error) => {
+                console.error("Error checking progress:", error);
+                alert("An error occurred while verifying progress. Please try again.");
+            });
+        });
+    }
 
     // Show the PDF button for specific roles
     firebase.auth().onAuthStateChanged((user) => {
