@@ -163,7 +163,7 @@
 </head>
 <body>
 <div class="btn-group">
-    <button class="back-btn" onclick="window.history.back()">Back</button>
+    <button class="back-btn" onclick="goBack()">Back</button>
 </div>
 
 <h1>Hannah Test</h1>
@@ -215,6 +215,41 @@ let questions = [];
 let answeredQuestions = [];
 let selectedAnswers = [];
 let speechSynthesisUtterance = null;
+
+function goBack() {
+    const { level, unit, fase } = getParamsFromURL();
+
+    ensureUserIsAuthenticated((userId) => {
+        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+        dbRef.get()
+            .then((snapshot) => {
+                if (snapshot.exists()) {
+                    const progress = snapshot.val();
+                    const nextFaseKey = `fase${parseInt(fase, 10) + 1}`;
+
+                    if (progress[nextFaseKey]) {
+                        // Próxima fase desbloqueada, permite navegação
+                        window.history.back();
+                    } else {
+                        // Próxima fase bloqueada, solicita confirmação
+                        const confirmNavigation = confirm(
+                            "The next phase is locked. Do you still want to go back?"
+                        );
+                        if (confirmNavigation) {
+                            window.history.back();
+                        }
+                    }
+                } else {
+                    alert("Progress could not be verified. Please try again later.");
+                }
+            })
+            .catch((error) => {
+                console.error("Error checking progress:", error);
+                alert("An error occurred while verifying progress. Please try again.");
+            });
+    });
+}
 
 // Função para exibir erros ao usuário
 function handleError(message) {
@@ -496,11 +531,17 @@ function getPhaseFromURL() {
     return params.get("fase");
 }
 
-// Verificação de autenticação
 function ensureUserIsAuthenticated(callback) {
     firebase.auth().onAuthStateChanged((user) => {
-        if (user) callback(user.uid);
-        else handleError("You need to be logged in to continue.");
+        if (user) {
+            callback(user.uid);
+        } else {
+            handleError("You need to be logged in to continue.");
+            // Redireciona para a página de login ou recarrega a página
+            setTimeout(() => {
+                window.location.href = "/login.html"; // Substitua pelo caminho da página de login
+            }, 3000);
+        }
     });
 }
 
