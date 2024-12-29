@@ -631,33 +631,56 @@ function closeModal() {
         };
     }
 function updateProgressInDatabase() {
-        const currentPhase = getPhaseFromURL();
-        const { level, unit } = getLevelAndUnitFromURL();
-        
-        firebase.auth().onAuthStateChanged(function(user) {
-            if (user) {
-                const userId = user.uid;
-                const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+    const params = getParamsFromURL(); // Extrai parâmetros da URL
+    const currentPhase = params.fase;
+    const level = params.level;
+    const unit = params.unit;
 
-                if (currentPhase === "last") {
-                    const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-                    dbRef.parent.child(nextUnit).set({ fase1: true });
-                } else if (currentPhase === "end") {
-                    const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
-                    firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
-                } else {
-                    const phaseNumber = parseInt(currentPhase);
-                    if (!isNaN(phaseNumber)) {
-                        dbRef.update({ [`fase${currentPhase}`]: true });
-                        const nextPhase = phaseNumber + 1;
-                        dbRef.update({ [`fase${nextPhase}`]: true });
-                    }
-                }
-            } else {
-                console.error("Usuário não autenticado");
-            }
-        });
+    if (!level || !unit || !currentPhase) {
+        console.error("Missing parameters: level, unit, or phase not defined.");
+        return;
     }
+
+    firebase.auth().onAuthStateChanged(function(user) {
+        if (user) {
+            const userId = user.uid;
+            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+            console.log(`Updating progress for user ${userId}: Level ${level}, Unit ${unit}, Phase ${currentPhase}`);
+
+            if (currentPhase === "last") {
+                // Liberar a próxima unidade
+                const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+                dbRef.parent.child(nextUnit).set({ fase1: true })
+                    .then(() => console.log(`Next unit unlocked: ${nextUnit}`))
+                    .catch((error) => console.error("Error unlocking next unit:", error));
+            } else if (currentPhase === "end") {
+                // Liberar o próximo nível
+                const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+                firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true })
+                    .then(() => console.log(`Next level unlocked: ${nextLevel}`))
+                    .catch((error) => console.error("Error unlocking next level:", error));
+            } else {
+                // Atualizar a fase atual e desbloquear a próxima fase
+                const phaseNumber = parseInt(currentPhase);
+                if (!isNaN(phaseNumber)) {
+                    const nextPhase = `fase${phaseNumber + 1}`;
+                    const updates = {
+                        [`fase${currentPhase}`]: true,
+                        [nextPhase]: true,
+                    };
+
+                    dbRef.update(updates)
+                        .then(() => console.log(`Current phase ${currentPhase} completed and next phase ${nextPhase} unlocked.`))
+                        .catch((error) => console.error("Error updating phases:", error));
+                } else {
+                    console.error("Invalid phase number:", currentPhase);
+                }
+            }
+        } else {
+            console.error("User is not authenticated.");
+        }
+    });
+}
 </script>
 </body>
 </html>
