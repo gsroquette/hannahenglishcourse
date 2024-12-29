@@ -176,221 +176,334 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
 <script>
-    // Configuração do Firebase
-    const firebaseConfig = {
-        apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
-        authDomain: "hannahenglishcourse.firebaseapp.com",
-        projectId: "hannahenglishcourse",
-        storageBucket: "hannahenglishcourse.appspot.com",
-        messagingSenderId: "449818788486",
-        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
-        measurementId: "G-07VVJG9LRS",
-        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
-    };
+// Configuração do Firebase
+const firebaseConfig = {
+    apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+    authDomain: "hannahenglishcourse.firebaseapp.com",
+    projectId: "hannahenglishcourse",
+    storageBucket: "hannahenglishcourse.appspot.com",
+    messagingSenderId: "449818788486",
+    appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+    measurementId: "G-07VVJG9LRS",
+    databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+};
 
-    // Inicializa o Firebase
-    firebase.initializeApp(firebaseConfig);
+// Inicializa o Firebase
+firebase.initializeApp(firebaseConfig);
 
-    // Variáveis globais
-    let correctAnswers = 0;
-    let totalQuestions = 0;
-    let currentQuestionIndex = 0;
-    let questions = [];
-    let answeredQuestions = [];
-    let selectedAnswers = [];
+// Variáveis globais
+let gradeRef;
+let correctAnswers = 0;
+let totalQuestions = 0;
+let currentQuestionIndex = 0;
+let questions = [];
+let answeredQuestions = [];
+let selectedAnswers = [];
+let speechSynthesisUtterance = null;
 
-    // Função para carregar e inicializar as perguntas
-    async function loadQuestions() {
-        try {
-            const { level, unit } = getParamsFromURL();
-            const questionFilePath = `../../../../${level}/${unit}/DataTestQuizLeVeAB/questions.txt`;
+// Função para carregar e inicializar as perguntas
+async function loadQuestions() {
+    try {
+        const { level, unit } = getParamsFromURL();
+        const questionFilePath = `../../../../${level}/${unit}/DataTestQuizLeVeAB/questions.txt`;
 
-            const response = await fetch(questionFilePath);
-            if (!response.ok) throw new Error("Failed to load questions");
+        const response = await fetch(questionFilePath);
+        if (!response.ok) throw new Error("Failed to load questions");
 
-            const text = await response.text();
-            const lines = text.split("\n");
-            let currentQuestion = null;
+        const text = await response.text();
+        const lines = text.split("\n");
+        let currentQuestion = null;
 
-            lines.forEach((line) => {
-                line = line.trim();
-                if (line.startsWith("Q:")) {
-                    if (currentQuestion) questions.push(currentQuestion);
-                    currentQuestion = { question: line.substring(2).trim(), answers: [], correct: "" };
-                } else if (/^[A-D]\./.test(line)) {
-                    currentQuestion.answers.push(line);
-                } else if (line.startsWith("Correct:")) {
-                    if (currentQuestion) currentQuestion.correct = line.split(":")[1].trim();
+        lines.forEach((line) => {
+            line = line.trim();
+            if (line.startsWith("Q:")) {
+                if (currentQuestion) questions.push(currentQuestion);
+                currentQuestion = { question: line.substring(2).trim(), answers: [], correct: "" };
+            } else if (/^[A-D]\./.test(line)) {
+                currentQuestion.answers.push(line);
+            } else if (line.startsWith("Correct:")) {
+                if (currentQuestion) currentQuestion.correct = line.split(":")[1].trim();
+            }
+        });
+
+        if (currentQuestion) questions.push(currentQuestion);
+
+        answeredQuestions = new Array(questions.length).fill(false);
+        totalQuestions = questions.length;
+        displayQuestion();
+    } catch (error) {
+        console.error("Error loading questions:", error);
+    }
+}
+
+// Função para exibir a questão atual
+function displayQuestion() {
+    const container = document.getElementById("quiz-container");
+    container.innerHTML = "";
+
+    const { level, unit } = getParamsFromURL();
+    const questionImagePath = `../../../../${level}/${unit}/DataTestQuizLeVeAB/images/imagem${currentQuestionIndex + 1}.png`;
+
+    const q = questions[currentQuestionIndex];
+    const questionDiv = document.createElement("div");
+    questionDiv.classList.add("question");
+
+    // Adiciona a imagem da questão
+    const questionImage = document.createElement("img");
+    questionImage.src = questionImagePath;
+    questionImage.alt = `Imagem para a questão ${currentQuestionIndex + 1}`;
+    questionImage.style.width = "100%";
+    questionImage.style.maxHeight = "300px";
+    questionDiv.appendChild(questionImage);
+
+    // Adiciona o texto da questão
+    const questionText = document.createElement("p");
+    questionText.id = "question-text";
+    questionText.innerText = `${currentQuestionIndex + 1}. ${q.question}`;
+    questionDiv.appendChild(questionText);
+
+    // Adiciona as opções de resposta
+    q.answers.forEach((answer) => {
+        const answerLabel = document.createElement("label");
+        const isChecked = selectedAnswers[currentQuestionIndex] === answer[0];
+        answerLabel.innerHTML = `<input type="radio" name="question${currentQuestionIndex}" value="${answer[0]}" onclick="selectAnswer('${answer[0]}')" ${isChecked ? "checked" : ""}> ${answer}`;
+        questionDiv.appendChild(answerLabel);
+    });
+
+    container.appendChild(questionDiv);
+    updateNavigationButtons();
+}
+
+// Função para registrar a resposta selecionada
+function selectAnswer(answer) {
+    selectedAnswers[currentQuestionIndex] = answer;
+    checkAnswer(answer);
+}
+
+// Função para verificar a resposta
+function checkAnswer(selectedAnswer) {
+    const q = questions[currentQuestionIndex];
+
+    if (selectedAnswer === q.correct && !answeredQuestions[currentQuestionIndex]) {
+        answeredQuestions[currentQuestionIndex] = true;
+        correctAnswers++;
+    } else if (selectedAnswer !== q.correct && answeredQuestions[currentQuestionIndex]) {
+        answeredQuestions[currentQuestionIndex] = false;
+        correctAnswers--;
+    }
+}
+
+// Funções para navegação entre questões
+function showNextQuestion() {
+    if (currentQuestionIndex < questions.length - 1) {
+        currentQuestionIndex++;
+        displayQuestion();
+    }
+}
+
+function showPreviousQuestion() {
+    if (currentQuestionIndex > 0) {
+        currentQuestionIndex--;
+        displayQuestion();
+    }
+}
+
+function updateNavigationButtons() {
+    document.getElementById("prev-btn").disabled = currentQuestionIndex === 0;
+    document.getElementById("next-btn").disabled = currentQuestionIndex === questions.length - 1;
+}
+
+// Função para verificar a conclusão do teste
+function checkCompletion() {
+    const grade = Math.round((correctAnswers / totalQuestions) * 100);
+    console.log(`Grade: ${grade}%`);
+
+    ensureUserIsAuthenticated((userId) => {
+        updateProgressInDatabase(userId, grade);
+    });
+
+    if (grade >= 70) {
+        showModal("Congratulations! You passed!");
+    } else {
+        showModal("You did not pass. Try again!");
+    }
+}
+
+// Função para atualizar o progresso no banco de dados
+function updateProgressInDatabase(userId, grade) {
+    const { level, unit } = getParamsFromURL();
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+    dbRef.update({ nota5: grade })
+        .then(() => {
+            if (grade >= 70) {
+                const currentPhase = getPhaseFromURL();
+
+                if (currentPhase === "last") {
+                    const nextUnit = `Unit${parseInt(unit.replace("Unit", "")) + 1}`;
+                    dbRef.parent.child(nextUnit).set({ fase1: true });
+                } else if (currentPhase === "end") {
+                    const nextLevel = `Level${parseInt(level.replace("Level", "")) + 1}`;
+                    firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+                } else {
+                    const nextPhase = `fase${parseInt(currentPhase) + 1}`;
+                    dbRef.update({ [nextPhase]: true });
                 }
+            }
+        })
+        .catch((error) => console.error("Error updating progress:", error));
+}
+
+// Função para geração de PDF
+function generatePDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    const logo = new Image();
+    logo.src = 'Logo.png'; // Substitua pelo caminho correto da imagem
+
+    logo.onload = () => {
+        doc.addImage(logo, 'PNG', 90, 10, 30, 30);
+
+        doc.setFontSize(20);
+        doc.text("Quiz Report", 105, 50, null, null, "center");
+
+        doc.setFontSize(12);
+        doc.text("Name: ____________________________________", 20, 70);
+        doc.text("Date: _______________", 150, 70);
+
+        let yPosition = 90;
+
+        questions.forEach((q, index) => {
+            doc.setFontSize(14);
+            let questionText = `${index + 1}. ${q.question}`;
+            let textLines = doc.splitTextToSize(questionText, 180);
+            let questionHeight = textLines.length * 10;
+
+            if (yPosition + questionHeight > 280) {
+                doc.addPage();
+                yPosition = 20;
+            }
+
+            doc.text(textLines, 20, yPosition);
+            yPosition += questionHeight;
+
+            q.answers.forEach(answer => {
+                doc.setFontSize(12);
+                let answerText = answer;
+                let answerLines = doc.splitTextToSize(answerText, 180);
+                let answerHeight = answerLines.length * 10;
+
+                if (yPosition + answerHeight > 280) {
+                    doc.addPage();
+                    yPosition = 20;
+                }
+
+                doc.text(answerLines, 30, yPosition);
+                yPosition += answerHeight;
             });
 
-            if (currentQuestion) questions.push(currentQuestion);
-
-            answeredQuestions = new Array(questions.length).fill(false);
-            totalQuestions = questions.length;
-            displayQuestion();
-        } catch (error) {
-            console.error("Error loading questions:", error);
-        }
-    }
-
-    // Função para exibir a questão atual
-    function displayQuestion() {
-        const container = document.getElementById("quiz-container");
-        container.innerHTML = "";
-
-        const { level, unit } = getParamsFromURL();
-        const questionImagePath = `../../../../${level}/${unit}/DataTestQuizLeVeAB/images/imagem${currentQuestionIndex + 1}.png`;
-
-        const q = questions[currentQuestionIndex];
-        const questionDiv = document.createElement("div");
-        questionDiv.classList.add("question");
-
-        const questionImage = document.createElement("img");
-        questionImage.src = questionImagePath;
-        questionImage.alt = `Imagem para a questão ${currentQuestionIndex + 1}`;
-        questionImage.style.width = "100%";
-        questionImage.style.maxHeight = "300px";
-        questionDiv.appendChild(questionImage);
-
-        const questionText = document.createElement("p");
-        questionText.id = "question-text";
-        questionText.innerText = `${currentQuestionIndex + 1}. ${q.question}`;
-        questionDiv.appendChild(questionText);
-
-        q.answers.forEach((answer) => {
-            const answerLabel = document.createElement("label");
-            const isChecked = selectedAnswers[currentQuestionIndex] === answer[0];
-            answerLabel.innerHTML = `<input type="radio" name="question${currentQuestionIndex}" value="${answer[0]}" onclick="selectAnswer('${answer[0]}')" ${isChecked ? "checked" : ""}> ${answer}`;
-            questionDiv.appendChild(answerLabel);
+            yPosition += 10;
         });
 
-        container.appendChild(questionDiv);
-        updateNavigationButtons();
-    }
+        doc.save('QuizQuestionsWithLogo.pdf');
+    };
+}
 
-    // Função para registrar a resposta selecionada
-    function selectAnswer(answer) {
-        selectedAnswers[currentQuestionIndex] = answer;
-        checkAnswer(answer);
-    }
+// Função para exibir o modal
+function showModal(message) {
+    const modal = document.getElementById("completion-modal");
+    modal.innerHTML = `<p>${message}</p>`;
+    modal.style.display = "block";
+}
 
-    // Função para verificar a resposta
-    function checkAnswer(selectedAnswer) {
-        const q = questions[currentQuestionIndex];
+// Função para fechar o modal
+function closeModal() {
+    const modal = document.getElementById("completion-modal");
+    modal.style.display = "none";
+}
 
-        if (selectedAnswer === q.correct && !answeredQuestions[currentQuestionIndex]) {
-            answeredQuestions[currentQuestionIndex] = true;
-            correctAnswers++;
-        } else if (selectedAnswer !== q.correct && answeredQuestions[currentQuestionIndex]) {
-            answeredQuestions[currentQuestionIndex] = false;
-            correctAnswers--;
-        }
-    }
+// Função para obter parâmetros da URL
+function getParamsFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    return {
+        level: params.get("level"),
+        unit: params.get("unit"),
+        fase: params.get("fase"),
+    };
+}
 
-    // Função para verificar a conclusão
-    function checkCompletion() {
-        const grade = Math.round((correctAnswers / totalQuestions) * 100);
-        console.log(`Grade: ${grade}%`);
+// Função para obter a fase atual da URL
+function getPhaseFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("fase");
+}
 
-        ensureUserIsAuthenticated((userId) => {
-            updateProgressInDatabase(userId, grade);
-        });
-
-        if (grade >= 70) {
-            showModal("Congratulations! You passed!");
+// Função para autenticar o usuário
+function ensureUserIsAuthenticated(callback) {
+    firebase.auth().onAuthStateChanged(function (user) {
+        if (user) {
+            callback(user.uid);
         } else {
-            showModal("You did not pass. Try again!");
+            alert("You need to be logged in to continue.");
         }
-    }
+    });
+}
 
-    // Função para atualizar o progresso no banco de dados
-    function updateProgressInDatabase(userId, grade) {
-        const { level, unit } = getParamsFromURL();
-        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+// Função para verificar se o aluno está vinculado a um professor
+function isStudentLinkedToProfessor(userId) {
+    const dbRef = firebase.database().ref("usuarios");
 
-        dbRef.update({ nota5: grade })
-            .then(() => {
-                if (grade >= 70) {
-                    const currentPhase = getPhaseFromURL();
+    return new Promise((resolve) => {
+        dbRef.once("value")
+            .then((snapshot) => {
+                let isLinked = false;
 
-                    if (currentPhase === "last") {
-                        const nextUnit = `Unit${parseInt(unit.replace("Unit", "")) + 1}`;
-                        dbRef.parent.child(nextUnit).set({ fase1: true });
-                    } else if (currentPhase === "end") {
-                        const nextLevel = `Level${parseInt(level.replace("Level", "")) + 1}`;
-                        firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
-                    } else {
-                        const nextPhase = `fase${parseInt(currentPhase) + 1}`;
-                        dbRef.update({ [nextPhase]: true });
+                snapshot.forEach((professorSnapshot) => {
+                    const professorData = professorSnapshot.val();
+                    if (professorData.turmas) {
+                        Object.keys(professorData.turmas).forEach((turmaId) => {
+                            const turma = professorData.turmas[turmaId];
+                            if (turma.students && turma.students[userId]) {
+                                isLinked = true;
+                            }
+                        });
                     }
-                }
+                });
+
+                resolve(isLinked);
             })
-            .catch((error) => console.error("Error updating progress:", error));
-    }
+            .catch((error) => {
+                console.error("Error checking if student is linked to a professor:", error);
+                resolve(false);
+            });
+    });
+}
 
-    // Função para geração de PDF
-    function generatePDF() {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
+// Função para salvar a nota do aluno no banco de dados
+function saveGrade(userId, grade) {
+    const { level, unit } = getParamsFromURL();
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
 
-        doc.setFontSize(18);
-        doc.text("Quiz Report", 10, 10);
+    dbRef.child("nota5")
+        .once("value")
+        .then((snapshot) => {
+            const existingGrade = snapshot.val();
 
-        let y = 20;
-        questions.forEach((q, index) => {
-            const questionText = `${index + 1}. ${q.question}`;
-            const answers = q.answers.join("\n");
-            const textLines = `${questionText}\n${answers}`;
-
-            if (y + 30 > 290) {
-                doc.addPage();
-                y = 20;
-            }
-            doc.text(textLines, 10, y);
-            y += 20;
+            isStudentLinkedToProfessor(userId).then((isLinked) => {
+                if (!isLinked || !existingGrade || existingGrade === 0) {
+                    dbRef.update({ nota5: grade })
+                        .then(() => console.log("Nota salva com sucesso."))
+                        .catch((error) => console.error("Erro ao salvar a nota5:", error));
+                } else {
+                    console.log("Nota já registrada. Somente o professor pode modificar.");
+                }
+            });
         });
+}
 
-        doc.save("quiz.pdf");
-    }
-
-    // Função para obter parâmetros da URL
-    function getParamsFromURL() {
-        const params = new URLSearchParams(window.location.search);
-        return {
-            level: params.get("level"),
-            unit: params.get("unit"),
-            fase: params.get("fase"),
-        };
-    }
-
-    // Função para obter a fase atual da URL
-    function getPhaseFromURL() {
-        const params = new URLSearchParams(window.location.search);
-        return params.get("fase");
-    }
-
-    // Função para autenticar o usuário
-    function ensureUserIsAuthenticated(callback) {
-        firebase.auth().onAuthStateChanged(function (user) {
-            if (user) {
-                callback(user.uid);
-            } else {
-                alert("You need to be logged in to continue.");
-            }
-        });
-    }
-
-    // Função para exibir o modal
-    function showModal(message) {
-        const modal = document.getElementById("completion-modal");
-        modal.innerHTML = `<p>${message}</p>`;
-        modal.style.display = "block";
-    }
-
-    // Carrega as perguntas ao carregar a página
-    window.onload = loadQuestions;
-</script>
+// Carrega as perguntas ao carregar a página
+window.onload = loadQuestions;
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </body>
