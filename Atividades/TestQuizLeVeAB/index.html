@@ -201,7 +201,15 @@ let answeredQuestions = [];
 let selectedAnswers = [];
 let speechSynthesisUtterance = null;
 
-// Função para carregar e inicializar as perguntas
+// Função para exibir erros ao usuário
+function handleError(message) {
+    const modal = document.getElementById("completion-modal");
+    modal.innerHTML = `<p style="color: red;">${message}</p>`;
+    modal.style.display = "block";
+    console.error(message);
+}
+
+// Função para carregar as perguntas
 async function loadQuestions() {
     try {
         const { level, unit } = getParamsFromURL();
@@ -211,6 +219,8 @@ async function loadQuestions() {
         if (!response.ok) throw new Error("Failed to load questions");
 
         const text = await response.text();
+        if (!text.trim()) throw new Error("Questions file is empty");
+
         const lines = text.split("\n");
         let currentQuestion = null;
 
@@ -228,11 +238,13 @@ async function loadQuestions() {
 
         if (currentQuestion) questions.push(currentQuestion);
 
+        if (questions.length === 0) throw new Error("No valid questions found");
+
         answeredQuestions = new Array(questions.length).fill(false);
         totalQuestions = questions.length;
         displayQuestion();
     } catch (error) {
-        console.error("Error loading questions:", error);
+        handleError(error.message);
     }
 }
 
@@ -274,26 +286,7 @@ function displayQuestion() {
     updateNavigationButtons();
 }
 
-// Função para registrar a resposta selecionada
-function selectAnswer(answer) {
-    selectedAnswers[currentQuestionIndex] = answer;
-    checkAnswer(answer);
-}
-
-// Função para verificar a resposta
-function checkAnswer(selectedAnswer) {
-    const q = questions[currentQuestionIndex];
-
-    if (selectedAnswer === q.correct && !answeredQuestions[currentQuestionIndex]) {
-        answeredQuestions[currentQuestionIndex] = true;
-        correctAnswers++;
-    } else if (selectedAnswer !== q.correct && answeredQuestions[currentQuestionIndex]) {
-        answeredQuestions[currentQuestionIndex] = false;
-        correctAnswers--;
-    }
-}
-
-// Funções para navegação entre questões
+// Navegação entre perguntas
 function showNextQuestion() {
     if (currentQuestionIndex < questions.length - 1) {
         currentQuestionIndex++;
@@ -313,12 +306,30 @@ function updateNavigationButtons() {
     document.getElementById("next-btn").disabled = currentQuestionIndex === questions.length - 1;
 }
 
-// Função para verificar a conclusão do teste
+// Verificação de respostas
+function selectAnswer(answer) {
+    selectedAnswers[currentQuestionIndex] = answer;
+    checkAnswer(answer);
+}
+
+function checkAnswer(selectedAnswer) {
+    const q = questions[currentQuestionIndex];
+
+    if (selectedAnswer === q.correct && !answeredQuestions[currentQuestionIndex]) {
+        answeredQuestions[currentQuestionIndex] = true;
+        correctAnswers++;
+    } else if (selectedAnswer !== q.correct && answeredQuestions[currentQuestionIndex]) {
+        answeredQuestions[currentQuestionIndex] = false;
+        correctAnswers--;
+    }
+}
+
+// Verifica se o quiz foi concluído
 function checkCompletion() {
     const grade = Math.round((correctAnswers / totalQuestions) * 100);
-    console.log(`Grade: ${grade}%`);
 
     ensureUserIsAuthenticated((userId) => {
+        saveGrade(userId, grade);
         updateProgressInDatabase(userId, grade);
     });
 
@@ -329,57 +340,80 @@ function checkCompletion() {
     }
 }
 
-// Função para atualizar o progresso no banco de dados
-function updateProgressInDatabase(userId, grade) {
+// Atualiza o progresso no banco de dados
+async function updateProgressInDatabase(userId, grade) {
     const { level, unit } = getParamsFromURL();
     const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
 
-    dbRef.update({ nota5: grade })
-        .then(() => {
-            if (grade >= 70) {
-                const currentPhase = getPhaseFromURL();
-
-                if (currentPhase === "last") {
-                    const nextUnit = `Unit${parseInt(unit.replace("Unit", "")) + 1}`;
-                    dbRef.parent.child(nextUnit).set({ fase1: true });
-                } else if (currentPhase === "end") {
-                    const nextLevel = `Level${parseInt(level.replace("Level", "")) + 1}`;
-                    firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
-                } else {
-                    const nextPhase = `fase${parseInt(currentPhase) + 1}`;
-                    dbRef.update({ [nextPhase]: true });
-                }
+    try {
+        if (grade >= 70) {
+            const currentPhase = getPhaseFromURL();
+            if (currentPhase === "last") {
+                const nextUnit = `Unit${parseInt(unit.replace("Unit", "")) + 1}`;
+                await dbRef.parent.child(nextUnit).set({ fase1: true });
+                console.log(`Next unit unlocked: ${nextUnit}`);
+            } else if (currentPhase === "end") {
+                const nextLevel = `Level${parseInt(level.replace("Level", "")) + 1}`;
+                await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+                console.log(`Next level unlocked: ${nextLevel}`);
+            } else {
+                const nextPhase = `fase${parseInt(currentPhase) + 1}`;
+                await dbRef.update({ [nextPhase]: true });
+                console.log(`Next phase unlocked: ${nextPhase}`);
             }
-        })
-        .catch((error) => console.error("Error updating progress:", error));
+        }
+    } catch (error) {
+        handleError("Failed to update progress. Please try again.");
+    }
 }
 
-// Função para geração de PDF
+// Salva a nota do usuário
+function saveGrade(userId, grade) {
+    const { level, unit } = getParamsFromURL();
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+    dbRef.child("nota5")
+        .once("value")
+        .then((snapshot) => {
+            const existingGrade = snapshot.val();
+
+            if (!existingGrade || grade > existingGrade) {
+                dbRef.update({ nota5: grade });
+            }
+        });
+}
+
 function generatePDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
+    // Adiciona o logo
     const logo = new Image();
-    logo.src = 'Logo.png'; // Substitua pelo caminho correto da imagem
+    logo.src = 'Logo.png';
 
     logo.onload = () => {
+        // Adiciona o logo no topo
         doc.addImage(logo, 'PNG', 90, 10, 30, 30);
 
+        // Adiciona o título
         doc.setFontSize(20);
-        doc.text("Quiz Report", 105, 50, null, null, "center");
+        doc.text('Hannah Quiz', 105, 50, null, null, 'center');
 
+        // Adiciona campos para nome e data
         doc.setFontSize(12);
-        doc.text("Name: ____________________________________", 20, 70);
-        doc.text("Date: _______________", 150, 70);
+        doc.text('Name: ____________________________________', 20, 70);
+        doc.text('Date: _______________', 150, 70);
 
         let yPosition = 90;
 
+        // Adiciona as perguntas e respostas
         questions.forEach((q, index) => {
             doc.setFontSize(14);
             let questionText = `${index + 1}. ${q.question}`;
             let textLines = doc.splitTextToSize(questionText, 180);
             let questionHeight = textLines.length * 10;
 
+            // Verifica se a página está cheia e adiciona uma nova página, se necessário
             if (yPosition + questionHeight > 280) {
                 doc.addPage();
                 yPosition = 20;
@@ -403,106 +437,59 @@ function generatePDF() {
                 yPosition += answerHeight;
             });
 
-            yPosition += 10;
+            yPosition += 10; // Espaçamento entre perguntas
         });
 
+        // Salva o PDF
         doc.save('QuizQuestionsWithLogo.pdf');
     };
+
+    // Verifica se o logo já foi carregado
+    if (logo.complete) logo.onload();
 }
 
-// Função para exibir o modal
+// Exibição de modais
 function showModal(message) {
     const modal = document.getElementById("completion-modal");
-    modal.innerHTML = `<p>${message}</p>`;
+    modal.innerHTML = `
+        <h2>${message}</h2>
+        <p>Your score: ${Math.round((correctAnswers / totalQuestions) * 100)}%</p>
+        <p>Total Questions: ${totalQuestions}</p>
+        <p>Correct Answers: ${correctAnswers}</p>
+        <button onclick="closeModal()">Close</button>
+    `;
     modal.style.display = "block";
 }
 
-// Função para fechar o modal
 function closeModal() {
     const modal = document.getElementById("completion-modal");
     modal.style.display = "none";
 }
 
-// Função para obter parâmetros da URL
+// Obter parâmetros da URL
 function getParamsFromURL() {
     const params = new URLSearchParams(window.location.search);
     return {
-        level: params.get("level"),
-        unit: params.get("unit"),
-        fase: params.get("fase"),
+        level: params.get("level") || "Level1",
+        unit: params.get("unit") || "Unit1",
+        fase: params.get("fase") || "fase1",
     };
 }
 
-// Função para obter a fase atual da URL
 function getPhaseFromURL() {
     const params = new URLSearchParams(window.location.search);
     return params.get("fase");
 }
 
-// Função para autenticar o usuário
+// Verificação de autenticação
 function ensureUserIsAuthenticated(callback) {
-    firebase.auth().onAuthStateChanged(function (user) {
-        if (user) {
-            callback(user.uid);
-        } else {
-            alert("You need to be logged in to continue.");
-        }
+    firebase.auth().onAuthStateChanged((user) => {
+        if (user) callback(user.uid);
+        else handleError("You need to be logged in to continue.");
     });
 }
 
-// Função para verificar se o aluno está vinculado a um professor
-function isStudentLinkedToProfessor(userId) {
-    const dbRef = firebase.database().ref("usuarios");
-
-    return new Promise((resolve) => {
-        dbRef.once("value")
-            .then((snapshot) => {
-                let isLinked = false;
-
-                snapshot.forEach((professorSnapshot) => {
-                    const professorData = professorSnapshot.val();
-                    if (professorData.turmas) {
-                        Object.keys(professorData.turmas).forEach((turmaId) => {
-                            const turma = professorData.turmas[turmaId];
-                            if (turma.students && turma.students[userId]) {
-                                isLinked = true;
-                            }
-                        });
-                    }
-                });
-
-                resolve(isLinked);
-            })
-            .catch((error) => {
-                console.error("Error checking if student is linked to a professor:", error);
-                resolve(false);
-            });
-    });
-}
-
-// Função para salvar a nota do aluno no banco de dados
-function saveGrade(userId, grade) {
-    const { level, unit } = getParamsFromURL();
-    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-
-    dbRef.child("nota5")
-        .once("value")
-        .then((snapshot) => {
-            const existingGrade = snapshot.val();
-
-            isStudentLinkedToProfessor(userId).then((isLinked) => {
-                if (!isLinked || !existingGrade || existingGrade === 0) {
-                    dbRef.update({ nota5: grade })
-                        .then(() => console.log("Nota salva com sucesso."))
-                        .catch((error) => console.error("Erro ao salvar a nota5:", error));
-                } else {
-                    console.log("Nota já registrada. Somente o professor pode modificar.");
-                }
-            });
-        });
-}
-
-// Carrega as perguntas ao carregar a página
+// Carregar perguntas ao iniciar
 window.onload = loadQuestions;
 
 </script>
