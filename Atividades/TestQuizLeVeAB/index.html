@@ -632,7 +632,7 @@ async function generatePDF() {
         };
         logo.onerror = () => {
             console.error("Failed to load logo.");
-            resolve();
+            resolve(); // Continua mesmo que o logo falhe
         };
     });
 
@@ -654,40 +654,21 @@ async function generatePDF() {
     let yPosition = 90; // Posição inicial da coluna
     let currentColumnX = leftColumnX; // Começa na coluna esquerda
 
-    // Processa perguntas, imagens e respostas
     for (const [index, q] of questions.entries()) {
-        const estimatedHeight = 50 + (q.answers.length * 10) + 20; // Altura estimada para imagem, texto e respostas
+        // Calcula altura estimada para a pergunta, imagem e respostas
+        const estimatedHeight = 10 + 40 + (q.answers.length * 8) + 5;
 
-        // Alterna coluna ou página se não houver espaço suficiente
+        // Verifica se há espaço suficiente para a pergunta inteira
         if (yPosition + estimatedHeight > maxY) {
             if (currentColumnX === leftColumnX) {
-                currentColumnX = rightColumnX; // Muda para a coluna direita
+                currentColumnX = rightColumnX; // Vai para a próxima coluna
                 yPosition = 90;
             } else {
                 doc.addPage();
-                currentColumnX = leftColumnX; // Reinicia na coluna esquerda
+                currentColumnX = leftColumnX; // Reinicia na nova página
                 yPosition = 90;
             }
         }
-
-        // Adiciona a imagem da questão
-        const questionImage = new Image();
-        const imagePath = `../../../../Level1/Unit1/DataTestQuizLeVeAB/images/imagem${index + 1}.png`;
-
-        const imageHeight = 40; // Altura padrão para a imagem
-
-        await new Promise((resolve) => {
-            questionImage.src = imagePath;
-            questionImage.onload = () => {
-                doc.addImage(questionImage, 'PNG', currentColumnX, yPosition, 40, imageHeight);
-                yPosition += imageHeight + 2; // Ajusta a posição para começar abaixo da imagem
-                resolve();
-            };
-            questionImage.onerror = () => {
-                console.error(`Failed to load image: ${imagePath}`);
-                resolve();
-            };
-        });
 
         // Adiciona o texto da pergunta
         doc.setFontSize(14);
@@ -696,9 +677,37 @@ async function generatePDF() {
         const questionHeight = textLines.length * 8;
 
         doc.text(textLines, currentColumnX, yPosition);
-        yPosition += questionHeight;
+        yPosition += questionHeight + 5; // Espaçamento após a pergunta
 
-        // Adiciona as opções de resposta
+        // Adiciona a imagem da questão
+        const questionImage = new Image();
+        const imagePath = `../../../../Level1/Unit1/DataTestQuizLeVeAB/images/imagem${index + 1}.png`;
+
+        await new Promise((resolve) => {
+            questionImage.src = imagePath;
+            questionImage.onload = () => {
+                const imageHeight = (questionImage.height / questionImage.width) * 40; // Proporção ajustada
+                if (yPosition + imageHeight > maxY) {
+                    if (currentColumnX === leftColumnX) {
+                        currentColumnX = rightColumnX;
+                        yPosition = 90;
+                    } else {
+                        doc.addPage();
+                        currentColumnX = leftColumnX;
+                        yPosition = 90;
+                    }
+                }
+                doc.addImage(questionImage, 'PNG', currentColumnX, yPosition, 40, imageHeight);
+                yPosition += imageHeight + 5; // Espaçamento após a imagem
+                resolve();
+            };
+            questionImage.onerror = () => {
+                console.error(`Failed to load image: ${imagePath}`);
+                resolve();
+            };
+        });
+
+        // Adiciona as alternativas
         for (const answer of q.answers) {
             const answerLines = doc.splitTextToSize(answer, columnWidth);
             const answerHeight = answerLines.length * 8;
@@ -719,11 +728,11 @@ async function generatePDF() {
             yPosition += answerHeight;
         }
 
-        yPosition += 5; // Espaçamento entre perguntas
+        yPosition += 5; // Pequeno espaçamento entre perguntas
     }
 
     // Salva o PDF
-    doc.save('QuizQuestionsCorrectedTwoColumns.pdf');
+    doc.save('QuizQuestionsSequentialCompact.pdf');
 }
 
 // Exibição de modais
