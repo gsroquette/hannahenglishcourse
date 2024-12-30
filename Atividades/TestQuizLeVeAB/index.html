@@ -656,13 +656,20 @@ async function generatePDF() {
 
     // Processa perguntas, imagens e respostas
     for (const [index, q] of questions.entries()) {
-        // Verifica se há espaço suficiente na coluna atual para todo o conteúdo
-        const estimatedHeight = 40 + 10 + (q.answers.length * 10) + 20; // Altura estimada para imagem + pergunta + respostas + espaçamento
+        // Adiciona a imagem da questão de forma síncrona
+        const questionImage = new Image();
+        const imagePath = `../../../../Level1/Unit1/DataTestQuizLeVeAB/images/imagem${index + 1}.png`;
+
+        // Verifica se há espaço suficiente para a imagem
+        const imageHeight = 40; // Altura padrão da imagem ajustada proporcionalmente
+        const estimatedHeight = imageHeight + 10 + (q.answers.length * 10) + 20;
+
+        // Verifica se o espaço disponível é suficiente, senão alterna ou quebra a página
         if (yPosition + estimatedHeight > maxY) {
             if (currentColumnX === leftColumnX) {
                 // Muda para a coluna direita
                 currentColumnX = rightColumnX;
-                yPosition = 90; // Reinicia a posição na nova coluna
+                yPosition = 90;
             } else {
                 // Adiciona nova página e reinicia na coluna esquerda
                 doc.addPage();
@@ -672,13 +679,9 @@ async function generatePDF() {
         }
 
         // Adiciona a imagem da questão
-        const questionImage = new Image();
-        const imagePath = `../../../../Level1/Unit1/DataTestQuizLeVeAB/images/imagem${index + 1}.png`;
-
         await new Promise((resolve) => {
             questionImage.src = imagePath;
             questionImage.onload = () => {
-                const imageHeight = (questionImage.height / questionImage.width) * 40; // Proporção ajustada para largura de 40
                 doc.addImage(questionImage, 'PNG', currentColumnX, yPosition, 40, imageHeight);
                 yPosition += imageHeight + 5; // Espaçamento após a imagem
                 resolve();
@@ -700,11 +703,23 @@ async function generatePDF() {
 
         // Adiciona as opções de resposta
         for (const answer of q.answers) {
-            doc.setFontSize(12);
             const answerLines = doc.splitTextToSize(answer, columnWidth);
             const answerHeight = answerLines.length * 10;
 
-            doc.text(answerLines, currentColumnX + 5, yPosition); // Adiciona recuo para respostas
+            if (yPosition + answerHeight > maxY) {
+                if (currentColumnX === leftColumnX) {
+                    // Muda para a coluna direita
+                    currentColumnX = rightColumnX;
+                    yPosition = 90;
+                } else {
+                    // Adiciona nova página e reinicia na coluna esquerda
+                    doc.addPage();
+                    currentColumnX = leftColumnX;
+                    yPosition = 90;
+                }
+            }
+
+            doc.text(answerLines, currentColumnX + 5, yPosition); // Recuo para as respostas
             yPosition += answerHeight;
         }
 
@@ -712,7 +727,7 @@ async function generatePDF() {
     }
 
     // Salva o PDF
-    doc.save('QuizQuestionsTwoColumnsFixed.pdf');
+    doc.save('QuizQuestionsTwoColumnsOptimized.pdf');
 }
 
 // Exibição de modais
