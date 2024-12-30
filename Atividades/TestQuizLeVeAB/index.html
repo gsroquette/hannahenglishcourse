@@ -632,7 +632,7 @@ async function generatePDF() {
         };
         logo.onerror = () => {
             console.error("Failed to load logo.");
-            resolve(); // Continua mesmo que o logo falhe
+            resolve();
         };
     });
 
@@ -656,17 +656,16 @@ async function generatePDF() {
 
     // Processa perguntas, imagens e respostas
     for (const [index, q] of questions.entries()) {
-        // Verifica se há espaço suficiente para o próximo bloco (imagem, pergunta, respostas)
-        const estimatedHeight = 40 + (q.answers.length * 10); // Altura estimada
+        const estimatedHeight = 50 + (q.answers.length * 10) + 20; // Altura estimada para imagem, texto e respostas
+
+        // Alterna coluna ou página se não houver espaço suficiente
         if (yPosition + estimatedHeight > maxY) {
             if (currentColumnX === leftColumnX) {
-                // Muda para a coluna direita
-                currentColumnX = rightColumnX;
-                yPosition = 90; // Reinicia na nova coluna
+                currentColumnX = rightColumnX; // Muda para a coluna direita
+                yPosition = 90;
             } else {
-                // Adiciona nova página e reinicia na coluna esquerda
                 doc.addPage();
-                currentColumnX = leftColumnX;
+                currentColumnX = leftColumnX; // Reinicia na coluna esquerda
                 yPosition = 90;
             }
         }
@@ -675,17 +674,18 @@ async function generatePDF() {
         const questionImage = new Image();
         const imagePath = `../../../../Level1/Unit1/DataTestQuizLeVeAB/images/imagem${index + 1}.png`;
 
+        const imageHeight = 40; // Altura padrão para a imagem
+
         await new Promise((resolve) => {
             questionImage.src = imagePath;
             questionImage.onload = () => {
-                const imageHeight = (questionImage.height / questionImage.width) * 40; // Proporção ajustada para largura de 40
                 doc.addImage(questionImage, 'PNG', currentColumnX, yPosition, 40, imageHeight);
-                yPosition += imageHeight + 2; // Reduz o espaçamento após a imagem
+                yPosition += imageHeight + 2; // Ajusta a posição para começar abaixo da imagem
                 resolve();
             };
             questionImage.onerror = () => {
                 console.error(`Failed to load image: ${imagePath}`);
-                resolve(); // Continua mesmo se a imagem não carregar
+                resolve();
             };
         });
 
@@ -693,7 +693,7 @@ async function generatePDF() {
         doc.setFontSize(14);
         const questionText = `${index + 1}. ${q.question}`;
         const textLines = doc.splitTextToSize(questionText, columnWidth);
-        const questionHeight = textLines.length * 8; // Altura ajustada
+        const questionHeight = textLines.length * 8;
 
         doc.text(textLines, currentColumnX, yPosition);
         yPosition += questionHeight;
@@ -705,11 +705,9 @@ async function generatePDF() {
 
             if (yPosition + answerHeight > maxY) {
                 if (currentColumnX === leftColumnX) {
-                    // Muda para a coluna direita
                     currentColumnX = rightColumnX;
                     yPosition = 90;
                 } else {
-                    // Adiciona nova página e reinicia na coluna esquerda
                     doc.addPage();
                     currentColumnX = leftColumnX;
                     yPosition = 90;
@@ -717,15 +715,15 @@ async function generatePDF() {
             }
 
             doc.setFontSize(12);
-            doc.text(answerLines, currentColumnX + 5, yPosition); // Recuo para as respostas
+            doc.text(answerLines, currentColumnX + 5, yPosition); // Recuo para respostas
             yPosition += answerHeight;
         }
 
-        yPosition += 5; // Reduz o espaçamento entre perguntas
+        yPosition += 5; // Espaçamento entre perguntas
     }
 
     // Salva o PDF
-    doc.save('QuizQuestionsCompactTwoColumns.pdf');
+    doc.save('QuizQuestionsCorrectedTwoColumns.pdf');
 }
 
 // Exibição de modais
