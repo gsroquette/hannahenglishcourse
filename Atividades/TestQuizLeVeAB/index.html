@@ -621,29 +621,26 @@ async function generatePDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
-    // Adiciona o logo
+    // Adiciona o logo e cabeçalho apenas na primeira página
     const logo = new Image();
     logo.src = 'Logo.png';
 
     await new Promise((resolve) => {
         logo.onload = () => {
             doc.addImage(logo, 'PNG', 90, 10, 30, 30);
+            doc.setFontSize(20);
+            doc.text('Hannah Quiz', 105, 50, null, null, 'center');
+
+            doc.setFontSize(12);
+            doc.text('Name: ____________________________________', 20, 70);
+            doc.text('Date: _______________', 150, 70);
             resolve();
         };
         logo.onerror = () => {
             console.error("Failed to load logo.");
-            resolve(); // Continua mesmo que o logo falhe
+            resolve();
         };
     });
-
-    // Adiciona o título
-    doc.setFontSize(20);
-    doc.text('Hannah Quiz', 105, 50, null, null, 'center');
-
-    // Adiciona campos para nome e data
-    doc.setFontSize(12);
-    doc.text('Name: ____________________________________', 20, 70);
-    doc.text('Date: _______________', 150, 70);
 
     const columnWidth = 85; // Largura fixa para cada coluna
     const columnSpacing = 10; // Espaço entre as colunas
@@ -651,22 +648,23 @@ async function generatePDF() {
     const rightColumnX = leftColumnX + columnWidth + columnSpacing; // Posição X da coluna direita
     const maxY = 280; // Altura máxima antes de quebrar a página
 
-    let yPosition = 90; // Posição inicial da coluna
+    let yPosition = 90; // Posição inicial na primeira página
     let currentColumnX = leftColumnX; // Começa na coluna esquerda
+    let isFirstPage = true; // Flag para verificar se é a primeira página
 
     for (const [index, q] of questions.entries()) {
-        // Calcula altura estimada para a pergunta, imagem e respostas
         const estimatedHeight = 10 + 40 + (q.answers.length * 8) + 5;
 
         // Verifica se há espaço suficiente para a pergunta inteira
         if (yPosition + estimatedHeight > maxY) {
             if (currentColumnX === leftColumnX) {
                 currentColumnX = rightColumnX; // Vai para a próxima coluna
-                yPosition = 90;
+                yPosition = isFirstPage ? 90 : 10; // Ajusta a posição dependendo da página
             } else {
                 doc.addPage();
                 currentColumnX = leftColumnX; // Reinicia na nova página
-                yPosition = 90;
+                yPosition = 10; // Começa no topo para páginas subsequentes
+                isFirstPage = false; // Atualiza o flag
             }
         }
 
@@ -690,11 +688,12 @@ async function generatePDF() {
                 if (yPosition + imageHeight > maxY) {
                     if (currentColumnX === leftColumnX) {
                         currentColumnX = rightColumnX;
-                        yPosition = 90;
+                        yPosition = isFirstPage ? 90 : 10;
                     } else {
                         doc.addPage();
                         currentColumnX = leftColumnX;
-                        yPosition = 90;
+                        yPosition = 10;
+                        isFirstPage = false;
                     }
                 }
                 doc.addImage(questionImage, 'PNG', currentColumnX, yPosition, 40, imageHeight);
@@ -715,11 +714,12 @@ async function generatePDF() {
             if (yPosition + answerHeight > maxY) {
                 if (currentColumnX === leftColumnX) {
                     currentColumnX = rightColumnX;
-                    yPosition = 90;
+                    yPosition = isFirstPage ? 90 : 10;
                 } else {
                     doc.addPage();
                     currentColumnX = leftColumnX;
-                    yPosition = 90;
+                    yPosition = 10;
+                    isFirstPage = false;
                 }
             }
 
@@ -732,7 +732,7 @@ async function generatePDF() {
     }
 
     // Salva o PDF
-    doc.save('QuizQuestionsSequentialCompact.pdf');
+    doc.save('QuizQuestionsFinalLayout.pdf');
 }
 
 // Exibição de modais
