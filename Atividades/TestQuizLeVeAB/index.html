@@ -656,20 +656,13 @@ async function generatePDF() {
 
     // Processa perguntas, imagens e respostas
     for (const [index, q] of questions.entries()) {
-        // Adiciona a imagem da questão de forma síncrona
-        const questionImage = new Image();
-        const imagePath = `../../../../Level1/Unit1/DataTestQuizLeVeAB/images/imagem${index + 1}.png`;
-
-        // Verifica se há espaço suficiente para a imagem
-        const imageHeight = 40; // Altura padrão da imagem ajustada proporcionalmente
-        const estimatedHeight = imageHeight + 10 + (q.answers.length * 10) + 20;
-
-        // Verifica se o espaço disponível é suficiente, senão alterna ou quebra a página
+        // Verifica se há espaço suficiente para o próximo bloco (imagem, pergunta, respostas)
+        const estimatedHeight = 40 + (q.answers.length * 10); // Altura estimada
         if (yPosition + estimatedHeight > maxY) {
             if (currentColumnX === leftColumnX) {
                 // Muda para a coluna direita
                 currentColumnX = rightColumnX;
-                yPosition = 90;
+                yPosition = 90; // Reinicia na nova coluna
             } else {
                 // Adiciona nova página e reinicia na coluna esquerda
                 doc.addPage();
@@ -679,11 +672,15 @@ async function generatePDF() {
         }
 
         // Adiciona a imagem da questão
+        const questionImage = new Image();
+        const imagePath = `../../../../Level1/Unit1/DataTestQuizLeVeAB/images/imagem${index + 1}.png`;
+
         await new Promise((resolve) => {
             questionImage.src = imagePath;
             questionImage.onload = () => {
+                const imageHeight = (questionImage.height / questionImage.width) * 40; // Proporção ajustada para largura de 40
                 doc.addImage(questionImage, 'PNG', currentColumnX, yPosition, 40, imageHeight);
-                yPosition += imageHeight + 5; // Espaçamento após a imagem
+                yPosition += imageHeight + 2; // Reduz o espaçamento após a imagem
                 resolve();
             };
             questionImage.onerror = () => {
@@ -696,7 +693,7 @@ async function generatePDF() {
         doc.setFontSize(14);
         const questionText = `${index + 1}. ${q.question}`;
         const textLines = doc.splitTextToSize(questionText, columnWidth);
-        const questionHeight = textLines.length * 10;
+        const questionHeight = textLines.length * 8; // Altura ajustada
 
         doc.text(textLines, currentColumnX, yPosition);
         yPosition += questionHeight;
@@ -704,7 +701,7 @@ async function generatePDF() {
         // Adiciona as opções de resposta
         for (const answer of q.answers) {
             const answerLines = doc.splitTextToSize(answer, columnWidth);
-            const answerHeight = answerLines.length * 10;
+            const answerHeight = answerLines.length * 8;
 
             if (yPosition + answerHeight > maxY) {
                 if (currentColumnX === leftColumnX) {
@@ -719,15 +716,16 @@ async function generatePDF() {
                 }
             }
 
+            doc.setFontSize(12);
             doc.text(answerLines, currentColumnX + 5, yPosition); // Recuo para as respostas
             yPosition += answerHeight;
         }
 
-        yPosition += 10; // Espaçamento entre perguntas
+        yPosition += 5; // Reduz o espaçamento entre perguntas
     }
 
     // Salva o PDF
-    doc.save('QuizQuestionsTwoColumnsOptimized.pdf');
+    doc.save('QuizQuestionsCompactTwoColumns.pdf');
 }
 
 // Exibição de modais
