@@ -617,7 +617,7 @@ async function isStudentLinkedToProfessor(userId) {
     }
 }
 
-function generatePDF() {
+async function generatePDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
@@ -625,84 +625,87 @@ function generatePDF() {
     const logo = new Image();
     logo.src = 'Logo.png';
 
-    logo.onload = () => {
-        // Adiciona o logo no topo
-        doc.addImage(logo, 'PNG', 90, 10, 30, 30);
+    // Aguarda o carregamento do logo antes de continuar
+    await new Promise((resolve) => {
+        logo.onload = () => {
+            doc.addImage(logo, 'PNG', 90, 10, 30, 30);
+            resolve();
+        };
+        logo.onerror = () => {
+            console.error("Failed to load logo.");
+            resolve(); // Continua mesmo que o logo falhe
+        };
+    });
 
-        // Adiciona o título
-        doc.setFontSize(20);
-        doc.text('Hannah Quiz', 105, 50, null, null, 'center');
+    // Adiciona o título
+    doc.setFontSize(20);
+    doc.text('Hannah Quiz', 105, 50, null, null, 'center');
 
-        // Adiciona campos para nome e data
-        doc.setFontSize(12);
-        doc.text('Name: ____________________________________', 20, 70);
-        doc.text('Date: _______________', 150, 70);
+    // Adiciona campos para nome e data
+    doc.setFontSize(12);
+    doc.text('Name: ____________________________________', 20, 70);
+    doc.text('Date: _______________', 150, 70);
 
-        let yPosition = 90;
+    let yPosition = 90;
 
-        // Adiciona as perguntas, imagens e respostas
-        questions.forEach((q, index) => {
-            // Adiciona a imagem da questão
-            const questionImage = new Image();
-            questionImage.src = `../../../../Level1/Unit1/DataTestQuizLeVeAB/images/imagem${index + 1}.png`; // Caminho para as imagens
+    // Processa as perguntas, imagens e respostas de forma síncrona
+    for (const [index, q] of questions.entries()) {
+        // Carrega a imagem da questão de forma síncrona
+        const questionImage = new Image();
+        const imagePath = `../../../../Level1/Unit1/DataTestQuizLeVeAB/images/imagem${index + 1}.png`;
 
+        await new Promise((resolve) => {
+            questionImage.src = imagePath;
             questionImage.onload = () => {
-                const imageHeight = (questionImage.height / questionImage.width) * 50; // Proporção para ajustar a largura a 50
+                const imageHeight = (questionImage.height / questionImage.width) * 50; // Proporção ajustada para largura de 50
                 if (yPosition + imageHeight > 280) {
                     doc.addPage();
                     yPosition = 20;
                 }
-                doc.addImage(questionImage, 'PNG', 20, yPosition, 50, imageHeight); // Adiciona a imagem
+                doc.addImage(questionImage, 'PNG', 20, yPosition, 50, imageHeight);
                 yPosition += imageHeight + 10; // Espaçamento após a imagem
+                resolve();
             };
+            questionImage.onerror = () => {
+                console.error(`Failed to load image: ${imagePath}`);
+                resolve(); // Continua mesmo se a imagem não carregar
+            };
+        });
 
-            // Adiciona o texto da questão
-            doc.setFontSize(14);
-            const questionText = `${index + 1}. ${q.question}`;
-            const textLines = doc.splitTextToSize(questionText, 180);
-            const questionHeight = textLines.length * 10;
+        // Adiciona o texto da questão
+        doc.setFontSize(14);
+        const questionText = `${index + 1}. ${q.question}`;
+        const textLines = doc.splitTextToSize(questionText, 180);
+        const questionHeight = textLines.length * 10;
 
-            if (yPosition + questionHeight > 280) {
+        if (yPosition + questionHeight > 280) {
+            doc.addPage();
+            yPosition = 20;
+        }
+
+        doc.text(textLines, 20, yPosition);
+        yPosition += questionHeight;
+
+        // Adiciona as respostas
+        for (const answer of q.answers) {
+            doc.setFontSize(12);
+            const answerLines = doc.splitTextToSize(answer, 180);
+            const answerHeight = answerLines.length * 10;
+
+            if (yPosition + answerHeight > 280) {
                 doc.addPage();
                 yPosition = 20;
             }
 
-            doc.text(textLines, 20, yPosition);
-            yPosition += questionHeight;
+            doc.text(answerLines, 30, yPosition);
+            yPosition += answerHeight;
+        }
 
-            // Adiciona as opções de resposta
-            q.answers.forEach((answer) => {
-                doc.setFontSize(12);
-                const answerText = answer;
-                const answerLines = doc.splitTextToSize(answerText, 180);
-                const answerHeight = answerLines.length * 10;
+        yPosition += 10; // Espaçamento entre perguntas
+    }
 
-                if (yPosition + answerHeight > 280) {
-                    doc.addPage();
-                    yPosition = 20;
-                }
-
-                doc.text(answerLines, 30, yPosition);
-                yPosition += answerHeight;
-            });
-
-            yPosition += 10; // Espaçamento entre perguntas
-        });
-
-        // Salva o PDF
-        doc.save('QuizQuestionsWithImages.pdf');
-    };
-
-    // Verifica se o logo já foi carregado
-    if (logo.complete) logo.onload();
-}
-
-        // Salva o PDF
-        doc.save('QuizQuestionsWithLogo.pdf');
-    };
-
-    // Verifica se o logo já foi carregado
-    if (logo.complete) logo.onload();
+    // Salva o PDF
+    doc.save('QuizQuestionsWithImages.pdf');
 }
 
 // Exibição de modais
