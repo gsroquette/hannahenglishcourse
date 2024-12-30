@@ -469,27 +469,36 @@ function checkCompletion() {
     ensureUserIsAuthenticated(async (userId) => {
         let isLinked = false;
         try {
+            // Verifica se aluno é vinculado
             isLinked = await isStudentLinkedToProfessor(userId);
-            // Sempre salva a nota, mesmo se < 70
+
+            // **(1) Sempre salva a nota** (mesmo se < 70)
             await saveGrade(userId, grade, isLinked);
+
+            // **(2) Tenta desbloquear fase se >= 70
             await updateProgressInDatabase(userId, grade);
+
+            // **(3) Atualiza imediatamente a nota na tela
+            // para não precisar refresh
+            await loadGrade(userId);
+
         } catch (error) {
             console.error("Error saving grade or updating progress:", error);
             showModal("An error occurred while saving your progress. Please try again.");
             return;
         }
 
-        // Monta a mensagem principal
+        // Mensagem no modal
         let message;
         if (grade >= 70) {
             message = "Congratulations! You passed!";
         } else {
             message = "You did not pass. Try again!";
-            // Se aluno vinculado e < 70, acrescentar msg extra
+            // Se aluno vinculado e < 70, mensagem extra
             if (isLinked) {
                 message += "<br>Please contact your teacher to reset your grade.";
             }
-            // Limpa as respostas para tentar novamente
+            // Limpa respostas
             clearAnswers();
         }
 
@@ -570,8 +579,8 @@ async function saveGrade(userId, newGrade, isLinked) {
         const snapshot = await dbRef.once("value");
         const existingGrade = snapshot.val() || 0;
 
-        // Se o aluno é vinculado: só grava se a nota atual for 0
         if (isLinked) {
+            // Aluno vinculado só grava se a nota atual for 0
             if (existingGrade === 0) {
                 await dbRef.set(newGrade);
                 console.log("[Linked] Grade saved:", newGrade);
@@ -579,7 +588,7 @@ async function saveGrade(userId, newGrade, isLinked) {
                 console.log("[Linked] Existing grade not changed (needs teacher to reset).");
             }
         } else {
-            // Se o aluno não é vinculado: sobrescreve sempre (registra nova tentativa)
+            // Aluno não vinculado sobrescreve sempre
             await dbRef.set(newGrade);
             console.log("[Unlinked] Grade overwritten with:", newGrade);
         }
@@ -740,8 +749,10 @@ function displayPDFButton() {
 
 // ==================== INICIALIZAÇÃO DA PÁGINA ===========================
 window.onload = () => {
-    ensureUserIsAuthenticated((userId) => {
-        loadGrade(userId);
+    ensureUserIsAuthenticated(async (userId) => {
+        // Carrega a nota atual
+        await loadGrade(userId);
+        // Carrega as perguntas
         loadQuestions();
     });
 };
