@@ -625,7 +625,6 @@ async function generatePDF() {
     const logo = new Image();
     logo.src = 'Logo.png';
 
-    // Aguarda o carregamento do logo antes de continuar
     await new Promise((resolve) => {
         logo.onload = () => {
             doc.addImage(logo, 'PNG', 90, 10, 30, 30);
@@ -647,9 +646,14 @@ async function generatePDF() {
     doc.text('Date: _______________', 150, 70);
 
     let yPosition = 90;
+    const leftColumnX = 20; // Posição da coluna esquerda
+    const rightColumnX = 110; // Posição da coluna direita
+    let isLeftColumn = true; // Alterna entre colunas
 
     // Processa as perguntas, imagens e respostas de forma síncrona
     for (const [index, q] of questions.entries()) {
+        const columnX = isLeftColumn ? leftColumnX : rightColumnX;
+
         // Carrega a imagem da questão de forma síncrona
         const questionImage = new Image();
         const imagePath = `../../../../Level1/Unit1/DataTestQuizLeVeAB/images/imagem${index + 1}.png`;
@@ -657,13 +661,14 @@ async function generatePDF() {
         await new Promise((resolve) => {
             questionImage.src = imagePath;
             questionImage.onload = () => {
-                const imageHeight = (questionImage.height / questionImage.width) * 50; // Proporção ajustada para largura de 50
+                const imageHeight = (questionImage.height / questionImage.width) * 40; // Proporção ajustada para largura de 40
                 if (yPosition + imageHeight > 280) {
                     doc.addPage();
                     yPosition = 20;
+                    isLeftColumn = true; // Reinicia na coluna esquerda
                 }
-                doc.addImage(questionImage, 'PNG', 20, yPosition, 50, imageHeight);
-                yPosition += imageHeight + 10; // Espaçamento após a imagem
+                doc.addImage(questionImage, 'PNG', columnX, yPosition, 40, imageHeight);
+                yPosition += imageHeight + 5; // Espaçamento após a imagem
                 resolve();
             };
             questionImage.onerror = () => {
@@ -675,37 +680,45 @@ async function generatePDF() {
         // Adiciona o texto da questão
         doc.setFontSize(14);
         const questionText = `${index + 1}. ${q.question}`;
-        const textLines = doc.splitTextToSize(questionText, 180);
+        const textLines = doc.splitTextToSize(questionText, 80); // Ajusta a largura para caber na coluna
         const questionHeight = textLines.length * 10;
 
         if (yPosition + questionHeight > 280) {
             doc.addPage();
             yPosition = 20;
+            isLeftColumn = true; // Reinicia na coluna esquerda
         }
 
-        doc.text(textLines, 20, yPosition);
+        doc.text(textLines, columnX, yPosition);
         yPosition += questionHeight;
 
         // Adiciona as respostas
         for (const answer of q.answers) {
             doc.setFontSize(12);
-            const answerLines = doc.splitTextToSize(answer, 180);
+            const answerLines = doc.splitTextToSize(answer, 80); // Ajusta a largura para caber na coluna
             const answerHeight = answerLines.length * 10;
 
             if (yPosition + answerHeight > 280) {
                 doc.addPage();
                 yPosition = 20;
+                isLeftColumn = true; // Reinicia na coluna esquerda
             }
 
-            doc.text(answerLines, 30, yPosition);
+            doc.text(answerLines, columnX + 10, yPosition); // Adiciona um pequeno recuo para as respostas
             yPosition += answerHeight;
         }
 
         yPosition += 10; // Espaçamento entre perguntas
+
+        // Alterna para a próxima coluna
+        if (!isLeftColumn) {
+            yPosition += 10; // Espaçamento extra ao mudar de coluna
+        }
+        isLeftColumn = !isLeftColumn;
     }
 
     // Salva o PDF
-    doc.save('QuizQuestionsWithImages.pdf');
+    doc.save('QuizQuestionsTwoColumns.pdf');
 }
 
 // Exibição de modais
