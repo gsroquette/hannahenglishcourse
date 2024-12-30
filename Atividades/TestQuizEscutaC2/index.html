@@ -176,6 +176,7 @@
     <button class="read-btn" id="read-btn" onclick="readQuestion()">Read</button>
     <button class="prev-btn" id="prev-btn" onclick="stopReading(); showPreviousQuestion()">Previous</button>
     <button class="next-btn" id="next-btn" onclick="stopReading(); showNextQuestion()">Next</button>
+    <!-- Botão PDF será inserido dinamicamente se for professor/proprietário -->
 </div>
 
 <div id="quiz-container" class="question-container"></div>
@@ -193,7 +194,7 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
 <script>
-// ==================== CONFIGURAÇÃO DO FIREBASE ====================
+// ==================== CONFIG DO FIREBASE ====================
 const firebaseConfig = {
     apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
     authDomain: "hannahenglishcourse.firebaseapp.com",
@@ -206,16 +207,15 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 
-// ==================== VARIÁVEIS GLOBAIS ===========================
+// ==================== VARS GLOBAIS ============================
 let correctAnswers = 0;
 let totalQuestions = 0;
 let currentQuestionIndex = 0;
 let questions = [];
 let answeredQuestions = [];
 let selectedAnswers = [];
-let speechSynthesisUtterance = null;
 
-// ==================== FUNÇÕES DO QUIZ ============================
+// ==================== FUNÇÕES DO QUIZ =========================
 function goBack() {
     const { level, unit, fase } = getParamsFromURL();
 
@@ -233,7 +233,7 @@ function goBack() {
                             .get()
                             .then((unitSnapshot) => {
                                 if (unitSnapshot.exists() && unitSnapshot.val().fase1) {
-                                    window.history.back(); // Navegação permitida
+                                    window.history.back();
                                 } else {
                                     confirmBackNavigation("The next unit is locked. Do you still want to go back?");
                                 }
@@ -244,14 +244,13 @@ function goBack() {
                             .get()
                             .then((levelSnapshot) => {
                                 if (levelSnapshot.exists() && levelSnapshot.val().fase1) {
-                                    window.history.back(); 
+                                    window.history.back();
                                 } else {
                                     confirmBackNavigation("The next level is locked. Do you still want to go back?");
                                 }
                             });
                     } else {
                         const nextFaseKey = `fase${parseInt(fase, 10) + 1}`;
-
                         if (progress[nextFaseKey]) {
                             window.history.back();
                         } else {
@@ -276,7 +275,6 @@ function confirmBackNavigation(message) {
     }
 }
 
-// Exibe erros em modal
 function handleError(message) {
     const modal = document.getElementById("completion-modal");
     modal.innerHTML = `<p style="color: red;">${message}</p>`;
@@ -284,11 +282,12 @@ function handleError(message) {
     console.error(message);
 }
 
-// Carrega as perguntas (arquivo .txt)
+// Carrega perguntas
 async function loadQuestions() {
     try {
         const { level, unit } = getParamsFromURL();
         const questionFilePath = `../../../../${level}/${unit}/DataTestQuizEscutaC2/questions.txt`;
+
         console.log("Loading questions from:", questionFilePath);
 
         const response = await fetch(questionFilePath);
@@ -327,7 +326,7 @@ async function loadQuestions() {
     }
 }
 
-// Lê a questão em voz alta
+// Lê a questão
 function readQuestion() {
     if (!questions.length) {
         alert("No questions loaded to read.");
@@ -339,7 +338,7 @@ function readQuestion() {
     speechSynthesis.speak(utterance);
 }
 
-// Exibe apenas as opções de resposta, sem texto da questão
+// Exibe as opções
 function displayQuestion() {
     const container = document.getElementById("quiz-container");
     container.innerHTML = "";
@@ -354,7 +353,6 @@ function displayQuestion() {
     const questionDiv = document.createElement("div");
     questionDiv.classList.add("question");
 
-    // Exibe as opções (A, B, C, D)
     q.answers.forEach((answer) => {
         const answerLabel = document.createElement("label");
         const isChecked = selectedAnswers[currentQuestionIndex] === answer[0];
@@ -371,7 +369,6 @@ function displayQuestion() {
     updateNavigationButtons();
 }
 
-// Para a fala (se estiver rodando)
 function stopReading() {
     if (speechSynthesis.speaking || speechSynthesis.pending) {
         speechSynthesis.cancel();
@@ -379,7 +376,6 @@ function stopReading() {
     }
 }
 
-// Botão next
 function showNextQuestion() {
     if (questions.length === 0) {
         alert("No questions loaded.");
@@ -396,7 +392,6 @@ function showNextQuestion() {
     }
 }
 
-// Botão previous
 function showPreviousQuestion() {
     if (questions.length === 0) {
         alert("No questions loaded.");
@@ -410,7 +405,6 @@ function showPreviousQuestion() {
     }
 }
 
-// Ativa/desativa botões de navegação
 function updateNavigationButtons() {
     const prevBtn = document.getElementById("prev-btn");
     const nextBtn = document.getElementById("next-btn");
@@ -419,19 +413,16 @@ function updateNavigationButtons() {
     nextBtn.disabled = currentQuestionIndex === questions.length - 1;
 }
 
-// Seleciona resposta
 function selectAnswer(answer) {
     selectedAnswers[currentQuestionIndex] = answer;
     checkAnswer(answer);
     answeredQuestions[currentQuestionIndex] = true;
 
-    // Se todas respondidas e está na última questão
     if (allQuestionsAnswered() && currentQuestionIndex === questions.length - 1) {
         checkCompletion();
     }
 }
 
-// Verifica se a resposta está correta
 function checkAnswer(selectedAnswer) {
     const q = questions[currentQuestionIndex];
     if (selectedAnswer === q.correct && !answeredQuestions[currentQuestionIndex]) {
@@ -443,12 +434,11 @@ function checkAnswer(selectedAnswer) {
     }
 }
 
-// Verifica se todas estão respondidas
 function allQuestionsAnswered() {
     return answeredQuestions.every((ans) => ans);
 }
 
-// =============== NOVA FUNÇÃO: Limpa respostas se falhar ===============
+// Limpa respostas
 function clearAnswers() {
     correctAnswers = 0;
     answeredQuestions = new Array(questions.length).fill(false);
@@ -457,7 +447,7 @@ function clearAnswers() {
     displayQuestion();
 }
 
-// ==================== LÓGICA DE PASSAR OU NÃO PASSAR ====================
+// ==================== LÓGICA DE PASSAR OU NÃO ====================
 function checkCompletion() {
     if (!allQuestionsAnswered()) {
         alert("Please answer all questions before completing the quiz.");
@@ -469,44 +459,40 @@ function checkCompletion() {
     ensureUserIsAuthenticated(async (userId) => {
         let isLinked = false;
         try {
-            // Verifica se aluno é vinculado
             isLinked = await isStudentLinkedToProfessor(userId);
-
-            // **(1) Sempre salva a nota** (mesmo se < 70)
+            // Salva a nota (sempre)
             await saveGrade(userId, grade, isLinked);
-
-            // **(2) Tenta desbloquear fase se >= 70
+            // Tenta desbloquear a fase se >= 70
             await updateProgressInDatabase(userId, grade);
-
-            // **(3) Atualiza imediatamente a nota na tela
-            // para não precisar refresh
+            // Atualiza a nota na tela
             await loadGrade(userId);
-
         } catch (error) {
             console.error("Error saving grade or updating progress:", error);
             showModal("An error occurred while saving your progress. Please try again.");
             return;
         }
 
-        // Mensagem no modal
+        // Monta mensagem no modal
         let message;
         if (grade >= 70) {
             message = "Congratulations! You passed!";
+            // Exibe modal com acertos
+            showModal(message);
         } else {
+            // Exibir antes de zerar correctAnswers
             message = "You did not pass. Try again!";
-            // Se aluno vinculado e < 70, mensagem extra
             if (isLinked) {
                 message += "<br>Please contact your teacher to reset your grade.";
             }
-            // Limpa respostas
+            // 1) Exibe modal antes de limpar
+            showModal(message);
+
+            // 2) Agora limpa as respostas
             clearAnswers();
         }
-
-        showModal(message);
     });
 }
 
-// ==================== ATUALIZA PROGRESSO NO BANCO (70+) =================
 async function updateProgressInDatabase(userId, grade) {
     const { level, unit } = getParamsFromURL();
 
@@ -531,7 +517,6 @@ async function updateProgressInDatabase(userId, grade) {
     }
 }
 
-// ==================== LOAD GRADE E EXIBIÇÃO NA TELA =====================
 async function loadGrade(userId) {
     const { level, unit } = getParamsFromURL();
     const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/Quiz test - listening`);
@@ -552,13 +537,12 @@ async function loadGrade(userId) {
                 gradeDisplay.classList.remove("grade-style-red");
             }
 
-            // Se o aluno estiver vinculado e tiver < 70, mostra msg extra
+            // Se vinculado e < 70, avisa "Please contact..."
             const linked = await isStudentLinkedToProfessor(userId);
             if (linked && grade < 70) {
                 gradeDisplay.innerHTML += "<br><span style='color: red;'>Please contact your teacher to reset your grade.</span>";
             }
-
-            // Se estiver vinculado, exibe "Only your teacher can modify this grade"
+            // Se vinculado, exibe "Only your teacher can modify..."
             if (linked) {
                 gradeDisplay.innerHTML += "<br><span style='color: red;'>Only your teacher can modify this grade</span>";
             }
@@ -570,7 +554,7 @@ async function loadGrade(userId) {
     }
 }
 
-// ==================== SALVAR NOTA (COM AS NOVAS REGRAS) =================
+// Salva a nota
 async function saveGrade(userId, newGrade, isLinked) {
     const { level, unit } = getParamsFromURL();
     const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/Quiz test - listening`);
@@ -580,24 +564,23 @@ async function saveGrade(userId, newGrade, isLinked) {
         const existingGrade = snapshot.val() || 0;
 
         if (isLinked) {
-            // Aluno vinculado só grava se a nota atual for 0
+            // Vinculado só salva se a nota atual for 0
             if (existingGrade === 0) {
                 await dbRef.set(newGrade);
                 console.log("[Linked] Grade saved:", newGrade);
             } else {
-                console.log("[Linked] Existing grade not changed (needs teacher to reset).");
+                console.log("[Linked] Not changed, professor must reset first.");
             }
         } else {
-            // Aluno não vinculado sobrescreve sempre
+            // Não vinculado sobrescreve sempre
             await dbRef.set(newGrade);
-            console.log("[Unlinked] Grade overwritten with:", newGrade);
+            console.log("[Unlinked] Grade overwritten:", newGrade);
         }
     } catch (error) {
         console.error("Error saving grade:", error);
     }
 }
 
-// Verifica se o aluno está vinculado a um professor
 async function isStudentLinkedToProfessor(userId) {
     const dbRef = firebase.database().ref(`usuarios/${userId}/professor`);
     try {
@@ -609,7 +592,6 @@ async function isStudentLinkedToProfessor(userId) {
     }
 }
 
-// ==================== PDF (SEM ALTERAÇÃO SIGNIFICATIVA) =================
 function generatePDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
@@ -641,9 +623,8 @@ function generatePDF() {
 
             q.answers.forEach(answer => {
                 doc.setFontSize(12);
-                let answerText = answer;
-                let answerLines = doc.splitTextToSize(answerText, 180);
-                let answerHeight = answerLines.length * 10;
+                const answerLines = doc.splitTextToSize(answer, 180);
+                const answerHeight = answerLines.length * 10;
 
                 if (yPosition + answerHeight > 280) {
                     doc.addPage();
@@ -654,13 +635,14 @@ function generatePDF() {
             });
             yPosition += 10;
         });
+
         doc.save('QuizQuestionsWithLogo.pdf');
     };
 
     if (logo.complete) logo.onload();
 }
 
-// ==================== MODAL DE FINALIZAÇÃO =============================
+// Exibe modal
 function showModal(message) {
     const modal = document.getElementById("completion-modal");
     const overlay = document.getElementById("overlay");
@@ -688,7 +670,6 @@ function closeModal() {
     if (overlay) overlay.style.display = "none";
 }
 
-// ==================== UTILITÁRIOS DE URL E LOGIN =======================
 function getParamsFromURL() {
     const params = new URLSearchParams(window.location.search);
     return {
@@ -747,7 +728,6 @@ function displayPDFButton() {
     btnGroup.appendChild(pdfButton);
 }
 
-// ==================== INICIALIZAÇÃO DA PÁGINA ===========================
 window.onload = () => {
     ensureUserIsAuthenticated(async (userId) => {
         // Carrega a nota atual
