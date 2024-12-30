@@ -645,7 +645,7 @@ async function generatePDF() {
     doc.text('Name: ____________________________________', 20, 70);
     doc.text('Date: _______________', 150, 70);
 
-    const columnWidth = 80; // Largura fixa para cada coluna
+    const columnWidth = 85; // Largura fixa para cada coluna
     const columnSpacing = 10; // Espaço entre as colunas
     const leftColumnX = 20; // Posição X da coluna esquerda
     const rightColumnX = leftColumnX + columnWidth + columnSpacing; // Posição X da coluna direita
@@ -654,9 +654,24 @@ async function generatePDF() {
     let yPosition = 90; // Posição inicial da coluna
     let currentColumnX = leftColumnX; // Começa na coluna esquerda
 
-    // Processa perguntas e respostas
+    // Processa perguntas, imagens e respostas
     for (const [index, q] of questions.entries()) {
-        // Adiciona a imagem da questão de forma síncrona
+        // Verifica se há espaço suficiente na coluna atual para todo o conteúdo
+        const estimatedHeight = 40 + 10 + (q.answers.length * 10) + 20; // Altura estimada para imagem + pergunta + respostas + espaçamento
+        if (yPosition + estimatedHeight > maxY) {
+            if (currentColumnX === leftColumnX) {
+                // Muda para a coluna direita
+                currentColumnX = rightColumnX;
+                yPosition = 90; // Reinicia a posição na nova coluna
+            } else {
+                // Adiciona nova página e reinicia na coluna esquerda
+                doc.addPage();
+                currentColumnX = leftColumnX;
+                yPosition = 90;
+            }
+        }
+
+        // Adiciona a imagem da questão
         const questionImage = new Image();
         const imagePath = `../../../../Level1/Unit1/DataTestQuizLeVeAB/images/imagem${index + 1}.png`;
 
@@ -664,11 +679,6 @@ async function generatePDF() {
             questionImage.src = imagePath;
             questionImage.onload = () => {
                 const imageHeight = (questionImage.height / questionImage.width) * 40; // Proporção ajustada para largura de 40
-                if (yPosition + imageHeight > maxY) {
-                    doc.addPage();
-                    yPosition = 20;
-                    currentColumnX = leftColumnX; // Reinicia na coluna esquerda
-                }
                 doc.addImage(questionImage, 'PNG', currentColumnX, yPosition, 40, imageHeight);
                 yPosition += imageHeight + 5; // Espaçamento após a imagem
                 resolve();
@@ -679,46 +689,26 @@ async function generatePDF() {
             };
         });
 
-        // Adiciona o texto da questão
+        // Adiciona o texto da pergunta
         doc.setFontSize(14);
         const questionText = `${index + 1}. ${q.question}`;
         const textLines = doc.splitTextToSize(questionText, columnWidth);
         const questionHeight = textLines.length * 10;
 
-        if (yPosition + questionHeight > maxY) {
-            doc.addPage();
-            yPosition = 20;
-            currentColumnX = leftColumnX; // Reinicia na coluna esquerda
-        }
-
         doc.text(textLines, currentColumnX, yPosition);
         yPosition += questionHeight;
 
-        // Adiciona as respostas
+        // Adiciona as opções de resposta
         for (const answer of q.answers) {
             doc.setFontSize(12);
             const answerLines = doc.splitTextToSize(answer, columnWidth);
             const answerHeight = answerLines.length * 10;
-
-            if (yPosition + answerHeight > maxY) {
-                doc.addPage();
-                yPosition = 20;
-                currentColumnX = leftColumnX; // Reinicia na coluna esquerda
-            }
 
             doc.text(answerLines, currentColumnX + 5, yPosition); // Adiciona recuo para respostas
             yPosition += answerHeight;
         }
 
         yPosition += 10; // Espaçamento entre perguntas
-
-        // Alterna entre as colunas
-        if (currentColumnX === leftColumnX) {
-            currentColumnX = rightColumnX;
-        } else {
-            currentColumnX = leftColumnX;
-            yPosition += 10; // Adiciona espaçamento entre linhas ao alternar de volta
-        }
     }
 
     // Salva o PDF
