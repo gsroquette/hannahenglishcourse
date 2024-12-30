@@ -193,7 +193,7 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
 <script>
-// ==================== CONFIGURAÇÃO DO FIREBASE ====================
+// Configuração do Firebase
 const firebaseConfig = {
     apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
     authDomain: "hannahenglishcourse.firebaseapp.com",
@@ -204,9 +204,12 @@ const firebaseConfig = {
     measurementId: "G-07VVJG9LRS",
     databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
 };
+
+// Inicializa o Firebase
 firebase.initializeApp(firebaseConfig);
 
-// ==================== VARIÁVEIS GLOBAIS ===========================
+// Variáveis globais
+let gradeRef;
 let correctAnswers = 0;
 let totalQuestions = 0;
 let currentQuestionIndex = 0;
@@ -215,7 +218,6 @@ let answeredQuestions = [];
 let selectedAnswers = [];
 let speechSynthesisUtterance = null;
 
-// ==================== FUNÇÕES DO QUIZ ============================
 function goBack() {
     const { level, unit, fase } = getParamsFromURL();
 
@@ -228,6 +230,7 @@ function goBack() {
                     const progress = snapshot.val();
 
                     if (fase === "last") {
+                        // Verificar próxima unidade
                         const nextUnit = `Unit${parseInt(unit.replace("Unit", "")) + 1}`;
                         firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`)
                             .get()
@@ -239,17 +242,19 @@ function goBack() {
                                 }
                             });
                     } else if (fase === "end") {
+                        // Verificar próximo nível
                         const nextLevel = `Level${parseInt(level.replace("Level", "")) + 1}`;
                         firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`)
                             .get()
                             .then((levelSnapshot) => {
                                 if (levelSnapshot.exists() && levelSnapshot.val().fase1) {
-                                    window.history.back(); 
+                                    window.history.back(); // Navegação permitida
                                 } else {
                                     confirmBackNavigation("The next level is locked. Do you still want to go back?");
                                 }
                             });
                     } else {
+                        // Lógica padrão para fases numéricas
                         const nextFaseKey = `fase${parseInt(fase, 10) + 1}`;
 
                         if (progress[nextFaseKey]) {
@@ -276,7 +281,7 @@ function confirmBackNavigation(message) {
     }
 }
 
-// Exibe erros em modal
+// Função para exibir erros ao usuário
 function handleError(message) {
     const modal = document.getElementById("completion-modal");
     modal.innerHTML = `<p style="color: red;">${message}</p>`;
@@ -284,12 +289,13 @@ function handleError(message) {
     console.error(message);
 }
 
-// Carrega as perguntas (arquivo .txt)
+// Função para carregar as perguntas
 async function loadQuestions() {
     try {
         const { level, unit } = getParamsFromURL();
         const questionFilePath = `../../../../${level}/${unit}/DataTestQuizEscutaC2/questions.txt`;
-        console.log("Loading questions from:", questionFilePath);
+
+        console.log("Loading questions from:", questionFilePath); // Log para depuração
 
         const response = await fetch(questionFilePath);
         if (!response.ok) throw new Error("Failed to load questions");
@@ -303,22 +309,22 @@ async function loadQuestions() {
         lines.forEach((line) => {
             line = line.trim();
             if (line.startsWith("Q:")) {
+                // Inicia um objeto a cada "Q:"
                 if (currentQuestion) questions.push(currentQuestion);
                 currentQuestion = { question: line.substring(2).trim(), answers: [], correct: "" };
             } else if (/^[A-D]\./.test(line)) {
+                // Adiciona cada opção (A., B., C., D.)
                 currentQuestion.answers.push(line);
             } else if (line.startsWith("Correct:")) {
-                if (currentQuestion) {
-                    currentQuestion.correct = line.split(":")[1].trim();
-                }
+                if (currentQuestion) currentQuestion.correct = line.split(":")[1].trim();
             }
         });
 
         if (currentQuestion) questions.push(currentQuestion);
+
         if (questions.length === 0) throw new Error("No valid questions found");
 
         console.log("Questions loaded successfully:", questions);
-
         answeredQuestions = new Array(questions.length).fill(false);
         totalQuestions = questions.length;
         displayQuestion();
@@ -327,7 +333,7 @@ async function loadQuestions() {
     }
 }
 
-// Lê a questão em voz alta
+// Lê a questão em voz alta (mas não exibe texto da questão na tela)
 function readQuestion() {
     if (!questions.length) {
         alert("No questions loaded to read.");
@@ -335,11 +341,11 @@ function readQuestion() {
     }
     const questionText = questions[currentQuestionIndex].question;
     const utterance = new SpeechSynthesisUtterance(questionText);
-    utterance.lang = "en-US";
+    utterance.lang = "en-US"; // Definir o idioma para inglês
     speechSynthesis.speak(utterance);
 }
 
-// Exibe apenas as opções de resposta, sem texto da questão
+// Função para exibir apenas as opções de resposta, **sem** texto da questão
 function displayQuestion() {
     const container = document.getElementById("quiz-container");
     container.innerHTML = "";
@@ -351,10 +357,11 @@ function displayQuestion() {
     }
 
     const q = questions[currentQuestionIndex];
-    const questionDiv = document.createElement("div");
-    questionDiv.classList.add("question");
 
-    // Exibe as opções (A, B, C, D)
+    const questionDiv = document.createElement("div");
+    questionDiv.classList.add("question");    
+
+    // Exibe apenas as opções (A, B, C, D)
     q.answers.forEach((answer) => {
         const answerLabel = document.createElement("label");
         const isChecked = selectedAnswers[currentQuestionIndex] === answer[0];
@@ -371,7 +378,6 @@ function displayQuestion() {
     updateNavigationButtons();
 }
 
-// Para a fala (se estiver rodando)
 function stopReading() {
     if (speechSynthesis.speaking || speechSynthesis.pending) {
         speechSynthesis.cancel();
@@ -379,7 +385,7 @@ function stopReading() {
     }
 }
 
-// Botão next
+// Navegação entre perguntas
 function showNextQuestion() {
     if (questions.length === 0) {
         alert("No questions loaded.");
@@ -390,13 +396,13 @@ function showNextQuestion() {
         currentQuestionIndex++;
         displayQuestion();
     } else if (allQuestionsAnswered()) {
+        // Se chegou à última questão e todas foram respondidas
         checkCompletion();
     } else {
         alert("Please answer all questions before completing the quiz.");
     }
 }
 
-// Botão previous
 function showPreviousQuestion() {
     if (questions.length === 0) {
         alert("No questions loaded.");
@@ -410,7 +416,6 @@ function showPreviousQuestion() {
     }
 }
 
-// Ativa/desativa botões de navegação
 function updateNavigationButtons() {
     const prevBtn = document.getElementById("prev-btn");
     const nextBtn = document.getElementById("next-btn");
@@ -419,21 +424,21 @@ function updateNavigationButtons() {
     nextBtn.disabled = currentQuestionIndex === questions.length - 1;
 }
 
-// Seleciona resposta
+// Verificação de respostas
 function selectAnswer(answer) {
     selectedAnswers[currentQuestionIndex] = answer;
     checkAnswer(answer);
     answeredQuestions[currentQuestionIndex] = true;
 
-    // Se todas respondidas e está na última questão
+    // Verifica automaticamente a conclusão se todas as questões foram respondidas
     if (allQuestionsAnswered() && currentQuestionIndex === questions.length - 1) {
         checkCompletion();
     }
 }
 
-// Verifica se a resposta está correta
 function checkAnswer(selectedAnswer) {
     const q = questions[currentQuestionIndex];
+
     if (selectedAnswer === q.correct && !answeredQuestions[currentQuestionIndex]) {
         answeredQuestions[currentQuestionIndex] = true;
         correctAnswers++;
@@ -443,21 +448,11 @@ function checkAnswer(selectedAnswer) {
     }
 }
 
-// Verifica se todas estão respondidas
 function allQuestionsAnswered() {
-    return answeredQuestions.every((ans) => ans);
+    return answeredQuestions.every((answered) => answered);
 }
 
-// =============== NOVA FUNÇÃO: Limpa respostas se falhar ===============
-function clearAnswers() {
-    correctAnswers = 0;
-    answeredQuestions = new Array(questions.length).fill(false);
-    selectedAnswers = [];
-    currentQuestionIndex = 0;
-    displayQuestion();
-}
-
-// ==================== LÓGICA DE PASSAR OU NÃO PASSAR ====================
+// Verifica se o quiz foi concluído
 function checkCompletion() {
     if (!allQuestionsAnswered()) {
         alert("Please answer all questions before completing the quiz.");
@@ -467,11 +462,8 @@ function checkCompletion() {
     const grade = Math.round((correctAnswers / totalQuestions) * 100);
 
     ensureUserIsAuthenticated(async (userId) => {
-        let isLinked = false;
         try {
-            isLinked = await isStudentLinkedToProfessor(userId);
-            // Sempre salva a nota, mesmo se < 70
-            await saveGrade(userId, grade, isLinked);
+            await saveGrade(userId, grade);
             await updateProgressInDatabase(userId, grade);
         } catch (error) {
             console.error("Error saving grade or updating progress:", error);
@@ -479,30 +471,19 @@ function checkCompletion() {
             return;
         }
 
-        // Monta a mensagem principal
-        let message;
-        if (grade >= 70) {
-            message = "Congratulations! You passed!";
-        } else {
-            message = "You did not pass. Try again!";
-            // Se aluno vinculado e < 70, acrescentar msg extra
-            if (isLinked) {
-                message += "<br>Please contact your teacher to reset your grade.";
-            }
-            // Limpa as respostas para tentar novamente
-            clearAnswers();
-        }
-
+        const message = grade >= 70 
+            ? "Congratulations! You passed!" 
+            : "You did not pass. Try again!";
         showModal(message);
     });
 }
 
-// ==================== ATUALIZA PROGRESSO NO BANCO (70+) =================
+// Atualiza o progresso no banco de dados
 async function updateProgressInDatabase(userId, grade) {
     const { level, unit } = getParamsFromURL();
 
-    if (grade >= 70) {
-        try {
+    try {
+        if (grade >= 70) {
             const currentPhase = getPhaseFromURL();
             const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
 
@@ -516,13 +497,12 @@ async function updateProgressInDatabase(userId, grade) {
                 const nextPhase = `fase${parseInt(currentPhase) + 1}`;
                 await dbRef.update({ [nextPhase]: true });
             }
-        } catch (error) {
-            handleError("Failed to update progress. Please try again.");
         }
+    } catch (error) {
+        handleError("Failed to update progress. Please try again.");
     }
 }
 
-// ==================== LOAD GRADE E EXIBIÇÃO NA TELA =====================
 async function loadGrade(userId) {
     const { level, unit } = getParamsFromURL();
     const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/Quiz test - listening`);
@@ -531,6 +511,7 @@ async function loadGrade(userId) {
     try {
         const snapshot = await dbRef.once("value");
         const grade = snapshot.val();
+
         if (grade !== null) {
             gradeDisplay.style.display = "block"; 
             gradeDisplay.innerHTML = `Your Grade: ${grade}%`;
@@ -543,14 +524,9 @@ async function loadGrade(userId) {
                 gradeDisplay.classList.remove("grade-style-red");
             }
 
-            // Se o aluno estiver vinculado e tiver < 70, mostra msg extra
-            const linked = await isStudentLinkedToProfessor(userId);
-            if (linked && grade < 70) {
-                gradeDisplay.innerHTML += "<br><span style='color: red;'>Please contact your teacher to reset your grade.</span>";
-            }
-
-            // Se estiver vinculado, exibe "Only your teacher can modify this grade"
-            if (linked) {
+            // Verifica se o aluno está vinculado a um professor
+            const isLinked = await isStudentLinkedToProfessor(userId);
+            if (isLinked) {
                 gradeDisplay.innerHTML += "<br><span style='color: red;'>Only your teacher can modify this grade</span>";
             }
         } else {
@@ -561,34 +537,25 @@ async function loadGrade(userId) {
     }
 }
 
-// ==================== SALVAR NOTA (COM AS NOVAS REGRAS) =================
-async function saveGrade(userId, newGrade, isLinked) {
+// Salva a nota do usuário
+async function saveGrade(userId, grade) {
     const { level, unit } = getParamsFromURL();
     const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/Quiz test - listening`);
 
     try {
         const snapshot = await dbRef.once("value");
-        const existingGrade = snapshot.val() || 0;
+        const existingGrade = snapshot.val();
 
-        // Se o aluno é vinculado: só grava se a nota atual for 0
-        if (isLinked) {
-            if (existingGrade === 0) {
-                await dbRef.set(newGrade);
-                console.log("[Linked] Grade saved:", newGrade);
-            } else {
-                console.log("[Linked] Existing grade not changed (needs teacher to reset).");
-            }
+        if (!existingGrade || existingGrade === 0) {
+            await dbRef.set(grade);
         } else {
-            // Se o aluno não é vinculado: sobrescreve sempre (registra nova tentativa)
-            await dbRef.set(newGrade);
-            console.log("[Unlinked] Grade overwritten with:", newGrade);
+            console.log("Grade already exists and cannot be changed by the student.");
         }
     } catch (error) {
         console.error("Error saving grade:", error);
     }
 }
 
-// Verifica se o aluno está vinculado a um professor
 async function isStudentLinkedToProfessor(userId) {
     const dbRef = firebase.database().ref(`usuarios/${userId}/professor`);
     try {
@@ -600,33 +567,42 @@ async function isStudentLinkedToProfessor(userId) {
     }
 }
 
-// ==================== PDF (SEM ALTERAÇÃO SIGNIFICATIVA) =================
 function generatePDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
+
+    // Adiciona o logo
     const logo = new Image();
     logo.src = 'Logo.png';
 
     logo.onload = () => {
+        // Adiciona o logo no topo
         doc.addImage(logo, 'PNG', 90, 10, 30, 30);
+
+        // Adiciona o título
         doc.setFontSize(20);
         doc.text('Hannah Test', 105, 50, null, null, 'center');
 
+        // Adiciona campos para nome e data
         doc.setFontSize(12);
         doc.text('Name: ____________________________________', 20, 70);
         doc.text('Date: _______________', 150, 70);
 
         let yPosition = 90;
+
+        // Adiciona as perguntas e respostas
         questions.forEach((q, index) => {
             doc.setFontSize(14);
             let questionText = `${index + 1}. ${q.question}`;
             let textLines = doc.splitTextToSize(questionText, 180);
             let questionHeight = textLines.length * 10;
 
+            // Verifica se a página está cheia e adiciona uma nova página, se necessário
             if (yPosition + questionHeight > 280) {
                 doc.addPage();
                 yPosition = 20;
             }
+
             doc.text(textLines, 20, yPosition);
             yPosition += questionHeight;
 
@@ -640,18 +616,23 @@ function generatePDF() {
                     doc.addPage();
                     yPosition = 20;
                 }
+
                 doc.text(answerLines, 30, yPosition);
                 yPosition += answerHeight;
             });
-            yPosition += 10;
+
+            yPosition += 10; // Espaçamento entre perguntas
         });
+
+        // Salva o PDF
         doc.save('QuizQuestionsWithLogo.pdf');
     };
 
+    // Verifica se o logo já foi carregado
     if (logo.complete) logo.onload();
 }
 
-// ==================== MODAL DE FINALIZAÇÃO =============================
+// Exibição de modais
 function showModal(message) {
     const modal = document.getElementById("completion-modal");
     const overlay = document.getElementById("overlay");
@@ -659,11 +640,9 @@ function showModal(message) {
         console.error("Modal or overlay element not found!");
         return;
     }
-
-    const gradeCalculated = Math.round((correctAnswers / totalQuestions) * 100);
     modal.innerHTML = `
         <h2>${message}</h2>
-        <p>Your score: ${gradeCalculated}%</p>
+        <p>Your score: ${Math.round((correctAnswers / totalQuestions) * 100)}%</p>
         <p>Total Questions: ${totalQuestions}</p>
         <p>Correct Answers: ${correctAnswers}</p>
         <button onclick="closeModal()">Close</button>
@@ -679,7 +658,7 @@ function closeModal() {
     if (overlay) overlay.style.display = "none";
 }
 
-// ==================== UTILITÁRIOS DE URL E LOGIN =======================
+// Obter parâmetros da URL
 function getParamsFromURL() {
     const params = new URLSearchParams(window.location.search);
     return {
@@ -699,6 +678,7 @@ function ensureUserIsAuthenticated(callback) {
         if (user) {
             const userId = user.uid;
             const roleRef = firebase.database().ref(`usuarios/${userId}/role`);
+            
             roleRef.once('value')
                 .then((snapshot) => {
                     const role = snapshot.val();
@@ -726,6 +706,7 @@ function displayPDFButton() {
         console.error("Button group not found!");
         return;
     }
+
     if (document.querySelector('.pdf-btn')) {
         console.log("PDF button already exists.");
         return;
@@ -738,7 +719,6 @@ function displayPDFButton() {
     btnGroup.appendChild(pdfButton);
 }
 
-// ==================== INICIALIZAÇÃO DA PÁGINA ===========================
 window.onload = () => {
     ensureUserIsAuthenticated((userId) => {
         loadGrade(userId);
