@@ -645,16 +645,18 @@ async function generatePDF() {
     doc.text('Name: ____________________________________', 20, 70);
     doc.text('Date: _______________', 150, 70);
 
-    let yPosition = 90;
-    const leftColumnX = 20; // Posição da coluna esquerda
-    const rightColumnX = 110; // Posição da coluna direita
-    let isLeftColumn = true; // Alterna entre colunas
+    const columnWidth = 80; // Largura fixa para cada coluna
+    const columnSpacing = 10; // Espaço entre as colunas
+    const leftColumnX = 20; // Posição X da coluna esquerda
+    const rightColumnX = leftColumnX + columnWidth + columnSpacing; // Posição X da coluna direita
+    const maxY = 280; // Altura máxima antes de quebrar a página
 
-    // Processa as perguntas, imagens e respostas de forma síncrona
+    let yPosition = 90; // Posição inicial da coluna
+    let currentColumnX = leftColumnX; // Começa na coluna esquerda
+
+    // Processa perguntas e respostas
     for (const [index, q] of questions.entries()) {
-        const columnX = isLeftColumn ? leftColumnX : rightColumnX;
-
-        // Carrega a imagem da questão de forma síncrona
+        // Adiciona a imagem da questão de forma síncrona
         const questionImage = new Image();
         const imagePath = `../../../../Level1/Unit1/DataTestQuizLeVeAB/images/imagem${index + 1}.png`;
 
@@ -662,12 +664,12 @@ async function generatePDF() {
             questionImage.src = imagePath;
             questionImage.onload = () => {
                 const imageHeight = (questionImage.height / questionImage.width) * 40; // Proporção ajustada para largura de 40
-                if (yPosition + imageHeight > 280) {
+                if (yPosition + imageHeight > maxY) {
                     doc.addPage();
                     yPosition = 20;
-                    isLeftColumn = true; // Reinicia na coluna esquerda
+                    currentColumnX = leftColumnX; // Reinicia na coluna esquerda
                 }
-                doc.addImage(questionImage, 'PNG', columnX, yPosition, 40, imageHeight);
+                doc.addImage(questionImage, 'PNG', currentColumnX, yPosition, 40, imageHeight);
                 yPosition += imageHeight + 5; // Espaçamento após a imagem
                 resolve();
             };
@@ -680,45 +682,47 @@ async function generatePDF() {
         // Adiciona o texto da questão
         doc.setFontSize(14);
         const questionText = `${index + 1}. ${q.question}`;
-        const textLines = doc.splitTextToSize(questionText, 80); // Ajusta a largura para caber na coluna
+        const textLines = doc.splitTextToSize(questionText, columnWidth);
         const questionHeight = textLines.length * 10;
 
-        if (yPosition + questionHeight > 280) {
+        if (yPosition + questionHeight > maxY) {
             doc.addPage();
             yPosition = 20;
-            isLeftColumn = true; // Reinicia na coluna esquerda
+            currentColumnX = leftColumnX; // Reinicia na coluna esquerda
         }
 
-        doc.text(textLines, columnX, yPosition);
+        doc.text(textLines, currentColumnX, yPosition);
         yPosition += questionHeight;
 
         // Adiciona as respostas
         for (const answer of q.answers) {
             doc.setFontSize(12);
-            const answerLines = doc.splitTextToSize(answer, 80); // Ajusta a largura para caber na coluna
+            const answerLines = doc.splitTextToSize(answer, columnWidth);
             const answerHeight = answerLines.length * 10;
 
-            if (yPosition + answerHeight > 280) {
+            if (yPosition + answerHeight > maxY) {
                 doc.addPage();
                 yPosition = 20;
-                isLeftColumn = true; // Reinicia na coluna esquerda
+                currentColumnX = leftColumnX; // Reinicia na coluna esquerda
             }
 
-            doc.text(answerLines, columnX + 10, yPosition); // Adiciona um pequeno recuo para as respostas
+            doc.text(answerLines, currentColumnX + 5, yPosition); // Adiciona recuo para respostas
             yPosition += answerHeight;
         }
 
         yPosition += 10; // Espaçamento entre perguntas
 
-        // Alterna para a próxima coluna
-        if (!isLeftColumn) {
-            yPosition += 10; // Espaçamento extra ao mudar de coluna
+        // Alterna entre as colunas
+        if (currentColumnX === leftColumnX) {
+            currentColumnX = rightColumnX;
+        } else {
+            currentColumnX = leftColumnX;
+            yPosition += 10; // Adiciona espaçamento entre linhas ao alternar de volta
         }
-        isLeftColumn = !isLeftColumn;
     }
 
     // Salva o PDF
-    doc.save('QuizQuestionsTwoColumns.pdf');
+    doc.save('QuizQuestionsTwoColumnsFixed.pdf');
 }
 
 // Exibição de modais
