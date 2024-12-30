@@ -19,7 +19,8 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 1029, name: "TestQuizLidoABC", path: `/Atividades/TestQuizLidoABC/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1029`, img: "../../imagens/test.png", unlocked: false },
         { id: 1030, name: "TestQuizLeVeAB", path: `/Atividades/TestQuizLeVeAB/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1030`, img: "../../imagens/test.png", unlocked: false }, 
         { id: 1031, name: "TestQuizVeEscutaC", path: `/Atividades/TestQuizVeEscutaC/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1031`, img: "../../imagens/test.png", unlocked: false },  
-        { id: 1032, name: "TestQuizEscutaC2", path: `/Atividades/TestQuizEscutaC2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=last`, img: "../../imagens/test.png", unlocked: false },           
+        { id: 1032, name: "TestQuizEscutaC2", path: `/Atividades/TestQuizEscutaC2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1032`, img: "../../imagens/test.png", unlocked: false },   
+        { id: 1033, name: "TestwordB2C", path: `/Atividades/TestwordB2C/index.html?level=${currentLevel}&unit=${currentUnit}&fase=last`, img: "../../imagens/test.png", unlocked: false },           
 ];
 
     // Fechar o dropdown ao clicar fora dele
