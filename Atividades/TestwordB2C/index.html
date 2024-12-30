@@ -37,6 +37,7 @@
             background-color: #333;
         }
 
+        /* Botão de gerar PDF */
         #pdfButton {
             display: none; 
             padding: 15px 25px; 
@@ -53,13 +54,7 @@
             background-color: #28a428;
         }
 
-        h1 {
-            text-align: center;
-            color: #ff4500;
-            font-size: 3rem;
-            margin-bottom: 20px;
-        }
-
+        /* Exibição da nota */
         #grade-display {
             display: none; 
             text-align: center; 
@@ -68,8 +63,6 @@
             margin-bottom: 20px;
         }
 
-        /* Verde se >= 70, vermelho se < 70, ajustado dinamicamente */
-        
         .activity-container {
             margin-top: 20px;
         }
@@ -101,7 +94,7 @@
             align-items: center;
         }
 
-        /* Estilo do botão Finish Test */
+        /* Botão Finish Test */
         #finishButton {
             display: block;
             margin: 20px auto;
@@ -121,15 +114,18 @@
         /* Modal de conclusão */
         #overlay {
             position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
+            top: 0; 
+            left: 0;
+            width: 100%; 
+            height: 100%;
             background: rgba(0, 0, 0, 0.7);
             display: none;
             z-index: 1000;
         }
         #completion-modal {
             position: fixed;
-            top: 50%; left: 50%;
+            top: 50%; 
+            left: 50%;
             transform: translate(-50%, -50%);
             background: white;
             padding: 30px;
@@ -198,6 +194,7 @@
 <!-- Botão BACK com nova função goBack() -->
 <button class="back-btn" onclick="goBack()">Back</button>
 
+<!-- Botão PDF -->
 <button id="pdfButton" onclick="generatePDF()">Generate PDF</button>
 
 <h1>Missing Word Test</h1>
@@ -220,6 +217,8 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<!-- Biblioteca jsPDF (para gerar PDF) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
 
 <script>
@@ -242,13 +241,12 @@ let correctAnswers = 0;
 let totalQuestions = 0;
 let currentQuestionIndex = 0;
 
-// Armazenamos aqui para manter a lógica de "limpar" se <70
-// (Não faz manipulação do HTML de perguntas, pois aqui é missing word.)
+// Para manter coerência com lógicas de “limpar” se < 70
 let answeredQuestions = []; 
 let selectedAnswers = [];
 
-// ========================== PONTOS 9 E 10 (URL) ==========================
-// Retorna { level, unit, fase } do search param
+// ========================== 9 E 10 (URL E CAMINHOS) ==========================
+// Retorna { level, unit, fase } via search param
 function getParamsFromURL() {
     const params = new URLSearchParams(window.location.search);
     return {
@@ -320,7 +318,7 @@ function confirmBackNavigation(message) {
     }
 }
 
-// ========================= BOTÃO PDF (pode manter como estava) =========================
+// ========================= BOTÃO PDF =========================
 firebase.auth().onAuthStateChanged((user) => {
     if (user) {
         const userId = user.uid;
@@ -361,14 +359,14 @@ async function generatePDF() {
         // Adiciona as atividades
         let yOffset = 60; // Posição inicial
         document.querySelectorAll('.activity').forEach((activity, index) => {
-            if (yOffset > 270) { // Se ultrapassar o limite da página
+            if (yOffset > 270) {
                 doc.addPage();
                 yOffset = 20;
             }
 
             const imgElement = activity.querySelector('img');
             if (imgElement) {
-                // Converte imagem para Base64 e adiciona ao PDF
+                // Converte imagem para Base64
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 canvas.width = imgElement.width;
@@ -382,6 +380,7 @@ async function generatePDF() {
             if (wordContainer) {
                 doc.setFontSize(14);
                 let xPos = 50;
+                // Se quisesse desenhar traços, etc.
                 wordContainer.querySelectorAll('.missing-letter-input').forEach(() => {
                     doc.text("_____", xPos, yOffset + 10);
                     xPos += 15;
@@ -394,7 +393,7 @@ async function generatePDF() {
         doc.save("Hannah_Missing_Word.pdf");
     };
 
-    // Caso a logo não carregue, salva o PDF sem a imagem
+    // Caso a logo não carregue, salva sem a imagem
     logo.onerror = function() {
         doc.setFontSize(12);
         doc.text("Name: __________________________________________ Date: ____________", 50, 20);
@@ -404,9 +403,8 @@ async function generatePDF() {
     };
 }
 
-// =================== LÓGICA DO TESTE DE MISSING WORD ====================
+// =================== MISSING WORD LOGIC + CARREGANDO ARQUIVO ====================
 function playSound(word) {
-    // Lê a palavra em voz alta
     if ('speechSynthesis' in window) {
         const synth = window.speechSynthesis;
         const utterThis = new SpeechSynthesisUtterance(word);
@@ -454,7 +452,7 @@ function createActivity(imageUrl, word) {
     wordInput.placeholder = "Type the word here";
     wordContainer.appendChild(wordInput);
 
-    // Exibe a palavra
+    // Exibe a palavra completa
     const fullWordElement = document.createElement('div');
     fullWordElement.innerText = word.toUpperCase();
     fullWordElement.style.fontWeight = 'bold';
@@ -465,26 +463,28 @@ function createActivity(imageUrl, word) {
     activityContainer.appendChild(activityDiv);
 }
 
-// Carrega atividades a partir de ../data1/words.txt (PONTO 10)
+// Carrega atividades a partir de ../../../../${level}/${unit}/data1/words.txt
 async function loadActivities() {
     try {
-        const response = await fetch('../data1/words.txt');
+        const { level, unit } = getParamsFromURL();
+        const wordsPath = `../../../../${level}/${unit}/data1/words.txt`;
+
+        const response = await fetch(wordsPath);
         const text = await response.text();
         const words = text.trim().split('\n');
 
         words.forEach((word, index) => {
-            const imageName = `imagem${index + 1}.jpeg`;
-            const imageUrl = `../data1/imagens/${imageName}`;
+            // imagens em ../../../../${level}/${unit}/data1/imagens/imagemX.png
+            const imageUrl = `../../../../${level}/${unit}/data1/imagens/imagem${index + 1}.png`;
             createActivity(imageUrl, word);
         });
-        // Preenche `activities` com as palavras
         activities = words;
     } catch (error) {
         console.error('Erro ao carregar palavras:', error);
     }
 }
 
-// =================== CÁLCULO DE NOTA (1-8) ====================
+// =================== LÓGICA DE NOTA (1-8) ====================
 function checkCompletion() {
     const wordInputs = document.querySelectorAll('.word-input');
     let allFilled = true;
@@ -523,14 +523,14 @@ function checkCompletion() {
 
             // (2) Se >= 70, desbloqueia fase
             if (grade >= 70) {
-                await unlockNextPhase(userId, grade);
+                await unlockNextPhase(userId);
             }
             // (3) Recarrega nota sem F5
-            await loadExistingGrade(); 
+            await loadExistingGrade();
 
         } catch (error) {
             console.error("Error saving grade or unlocking next phase:", error);
-            showModal("An error occurred while saving your progress. Please try again.");
+            showModal("An error occurred while saving your progress. Please try again.", grade);
             return;
         }
 
@@ -544,7 +544,6 @@ function checkCompletion() {
             if (isLinked) {
                 message += "<br>Please contact your teacher to reset your grade.";
             }
-            // Exibe modal com a nota
             showModal(message, grade);
             clearAnswers(); 
         }
@@ -555,7 +554,6 @@ function showModal(message, grade) {
     document.getElementById('overlay').style.display = 'block';
     const modal = document.getElementById('completion-modal');
     modal.style.display = 'block';
-    // Ajusta o texto do <p> dentro do modal
     const pElement = modal.querySelector('p');
     if (pElement) {
         pElement.innerHTML = `${message} <br>Your Grade: ${grade}%.`;
@@ -567,22 +565,27 @@ function closeModal() {
     document.getElementById('completion-modal').style.display = 'none';
 }
 
+// Limpa respostas se nota < 70
+function clearAnswers() {
+    const wordInputs = document.querySelectorAll('.word-input');
+    wordInputs.forEach((input) => {
+        input.value = "";
+        input.classList.remove('correct');
+    });
+}
+
 // (6) Desbloqueio da próxima fase se >= 70
-async function unlockNextPhase(userId, grade) {
-    if (grade < 70) return; // segurança
+async function unlockNextPhase(userId) {
     const { level, unit, fase } = getParamsFromURL();
     const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
 
     if (fase === "last") {
-        // Próxima unidade
         const nextUnit = `Unit${parseInt(unit.replace("Unit", "")) + 1}`;
         await dbRef.parent.child(nextUnit).update({ fase1: true });
     } else if (fase === "end") {
-        // Próximo nível
         const nextLevel = `Level${parseInt(level.replace("Level", "")) + 1}`;
         await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).update({ fase1: true });
     } else {
-        // Próxima fase
         const nextFase = `fase${parseInt(fase) + 1}`;
         await dbRef.update({ [nextFase]: true });
     }
@@ -591,7 +594,7 @@ async function unlockNextPhase(userId, grade) {
 // =================== SALVAR E CARREGAR NOTA (1-4) ======================
 async function saveGradeToDatabase(userId, newGrade, isLinked) {
     const { level, unit } = getParamsFromURL();
-    // Ajuste o campo no DB
+    // Ajuste o nome do campo conforme desejar
     const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/test - complete word 1`);
 
     try {
@@ -616,7 +619,6 @@ async function saveGradeToDatabase(userId, newGrade, isLinked) {
     }
 }
 
-// Carrega a nota do DB (pode ser chamada ao entrar ou após salvar)
 function loadExistingGrade() {
     firebase.auth().onAuthStateChanged(async (user) => {
         if (user) {
@@ -630,7 +632,7 @@ function loadExistingGrade() {
                 if (existingGrade !== null) {
                     displayGrade(existingGrade);
                 } else {
-                    console.log("Nenhuma nota encontrada (nota2).");
+                    console.log("Nenhuma nota encontrada (test - complete word 1).");
                 }
             } catch (error) {
                 console.error("Erro ao buscar a nota:", error);
@@ -664,8 +666,8 @@ function displayGrade(grade) {
     }
 }
 
+// (8) Em vez de 'professor', usamos 'atrelado_professor'
 function isStudentLinkedToProfessor(userId) {
-    // (8) Verificar "atrelado_professor" em vez de "professor"
     return firebase.database().ref(`usuarios/${userId}/atrelado_professor`)
         .once("value")
         .then(snapshot => snapshot.exists() && snapshot.val() !== "")
@@ -691,8 +693,10 @@ function ensureUserIsAuthenticated(callback) {
 
 // ==================== DOMContentLoaded ===========================
 document.addEventListener('DOMContentLoaded', () => {
-    loadActivities();     // Carrega as palavras e imagens do data1/words.txt
-    loadExistingGrade(); // Carrega a nota (nota2) do banco
+    // Carrega as palavras/imagens do data1
+    loadActivities();
+    // Carrega a nota do BD
+    loadExistingGrade();
 });
 </script>
 </body>
