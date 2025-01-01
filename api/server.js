@@ -48,7 +48,7 @@ They are at ${studentLevel} level.
 The lesson topic is "${conversationDetails}". Keep the conversation centered on ${conversationFullContent}.
 
 Start by saying: "Let's begin the lesson, ${studentName}!" and begin the class.
-After covering all of ${conversationFullContent}, thank, congratulate, and say goodbye, affirming that he/she is ready for the next stage. Then, stop interacting. If the student insists, politely decline and ask to go to the next lesson.
+After covering all of ${conversationFullContent}, thank, congratulate, and say goodbye, affirming that he/she is ready for the next stage. Then, stop interacting. If the student insists, politely refuse and ask to go to the next class and say: press the black button to go back
 
 Adapt the language according to the level (CEFR):
 
