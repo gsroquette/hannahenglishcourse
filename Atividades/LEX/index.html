@@ -163,17 +163,17 @@
         let alternateTimeout;
         let userId = null;
         let chatHistory = [];
-       
-// Atualizar Slider de Velocidade
-function updateSliderBackground() {
-    const value = ((speedSlider.value - speedSlider.min) / (speedSlider.max - speedSlider.min)) * 100;
-    speedSlider.style.setProperty("--progress", `${value}%`);
-    speedDisplay.textContent = `${speedSlider.value}x`;
-}
-speedSlider.addEventListener("input", updateSliderBackground);
 
-// Inicializar Slider ao Carregar
-window.addEventListener("DOMContentLoaded", updateSliderBackground);
+        // Atualizar Slider de Velocidade
+        function updateSliderBackground() {
+            const value = ((speedSlider.value - speedSlider.min) / (speedSlider.max - speedSlider.min)) * 100;
+            speedSlider.style.setProperty("--progress", `${value}%`);
+            speedDisplay.textContent = `${speedSlider.value}x`;
+        }
+        speedSlider.addEventListener("input", updateSliderBackground);
+
+        // Inicializar Slider ao Carregar
+        window.addEventListener("DOMContentLoaded", updateSliderBackground);
 
         // Botão de Voltar
         backButton.addEventListener("click", () => window.history.back());
@@ -200,153 +200,151 @@ window.addEventListener("DOMContentLoaded", updateSliderBackground);
             robotImg.src = ROBOT_STATIC;
         }
 
-          function checkSpeechRecognitionSupport() {
-    if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
-        const fallbackInput = document.getElementById("fallback-input");
-        if (fallbackInput) fallbackInput.style.display = 'block';
-        speakButton.style.display = 'none';
-        messageElement.innerText = "Speech recognition is not supported or disabled in your browser. Please enable it.";
-        messageElement.style.visibility = 'visible';
-        console.warn("Speech recognition is not supported or disabled in this browser.");
-        return false;
-    }
-    return true;
-}
-
-// Função para TTS (Text-to-Speech)
-function speak(text, lang = "en-US") {
-    const synth = window.speechSynthesis;
-    const voices = synth.getVoices();
-
-    if (voices.length === 0) {
-        console.warn("Nenhuma voz disponível. Tentando novamente...");
-        setTimeout(() => speak(text, lang), 500);
-        return;
-    }
-
-    const selectedVoice = voices.find(voice => voice.lang === lang) || voices[0];
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.voice = selectedVoice;
-    utterance.lang = selectedVoice.lang;
-
-    // Captura dinamicamente o valor do seletor de velocidade
-    const playbackSpeed = parseFloat(speedSlider.value);
-    utterance.rate = playbackSpeed || 1;
-
-    utterance.onstart = () => {
-        isSpeaking = true;
-        robotImg.src = ROBOT_GIF; // Muda para GIF durante a fala
-        speakButton.innerText = "Samuel is talking"; // Atualiza o texto do botão
-        speakButton.disabled = true; // Desativa o botão
-    };
-
-    utterance.onend = () => {
-        isSpeaking = false;
-        robotImg.src = ROBOT_STATIC; // Retorna à imagem estática
-        speakButton.innerText = "Press to Speak"; // Restaura o texto do botão
-        speakButton.disabled = false; // Reativa o botão
-    };
-
-    if (synth.speaking) synth.cancel(); // Cancela qualquer fala em andamento
-    synth.speak(utterance);
-}
-
-function ensureVoicesLoaded(callback) {
-    const synth = window.speechSynthesis;
-    let attempts = 0;
-
-    function checkVoices() {
-        if (synth.getVoices().length > 0 || attempts > 10) {
-            callback();
-        } else {
-            attempts++;
-            setTimeout(checkVoices, 200);
-        }
-    }
-    checkVoices();
-}
-
-// Certifique-se de carregar as vozes antes de iniciar
-ensureVoicesLoaded(() => {
-    console.log("Vozes carregadas!");
-});
-
-        // Configuração do Reconhecimento de Voz
-     function setupSpeechRecognition() {
-    if (!checkSpeechRecognitionSupport()) return;
-
-    recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-    recognition.lang = "en-US";
-
-    recognition.onstart = () => {
-        isSpeaking = true; // Indica que o usuário está falando
-        resetStaticTimer(); // Reseta o temporizador de inatividade
-        speakButton.classList.add("listening");
-        speakButton.innerText = "Listening...";
-        console.log("User is speaking...");
-    };
-
-    recognition.onend = () => {
-        isSpeaking = false; // Finaliza o estado de fala do usuário
-        speakButton.classList.remove("listening");
-        speakButton.innerText = "Press to Speak";
-        console.log("User finished speaking.");
-    };
-
-    recognition.onresult = async (event) => {
-        const userSpeech = event.results[0][0].transcript;
-        messageElement.style.visibility = "visible";
-        messageElement.innerText = `You said: "${userSpeech}"`;
-        console.log("User speech:", userSpeech);
-
-        if (!userId) {
-            alert("User ID is missing. Please log in again.");
-            return;
+        function checkSpeechRecognitionSupport() {
+            if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
+                const fallbackInput = document.getElementById("fallback-input");
+                if (fallbackInput) fallbackInput.style.display = 'block';
+                speakButton.style.display = 'none';
+                messageElement.innerText = "Speech recognition is not supported or disabled in your browser. Please enable it.";
+                messageElement.style.visibility = 'visible';
+                console.warn("Speech recognition is not supported or disabled in this browser.");
+                return false;
+            }
+            return true;
         }
 
-        try {
-            const response = await fetch('/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ uid: userId, message: userSpeech, chatHistory }),
-            });
-            const data = await response.json();
+        // Função para TTS (Text-to-Speech)
+        function speak(text, lang = "en-US") {
+            const synth = window.speechSynthesis;
+            const voices = synth.getVoices();
 
-            if (!data.response) {
-                console.error("Error: Missing response from AI.");
+            if (voices.length === 0) {
+                console.warn("Nenhuma voz disponível. Tentando novamente...");
+                setTimeout(() => speak(text, lang), 500);
                 return;
             }
 
-            chatHistory = data.chatHistory;
-            messageElement.innerText = data.response;
+            const selectedVoice = voices.find(voice => voice.lang === lang) || voices[0];
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.voice = selectedVoice;
+            utterance.lang = selectedVoice.lang;
 
-            // Chamando a função de fala com resposta da IA
-            speak(data.response);
-        } catch (error) {
-            console.error("Error communicating with the server:", error);
-            messageElement.innerText = "Error communicating with the server.";
+            // Captura dinamicamente o valor do seletor de velocidade
+            const playbackSpeed = parseFloat(speedSlider.value);
+            utterance.rate = playbackSpeed || 1;
+
+            utterance.onstart = () => {
+                isSpeaking = true;
+                robotImg.src = ROBOT_GIF; // Muda para GIF durante a fala
+                speakButton.innerText = "Samuel is talking"; // Atualiza o texto do botão
+                speakButton.disabled = true;
+            };
+
+            utterance.onend = () => {
+                isSpeaking = false;
+                robotImg.src = ROBOT_STATIC; // Retorna à imagem estática
+                speakButton.innerText = "Press to Speak";
+                speakButton.disabled = false;
+            };
+
+            if (synth.speaking) synth.cancel();
+            synth.speak(utterance);
         }
-    };
 
- recognition.onerror = (event) => {
-        isSpeaking = false; // Garante que o estado de fala seja resetado
-        speakButton.classList.remove("listening");
-        speakButton.innerText = "Press to Speak";
+        function ensureVoicesLoaded(callback) {
+            const synth = window.speechSynthesis;
+            let attempts = 0;
 
-        // Tratamento de erros específicos
-        if (event.error === 'not-allowed (Check if your voice recognition and microphone are active)') {
-            messageElement.innerText = "Microphone access is blocked. Please enable it to use speech recognition.";
-        } else if (event.error === 'no-speech') {
-            messageElement.innerText = "No speech detected. Please try again.";
-        } else if (event.error === 'audio-capture') {
-            messageElement.innerText = "No microphone detected. Please connect one and try again.";
-        } else {
-            messageElement.innerText = `An error occurred: ${event.error}`;
+            function checkVoices() {
+                if (synth.getVoices().length > 0 || attempts > 10) {
+                    callback();
+                } else {
+                    attempts++;
+                    setTimeout(checkVoices, 200);
+                }
+            }
+            checkVoices();
         }
-        messageElement.style.visibility = 'visible';
-        console.error("Speech recognition error:", event.error);
-    };
-}
+
+        // Certifique-se de carregar as vozes antes de iniciar
+        ensureVoicesLoaded(() => {
+            console.log("Vozes carregadas!");
+        });
+
+        // Configuração do Reconhecimento de Voz
+        function setupSpeechRecognition() {
+            if (!checkSpeechRecognitionSupport()) return;
+
+            recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = "en-US";
+
+            recognition.onstart = () => {
+                isSpeaking = true;
+                resetStaticTimer();
+                speakButton.classList.add("listening");
+                speakButton.innerText = "Listening...";
+                console.log("User is speaking...");
+            };
+
+            recognition.onend = () => {
+                isSpeaking = false;
+                speakButton.classList.remove("listening");
+                speakButton.innerText = "Press to Speak";
+                console.log("User finished speaking.");
+            };
+
+            recognition.onresult = async (event) => {
+                const userSpeech = event.results[0][0].transcript;
+                messageElement.style.visibility = "visible";
+                messageElement.innerText = `You said: "${userSpeech}"`;
+                console.log("User speech:", userSpeech);
+
+                if (!userId) {
+                    alert("User ID is missing. Please log in again.");
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ uid: userId, message: userSpeech, chatHistory }),
+                    });
+                    const data = await response.json();
+
+                    if (!data.response) {
+                        console.error("Error: Missing response from AI.");
+                        return;
+                    }
+
+                    chatHistory = data.chatHistory;
+                    messageElement.innerText = data.response;
+
+                    speak(data.response);
+                } catch (error) {
+                    console.error("Error communicating with the server:", error);
+                    messageElement.innerText = "Error communicating with the server.";
+                }
+            };
+
+            recognition.onerror = (event) => {
+                isSpeaking = false;
+                speakButton.classList.remove("listening");
+                speakButton.innerText = "Press to Speak";
+
+                if (event.error === 'not-allowed (Check if your voice recognition and microphone are active)') {
+                    messageElement.innerText = "Microphone access is blocked. Please enable it to use speech recognition.";
+                } else if (event.error === 'no-speech') {
+                    messageElement.innerText = "No speech detected. Please try again.";
+                } else if (event.error === 'audio-capture') {
+                    messageElement.innerText = "No microphone detected. Please connect one and try again.";
+                } else {
+                    messageElement.innerText = `An error occurred: ${event.error}`;
+                }
+                messageElement.style.visibility = 'visible';
+                console.error("Speech recognition error:", event.error);
+            };
+        }
 
         // Fallback para Mensagem Digitada
         document.addEventListener("DOMContentLoaded", () => {
@@ -362,70 +360,71 @@ ensureVoicesLoaded(() => {
                         messageElement.innerText = `You said: "${userMessage}"`;
                         userInput.value = "";
                         console.log("User typed:", userMessage);
+                        // Aqui você pode fazer uma chamada fetch ao /api/chat caso queira usar o fallback.
                     }
                 });
             }
         });
 
         // Inicialização da Conversa
-async function initializeConversation() {
-    firebase.auth().onAuthStateChanged(async (user) => {
-        if (user) {
-            userId = user.uid;
-            console.log("User authenticated. User ID:", userId);
+        async function initializeConversation() {
+            firebase.auth().onAuthStateChanged(async (user) => {
+                if (user) {
+                    userId = user.uid;
+                    console.log("User authenticated. User ID:", userId);
 
-            const urlParams = new URLSearchParams(window.location.search);
-            const level = urlParams.get('level') || 'Level1';
-            const unit = urlParams.get('unit') || 'Unit1';
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const level = urlParams.get('level') || 'Level1';
+                    const unit = urlParams.get('unit') || 'Unit1';
 
-            try {
-                const response = await fetch(`/api/start?uid=${userId}&level=${level}&unit=${unit}`);
-                if (!response.ok) throw new Error("Failed to initialize conversation.");
+                    try {
+                        const response = await fetch(`/api/start?uid=${userId}&level=${level}&unit=${unit}`);
+                        if (!response.ok) throw new Error("Failed to initialize conversation.");
 
-                const data = await response.json();
-                console.log("Server Response:", data);
+                        const data = await response.json();
+                        console.log("Server Response:", data);
 
-                chatHistory = data.chatHistory || [];
-                messageElement.innerText = data.response;
+                        chatHistory = data.chatHistory || [];
+                        messageElement.innerText = data.response;
 
-                messageElement.style.visibility = "hidden";
+                        messageElement.style.visibility = "hidden";
 
-                speakButton.style.display = "block";
+                        speakButton.style.display = "block";
 
-                if (!speakButton.hasAttribute('data-initialized')) {
-                    speakButton.setAttribute('data-initialized', 'true');
+                        if (!speakButton.hasAttribute('data-initialized')) {
+                            speakButton.setAttribute('data-initialized', 'true');
 
-                    speakButton.addEventListener("click", () => {
-                        if (speakButton.innerText === "Press to Start") {
-                            messageElement.style.visibility = "visible";
-                            if (data.response) {
-                                speak(data.response);
-                            } else {
-                                console.error("Erro: Resposta da IA ausente.");
-                                messageElement.innerText = "No response received from the server.";
-                            }
-                            speakButton.innerText = "Press to Speak";
-                        } else {
-                            recognition.start();
+                            speakButton.addEventListener("click", () => {
+                                if (speakButton.innerText === "Press to Start") {
+                                    messageElement.style.visibility = "visible";
+                                    if (data.response) {
+                                        speak(data.response);
+                                    } else {
+                                        console.error("Erro: Resposta da IA ausente.");
+                                        messageElement.innerText = "No response received from the server.";
+                                    }
+                                    speakButton.innerText = "Press to Speak";
+                                } else {
+                                    recognition.start();
+                                }
+                            });
                         }
-                    });
-                }
-            } catch (error) {
-                console.error("Error initializing conversation:", error);
-                messageElement.innerText = "An unexpected error occurred. Try again later.";
-                speakButton.disabled = true;
-                messageElement.style.visibility = "visible";
-            }
-        } else {
-            console.warn("User is not logged in. Redirecting to login page...");
-            messageElement.innerText = "Redirecting to login page...";
-            messageElement.style.visibility = "visible";
+                    } catch (error) {
+                        console.error("Error initializing conversation:", error);
+                        messageElement.innerText = "An unexpected error occurred. Try again later.";
+                        speakButton.disabled = true;
+                        messageElement.style.visibility = "visible";
+                    }
+                } else {
+                    console.warn("User is not logged in. Redirecting to login page...");
+                    messageElement.innerText = "Redirecting to login page...";
+                    messageElement.style.visibility = "visible";
 
-            // Redireciona para a página de login
-            window.location.href = "https://hannahenglishcourse.vercel.app/Formulario/login.html";
+                    // Redireciona para a página de login
+                    window.location.href = "https://hannahenglishcourse.vercel.app/Formulario/login.html";
+                }
+            });
         }
-    });
-}
 
         // Configuração Inicial ao Carregar a Página
         window.onload = () => {
@@ -440,12 +439,13 @@ async function initializeConversation() {
             initializeConversation();
             startStaticImageTimer();
         };
-// Interrompe o sintetizador de voz ao sair da página
+
+        // Interrompe o sintetizador de voz ao sair da página
         document.addEventListener("visibilitychange", () => {
             if (document.hidden) {
                 const synth = window.speechSynthesis;
                 if (synth.speaking) {
-                    synth.cancel(); // Cancela qualquer fala em andamento
+                    synth.cancel();
                     console.log("Speech synthesis stopped as the page was hidden.");
                 }
             }
