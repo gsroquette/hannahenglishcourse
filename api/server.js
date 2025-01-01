@@ -41,7 +41,7 @@ const conversations = {};
 function createInitialContext(studentName, studentLevel, studentUnit, conversationDetails, conversationFullContent) {
     return {
         role: "system",
-      content: `
+        content: `
 You are Samuel, a friendly, patient, and motivating virtual robot friend.
 Your goal is to help ${studentName} practice English conversation. Always address them by their name.
 They are currently at ${studentLevel}. Today's lesson topic is "${conversationDetails}". Keep the conversation centered on ${conversationFullContent}.
@@ -61,7 +61,7 @@ Praise correct answers. If there’s a mistake, ask them to try again once. If t
 Use only text, never use visual elements like emojis.
 Maintain a positive, light, and productive learning tone.
 `,
-};
+    };
 }
 
 // Função para carregar o tópico e conteúdo do arquivo conversa.txt
@@ -81,8 +81,22 @@ function loadConversationDetails(level, unit) {
     }
 }
 
+// Função para validar e limpar o histórico de mensagens
+function validateAndTrimHistory(userId) {
+    if (!Array.isArray(conversations[userId])) {
+        conversations[userId] = [];
+    }
+
+    conversations[userId] = conversations[userId].filter(message => {
+        return message && typeof message.role === 'string' && typeof message.content === 'string';
+    });
+
+    if (conversations[userId].length > 20) {
+        conversations[userId] = conversations[userId].slice(-20);
+    }
+}
+
 // Endpoint /api/start
-// Atualização no endpoint /api/start para corrigir o caminho do arquivo
 app.get('/api/start', async (req, res) => {
     try {
         const userId = req.query.uid;
@@ -96,18 +110,15 @@ app.get('/api/start', async (req, res) => {
             return res.status(400).json({ error: "User ID is required." });
         }
 
+        // Carrega dados do arquivo conversa.txt
         let conversationDetails = 'General conversation';
         let conversationFullContent = '';
-
-        // Caminho do arquivo conversa.txt corrigido
         const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataIA', 'conversa.txt');
         console.log(`📂 Tentando acessar o arquivo: ${filePath}`);
 
-        // Verifica se o arquivo existe e carrega o conteúdo
         if (fs.existsSync(filePath)) {
             const fileContent = fs.readFileSync(filePath, 'utf-8').trim();
             console.log("✅ Arquivo conversa.txt carregado com sucesso.");
-
             const lines = fileContent.split('\n');
             if (lines.length > 0) {
                 conversationDetails = lines[0].trim();
@@ -132,28 +143,29 @@ app.get('/api/start', async (req, res) => {
         const studentName = snapshot.val();
         console.log(`✅ Nome do usuário recuperado: ${studentName}`);
 
-        // Cria o contexto inicial
-        const contextMessage = createInitialContext(studentName, studentLevel, studentUnit, conversationDetails);
+        // Cria o contexto inicial (IMPORTANTE: passar 5º parâmetro)
+        const contextMessage = createInitialContext(
+            studentName,
+            studentLevel,
+            studentUnit,
+            conversationDetails,
+            conversationFullContent
+        );
 
         // Mensagem inicial
         const initialMessage = `Hello ${studentName}! Today's topic is: ${conversationDetails}. I'm ready to help you at your ${studentLevel}, in ${studentUnit}. Shall we begin?`;
 
-        // Salva ou atualiza o contexto no histórico
-        if (!conversations[userId]) {
-            conversations[userId] = [
-                { studentName, studentLevel, studentUnit },
-                contextMessage,
-                { role: "assistant", content: initialMessage },
-            ];
-            console.log(`📝 Contexto inicial salvo para userId=${userId}`);
-        } else {
-            conversations[userId].unshift(contextMessage);
-        }
+        // **Sempre** recriamos o array de conversas (para evitar cache antigo)
+        conversations[userId] = [
+            { studentName, studentLevel, studentUnit },
+            contextMessage,
+            { role: "assistant", content: initialMessage },
+        ];
+        console.log(`📝 Contexto inicial (re)inicializado para userId=${userId}`);
 
         // Valida e limpa o histórico
         validateAndTrimHistory(userId);
 
-        // Retorna a resposta e o histórico
         return res.json({
             response: initialMessage,
             studentInfo: {
@@ -170,21 +182,6 @@ app.get('/api/start', async (req, res) => {
     }
 });
 
-// Função para validar e limpar o histórico de mensagens
-function validateAndTrimHistory(userId) {
-    if (!Array.isArray(conversations[userId])) {
-        conversations[userId] = [];
-    }
-
-    conversations[userId] = conversations[userId].filter(message => {
-        return message && typeof message.role === 'string' && typeof message.content === 'string';
-    });
-
-    if (conversations[userId].length > 20) {
-        conversations[userId] = conversations[userId].slice(-20);
-    }
-}
-
 // Endpoint POST /api/chat para interagir com a IA
 app.post('/api/chat', async (req, res) => {
     const userId = req.body.uid;
@@ -199,7 +196,7 @@ app.post('/api/chat', async (req, res) => {
     }
 
     try {
-        // Inicializa o contexto se não existir
+        // Se não houver contexto ainda, cria um novo (isso normalmente só acontece se alguém chamar /api/chat antes de /api/start)
         if (!conversations[userId]) {
             console.warn(`⚠️ Contexto ausente para userId=${userId}. Criando um novo contexto.`);
 
@@ -212,12 +209,21 @@ app.post('/api/chat', async (req, res) => {
                 console.log(`✅ Nome do usuário recuperado do Firebase para userId=${userId}: ${studentName}`);
             }
 
-            const studentLevel = req.body.level || "Level1"; // Nível extraído ou genérico
-            const studentUnit = req.body.unit || "Unit1";   // Unidade extraída ou genérica
-            const { topic: conversationDetails, fullContent: conversationFullContent } = loadConversationDetails(studentLevel, studentUnit);
+            const studentLevel = req.body.level || "Level1";
+            const studentUnit = req.body.unit || "Unit1";
+            const { topic: conversationDetails, fullContent: conversationFullContent } =
+                loadConversationDetails(studentLevel, studentUnit);
 
             // Cria o contexto inicial com os dados
-            const contextMessage = createInitialContext(studentName, studentLevel, studentUnit, conversationDetails, conversationFullContent);
+            const contextMessage = createInitialContext(
+                studentName,
+                studentLevel,
+                studentUnit,
+                conversationDetails,
+                conversationFullContent
+            );
+
+            // Inicia a conversa
             conversations[userId] = [contextMessage];
         }
 
@@ -229,7 +235,7 @@ app.post('/api/chat', async (req, res) => {
 
         // Chama a OpenAI com o histórico atualizado
         const completion = await openai.createChatCompletion({
-            model: 'chatgpt-4o-latest',
+            model: 'chatgpt-4o-latest', // Certifique-se de que este modelo exista na sua conta
             messages: conversations[userId],
         });
 
@@ -246,8 +252,11 @@ app.post('/api/chat', async (req, res) => {
     }
 });
 
+// Rota raiz para ver se está tudo ok
 app.get('/', (req, res) => res.send("Servidor rodando com sucesso!"));
 
+// Inicializa o servidor
 app.listen(PORT, () => console.log(`🚀 Servidor rodando na porta ${PORT}`));
 
+// Exporta o app para uso em testes ou outros módulos
 module.exports = app;
