@@ -5,91 +5,150 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hannah's Grammar Exercises</title>
     <style>
-       body {
-            background-image: url('../../../../../imagens/fundo.png');
-            background-repeat: repeat;
+        body {
             font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            background-color: #f4f4f4;
             margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+            background-image: url('fundo.png');
+            background-repeat: repeat;
+            background-size: auto;
         }
         .container {
             max-width: 800px;
             margin: auto;
-            background: white;
+            /* Removido fundo e sombra para que pareça escrito diretamente na imagem */
             padding: 20px;
             border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             position: relative;
         }
+        /* Botão "Back" preto, relevo, texto branco */
         .back-button {
             position: absolute;
             top: 20px;
             left: 20px;
-            background-color: #007bff;
+            background-color: black;
             color: white;
+            border: 2px solid #333;
             padding: 10px 15px;
             border-radius: 5px;
             text-decoration: none;
             font-size: 1rem;
             cursor: pointer;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
         }
         .back-button:hover {
-            background-color: #0056b3;
+            background-color: #444;
         }
+
         h1 {
             text-align: center;
             color: #333;
             font-size: 2rem;
             margin-top: 70px;
         }
-        .exercise {
-            margin-bottom: 20px;
+
+        .exercise-title {
+            font-weight: bold;
+            font-size: 1.4rem;
+            margin-top: 30px;
+            margin-bottom: 10px;
         }
-        .exercise p {
+        .exercise-description {
+            font-style: italic;
+            margin-bottom: 10px;
+        }
+
+        .exercise-line {
             margin: 10px 0;
-            font-size: 1.2rem;
+            font-size: 1rem;
         }
+
         .answer-input {
-            width: 150px;
             padding: 5px;
             border: 1px solid #ccc;
             border-radius: 5px;
             font-size: 1rem;
         }
-        .check-btn {
-            padding: 8px 15px;
-            background-color: white;
-            color: black;
-            border: 1px solid #ccc;
-            border-radius: 20px;
+
+        /* Remover antigos botões "Check" de cada pergunta */
+        /* -- agora teremos apenas um botão Check Answers no final -- */
+
+        /* Botão Check Answers preto, relevo, texto branco */
+        #check-all-btn {
+            background-color: black;
+            color: white;
+            border: 2px solid #333;
+            padding: 10px 20px;
+            border-radius: 5px;
             cursor: pointer;
             font-size: 1rem;
-            transition: background-color 0.3s ease, box-shadow 0.3s ease;
-            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+            margin-top: 20px;
         }
-        .check-btn:hover {
-            background-color: #f0f0f0;
-            box-shadow: 3px 3px 7px rgba(0, 0, 0, 0.2);
+        #check-all-btn:hover {
+            background-color: #444;
         }
-        .answer {
-            font-weight: bold;
-            color: green;
-            margin-left: 10px;
-            display: none;
+
+        /* Resposta certa ou errada */
+        .correct {
+            color: blue;
+        }
+        .incorrect {
+            color: red;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none; 
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 300px;
+            text-align: center;
+        }
+        .close-modal-btn {
+            margin-top: 10px;
+            background-color: black;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .close-modal-btn:hover {
+            background-color: #444;
         }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <!-- Ajustado para chamar a função goBack() ao clicar no botão -->
     <a href="javascript:goBack()" class="back-button">Back</a>
     <h1>Hannah's Grammar Exercises</h1>
 
-    <div id="exercises">
-        <!-- Exercises will be loaded here dynamically -->
+    <div id="exercises"></div>
+
+    <!-- Botão único para checar TODAS as respostas -->
+    <button id="check-all-btn" onclick="checkAllAnswers()">Check Answers</button>
+</div>
+
+<!-- Modal de conclusão -->
+<div class="modal-overlay" id="completion-modal-overlay">
+    <div class="modal-content" id="completion-modal-content">
+        <p>Congratulations! You have completed the activity.</p>
+        <button class="close-modal-btn" onclick="closeModal()">OK</button>
     </div>
 </div>
 
@@ -111,6 +170,10 @@
         databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
     };
     firebase.initializeApp(firebaseConfig);
+
+    // Variáveis de controle
+    let checkCount = 0; // Conta quantas vezes o aluno clicou em "Check Answers".
+    let allInputs = []; // Guardaremos referência a todos os campos (objeto com input e answer)
 
     // Extrair parâmetros da URL
     function getParamsFromURL() {
@@ -141,15 +204,15 @@
 
         try {
             if (fase === "last") {
-                // Se for a última fase da unidade, então passar para a próxima unidade
+                // Próxima unidade
                 const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
                 await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
             } else if (fase === "end") {
-                // Se for a última fase do nível, passa para o próximo nível
+                // Próximo nível
                 const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
                 await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
             } else {
-                // Se for uma fase intermediária, marca a atual como concluída e libera a próxima
+                // Fase intermediária
                 const nextFase = parseInt(fase, 10) + 1;
                 await dbRef.update({ 
                     [`fase${fase}`]: true,
@@ -168,99 +231,16 @@
         });
     }
 
-    // Carregar conteúdo do arquivo exercicios.txt
-    async function loadContent() {
-        const { level, unit } = getParamsFromURL();
-        if (!level || !unit) {
-            console.error("Parameters 'level' or 'unit' are missing in the URL.");
-            document.getElementById('exercises').textContent = "Content could not be loaded.";
-            return;
-        }
-
-        const basePath = `../../../../${level}/${unit}/DataExerciciosdaGramatica/`;
-        try {
-            const lyricsResponse = await fetch(`${basePath}exercicios.txt`);
-            if (!lyricsResponse.ok) throw new Error(`Error loading lyrics file: ${basePath}exercicios.txt`);
-
-            const data = await lyricsResponse.text();
-            const exercisesDiv = document.getElementById('exercises');
-            const lines = data.split('\n');
-            let htmlContent = '';
-
-            lines.forEach((line) => {
-                if (line.includes('[Answer:')) {
-                    const [question, answer] = line.split('[Answer:');
-                    const cleanedAnswer = answer.replace(']', '').trim();
-
-                    // Extrair o tamanho do input, se especificado
-                    let inputSize = 'medium'; // Padrão
-                    const sizeMatch = question.match(/\[size:(.*?)\]/); // Exemplo: [size:small]
-                    
-                    // Substitui "___" pelo input, ajustando largura conforme [size:]
-                    const formattedQuestion = sizeMatch
-                        ? question
-                            .replace(sizeMatch[0], '')
-                            .replace(
-                                '___',
-                                `<input type="text" class="answer-input" style="width: ${getInputWidth(sizeMatch[1])};" placeholder="Type here..." />`
-                            )
-                        : question.replace(
-                            '___',
-                            `<input type="text" class="answer-input" style="width: 150px;" placeholder="Type here..." />`
-                        );
-
-                    htmlContent += `
-                        <div class="exercise">
-                            <p>
-                                ${formattedQuestion}
-                                <button class="check-btn" data-answer="${cleanedAnswer}" onclick="checkAnswer(this)">Check</button>
-                                <span class="answer">${cleanedAnswer}</span>
-                            </p>
-                        </div>`;
-                }
-            });
-
-            exercisesDiv.innerHTML = htmlContent;
-        } catch (error) {
-            console.error("Error loading exercises:", error);
-            document.getElementById('exercises').textContent = "Exercises could not be loaded.";
-        }
-    }
-
-    // Definir largura do input de acordo com o tamanho especificado
-    function getInputWidth(size) {
-        if (size === 'small') return '30px';   // ~1 caractere
-        if (size === 'large') return '300px';  // ~5-6 palavras
-        if (size === 'huge') return '800px';   // ~50 palavras
-        if (size === 'essay') return '2000px'; // ~370 palavras
-        return '150px';                        // Padrão
-    }
-
-    // Verificar resposta do exercício
-    function checkAnswer(button) {
-        const userInput = button.previousElementSibling; // input field
-        const answerSpan = button.nextElementSibling;     // hidden answer <span>
-        const correctAnswer = button.getAttribute('data-answer'); // correct answer
-
-        if (userInput.value.trim().toLowerCase() === correctAnswer.toLowerCase()) {
-            userInput.style.backgroundColor = 'lightgreen';
-            answerSpan.style.display = 'inline';
-        } else {
-            userInput.style.backgroundColor = 'lightcoral';
-            alert('Incorrect! Try again.');
-        }
-    }
-
-    // Exibir modal de conclusão (caso necessário)
+    // Exibir modal de conclusão
     function showModal() {
-        document.getElementById('overlay').style.display = 'block';
-        document.getElementById('completion-modal').style.display = 'block';
+        const overlay = document.getElementById('completion-modal-overlay');
+        overlay.style.display = 'flex';
     }
 
     // Fechar modal de conclusão
     function closeModal() {
-        document.getElementById('completion-modal').style.display = 'none';
-        document.getElementById('overlay').style.display = 'none';
+        const overlay = document.getElementById('completion-modal-overlay');
+        overlay.style.display = 'none';
     }
 
     // Validação de navegação no botão "Back"
@@ -273,10 +253,8 @@
                     const progress = snapshot.val();
                     const nextFaseKey = `fase${parseInt(fase, 10) + 1}`;
                     if (progress[nextFaseKey]) {
-                        // Se a próxima fase já está desbloqueada, apenas volta
                         window.history.back();
                     } else {
-                        // Se a próxima fase não está desbloqueada, exibe aviso
                         const confirmNavigation = confirm("The next phase is locked. Do you still want to go back?");
                         if (confirmNavigation) {
                             window.history.back();
@@ -292,7 +270,193 @@
         });
     }
 
-    // Carregar o conteúdo assim que a página estiver pronta
+    // Função para tocar o alarme por 4 segundos
+    function playAlarm() {
+        const audio = new Audio('alarme.mp3');
+        audio.play();
+        setTimeout(() => {
+            audio.pause();
+            audio.currentTime = 0;
+        }, 4000);
+    }
+
+    // Função principal para checar todas as respostas
+    function checkAllAnswers() {
+        checkCount++;
+        let allCorrect = true; // Verifica se todas estão corretas
+
+        // 1) Verificar cada input
+        const wrongInputs = [];
+        allInputs.forEach(item => {
+            const userAnswer = item.input.value.trim().toLowerCase();
+            const correctAnswer = item.correctAnswer.trim().toLowerCase();
+
+            if (userAnswer === correctAnswer) {
+                // Certo
+                item.input.classList.remove('incorrect');
+                item.input.classList.add('correct');
+            } else {
+                // Errado
+                item.input.classList.remove('correct');
+                item.input.classList.add('incorrect');
+                allCorrect = false;
+                wrongInputs.push(item.input);
+            }
+        });
+
+        // Tocar alarme e rolar para o primeiro erro (se existir)
+        if (!allCorrect) {
+            playAlarm();
+
+            if (wrongInputs.length > 0) {
+                wrongInputs[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        // 2) Lógicas de repetição
+        if (checkCount === 3) {
+            // Na terceira vez: mostrar as respostas certas dos que ainda estiverem errados e concluir
+            allInputs.forEach(item => {
+                const userAnswer = item.input.value.trim().toLowerCase();
+                const correctAnswer = item.correctAnswer.trim().toLowerCase();
+                if (userAnswer !== correctAnswer) {
+                    // Exibir a resposta correta no campo
+                    item.input.value = item.correctAnswer;
+                }
+            });
+            // Marcar tudo como correto visualmente agora
+            allInputs.forEach(item => {
+                item.input.classList.remove('incorrect');
+                item.input.classList.add('correct');
+            });
+
+            // Concluir a atividade
+            markPhaseCompleted();
+            showModal();
+        } else {
+            // Se não for terceira tentativa, mas o usuário já acertou tudo, também conclui
+            if (allCorrect) {
+                markPhaseCompleted();
+                showModal();
+            }
+        }
+    }
+
+    // Carregar conteúdo do arquivo exercicios.txt
+    async function loadContent() {
+        const { level, unit } = getParamsFromURL();
+        if (!level || !unit) {
+            console.error("Parameters 'level' or 'unit' are missing in the URL.");
+            document.getElementById('exercises').textContent = "Content could not be loaded.";
+            return;
+        }
+
+        const basePath = `../../../../${level}/${unit}/DataExerciciosdaGramatica/`;
+        try {
+            const response = await fetch(`${basePath}exercicios.txt`);
+            if (!response.ok) throw new Error(`Error loading file: ${basePath}exercicios.txt`);
+
+            const data = await response.text();
+            const lines = data.split('\n');
+
+            const exercisesDiv = document.getElementById('exercises');
+            let htmlContent = '';
+            let currentExerciseTitle = '';
+            let currentExerciseDesc = '';
+            let insideExercise = false;
+
+            lines.forEach((line) => {
+                const trimmedLine = line.trim();
+
+                // 1) Capturar título (#TITLE: ...)
+                if (trimmedLine.startsWith('#TITLE:')) {
+                    const titleText = trimmedLine.replace('#TITLE:', '').trim();
+                    htmlContent += `<h2 class="exercise-title">${titleText}</h2>`;
+                    return;
+                }
+
+                // 2) Se começa com "Exercise X:" -> inserir como subtítulo
+                if (/^Exercise\s+\d+:/i.test(trimmedLine)) {
+                    insideExercise = true;
+                    htmlContent += `<div class="exercise-description">${trimmedLine}</div>`;
+                    return;
+                }
+
+                // 3) Linhas de múltipla escolha ou explicações (A), (B), ...
+                //    Se não contiver [Answer:], apenas exibe como texto normal
+                if (trimmedLine && !trimmedLine.includes('[Answer:')) {
+                    // Se for algo como (A) The serpent. ...
+                    htmlContent += `<div class="exercise-line">${trimmedLine}</div>`;
+                    return;
+                }
+
+                // 4) Quando encontramos [Answer:], tratamos como pergunta
+                if (trimmedLine.includes('[Answer:')) {
+                    const [questionPart, answerPart] = trimmedLine.split('[Answer:');
+                    const cleanAnswer = answerPart.replace(']', '').trim();
+                    
+                    // Verificar se existe algo como ___[size:small], [size:medium], [size:large], [size:huge]
+                    let inputSize = '150px'; // default
+                    const sizeMatch = questionPart.match(/\[size:(.*?)\]/);
+
+                    if (sizeMatch) {
+                        const sizeValue = sizeMatch[1].trim();
+                        if (sizeValue === 'small') inputSize = '30px';
+                        if (sizeValue === 'medium') inputSize = '150px'; // ~2-3 palavras curtas
+                        if (sizeValue === 'large') inputSize = '300px'; // ~5-6 palavras
+                        if (sizeValue === 'huge') inputSize = '800px'; // ~50 palavras (texto curto)
+                    }
+
+                    // Remover [size:..] do texto a ser exibido
+                    let displayQuestion = questionPart.replace(/\[size:.*?\]/, '').trim();
+                    // Substituir o "___" pelo input
+                    displayQuestion = displayQuestion.replace('___', `<input type="text" class="answer-input" style="width:${inputSize};" />`);
+
+                    // Gera HTML
+                    htmlContent += `
+                        <div class="exercise-line">
+                            ${displayQuestion}
+                        </div>`;
+
+                    // Após gerar HTML, precisamos armazenar a info (resposta correta) para uso posterior
+                    // Faremos isso depois que o HTML estiver montado (no final do forEach).
+                    // Faremos um push no final do loop, mas precisamos de algo temporário...
+                    // Vamos apenas salvar o item em um array e criaremos a referência mais tarde
+                    // (faremos num segundo momento, pois precisamos ter o input de fato no DOM).
+                }
+            });
+
+            // Injeta o HTML no container
+            exercisesDiv.innerHTML = htmlContent;
+
+            // Agora, vamos mapear todos os inputs com suas respostas corretas
+            allInputs = []; // reset
+            let lineIndex = 0; // contador para percorrer lines novamente
+            lines.forEach((line) => {
+                if (line.includes('[Answer:')) {
+                    const [qPart, aPart] = line.split('[Answer:');
+                    const correctAnswer = aPart.replace(']', '').trim();
+
+                    // Localiza o input correspondente no DOM, na ordem que aparecem
+                    const inputElement = exercisesDiv.querySelectorAll('input.answer-input')[allInputs.length];
+                    // Armazena no array
+                    if (inputElement) {
+                        allInputs.push({
+                            input: inputElement,
+                            correctAnswer: correctAnswer
+                        });
+                    }
+                }
+                lineIndex++;
+            });
+
+        } catch (error) {
+            console.error("Error loading exercises:", error);
+            document.getElementById('exercises').textContent = "Exercises could not be loaded.";
+        }
+    }
+
+    // Carregar conteúdo assim que a página estiver pronta
     document.addEventListener('DOMContentLoaded', loadContent);
 </script>
 </body>
