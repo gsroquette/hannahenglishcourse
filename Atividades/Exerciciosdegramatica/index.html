@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hannah's Grammar Exercises</title>
     <style>
-         body {
+        body {
             font-family: Arial, sans-serif;
             background-color: #ffffff;
             background-image: url('../../../imagens/fundo.png');
@@ -13,11 +13,12 @@
             background-size: auto;
             margin: 0;
             padding: 0;
+            line-height: 1.6;
         }
         .container {
             max-width: 800px;
             margin: auto;
-            /* Removido fundo e sombra para que pareça escrito diretamente na imagem */
+            /* Não usamos fundo branco nem sombra, conforme instruções */
             padding: 20px;
             border-radius: 8px;
             position: relative;
@@ -54,8 +55,10 @@
             margin-top: 30px;
             margin-bottom: 10px;
         }
+
+        /* "Exercise 1:" etc. em negrito */
         .exercise-description {
-            font-style: italic;
+            font-weight: bold;
             margin-bottom: 10px;
         }
 
@@ -70,9 +73,6 @@
             border-radius: 5px;
             font-size: 1rem;
         }
-
-        /* Remover antigos botões "Check" de cada pergunta */
-        /* -- agora teremos apenas um botão Check Answers no final -- */
 
         /* Botão Check Answers preto, relevo, texto branco */
         #check-all-btn {
@@ -92,10 +92,18 @@
 
         /* Resposta certa ou errada */
         .correct {
-            color: blue;
+            color: blue; /* certo: azul */
         }
         .incorrect {
-            color: red;
+            color: red;  /* errado: vermelho */
+        }
+
+        /* Mostra a resposta certa ao lado (fora do input) */
+        .correct-answer-span {
+            display: none; 
+            font-weight: bold;
+            margin-left: 10px;
+            color: blue;
         }
 
         .modal-overlay {
@@ -171,8 +179,9 @@
     firebase.initializeApp(firebaseConfig);
 
     // Variáveis de controle
-    let checkCount = 0; // Conta quantas vezes o aluno clicou em "Check Answers".
-    let allInputs = []; // Guardaremos referência a todos os campos (objeto com input e answer)
+    let checkCount = 0;        // Conta quantas vezes o aluno clicou em "Check Answers".
+    let allInputs = [];        // Guardaremos referência a todos os campos (objeto com input, answer e span)
+    let userData = {};         // Informações do usuário logado (para ver se é aluno e se está atrelado a professor)
 
     // Extrair parâmetros da URL
     function getParamsFromURL() {
@@ -184,11 +193,26 @@
         };
     }
 
+    // Carregar dados do usuário
+    async function loadUserData(userId, callback) {
+        try {
+            const snapshot = await firebase.database().ref('usuarios/' + userId).once('value');
+            userData = snapshot.val() || {};
+            callback();
+        } catch (error) {
+            console.error("Error loading user data:", error);
+            alert("Error loading user data.");
+        }
+    }
+
     // Garantir que o usuário esteja autenticado
     function ensureUserIsAuthenticated(callback) {
         firebase.auth().onAuthStateChanged(function (user) {
             if (user) {
-                callback(user.uid);
+                // Carrega dados do usuário
+                loadUserData(user.uid, () => {
+                    callback(user.uid);
+                });
             } else {
                 console.error("User is not authenticated.");
                 alert("You need to be logged in to proceed.");
@@ -269,7 +293,7 @@
         });
     }
 
-    // Função para tocar o alarme por 4 segundos
+    // Função para tocar o alarme por 4 segundos (só se role=aluno e atrelado_professor)
     function playAlarm() {
         const audio = new Audio('alarme.mp3');
         audio.play();
@@ -283,9 +307,9 @@
     function checkAllAnswers() {
         checkCount++;
         let allCorrect = true; // Verifica se todas estão corretas
+        const wrongInputs = [];
 
         // 1) Verificar cada input
-        const wrongInputs = [];
         allInputs.forEach(item => {
             const userAnswer = item.input.value.trim().toLowerCase();
             const correctAnswer = item.correctAnswer.trim().toLowerCase();
@@ -294,6 +318,8 @@
                 // Certo
                 item.input.classList.remove('incorrect');
                 item.input.classList.add('correct');
+                // Não mostra a span de resposta certa agora, pois não há erro
+                item.correctAnswerSpan.style.display = 'none';
             } else {
                 // Errado
                 item.input.classList.remove('correct');
@@ -303,37 +329,49 @@
             }
         });
 
-        // Tocar alarme e rolar para o primeiro erro (se existir)
+        // 2) Se houver erros, verificar se usuário é "aluno" e atrelado a professor, então toca o alarme
         if (!allCorrect) {
-            playAlarm();
-
+            if (
+                userData.role === 'aluno' &&
+                userData.atrelado_professor &&
+                userData.atrelado_professor.trim() !== ''
+            ) {
+                playAlarm();
+            }
+            // Scroll para o primeiro erro
             if (wrongInputs.length > 0) {
                 wrongInputs[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         }
 
-        // 2) Lógicas de repetição
+        // 3) Lógica de repetição/tentativas
         if (checkCount === 3) {
-            // Na terceira vez: mostrar as respostas certas dos que ainda estiverem errados e concluir
+            // Na terceira vez: mostrar as respostas corretas nos que ainda estiverem errados
             allInputs.forEach(item => {
                 const userAnswer = item.input.value.trim().toLowerCase();
                 const correctAnswer = item.correctAnswer.trim().toLowerCase();
                 if (userAnswer !== correctAnswer) {
-                    // Exibir a resposta correta no campo
-                    item.input.value = item.correctAnswer;
+                    // Exibir a resposta correta fora do input
+                    item.correctAnswerSpan.textContent = `Right answer: ${item.correctAnswer}`;
+                    item.correctAnswerSpan.style.display = 'inline';
                 }
             });
-            // Marcar tudo como correto visualmente agora
-            allInputs.forEach(item => {
-                item.input.classList.remove('incorrect');
-                item.input.classList.add('correct');
-            });
 
-            // Concluir a atividade
+            // Se ainda houver erros, não mudamos o input do aluno, mas marcamos todos como "correct" visual
+            // se quiser. Pela descrição, vamos manter a cor vermelha no input para ver o erro,
+            // mas agora exibe a "Right answer" do lado. Se preferir, comentar a linha abaixo:
+            //   item.input.classList.remove('incorrect');
+            //   item.input.classList.add('correct');
+            // mas vamos deixar como está para que fique claro qual errou.  
+
+            // Concluir a atividade (se for a regra final).
+            // Mas o enunciado diz: "Na próxima vez que apertar check answers vai marcar as respostas certas em azul e as erradas em vermelho e mostrar as respostas certas ... e depois disso concluir"
+            // Então concluímos aqui
             markPhaseCompleted();
             showModal();
+
         } else {
-            // Se não for terceira tentativa, mas o usuário já acertou tudo, também conclui
+            // Se não for a terceira tentativa, mas o usuário já acertou tudo, conclui a atividade
             if (allCorrect) {
                 markPhaseCompleted();
                 showModal();
@@ -360,9 +398,7 @@
 
             const exercisesDiv = document.getElementById('exercises');
             let htmlContent = '';
-            let currentExerciseTitle = '';
-            let currentExerciseDesc = '';
-            let insideExercise = false;
+            allInputs = []; // reset
 
             lines.forEach((line) => {
                 const trimmedLine = line.trim();
@@ -374,9 +410,8 @@
                     return;
                 }
 
-                // 2) Se começa com "Exercise X:" -> inserir como subtítulo
+                // 2) Se começa com "Exercise X:" -> inserir como subtítulo em negrito
                 if (/^Exercise\s+\d+:/i.test(trimmedLine)) {
-                    insideExercise = true;
                     htmlContent += `<div class="exercise-description">${trimmedLine}</div>`;
                     return;
                 }
@@ -384,7 +419,6 @@
                 // 3) Linhas de múltipla escolha ou explicações (A), (B), ...
                 //    Se não contiver [Answer:], apenas exibe como texto normal
                 if (trimmedLine && !trimmedLine.includes('[Answer:')) {
-                    // Se for algo como (A) The serpent. ...
                     htmlContent += `<div class="exercise-line">${trimmedLine}</div>`;
                     return;
                 }
@@ -393,7 +427,7 @@
                 if (trimmedLine.includes('[Answer:')) {
                     const [questionPart, answerPart] = trimmedLine.split('[Answer:');
                     const cleanAnswer = answerPart.replace(']', '').trim();
-                    
+
                     // Verificar se existe algo como ___[size:small], [size:medium], [size:large], [size:huge]
                     let inputSize = '150px'; // default
                     const sizeMatch = questionPart.match(/\[size:(.*?)\]/);
@@ -401,9 +435,9 @@
                     if (sizeMatch) {
                         const sizeValue = sizeMatch[1].trim();
                         if (sizeValue === 'small') inputSize = '30px';
-                        if (sizeValue === 'medium') inputSize = '150px'; // ~2-3 palavras curtas
-                        if (sizeValue === 'large') inputSize = '300px'; // ~5-6 palavras
-                        if (sizeValue === 'huge') inputSize = '800px'; // ~50 palavras (texto curto)
+                        if (sizeValue === 'medium') inputSize = '150px'; 
+                        if (sizeValue === 'large') inputSize = '300px'; 
+                        if (sizeValue === 'huge') inputSize = '800px'; 
                     }
 
                     // Remover [size:..] do texto a ser exibido
@@ -411,42 +445,39 @@
                     // Substituir o "___" pelo input
                     displayQuestion = displayQuestion.replace('___', `<input type="text" class="answer-input" style="width:${inputSize};" />`);
 
-                    // Gera HTML
+                    // Gera HTML com um span oculto para exibir a resposta correta quando precisar
                     htmlContent += `
                         <div class="exercise-line">
                             ${displayQuestion}
-                        </div>`;
-
-                    // Após gerar HTML, precisamos armazenar a info (resposta correta) para uso posterior
-                    // Faremos isso depois que o HTML estiver montado (no final do forEach).
-                    // Faremos um push no final do loop, mas precisamos de algo temporário...
-                    // Vamos apenas salvar o item em um array e criaremos a referência mais tarde
-                    // (faremos num segundo momento, pois precisamos ter o input de fato no DOM).
+                            <span class="correct-answer-span"></span>
+                        </div>
+                    `;
                 }
             });
 
             // Injeta o HTML no container
             exercisesDiv.innerHTML = htmlContent;
 
-            // Agora, vamos mapear todos os inputs com suas respostas corretas
-            allInputs = []; // reset
-            let lineIndex = 0; // contador para percorrer lines novamente
+            // Mapear todos os inputs com suas respostas corretas
+            let answerIndex = 0;
             lines.forEach((line) => {
                 if (line.includes('[Answer:')) {
                     const [qPart, aPart] = line.split('[Answer:');
                     const correctAnswer = aPart.replace(']', '').trim();
 
                     // Localiza o input correspondente no DOM, na ordem que aparecem
-                    const inputElement = exercisesDiv.querySelectorAll('input.answer-input')[allInputs.length];
-                    // Armazena no array
-                    if (inputElement) {
+                    const inputElement = exercisesDiv.querySelectorAll('input.answer-input')[answerIndex];
+                    const spanElement = exercisesDiv.querySelectorAll('.correct-answer-span')[answerIndex];
+
+                    if (inputElement && spanElement) {
                         allInputs.push({
                             input: inputElement,
-                            correctAnswer: correctAnswer
+                            correctAnswer: correctAnswer,
+                            correctAnswerSpan: spanElement
                         });
                     }
+                    answerIndex++;
                 }
-                lineIndex++;
             });
 
         } catch (error) {
@@ -455,8 +486,13 @@
         }
     }
 
-    // Carregar conteúdo assim que a página estiver pronta
-    document.addEventListener('DOMContentLoaded', loadContent);
+    // Ao carregar a página, primeiro nos certificamos de que o usuário está autenticado
+    document.addEventListener('DOMContentLoaded', () => {
+        ensureUserIsAuthenticated(() => {
+            // Depois de carregar userData, carregamos o conteúdo do exercício
+            loadContent();
+        });
+    });
 </script>
 </body>
 </html>
