@@ -85,7 +85,8 @@
 <body>
 
 <div class="container">
-    <a href="javascript:history.back()" class="back-button">Back</a>
+    <!-- Ajustado para chamar a função goBack() ao clicar no botão -->
+    <a href="javascript:goBack()" class="back-button">Back</a>
     <h1>Hannah's Grammar Exercises</h1>
 
     <div id="exercises">
@@ -93,11 +94,13 @@
     </div>
 </div>
 
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
 <script>
+    // Configuração do Firebase
     const firebaseConfig = {
         apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
         authDomain: "hannahenglishcourse.firebaseapp.com",
@@ -108,10 +111,9 @@
         measurementId: "G-07VVJG9LRS",
         databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
     };
-
     firebase.initializeApp(firebaseConfig);
 
-    // Extract parameters from URL
+    // Extrair parâmetros da URL
     function getParamsFromURL() {
         const params = new URLSearchParams(window.location.search);
         return {
@@ -121,7 +123,7 @@
         };
     }
 
-    // Ensure user authentication
+    // Garantir que o usuário esteja autenticado
     function ensureUserIsAuthenticated(callback) {
         firebase.auth().onAuthStateChanged(function (user) {
             if (user) {
@@ -133,103 +135,113 @@
         });
     }
 
-    // Update the next phase, unit, or level
+    // Atualizar para a próxima fase, unidade ou nível
     async function updateNextPhase(userId) {
         const { level, unit, fase } = getParamsFromURL();
         const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
 
         try {
             if (fase === "last") {
+                // Se for a última fase da unidade, então passar para a próxima unidade
                 const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
                 await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
             } else if (fase === "end") {
+                // Se for a última fase do nível, passa para o próximo nível
                 const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
                 await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
             } else {
+                // Se for uma fase intermediária, marca a atual como concluída e libera a próxima
                 const nextFase = parseInt(fase, 10) + 1;
-                await dbRef.update({ [`fase${fase}`]: true, [`fase${nextFase}`]: true });
+                await dbRef.update({ 
+                    [`fase${fase}`]: true,
+                    [`fase${nextFase}`]: true 
+                });
             }
         } catch (error) {
             console.error("Error updating the next phase:", error);
         }
     }
 
-    // Mark the current phase as completed
+    // Marcar a fase atual como concluída
     function markPhaseCompleted() {
         ensureUserIsAuthenticated((userId) => {
             updateNextPhase(userId);
         });
     }
 
- // Load dynamic content
-async function loadContent() {
-    const { level, unit } = getParamsFromURL();
-    if (!level || !unit) {
-        console.error("Parameters 'level' or 'unit' are missing in the URL.");
-        document.getElementById('exercises').textContent = "Content could not be loaded.";
-        return;
-    }
-
-    const basePath = `../../../../${level}/${unit}/DataExerciciosdaGramatica/`;
-    try {
-        const lyricsResponse = await fetch(`${basePath}exercicios.txt`);
-        if (!lyricsResponse.ok) throw new Error(`Error loading lyrics file: ${basePath}exercicios.txt`);
-
-        const data = await lyricsResponse.text();
-        const exercisesDiv = document.getElementById('exercises');
-        const lines = data.split('\n');
-        let htmlContent = '';
-
-       lines.forEach((line) => {
-    if (line.includes('[Answer:')) {
-        const [question, answer] = line.split('[Answer:');
-        const cleanedAnswer = answer.replace(']', '').trim();
-
-        // Extrair o tamanho do input, se especificado
-        let inputSize = 'medium'; // Padrão
-        const sizeMatch = question.match(/\[size:(.*?)\]/); // Buscar o tamanho no formato [size:...]
-        if (sizeMatch) {
-            inputSize = sizeMatch[1]; // Pega o valor definido
-            question = question.replace(sizeMatch[0], ''); // Remove a tag [size:...] do texto
+    // Carregar conteúdo do arquivo exercicios.txt
+    async function loadContent() {
+        const { level, unit } = getParamsFromURL();
+        if (!level || !unit) {
+            console.error("Parameters 'level' or 'unit' are missing in the URL.");
+            document.getElementById('exercises').textContent = "Content could not be loaded.";
+            return;
         }
 
-        // Determinar a largura com base no tamanho extraído
-        let inputWidth;
-        if (inputSize === 'small') {
-            inputWidth = '30px'; // 1 caractere
-        } else if (inputSize === 'large') {
-            inputWidth = '300px'; // 5-6 palavras
-        } else if (inputSize === 'huge') {
-            inputWidth = '800px'; // ~50 palavras
-        } else if (inputSize === 'essay') {
-            inputWidth = '2000px'; // ~370 palavras
-        } else {
-            inputWidth = '150px'; // Tamanho padrão (medium)
+        const basePath = `../../../../${level}/${unit}/DataExerciciosdaGramatica/`;
+        try {
+            const lyricsResponse = await fetch(`${basePath}exercicios.txt`);
+            if (!lyricsResponse.ok) throw new Error(`Error loading lyrics file: ${basePath}exercicios.txt`);
+
+            const data = await lyricsResponse.text();
+            const exercisesDiv = document.getElementById('exercises');
+            const lines = data.split('\n');
+            let htmlContent = '';
+
+            lines.forEach((line) => {
+                if (line.includes('[Answer:')) {
+                    const [question, answer] = line.split('[Answer:');
+                    const cleanedAnswer = answer.replace(']', '').trim();
+
+                    // Extrair o tamanho do input, se especificado
+                    let inputSize = 'medium'; // Padrão
+                    const sizeMatch = question.match(/\[size:(.*?)\]/); // Exemplo: [size:small]
+                    
+                    // Substitui "___" pelo input, ajustando largura conforme [size:]
+                    const formattedQuestion = sizeMatch
+                        ? question
+                            .replace(sizeMatch[0], '')
+                            .replace(
+                                '___',
+                                `<input type="text" class="answer-input" style="width: ${getInputWidth(sizeMatch[1])};" placeholder="Type here..." />`
+                            )
+                        : question.replace(
+                            '___',
+                            `<input type="text" class="answer-input" style="width: 150px;" placeholder="Type here..." />`
+                        );
+
+                    htmlContent += `
+                        <div class="exercise">
+                            <p>
+                                ${formattedQuestion}
+                                <button class="check-btn" data-answer="${cleanedAnswer}" onclick="checkAnswer(this)">Check</button>
+                                <span class="answer">${cleanedAnswer}</span>
+                            </p>
+                        </div>`;
+                }
+            });
+
+            exercisesDiv.innerHTML = htmlContent;
+        } catch (error) {
+            console.error("Error loading exercises:", error);
+            document.getElementById('exercises').textContent = "Exercises could not be loaded.";
         }
-
-        // Gerar o HTML da questão
-        htmlContent += `
-            <div class="exercise">
-                <p>
-                    ${question.replace('___', `<input type="text" class="answer-input" style="width: ${inputWidth};" placeholder="Type here..." />`)}
-                    <button class="check-btn" data-answer="${cleanedAnswer}" onclick="checkAnswer(this)">Check</button>
-                    <span class="answer">${cleanedAnswer}</span>
-                </p>
-            </div>`;
     }
-});
 
-        exercisesDiv.innerHTML = htmlContent;
-    } catch (error) {
-        console.error("Error loading lyrics:", error);
-        document.getElementById('lyrics-container').textContent = "Exercises could not be loaded.";
+    // Definir largura do input de acordo com o tamanho especificado
+    function getInputWidth(size) {
+        if (size === 'small') return '30px';   // ~1 caractere
+        if (size === 'large') return '300px';  // ~5-6 palavras
+        if (size === 'huge') return '800px';   // ~50 palavras
+        if (size === 'essay') return '2000px'; // ~370 palavras
+        return '150px';                        // Padrão
     }
-}
 
+    // Verificar resposta do exercício
     function checkAnswer(button) {
-        const userInput = button.previousElementSibling; // Input field
-        const answerSpan = button.nextElementSibling; // Hidden answer
-        const correctAnswer = button.getAttribute('data-answer'); // Correct answer
+        const userInput = button.previousElementSibling; // input field
+        const answerSpan = button.nextElementSibling;     // hidden answer <span>
+        const correctAnswer = button.getAttribute('data-answer'); // correct answer
 
         if (userInput.value.trim().toLowerCase() === correctAnswer.toLowerCase()) {
             userInput.style.backgroundColor = 'lightgreen';
@@ -240,19 +252,19 @@ async function loadContent() {
         }
     }
 
-   // Show completion modal
+    // Exibir modal de conclusão (caso necessário)
     function showModal() {
         document.getElementById('overlay').style.display = 'block';
         document.getElementById('completion-modal').style.display = 'block';
     }
 
-    // Close completion modal
+    // Fechar modal de conclusão
     function closeModal() {
         document.getElementById('completion-modal').style.display = 'none';
         document.getElementById('overlay').style.display = 'none';
     }
 
-    // Validate navigation on "Back" button
+    // Validação de navegação no botão "Back"
     function goBack() {
         const { level, unit, fase } = getParamsFromURL();
         ensureUserIsAuthenticated((userId) => {
@@ -262,8 +274,10 @@ async function loadContent() {
                     const progress = snapshot.val();
                     const nextFaseKey = `fase${parseInt(fase, 10) + 1}`;
                     if (progress[nextFaseKey]) {
+                        // Se a próxima fase já está desbloqueada, apenas volta
                         window.history.back();
                     } else {
+                        // Se a próxima fase não está desbloqueada, exibe aviso
                         const confirmNavigation = confirm("The next phase is locked. Do you still want to go back?");
                         if (confirmNavigation) {
                             window.history.back();
@@ -277,9 +291,10 @@ async function loadContent() {
                 alert("An error occurred while verifying progress. Please try again.");
             });
         });
-    } 
-      
-      document.addEventListener('DOMContentLoaded', loadContent);
+    }
+
+    // Carregar o conteúdo assim que a página estiver pronta
+    document.addEventListener('DOMContentLoaded', loadContent);
 </script>
 </body>
 </html>
