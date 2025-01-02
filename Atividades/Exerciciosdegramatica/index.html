@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hannah's Grammar Exercises</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+            background-image: url('fundo.png');
+            background-repeat: repeat;
+            background-size: auto;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+        .back-button {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        .back-button:hover {
+            background-color: #0056b3;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            font-size: 2rem;
+            margin-top: 70px;
+        }
+        .exercise {
+            margin-bottom: 20px;
+        }
+        .exercise p {
+            margin: 10px 0;
+            font-size: 1.2rem;
+        }
+        .answer-input {
+            width: 150px;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+        .check-btn {
+            padding: 8px 15px;
+            background-color: white;
+            color: black;
+            border: 1px solid #ccc;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        .check-btn:hover {
+            background-color: #f0f0f0;
+            box-shadow: 3px 3px 7px rgba(0, 0, 0, 0.2);
+        }
+        .answer {
+            font-weight: bold;
+            color: green;
+            margin-left: 10px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <a href="javascript:history.back()" class="back-button">Back</a>
+    <h1>Hannah's Grammar Exercises</h1>
+
+    <div id="exercises">
+        <!-- Exercises will be loaded here dynamically -->
+    </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+        authDomain: "hannahenglishcourse.firebaseapp.com",
+        projectId: "hannahenglishcourse",
+        storageBucket: "hannahenglishcourse.appspot.com",
+        messagingSenderId: "449818788486",
+        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+        measurementId: "G-07VVJG9LRS",
+        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+
+    // Extract parameters from URL
+    function getParamsFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        return {
+            level: params.get('level'),
+            unit: params.get('unit'),
+            fase: params.get('fase'),
+        };
+    }
+
+    // Ensure user authentication
+    function ensureUserIsAuthenticated(callback) {
+        firebase.auth().onAuthStateChanged(function (user) {
+            if (user) {
+                callback(user.uid);
+            } else {
+                console.error("User is not authenticated.");
+                alert("You need to be logged in to proceed.");
+            }
+        });
+    }
+
+    // Update the next phase, unit, or level
+    async function updateNextPhase(userId) {
+        const { level, unit, fase } = getParamsFromURL();
+        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+        try {
+            if (fase === "last") {
+                const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+                await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
+            } else if (fase === "end") {
+                const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+                await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+            } else {
+                const nextFase = parseInt(fase, 10) + 1;
+                await dbRef.update({ [`fase${fase}`]: true, [`fase${nextFase}`]: true });
+            }
+        } catch (error) {
+            console.error("Error updating the next phase:", error);
+        }
+    }
+
+    // Mark the current phase as completed
+    function markPhaseCompleted() {
+        ensureUserIsAuthenticated((userId) => {
+            updateNextPhase(userId);
+        });
+    }
+
+ // Load dynamic content
+async function loadContent() {
+    const { level, unit } = getParamsFromURL();
+    if (!level || !unit) {
+        console.error("Parameters 'level' or 'unit' are missing in the URL.");
+        document.getElementById('exercises').textContent = "Content could not be loaded.";
+        return;
+    }
+
+    const basePath = `../../../../${level}/${unit}/DataExerciciosdaGramatica/`;
+    try {
+        const lyricsResponse = await fetch(`${basePath}exercicios.txt`);
+        if (!lyricsResponse.ok) throw new Error(`Error loading lyrics file: ${basePath}exercicios.txt`);
+
+        const data = await lyricsResponse.text();
+        const exercisesDiv = document.getElementById('exercises');
+        const lines = data.split('\n');
+        let htmlContent = '';
+
+       lines.forEach((line) => {
+    if (line.includes('[Answer:')) {
+        const [question, answer] = line.split('[Answer:');
+        const cleanedAnswer = answer.replace(']', '').trim();
+
+        // Extrair o tamanho do input, se especificado
+        let inputSize = 'medium'; // Padrão
+        const sizeMatch = question.match(/\[size:(.*?)\]/); // Buscar o tamanho no formato [size:...]
+        if (sizeMatch) {
+            inputSize = sizeMatch[1]; // Pega o valor definido
+            question = question.replace(sizeMatch[0], ''); // Remove a tag [size:...] do texto
+        }
+
+        // Determinar a largura com base no tamanho extraído
+        let inputWidth;
+        if (inputSize === 'small') {
+            inputWidth = '30px'; // 1 caractere
+        } else if (inputSize === 'large') {
+            inputWidth = '300px'; // 5-6 palavras
+        } else if (inputSize === 'huge') {
+            inputWidth = '800px'; // ~50 palavras
+        } else if (inputSize === 'essay') {
+            inputWidth = '2000px'; // ~370 palavras
+        } else {
+            inputWidth = '150px'; // Tamanho padrão (medium)
+        }
+
+        // Gerar o HTML da questão
+        htmlContent += `
+            <div class="exercise">
+                <p>
+                    ${question.replace('___', `<input type="text" class="answer-input" style="width: ${inputWidth};" placeholder="Type here..." />`)}
+                    <button class="check-btn" data-answer="${cleanedAnswer}" onclick="checkAnswer(this)">Check</button>
+                    <span class="answer">${cleanedAnswer}</span>
+                </p>
+            </div>`;
+    }
+});
+
+        exercisesDiv.innerHTML = htmlContent;
+    } catch (error) {
+        console.error("Error loading lyrics:", error);
+        document.getElementById('lyrics-container').textContent = "Exercises could not be loaded.";
+    }
+}
+
+    function checkAnswer(button) {
+        const userInput = button.previousElementSibling; // Input field
+        const answerSpan = button.nextElementSibling; // Hidden answer
+        const correctAnswer = button.getAttribute('data-answer'); // Correct answer
+
+        if (userInput.value.trim().toLowerCase() === correctAnswer.toLowerCase()) {
+            userInput.style.backgroundColor = 'lightgreen';
+            answerSpan.style.display = 'inline';
+        } else {
+            userInput.style.backgroundColor = 'lightcoral';
+            alert('Incorrect! Try again.');
+        }
+    }
+
+   // Show completion modal
+    function showModal() {
+        document.getElementById('overlay').style.display = 'block';
+        document.getElementById('completion-modal').style.display = 'block';
+    }
+
+    // Close completion modal
+    function closeModal() {
+        document.getElementById('completion-modal').style.display = 'none';
+        document.getElementById('overlay').style.display = 'none';
+    }
+
+    // Validate navigation on "Back" button
+    function goBack() {
+        const { level, unit, fase } = getParamsFromURL();
+        ensureUserIsAuthenticated((userId) => {
+            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+            dbRef.get().then((snapshot) => {
+                if (snapshot.exists()) {
+                    const progress = snapshot.val();
+                    const nextFaseKey = `fase${parseInt(fase, 10) + 1}`;
+                    if (progress[nextFaseKey]) {
+                        window.history.back();
+                    } else {
+                        const confirmNavigation = confirm("The next phase is locked. Do you still want to go back?");
+                        if (confirmNavigation) {
+                            window.history.back();
+                        }
+                    }
+                } else {
+                    alert("Progress could not be verified. Please try again later.");
+                }
+            }).catch((error) => {
+                console.error("Error checking progress:", error);
+                alert("An error occurred while verifying progress. Please try again.");
+            });
+        });
+    } 
+      
+      document.addEventListener('DOMContentLoaded', loadContent);
+</script>
+</body>
+</html>
