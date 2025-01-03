@@ -734,24 +734,61 @@
                     return;
                 }
 
-                // Se a linha não tiver [Answer:], imprime normal
-                if (line && !line.includes('[Answer:')) {
+                // Se a linha não tiver [Answer:] nem [FreeText], imprime normal
+                if (line && !line.includes('[Answer:') && !line.includes('[FreeText]')) {
                     drawWrappedText([line], 0, false);
                     return;
                 }
 
-                // Se tiver [Answer:], trocamos o input pela linha em branco
-                if (line.includes('[Answer:')) {
-                    let [qPart] = line.split('[Answer:');
-                    
-                    // Remove [size:...] se existir
-                    qPart = qPart.replace(/\[size:.*?\]/, '').trim();
+                // Se a linha contiver ambos [Answer:] e [FreeText]
+                if (line.includes('[Answer:') && line.includes('[FreeText]')) {
+                    let [questionPart, answerPartWithFreeText] = line.split('[Answer:');
+                    const correctAnswer = answerPartWithFreeText.split(']')[0].trim();
+
+                    // Verificar [size:small], [size:medium], [size:large], [size:huge], [size:essay]
+                    let inputSize = '150px'; // default
+                    let useTextarea = false;
+                    const sizeMatch = questionPart.match(/\[size:(.*?)\]/);
+
+                    if (sizeMatch) {
+                        const sizeValue = sizeMatch[1].trim();
+                        if (sizeValue === 'small') inputSize = '30px';
+                        if (sizeValue === 'medium') inputSize = '150px'; 
+                        if (sizeValue === 'large') inputSize = '300px'; 
+                        if (sizeValue === 'huge') inputSize = '800px'; 
+                        if (sizeValue === 'essay') {
+                            useTextarea = true;
+                            // Largura 100% + rows
+                        }
+                    }
+
+                    // Remover [size:..] do texto a ser exibido
+                    let displayQuestion = questionPart.replace(/\[size:.*?\]/, '').trim();
+
                     // Substituir "___" por linhas
-                    // Se quiser mais espaço, podemos colocar mais underlines
-                    const questionText = qPart.replace('___', '____________________');
-                    
-                    drawWrappedText([questionText], 0, false);
+                    displayQuestion = displayQuestion.replace('___', '____________________');
+
+                    // Adicionar a pergunta
+                    drawWrappedText([displayQuestion], 0, false);
                     currentY += 5; // Pequeno espaço após a linha
+
+                    // Adicionar uma linha em branco para a resposta
+                    const underline = '______________________________';
+                    drawWrappedText([underline], 0, false);
+                    currentY += 5; // Pequeno espaço após a linha
+
+                    return;
+                }
+
+                // Se a linha tiver [FreeText], substitui pela linha em branco
+                if (line.includes('[FreeText]') && !line.includes('[Answer:')) {
+                    let displayText = line.replace('[FreeText]', '').trim();
+                    drawWrappedText([displayText], 0, false);
+                    // Adicionar uma linha em branco para a resposta
+                    const underline = '______________________________';
+                    drawWrappedText([underline], 0, false);
+                    currentY += 5; // Pequeno espaço após a linha
+                    return;
                 }
 
                 // Adicionar uma linha em branco após o exercício
