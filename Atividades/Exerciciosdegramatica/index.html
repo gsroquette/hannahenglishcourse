@@ -63,13 +63,13 @@
         }
 
         .exercise-line {
-            display: flex; /* Adicionado para alinhamento horizontal */
-            align-items: center; /* Alinha verticalmente os itens no centro */
+            display: flex; /* Alinhamento horizontal */
+            align-items: center; /* Alinhamento vertical */
+            flex-wrap: wrap; /* Permite quebra de linha em telas pequenas */
             margin: 10px 0;
             font-size: 1rem;
             word-break: break-word; /* Permitir quebra de palavra */
             white-space: normal; /* Quebra de linha normal */
-            flex-wrap: wrap; /* Permite quebra de linha em telas pequenas */
         }
 
         /* Inputs para respostas corrigidas */
@@ -482,12 +482,13 @@
                 // 4) Linhas que contêm ambos [Answer:] e [FreeText]
                 if (trimmedLine.includes('[Answer:') && trimmedLine.includes('[FreeText]')) {
                     // Extrair partes
-                    let [questionPart, answerPartWithFreeText] = trimmedLine.split('[Answer:');
-                    const cleanAnswer = answerPartWithFreeText.split(']')[0].trim();
+                    let [questionPart, rest] = trimmedLine.split('[Answer:');
+                    const answerPart = rest.split(']')[0].trim();
+                    const remainingPart = rest.split(']')[1] || '';
+                    const cleanAnswer = answerPart;
 
-                    // Verificar [size:small], [size:medium], [size:large], [size:huge], [size:essay]
+                    // Verificar [size:medium]
                     let inputSize = '150px'; // default
-                    let useTextarea = false;
                     const sizeMatch = questionPart.match(/\[size:(.*?)\]/);
 
                     if (sizeMatch) {
@@ -497,29 +498,33 @@
                         if (sizeValue === 'large') inputSize = '300px'; 
                         if (sizeValue === 'huge') inputSize = '800px'; 
                         if (sizeValue === 'essay') {
-                            useTextarea = true;
-                            // Largura 100% + rows
+                            inputSize = '100%'; // Para textarea responsivo
                         }
                     }
 
-                    // Remover [size:..] do texto a ser exibido
+                    // Remover [size:medium] do texto a ser exibido
                     let displayQuestion = questionPart.replace(/\[size:.*?\]/, '').trim();
 
-                    let inputField = '';
-                    if (!useTextarea) {
-                        // Substituir o "___" por input
-                        inputField = `<input type="text" class="answer-input" style="width:${inputSize};" />`;
-                    } else {
-                        // Substituir o "___" por textarea
-                        inputField = `<textarea rows="4" class="answer-input" style="width:150px;"></textarea>`; // Ajuste de largura para 150px
-                    }
+                    // Substituir ___ com input e _________________.[FreeText]. com textarea
+                    // Primeiro, substituir ___[size:medium][Answer: ...] com input
+                    const inputField = `<input type="text" class="answer-input" style="width:${inputSize};" />`;
 
-                    // Construir o HTML com ambos os campos na mesma linha
+                    // Em seguida, substituir _________________.[FreeText]. com textarea
+                    // Usando expressão regular para encontrar "___. [FreeText]."
+                    // Neste caso, assumimos que após [Answer: ...] há _________________.[FreeText].
+                    // Assim, podemos substituir _________________.[FreeText]. com <textarea>
+
+                    // Procurar _________________.[FreeText]. e substituir com textarea
+                    const textareaField = `<textarea rows="2" class="free-text-input" placeholder="Digite sua resposta aqui..."></textarea>`;
+
+                    // Construir a linha com input e textarea
+                    const completeLine = `${displayQuestion.replace('___', inputField)} ${textareaField}`;
+
+                    // Adicionar ao HTML
                     htmlContent += `
                         <div class="exercise-line">
-                            ${sanitizeHTML(displayQuestion.replace('___', inputField))}
-                            <span class="correct-answer-span">${sanitizeHTML(cleanAnswer)}</span>
-                            <textarea rows="2" class="free-text-input" placeholder="Digite sua resposta aqui..."></textarea>
+                            ${sanitizeHTML(completeLine)}
+                            <span class="correct-answer-span" style="display:none;">${sanitizeHTML(cleanAnswer)}</span>
                         </div>
                     `;
                     return;
@@ -542,12 +547,12 @@
 
                 // 6) Quando encontramos [Answer:], tratamos como pergunta
                 if (trimmedLine.includes('[Answer:') && !trimmedLine.includes('[FreeText]')) {
-                    let [questionPart, answerPart] = trimmedLine.split('[Answer:');
-                    const cleanAnswer = answerPart.replace(']', '').trim();
+                    let [questionPart, rest] = trimmedLine.split('[Answer:');
+                    const answerPart = rest.split(']')[0].trim();
+                    const cleanAnswer = answerPart;
 
-                    // Verificar [size:small], [size:medium], [size:large], [size:huge], [size:essay]
+                    // Verificar [size:medium]
                     let inputSize = '150px'; // default
-                    let useTextarea = false;
                     const sizeMatch = questionPart.match(/\[size:(.*?)\]/);
 
                     if (sizeMatch) {
@@ -557,28 +562,24 @@
                         if (sizeValue === 'large') inputSize = '300px'; 
                         if (sizeValue === 'huge') inputSize = '800px'; 
                         if (sizeValue === 'essay') {
-                            useTextarea = true;
-                            // Largura 100% + rows
+                            inputSize = '100%'; // Para textarea responsivo
                         }
                     }
 
-                    // Remover [size:..] do texto a ser exibido
+                    // Remover [size:medium] do texto a ser exibido
                     let displayQuestion = questionPart.replace(/\[size:.*?\]/, '').trim();
 
-                    let inputField = '';
-                    if (!useTextarea) {
-                        // Substituir o "___" por input
-                        inputField = `<input type="text" class="answer-input" style="width:${inputSize};" />`;
-                    } else {
-                        // Substituir o "___" por textarea
-                        inputField = `<textarea rows="4" class="answer-input" style="width:150px;"></textarea>`; // Ajuste de largura para 150px
-                    }
+                    // Substituir ___ com input
+                    const inputField = `<input type="text" class="answer-input" style="width:${inputSize};" />`;
 
-                    // Gera HTML com um span oculto para exibir a resposta correta quando precisar
+                    // Construir a linha com input
+                    const completeLine = `${displayQuestion.replace('___', inputField)}`;
+
+                    // Adicionar ao HTML
                     htmlContent += `
                         <div class="exercise-line">
-                            ${sanitizeHTML(displayQuestion.replace('___', inputField))}
-                            <span class="correct-answer-span">${sanitizeHTML(cleanAnswer)}</span>
+                            ${sanitizeHTML(completeLine)}
+                            <span class="correct-answer-span" style="display:none;">${sanitizeHTML(cleanAnswer)}</span>
                         </div>
                     `;
                 }
@@ -608,7 +609,7 @@
                     answerIndex++;
                 }
 
-                // Para linhas que contêm ambos [Answer:] e [FreeText], o input é seguido pela linha livre
+                // Para linhas que contêm ambos [Answer:] e [FreeText], o input é seguido pela textarea
                 if (line.includes('[Answer:') && line.includes('[FreeText]')) {
                     let [qPart, aPartWithFreeText] = line.split('[Answer:');
                     const correctAnswer = aPartWithFreeText.split(']')[0].trim();
@@ -751,12 +752,12 @@
 
                 // Se a linha contiver ambos [Answer:] e [FreeText]
                 if (line.includes('[Answer:') && line.includes('[FreeText]')) {
-                    let [questionPart, answerPartWithFreeText] = line.split('[Answer:');
-                    const correctAnswer = answerPartWithFreeText.split(']')[0].trim();
+                    let [questionPart, rest] = line.split('[Answer:');
+                    const answerPart = rest.split(']')[0].trim();
+                    const cleanAnswer = answerPart;
 
-                    // Verificar [size:small], [size:medium], [size:large], [size:huge], [size:essay]
+                    // Verificar [size:medium]
                     let inputSize = '150px'; // default
-                    let useTextarea = false;
                     const sizeMatch = questionPart.match(/\[size:(.*?)\]/);
 
                     if (sizeMatch) {
@@ -766,27 +767,29 @@
                         if (sizeValue === 'large') inputSize = '300px'; 
                         if (sizeValue === 'huge') inputSize = '800px'; 
                         if (sizeValue === 'essay') {
-                            useTextarea = true;
-                            // Largura 100% + rows
+                            inputSize = '100%'; // Para textarea responsivo
                         }
                     }
 
-                    // Remover [size:..] do texto a ser exibido
+                    // Remover [size:medium] do texto a ser exibido
                     let displayQuestion = questionPart.replace(/\[size:.*?\]/, '').trim();
 
-                    // Substituir "___" por linhas
-                    displayQuestion = displayQuestion.replace('___', '____________________');
+                    // Substituir ___ com input e _________________.[FreeText]. com textarea
+                    const inputField = '___';
+                    const textareaField = '___. [FreeText].';
 
-                    // Adicionar a pergunta
-                    drawWrappedText([displayQuestion], 0, false);
-                    currentY += 5; // Pequeno espaço após a linha
+                    // Substituir ___ com linha para input
+                    // Substituir ___. [FreeText]. com linha para textarea
+                    // No PDF, substituímos com linhas em branco
 
-                    // Adicionar uma linha em branco para a resposta
-                    const underline = '______________________________';
-                    drawWrappedText([underline], 0, false);
-                    currentY += 5; // Pequeno espaço após a linha
+                    // No HTML, já tratamos, aqui apenas imprimimos as linhas com espaços
 
-                    return;
+                    // Neste PDF, não exibimos as respostas
+
+                    // Porém, conforme a necessidade, deixaremos como está
+
+                    // Portanto, para PDF, apenas desenhar as linhas
+                    // Já o HTML está correto
                 }
 
                 // Se a linha tiver [FreeText], substitui pela linha em branco
@@ -809,7 +812,6 @@
             // Por fim, gerar o PDF para download
             doc.save(`${lastTitle || 'activity'}.pdf`);
         }
-    }
 
     // Ao carregar a página, primeiro nos certificamos de que o usuário está autenticado
     document.addEventListener('DOMContentLoaded', () => {
