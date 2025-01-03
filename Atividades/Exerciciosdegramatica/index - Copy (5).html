@@ -63,13 +63,10 @@
         }
 
         .exercise-line {
-            display: flex; /* Adicionado para alinhamento horizontal */
-            align-items: center; /* Alinha verticalmente os itens no centro */
             margin: 10px 0;
             font-size: 1rem;
             word-break: break-word; /* Permitir quebra de palavra */
             white-space: normal; /* Quebra de linha normal */
-            flex-wrap: wrap; /* Permite quebra de linha em telas pequenas */
         }
 
         /* Inputs para respostas corrigidas */
@@ -80,24 +77,24 @@
             font-size: 1rem;
             max-width: 150px; /* Ajuste conforme necessário */
             box-sizing: border-box; /* Garantir que padding conte no total */
-            margin: 0 5px;
         }
 
         /* Linhas de texto livre */
-        .free-text-input {
+        .free-text-span {
+            border-bottom: 1px solid #000; /* Linha contínua */
+            display: inline-block;
+            width: 200px; /* Ajuste conforme necessário */
             margin-left: 10px;
-            resize: vertical; /* Permite redimensionamento vertical */
-            padding: 5px;
-            min-width: 200px; /* Espaço mínimo para digitação */
-            box-sizing: border-box; /* Garantir que padding conte no total */
+            vertical-align: bottom;
+            min-height: 20px; /* Espaço para digitação */
         }
 
         /* Resposta certa ou errada */
         .correct {
-            border-color: green; /* certo: verde */
+            color: blue; /* certo: azul */
         }
         .incorrect {
-            border-color: red;  /* errado: vermelho */
+            color: red;  /* errado: vermelho */
         }
 
         /* Mostra a resposta certa ao lado (fora do input) */
@@ -185,9 +182,8 @@
                 white-space: normal;
             }
 
-            .free-text-input {
-                width: 100%; /* Ajuste para telas pequenas */
-                min-width: 0;
+            .free-text-span {
+                width: 100px; /* Ajuste para telas pequenas */
             }
         }
     </style>
@@ -407,7 +403,7 @@
             // Na terceira vez: mostrar as respostas corretas nos que ainda estiverem errados
             allInputs.forEach(item => {
                 const userAnswer = item.input.value.trim().toLowerCase();
-                const correctAnswer = item.correctAnswer.toLowerCase();
+                const correctAnswer = item.correctAnswer.trim().toLowerCase();
                 if (userAnswer !== correctAnswer) {
                     item.correctAnswerSpan.textContent = `Right answer: ${item.correctAnswer}`;
                     item.correctAnswerSpan.style.display = 'inline';
@@ -424,13 +420,6 @@
                 showModal();
             }
         }
-    }
-
-    // Função para sanitizar entradas e prevenir XSS
-    function sanitizeHTML(str) {
-        const temp = document.createElement('div');
-        temp.textContent = str;
-        return temp.innerHTML;
     }
 
     // Carregar conteúdo do arquivo exercicios.txt
@@ -460,20 +449,20 @@
                 // 1) Capturar título (#TITLE: ...)
                 if (trimmedLine.startsWith('#TITLE:')) {
                     const titleText = trimmedLine.replace('#TITLE:', '').trim();
-                    htmlContent += `<h2 class="exercise-title">${sanitizeHTML(titleText)}</h2>`;
+                    htmlContent += `<h2 class="exercise-title">${titleText}</h2>`;
                     return;
                 }
 
                 // 2) Se começa com "Exercise X:" -> inserir como subtítulo em negrito
                 if (/^Exercise\s+\d+:/i.test(trimmedLine)) {
-                    htmlContent += `<div class="exercise-description">${sanitizeHTML(trimmedLine)}</div>`;
+                    htmlContent += `<div class="exercise-description">${trimmedLine}</div>`;
                     return;
                 }
 
                 // 3) Linhas de múltipla escolha ou explicações (A), (B), ...
                 //    Se não contiver [Answer:] nem [FreeText], apenas exibe como texto normal
                 if (trimmedLine && !trimmedLine.includes('[Answer:') && !trimmedLine.includes('[FreeText]')) {
-                    htmlContent += `<div class="exercise-line">${sanitizeHTML(trimmedLine)}</div>`;
+                    htmlContent += `<div class="exercise-line">${trimmedLine}</div>`;
                     return;
                 }
 
@@ -503,21 +492,26 @@
                     // Remover [size:..] do texto a ser exibido
                     let displayQuestion = questionPart.replace(/\[size:.*?\]/, '').trim();
 
-                    let inputField = '';
                     if (!useTextarea) {
                         // Substituir o "___" por input
-                        inputField = `<input type="text" class="answer-input" style="width:${inputSize};" />`;
+                        displayQuestion = displayQuestion.replace('___', `<input type="text" class="answer-input" style="width:${inputSize};" />`);
                     } else {
                         // Substituir o "___" por textarea
-                        inputField = `<textarea rows="4" class="answer-input" style="width:150px;"></textarea>`; // Ajuste de largura para 150px
+                        displayQuestion = displayQuestion.replace('___', `<textarea rows="4" class="answer-input" style="width:100%;"></textarea>`);
                     }
 
-                    // Construir o HTML com ambos os campos na mesma linha
+                    // Adicionar o campo de resposta
                     htmlContent += `
                         <div class="exercise-line">
-                            ${sanitizeHTML(displayQuestion.replace('___', inputField))}
-                            <span class="correct-answer-span">${sanitizeHTML(cleanAnswer)}</span>
-                            <textarea rows="2" class="free-text-input" placeholder="Digite sua resposta aqui..."></textarea>
+                            ${displayQuestion}
+                            <span class="correct-answer-span"></span>
+                        </div>
+                    `;
+
+                    // Adicionar a linha de texto livre inline
+                    htmlContent += `
+                        <div class="exercise-line">
+                            <span class="free-text-span"></span>
                         </div>
                     `;
                     return;
@@ -528,11 +522,11 @@
                     // Remover a marcação [FreeText] do texto a ser exibido
                     let displayText = trimmedLine.replace('[FreeText]', '').trim();
 
-                    // Renderizar o texto seguido de uma área para digitação livre
+                    // Renderizar o texto seguido de uma linha para digitação livre
                     htmlContent += `
                         <div class="exercise-line">
-                            ${sanitizeHTML(displayText)}
-                            <textarea rows="2" class="free-text-input" placeholder="Digite sua resposta aqui..."></textarea>
+                            ${displayText}
+                            <span class="free-text-span"></span>
                         </div>
                     `;
                     return;
@@ -563,20 +557,19 @@
                     // Remover [size:..] do texto a ser exibido
                     let displayQuestion = questionPart.replace(/\[size:.*?\]/, '').trim();
 
-                    let inputField = '';
                     if (!useTextarea) {
                         // Substituir o "___" por input
-                        inputField = `<input type="text" class="answer-input" style="width:${inputSize};" />`;
+                        displayQuestion = displayQuestion.replace('___', `<input type="text" class="answer-input" style="width:${inputSize};" />`);
                     } else {
                         // Substituir o "___" por textarea
-                        inputField = `<textarea rows="4" class="answer-input" style="width:150px;"></textarea>`; // Ajuste de largura para 150px
+                        displayQuestion = displayQuestion.replace('___', `<textarea rows="4" class="answer-input" style="width:100%;"></textarea>`);
                     }
 
                     // Gera HTML com um span oculto para exibir a resposta correta quando precisar
                     htmlContent += `
                         <div class="exercise-line">
-                            ${sanitizeHTML(displayQuestion.replace('___', inputField))}
-                            <span class="correct-answer-span">${sanitizeHTML(cleanAnswer)}</span>
+                            ${displayQuestion}
+                            <span class="correct-answer-span"></span>
                         </div>
                     `;
                 }
@@ -584,9 +577,6 @@
 
             // Injeta o HTML no container
             exercisesDiv.innerHTML = htmlContent;
-
-            // Adicionar as áreas de texto livre
-            // Nenhuma ação necessária, pois já inserimos os textareas diretamente
 
             // Mapear todos os inputs/areas com suas respostas corretas
             let answerIndex = 0;
@@ -811,9 +801,6 @@
             doc.save(`${lastTitle || 'activity'}.pdf`);
         }
     }
-
-    // Função para gerar PDF (sem respostas), com layout personalizado
-    // Mantém a função existente
 
     // Ao carregar a página, primeiro nos certificamos de que o usuário está autenticado
     document.addEventListener('DOMContentLoaded', () => {
