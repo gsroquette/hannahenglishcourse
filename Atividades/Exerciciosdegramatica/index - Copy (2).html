@@ -178,8 +178,8 @@
 
     <!-- Botão único para checar TODAS as respostas -->
     <button id="check-all-btn" onclick="checkAllAnswers()">Check Answers</button>
-    <!-- Botão para gerar PDF, inicialmente oculto -->
-    <button id="generate-pdf-btn" onclick="generatePDF()" style="display: none;">Generate PDF</button>
+    <!-- Botão para gerar PDF -->
+    <button id="generate-pdf-btn" onclick="generatePDF()">Generate PDF</button>
 </div>
 
 <!-- Modal de conclusão -->
@@ -424,7 +424,7 @@
             allInputs = []; // reset
 
             linesFromFile.forEach((line) => {
-                let trimmedLine = line.trim();
+                const trimmedLine = line.trim();
 
                 // 1) Capturar título (#TITLE: ...)
                 if (trimmedLine.startsWith('#TITLE:')) {
@@ -448,7 +448,7 @@
 
                 // 4) Quando encontramos [Answer:], tratamos como pergunta
                 if (trimmedLine.includes('[Answer:')) {
-                    let [questionPart, answerPart] = trimmedLine.split('[Answer:');
+                    const [questionPart, answerPart] = trimmedLine.split('[Answer:');
                     const cleanAnswer = answerPart.replace(']', '').trim();
 
                     // Verificar [size:small], [size:medium], [size:large], [size:huge], [size:essay]
@@ -496,7 +496,7 @@
             let answerIndex = 0;
             linesFromFile.forEach((line) => {
                 if (line.includes('[Answer:')) {
-                    let [qPart, aPart] = line.split('[Answer:');
+                    const [qPart, aPart] = line.split('[Answer:');
                     const correctAnswer = aPart.replace(']', '').trim();
 
                     // Localiza o input correspondente no DOM, na ordem que aparecem
@@ -538,119 +538,89 @@
         // 1) Adicionar a logo (logo.png deve estar na mesma pasta)
         // Tente ajustar as dimensões da imagem conforme necessário
         // Se a imagem não for encontrada ou der erro no console, adapte o caminho.
-        try {
-            // Cria uma imagem base64 para evitar problemas de carregamento
-            // Alternativamente, se estiver hospedado em algum lugar acessível, use a URL completa
-            // Aqui assumimos que "logo.png" está acessível
-            const img = new Image();
-            img.src = 'logo.png';
-            img.onload = function() {
-                const imgWidth = 80;
-                const imgHeight = 40;
-                doc.addImage(img, "PNG", marginLeft, currentY, imgWidth, imgHeight);
-                currentY += imgHeight + 20;
+        doc.addImage("logo.png", "PNG", marginLeft, currentY, 80, 40);
+        currentY += 60;
 
-                // Continuar a geração após a imagem carregar
-                addPDFContent();
-            };
-            img.onerror = function() {
-                console.error("Logo image not found. Skipping logo in PDF.");
-                addPDFContent();
-            };
-        } catch (error) {
-            console.error("Error loading logo image:", error);
-            addPDFContent();
-        }
+        // 2) Campos para "Name" e "Date"
+        doc.setFontSize(12);
+        doc.text("Name: ________________________________________________", marginLeft, currentY);
+        currentY += 20;
+        doc.text("Date: ____________", marginLeft, currentY);
+        currentY += 40;
 
-        // Função para adicionar o restante do conteúdo no PDF
-        function addPDFContent() {
-            // 2) Campos para "Name" e "Date"
+        // 3) Lê as linhas salvas em linesFromFile e imprime sem mostrar as respostas
+        //    Respeitando as quebras e adicionando linhas para o aluno responder.
+
+        // Função auxiliar para desenhar texto com quebra de linha e controle de página
+        function drawWrappedText(textLines, indent = 0) {
+            const lineHeight = 14; // px
+            const maxWidth = pageWidth - marginLeft * 2 - indent;
             doc.setFontSize(12);
-            doc.text("Name: ________________________________________________", marginLeft, currentY);
-            currentY += 20;
-            doc.text("Date: ____________", marginLeft, currentY);
-            currentY += 40;
 
-            // 3) Lê as linhas salvas em linesFromFile e imprime sem mostrar as respostas
-            //    Respeitando as quebras e adicionando linhas para o aluno responder.
-
-            // Função auxiliar para desenhar texto com quebra de linha e controle de página
-            function drawWrappedText(textLines, indent = 0, extraSpaceAfter = false) {
-                const lineHeight = 14; // px
-                const maxWidth = pageWidth - marginLeft * 2 - indent;
-                doc.setFontSize(12);
-
-                textLines.forEach((textLine) => {
-                    const wrapped = doc.splitTextToSize(textLine, maxWidth);
-                    wrapped.forEach((part) => {
-                        if (currentY + lineHeight > pageHeight - 40) {
-                            doc.addPage();
-                            currentY = marginTop;
-                        }
-                        doc.text(part, marginLeft + indent, currentY);
-                        currentY += lineHeight;
-                    });
-                });
-
-                if (extraSpaceAfter) {
-                    currentY += lineHeight; // Adiciona uma linha extra
-                }
-            }
-
-            let lastTitle = ""; // Guardar último título (para não repetir)
-            let isNewExercise = false;
-
-            linesFromFile.forEach((rawLine) => {
-                let line = rawLine.trim();
-
-                // Se for título
-                if (line.startsWith('#TITLE:')) {
-                    let theTitle = line.replace('#TITLE:', '').trim();
-                    lastTitle = theTitle;
-                    // Exibir como título (fonte maior)
-                    doc.setFontSize(14);
-                    if (currentY + 20 > pageHeight - 40) {
+            textLines.forEach((textLine) => {
+                const wrapped = doc.splitTextToSize(textLine, maxWidth);
+                wrapped.forEach((part) => {
+                    if (currentY + lineHeight > pageHeight - 40) {
                         doc.addPage();
                         currentY = marginTop;
                     }
-                    doc.text(theTitle, marginLeft, currentY);
-                    currentY += 25;
-                    return;
-                }
-
-                // Se for "Exercise X:"
-                if (/^Exercise\s+\d+:/i.test(line)) {
-                    // Subtítulo em negrito
-                    doc.setFontSize(12);
-                    doc.setFont(undefined, 'bold');
-                    drawWrappedText([line], 0, true); // Adiciona espaço extra após o exercício
-                    doc.setFont(undefined, 'normal');
-                    return;
-                }
-
-                // Se a linha não tiver [Answer:], imprime normal
-                if (line && !line.includes('[Answer:')) {
-                    drawWrappedText([line]);
-                    return;
-                }
-
-                // Se tiver [Answer:], trocamos o input pela linha em branco
-                if (line.includes('[Answer:')) {
-                    let [qPart] = line.split('[Answer:');
-                    
-                    // Remove [size:...] se existir
-                    qPart = qPart.replace(/\[size:.*?\]/, '').trim();
-                    // Substituir "___" por linhas
-                    // Se quiser mais espaço, podemos colocar mais underlines
-                    const questionText = qPart.replace('___', '____________________');
-                    
-                    drawWrappedText([questionText]);
-                }
+                    doc.text(part, marginLeft + indent, currentY);
+                    currentY += lineHeight;
+                });
             });
-
-            // Por fim, gerar o PDF para download
-            doc.save(`${lastTitle || 'activity'}.pdf`);
         }
+
+        let lastTitle = ""; // Guardar último título (para não repetir)
+        linesFromFile.forEach((rawLine) => {
+            const line = rawLine.trim();
+
+            // Se for título
+            if (line.startsWith('#TITLE:')) {
+                let theTitle = line.replace('#TITLE:', '').trim();
+                lastTitle = theTitle;
+                // Exibir como título (fonte maior)
+                doc.setFontSize(14);
+                if (currentY + 20 > pageHeight - 40) {
+                    doc.addPage();
+                    currentY = marginTop;
+                }
+                doc.text(theTitle, marginLeft, currentY);
+                currentY += 25;
+                return;
+            }
+
+            // Se for "Exercise X:"
+            if (/^Exercise\s+\d+:/i.test(line)) {
+                // Subtítulo em negrito
+                doc.setFontSize(12);
+                doc.setFont(undefined, 'bold');
+                drawWrappedText([line]);
+                doc.setFont(undefined, 'normal');
+                return;
+            }
+
+            // Se a linha não tiver [Answer:], imprime normal
+            if (line && !line.includes('[Answer:')) {
+                drawWrappedText([line]);
+                return;
+            }
+
+            // Se tiver [Answer:], trocamos o input pela linha em branco
+            if (line.includes('[Answer:')) {
+                let [qPart] = line.split('[Answer:');
+                
+                // Remove [size:...] se existir
+                qPart = qPart.replace(/\[size:.*?\]/, '').trim();
+                // Substituir "___" por linhas
+                // Se quiser mais espaço, podemos colocar mais underlines
+                const questionText = qPart.replace('___', '____________________');
+                
+                drawWrappedText([questionText]);
+            }
+        });
+
+        // Por fim, gerar o PDF para download
+        doc.save(`${lastTitle || 'activity'}.pdf`);
     }
 
     // Ao carregar a página, primeiro nos certificamos de que o usuário está autenticado
@@ -658,14 +628,6 @@
         ensureUserIsAuthenticated(() => {
             // Depois de carregar userData, carregamos o conteúdo do exercício
             loadContent();
-
-            // Após carregar o conteúdo, verificar o papel do usuário para exibir o botão "Generate PDF"
-            const generatePdfBtn = document.getElementById('generate-pdf-btn');
-            if (userData.role === 'professor' || userData.role === 'proprietario') {
-                generatePdfBtn.style.display = 'inline-block';
-            } else {
-                generatePdfBtn.style.display = 'none';
-            }
         });
     });
 </script>
