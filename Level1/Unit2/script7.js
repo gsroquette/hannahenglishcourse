@@ -15,11 +15,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentLevel = urlPathParts[1]; // Ex: "Level1"
     const currentUnit = urlPathParts[2]; // Ex: "Unit1"
 
-   // 6
-const activities6 = [
-    { id: 27, name: "Hannah Video", path: `/Atividades/HannahVideo/index.html?level=${currentLevel}&unit=${currentUnit}&fase=27`, img: "../../imagens/botoes/video_button.png", unlocked: false },
-    { id: 28, name: "MatchingGame", path: `/Atividades/MatchingGame/index.html?level=${currentLevel}&unit=${currentUnit}&fase=28`, img: "../../imagens/botoes/matching_game_button.png", unlocked: false },
-    { id: 29, name: "LifeLessons", path: `/Atividades/LifeLessons/index.html?level=${currentLevel}&unit=${currentUnit}&fase=29`, img: "../../imagens/botoes/life_lessons_button.png", unlocked: false },
+    const activities7 = [
+    { id: 30, name: "TestQuizLidoABC", path: `/Atividades/TestQuizLidoABC/index.html?level=${currentLevel}&unit=${currentUnit}&fase=30`, img: "../../imagens/test.png", unlocked: false },
+    { id: 31, name: "TestQuizLeVeAB", path: `/Atividades/TestQuizLeVeAB/index.html?level=${currentLevel}&unit=${currentUnit}&fase=31`, img: "../../imagens/test.png", unlocked: false },
+    { id: 32, name: "TestQuizVeEscutaC", path: `/Atividades/TestQuizVeEscutaC/index.html?level=${currentLevel}&unit=${currentUnit}&fase=32`, img: "../../imagens/test.png", unlocked: false },
+    { id: 33, name: "TestQuizEscutaC2", path: `/Atividades/TestQuizEscutaC2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=33`, img: "../../imagens/test.png", unlocked: false },
+    { id: 34, name: "TestwordB2C", path: `/Atividades/TestwordB2C/index.html?level=${currentLevel}&unit=${currentUnit}&fase=34`, img: "../../imagens/test.png", unlocked: false },
+    { id: 35, name: "Testword2B2C", path: `/Atividades/Testword2B2C/index.html?level=${currentLevel}&unit=${currentUnit}&fase=35`, img: "../../imagens/test.png", unlocked: false },
+    { id: 36, name: "Testword3B2C", path: `/Atividades/Testword3B2C/index.html?level=${currentLevel}&unit=${currentUnit}&fase=36`, img: "../../imagens/test.png", unlocked: false },
 ];
 
     // Fechar o dropdown ao clicar fora dele

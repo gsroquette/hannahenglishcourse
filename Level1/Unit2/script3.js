@@ -15,13 +15,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentLevel = urlPathParts[1]; // Ex: "Level1"
     const currentUnit = urlPathParts[2]; // Ex: "Unit1"
 
-    const activities = [
-    { id: 1011, name: "Mixed Letters FIXO", path: `/Atividades/Mixed Letters FIXO/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1011`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
-    { id: 1012, name: "WordSearch", path: `/Atividades/WordSearch/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1012`, img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
-    { id: 1013, name: "Missing Word", path: `/Atividades/Missing Word/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1013`, img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
-    { id: 1014, name: "Flashcards3", path: `/Atividades/Flashcards3/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1014`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-    { id: 1015, name: "WordSearch2", path: `/Atividades/WordSearch2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1015`, img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
-    { id: 1016, name: "Speak3", path: `/Atividades/Speak3/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1016`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
+    const activities3 = [
+    { id: 12, name: "Grammar", path: `/Atividades/Grammar/index.html?level=${currentLevel}&unit=${currentUnit}&fase=12`, img: "../../imagens/botoes/grammar_button.png", unlocked: false },
+    { id: 13, name: "Exerciciosdegramatica", path: `/Atividades/Exerciciosdegramatica/index.html?level=${currentLevel}&unit=${currentUnit}&fase=13`, img: "../../imagens/botoes/grammar_button.png", unlocked: false },
+    { id: 14, name: "Fill in the Blanks", path: `/Atividades/Fill%20in%20the%20Blanks/index.html?level=${currentLevel}&unit=${currentUnit}&fase=14`, img: "../../imagens/botoes/fillintheblanks_button.png", unlocked: false },
 ];
 
     // Fechar o dropdown ao clicar fora dele
