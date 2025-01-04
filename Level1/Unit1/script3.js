@@ -15,10 +15,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentLevel = urlPathParts[1]; // Ex: "Level1"
     const currentUnit = urlPathParts[2]; // Ex: "Unit1"
 
-   const activities3 = [
-    { id: 12, name: "Grammar", path: "../Unit1/Grammar/index.html?fase=12", img: "../../imagens/botoes/grammar_button.png", unlocked: false },
-    { id: 13, name: "Exerciciosdegramatica", path: "../Unit1/Exerciciosdegramatica/index.html?fase=13", img: "../../imagens/botoes/grammar_button.png", unlocked: false },
-    { id: 14, name: "Fill in the Blanks", path: "../Unit1/FillInTheBlanks/index.html?fase=14", img: "../../imagens/botoes/fillintheblanks_button.png", unlocked: false },
+   const activities = [
+    { id: 12, name: "Grammar", path: `/Atividades/Grammar/index.html?level=${currentLevel}&unit=${currentUnit}&fase=12`, img: "../../imagens/botoes/grammar_button.png", unlocked: false },
+    { id: 13, name: "Exerciciosdegramatica", path: `/Atividades/Exerciciosdegramatica/index.html?level=${currentLevel}&unit=${currentUnit}&fase=13`, img: "../../imagens/botoes/grammar_button.png", unlocked: false },
+    { id: 14, name: "Fill in the Blanks", path: `/Atividades/Fill%20in%20the%20Blanks/index.html?level=${currentLevel}&unit=${currentUnit}&fase=14`, img: "../../imagens/botoes/fillintheblanks_button.png", unlocked: false },
 ];
 
     // Fechar o dropdown ao clicar fora dele
