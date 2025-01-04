@@ -15,14 +15,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentLevel = urlPathParts[1]; // Ex: "Level1"
     const currentUnit = urlPathParts[2]; // Ex: "Unit1"
 
-    const activities = [
-        { id: 1029, name: "TestQuizLidoABC", path: `/Atividades/TestQuizLidoABC/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1029`, img: "../../imagens/test.png", unlocked: false },
-        { id: 1030, name: "TestQuizLeVeAB", path: `/Atividades/TestQuizLeVeAB/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1030`, img: "../../imagens/test.png", unlocked: false }, 
-        { id: 1031, name: "TestQuizVeEscutaC", path: `/Atividades/TestQuizVeEscutaC/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1031`, img: "../../imagens/test.png", unlocked: false },  
-        { id: 1032, name: "TestQuizEscutaC2", path: `/Atividades/TestQuizEscutaC2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1032`, img: "../../imagens/test.png", unlocked: false },
-        { id: 1033, name: "TestwordB2C", path: `/Atividades/TestwordB2C/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1033`, img: "../../imagens/test.png", unlocked: false }, 
-        { id: 1034, name: "Testword2B2C", path: `/Atividades/Testword2B2C/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1034`, img: "../../imagens/test.png", unlocked: false },    
-        { id: 1035, name: "Testword3B2C", path: `/Atividades/Testword3B2C/index.html?level=${currentLevel}&unit=${currentUnit}&fase=last`, img: "../../imagens/test.png", unlocked: false },           
+  const activities6 = [
+    { id: 27, name: "Hannah Video", path: "../Unit1/HannahVideo/index.html?fase=27", img: "../../imagens/botoes/video_button.png", unlocked: false },
+    { id: 28, name: "MatchingGame", path: "../Unit1/MatchingGame/index.html?fase=28", img: "../../imagens/botoes/matching_game_button.png", unlocked: false },
+    { id: 29, name: "LifeLessons", path: "../Unit1/LifeLessons/index.html?fase=29", img: "../../imagens/botoes/life_lessons_button.png", unlocked: false },
 ];
 
     // Fechar o dropdown ao clicar fora dele

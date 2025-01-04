@@ -15,13 +15,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentLevel = urlPathParts[1]; // Ex: "Level1"
     const currentUnit = urlPathParts[2]; // Ex: "Unit1"
 
-   const activities5 = [
-    { id: 21, name: "Grammar2", path: `/Atividades/Grammar2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=21`, img: "../../imagens/botoes/grammar_button.png", unlocked: false },
-    { id: 22, name: "QUIZ2", path: `/Atividades/QUIZ2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=22`, img: "../../imagens/botoes/quiz_button.png", unlocked: false },
-    { id: 23, name: "Diálogo", path: `/Atividades/Dialogo/index.html?level=${currentLevel}&unit=${currentUnit}&fase=23`, img: "../../imagens/botoes/dialogo_button.png", unlocked: false },
-    { id: 24, name: "Speak", path: `/Atividades/Speak/index.html?level=${currentLevel}&unit=${currentUnit}&fase=24`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
-    { id: 25, name: "Speak2", path: `/Atividades/Speak2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=25`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
-    { id: 26, name: "Speak3", path: `/Atividades/Speak3/index.html?level=${currentLevel}&unit=${currentUnit}&fase=26`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
+ const activities5 = [
+    { id: 21, name: "Grammar2", path: "../Unit1/Grammar2/index.html?fase=21", img: "../../imagens/botoes/grammar_button.png", unlocked: false },
+    { id: 22, name: "QUIZ2", path: "../Unit1/QUIZ2/index.html?fase=22", img: "../../imagens/botoes/quiz_button.png", unlocked: false },
+    { id: 23, name: "Diálogo", path: "../Unit1/Dialogo/index.html?fase=23", img: "../../imagens/botoes/dialogo_button.png", unlocked: false },
+    { id: 24, name: "Speak", path: "../Unit1/Speak/index.html?fase=24", img: "../../imagens/botoes/speak_button.png", unlocked: false },
+    { id: 25, name: "Speak2", path: "../Unit1/Speak2/index.html?fase=25", img: "../../imagens/botoes/speak_button.png", unlocked: false },
+    { id: 26, name: "Speak3", path: "../Unit1/Speak3/index.html?fase=26", img: "../../imagens/botoes/speak_button.png", unlocked: false },
 ];
 
     // Fechar o dropdown ao clicar fora dele
