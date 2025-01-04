@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentLevel = urlPathParts[1]; // Ex: "Level1"
     const currentUnit = urlPathParts[2]; // Ex: "Unit1"
 
-   const activities1 = [
+   const activities = [
     { id: 1001, name: "StoryCards", path: `/Atividades/StoryCards/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1001`, img: "../../imagens/botoes/storycards_button.png", unlocked: false },
     { id: 1002, name: "Flashcards", path: `/Atividades/Flashcards/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1002`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
     { id: 1003, name: "Flashcards2", path: `/Atividades/Flashcards2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1003`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
