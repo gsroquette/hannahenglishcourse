@@ -291,8 +291,8 @@
         </div>
 
         <!-- Modal de conclusão -->
-        <div id="overlay" style="display: none;"></div>
-        <div id="completion-modal" style="display: none;">
+        <div id="overlay"></div>
+        <div id="completion-modal">
             <h2>Phase Completed!</h2>
             <p>Congratulations! You have completed this phase.</p>
             <button onclick="closeModal()">Close</button>
@@ -317,7 +317,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
 
     <script>
-        // Firebase Configuration
+        // ---------------------- Firebase Configuration ----------------------
         const firebaseConfig = {
             apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
             authDomain: "hannahenglishcourse.firebaseapp.com",
@@ -327,8 +327,6 @@
             messagingSenderId: "449818788486",
             appId: "1:449818788486:web:8a49d3f68591e6fb3f0707"
         };
-
-        // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
 
         function ensureUserIsAuthenticated(callback) {
@@ -342,7 +340,7 @@
             });
         }
 
-        // Function to handle "Back" navigation
+        // ---------------------- Back Navigation ----------------------
         function goBack() {
             const { level, unit, fase } = getParamsFromURL();
 
@@ -372,7 +370,7 @@
             });
         }
 
-        // Show the PDF button for specific roles
+        // ---------------------- Show PDF Button for Teachers ----------------------
         firebase.auth().onAuthStateChanged((user) => {
             if (user) {
                 const userId = user.uid;
@@ -391,52 +389,53 @@
             }
         });
 
-        // Load lesson data on DOMContentLoaded
+        // ---------------------- Load Data on DOMContentLoaded ----------------------
         document.addEventListener("DOMContentLoaded", function() {
             loadLessonData();
         });
 
-        let lessonData = [];       // Armazena as lições e explicações (text.txt)
-        let bibleLessonData = [];  // Armazena o texto bíblico (bible_lessons.txt)
+        let lessonData = [];       // Dados de texto.txt
+        let bibleLessonData = [];  // Dados de bible_lessons.txt
 
         async function loadLessonData() {
             const { level, unit } = getParamsFromURL();
+            // Arquivos no mesmo diretório (ajuste conforme sua estrutura):
             const lessonFilePath = `../../../../${level}/${unit}/DataMatching/texto.txt`;
             const bibleLessonFilePath = `../../../../${level}/${unit}/DataMatching/bible_lessons.txt`;
             const imageBasePath = `../../../../${level}/${unit}/DataMatching/imagens/`;
 
             try {
-                // 1) Carregar texto.txt
-                const responseText = await fetch(lessonFilePath);
-                const dataText = await responseText.text();
-                const linesText = dataText.split('\n').filter(line => line.trim() !== '');
+                // ---------------------- 1) Carregar texto.txt ----------------------
+                const response = await fetch(lessonFilePath);
+                const data = await response.text();
+                const lines = data.split('\n').filter(line => line.trim() !== '');
 
-                // Preenche lessonData com base no texto.txt
-                lessonData = linesText.map((line, index) => {
+                lessonData = lines.map((line, index) => {
                     const [type, lesson, explanation] = line.split('|').map(item => item.trim());
                     return {
-                        img: `${imageBasePath}imagem${index + 1}.png`,
-                        title: lesson,
-                        text: explanation,
+                        img: `${imageBasePath}imagem${index + 1}.png`, // imagemX.png
+                        title: lesson,      // Título da Lição
+                        text: explanation,  // Explicação (usada na coluna direita)
                         matchIndex: index + 1
                     };
                 });
 
-                // 2) Carregar bible_lessons.txt
+                // ---------------------- 2) Carregar bible_lessons.txt ----------------------
                 const responseBible = await fetch(bibleLessonFilePath);
-                const dataBible = await responseBible.text();
-                const linesBible = dataBible.split('\n').filter(line => line.trim() !== '');
+                const bibleData = await responseBible.text();
+                const bibleLines = bibleData.split('\n').filter(line => line.trim() !== '');
 
-                // Preenche bibleLessonData (mesmo índice de lessonData)
-                bibleLessonData = linesBible.map((line) => {
-                    const [type, lesson, bibleText] = line.split('|').map(item => item.trim());
+                // Mapeia as linhas de bible_lessons.txt
+                bibleLessonData = bibleLines.map((line) => {
+                    // Formato: bible|TítuloExato|TextoBíblico
+                    const [bibleType, bibleTitle, bibleText] = line.split('|').map(item => item.trim());
                     return {
-                        title: lesson,       // Se precisar, pode usar esse título
-                        bibleText: bibleText // Texto bíblico que aparecerá ao acertar
+                        title: bibleTitle,
+                        bibleText: bibleText
                     };
                 });
 
-                // Exibe lições e explicações na tela
+                // ---------------------- Montar as colunas (arrastar e soltar) ----------------------
                 displayLessonsAndExplanations();
             } catch (error) {
                 console.error("Error loading lesson data:", error);
@@ -444,13 +443,15 @@
         }
 
         function displayLessonsAndExplanations() {
+            // Embaralha as lições (para a coluna da esquerda)
             const shuffledLessons = shuffleArray([...lessonData]);
+            // Embaralha as explicações (para a coluna da direita)
             const shuffledExplanations = shuffleArray([...lessonData]);
 
             const lessonsContainer = document.getElementById('lessons');
             const explanationsContainer = document.getElementById('explanations');
 
-            // Renderiza a coluna da esquerda (lições)
+            // Monta coluna da esquerda (títulos)
             shuffledLessons.forEach(item => {
                 const lessonDiv = document.createElement('div');
                 lessonDiv.classList.add('list-item');
@@ -460,11 +461,11 @@
                 lessonsContainer.appendChild(lessonDiv);
             });
 
-            // Renderiza a coluna da direita (explicações)
+            // Monta coluna da direita (explicações)
             shuffledExplanations.forEach(item => {
                 const explanationDiv = document.createElement('div');
                 explanationDiv.classList.add('drop-zone');
-                explanationDiv.textContent = item.text;
+                explanationDiv.textContent = item.text;  // texto do texto.txt
                 explanationDiv.dataset.match = item.matchIndex;
                 explanationDiv.onclick = () => selectRightItem(explanationDiv);
                 explanationsContainer.appendChild(explanationDiv);
@@ -493,16 +494,19 @@
             if (!selectedLeftItem) return;
 
             if (selectedLeftItem.dataset.match === element.dataset.match) {
+                // Acertou
                 element.classList.add('correct');
                 selectedLeftItem.classList.add('used');
                 selectedLeftItem.classList.remove('selected');
 
-                // Mostra a imagem e o TEXTO BÍBLICO (carregado de bible_lessons.txt)
-                showLessonData(selectedLeftItem.dataset.match - 1);
+                // Exibir imagem + texto bíblico correspondente
+                const correctIndex = parseInt(selectedLeftItem.dataset.match, 10) - 1;
+                showLessonData(correctIndex);
 
                 selectedLeftItem = null;
                 checkCompletion();
             } else {
+                // Errou
                 element.classList.add('wrong');
                 setTimeout(() => {
                     element.classList.remove('wrong');
@@ -510,22 +514,28 @@
             }
         }
 
-        // Exibe modal com imagem + título (de text.txt) e texto (de bible_lessons.txt)
+        // Exibe o modal com a IMAGEM e TÍTULO de texto.txt e TEXTO BÍBLICO de bible_lessons.txt
         function showLessonData(index) {
-            const data = lessonData[index];
-            const bibleData = bibleLessonData[index];
+            const data = lessonData[index];          // Dados do texto.txt
+            const bibleData = bibleLessonData[index]; // Dados do bible_lessons.txt
 
             const imageContainer = document.getElementById('image-container');
             const lessonImage = document.getElementById('lesson-image');
             const lessonTitle = document.getElementById('lesson-title');
             const lessonText = document.getElementById('lesson-text');
 
-            // Imagem e título vêm do lessonData
+            // Imagem e Título (do texto.txt)
             lessonImage.src = data.img;
             lessonTitle.textContent = data.title;
 
-            // Texto vem do bible_lessons.txt
-            lessonText.textContent = bibleData.bibleText;
+            // Texto Bíblico (do bible_lessons.txt)
+            if (bibleData) {
+                lessonText.textContent = bibleData.bibleText;
+            } else {
+                // Se por acaso não encontrar o índice correspondente,
+                // podemos exibir a explicação original ou mensagem de erro
+                lessonText.textContent = data.text;
+            }
 
             imageContainer.style.display = 'flex';
         }
@@ -539,6 +549,7 @@
             window.location.reload();
         }
 
+        // ---------------------- PDF Generation ----------------------
         function generatePDF() {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
@@ -563,6 +574,7 @@
                 const rightItems = Array.from(document.querySelectorAll('#explanations .drop-zone'));
 
                 doc.setFontSize(12);
+                // Coluna da esquerda
                 leftItems.forEach((leftItem, index) => {
                     if (yOffset > 270) {
                         doc.addPage();
@@ -572,12 +584,14 @@
                     yOffset += lineSpacing;
                 });
 
+                // Coluna da direita
                 yOffset = 70;
-                rightItems.forEach((rightItem) => {
+                rightItems.forEach((rightItem, i) => {
                     if (yOffset > 270) {
                         doc.addPage();
                         yOffset = 20;
                     }
+                    // Quebra de linha caso o texto seja muito longo
                     const lines = doc.splitTextToSize(rightItem.textContent, 90);
                     lines.forEach((line) => {
                         doc.text(line, 110, yOffset);
@@ -588,6 +602,7 @@
                 doc.save("Hannah_Matching_Game.pdf");
             };
 
+            // Se não conseguir carregar a imagem do logo:
             logo.onerror = function() {
                 doc.setFontSize(12);
                 doc.text("Name: ____________________________________________ Date: __________", 50, 20);
@@ -601,6 +616,7 @@
                 const rightItems = Array.from(document.querySelectorAll('#explanations .drop-zone'));
 
                 doc.setFontSize(12);
+                // Coluna da esquerda
                 leftItems.forEach((leftItem, index) => {
                     if (yOffset > 270) {
                         doc.addPage();
@@ -610,8 +626,9 @@
                     yOffset += lineSpacing;
                 });
 
+                // Coluna da direita
                 yOffset = 70;
-                rightItems.forEach((rightItem) => {
+                rightItems.forEach((rightItem, i) => {
                     if (yOffset > 270) {
                         doc.addPage();
                         yOffset = 20;
@@ -627,6 +644,7 @@
             };
         }
 
+        // ---------------------- Verifica se completou todas as combinações ----------------------
         function checkCompletion() {
             const allItems = document.querySelectorAll('.list-item.used');
             const totalItems = document.querySelectorAll('.list-item').length;
@@ -653,6 +671,7 @@
             modal.style.display = 'none';
         }
 
+        // ---------------------- Leitura de parâmetros via URL ----------------------
         function getParamsFromURL() {
             const params = new URLSearchParams(window.location.search);
             return {
@@ -662,8 +681,9 @@
             };
         }
 
+        // ---------------------- Atualiza progresso no Firebase ----------------------
         function updateProgressInDatabase() {
-            const params = getParamsFromURL(); // Extrai parâmetros da URL
+            const params = getParamsFromURL();
             const currentPhase = params.fase;
             const level = params.level;
             const unit = params.unit;
@@ -681,19 +701,21 @@
 
                     if (currentPhase === "last") {
                         // Liberar a próxima unidade
-                        const nextUnit = "Unit" + (parseInt(unit.replace('Unit', '')) + 1);
+                        const nextUnitNumber = parseInt(unit.replace('Unit', ''), 10) + 1;
+                        const nextUnit = `Unit${nextUnitNumber}`;
                         dbRef.parent.child(nextUnit).set({ fase1: true })
                             .then(() => console.log(`Next unit unlocked: ${nextUnit}`))
                             .catch((error) => console.error("Error unlocking next unit:", error));
                     } else if (currentPhase === "end") {
                         // Liberar o próximo nível
-                        const nextLevel = "Level" + (parseInt(level.replace('Level', '')) + 1);
+                        const nextLevelNumber = parseInt(level.replace('Level', ''), 10) + 1;
+                        const nextLevel = `Level${nextLevelNumber}`;
                         firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true })
                             .then(() => console.log(`Next level unlocked: ${nextLevel}`))
                             .catch((error) => console.error("Error unlocking next level:", error));
                     } else {
-                        // Atualizar a fase atual e desbloquear a próxima fase
-                        const phaseNumber = parseInt(currentPhase);
+                        // Atualiza a fase atual e desbloqueia a próxima fase
+                        const phaseNumber = parseInt(currentPhase, 10);
                         if (!isNaN(phaseNumber)) {
                             const nextPhase = `fase${phaseNumber + 1}`;
                             const updates = {
