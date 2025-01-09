@@ -159,9 +159,12 @@
             </div>
         </header>
         
-        <!-- Adicionando a imagem convite agora em formato .gif -->
+        <!-- A imagem começa congelada (imagem estática) -->
         <div class="invitation-container" id="invitationContainer">
-            <img src="imagens/convite.gif" alt="Convite" class="invitation-button" id="invitationButton">
+            <img src="imagens/convite_still.png" 
+                 alt="Convite" 
+                 class="invitation-button" 
+                 id="invitationButton">
         </div>
 
         <main>
@@ -192,20 +195,22 @@
         // Inicializando Firebase
         firebase.initializeApp(firebaseConfig);
 
-        // --- SINTETIZADOR DE VOZ PARA QUANDO NÃO ESTIVER LOGADO ---
-        // Verifica periodicamente se existe uma voz en-US. Se não houver, exibe alerta.
-        // Repete continuamente a fala a cada 30 segundos enquanto não estiver logado.
-        
+        // --------------------------------------------------------
+        // SINTETIZADOR DE VOZ (TTS) para quando NÃO estiver logado
+        // --------------------------------------------------------
         let ttsInterval = null;
-        
+        let warnedNoVoice = false;
+
+        // Função que dispara a fala e alterna a imagem para o GIF quando em fala
         function speakSamuelMessage() {
-            const text = "Hi, I'm Samuel! Click that bouncy button to discover the best way to learn English, or log in to start studying!";
+            const text = "Hi, I'm Samuel. Click that bouncy button and discover the best way to learn English!";
             const utterance = new SpeechSynthesisUtterance(text);
 
-            // Tenta selecionar uma voz en-US
+            const invitationButton = document.getElementById("invitationButton");
             const availableVoices = speechSynthesis.getVoices();
             let foundEnglishVoice = false;
 
+            // Tenta selecionar uma voz en-US
             for (let voice of availableVoices) {
                 if (voice.lang.toLowerCase().includes("en-us")) {
                     utterance.voice = voice;
@@ -214,46 +219,64 @@
                 }
             }
 
+            // Se não encontrou voz en-US, alerta e mantém a imagem congelada
             if (!foundEnglishVoice) {
-                alert("You need to activate an English (US) voice in your device or browser to enjoy this interactive audio. Please check your speech settings or install an English (US) voice.");
-            } else {
-                speechSynthesis.speak(utterance);
+                if (!warnedNoVoice) {
+                    alert("You need to activate an English (US) voice in your device or browser to enjoy this interactive audio. Please check your speech settings or install an English (US) voice.");
+                    warnedNoVoice = true;
+                }
+                // Mantém imagem estática
+                invitationButton.src = "imagens/convite_still.png";
+                return;
             }
+
+            // Ao começar a falar, troca para GIF
+            utterance.onstart = function() {
+                invitationButton.src = "imagens/convite.gif";
+            };
+
+            // Ao terminar de falar, volta pra imagem estática
+            utterance.onend = function() {
+                invitationButton.src = "imagens/convite_still.png";
+            };
+
+            // Dispara a fala
+            speechSynthesis.speak(utterance);
         }
 
-        // Ao carregar as vozes, se não há usuário logado, inicia a repetição
+        // Ao carregar as vozes, verifica se precisa iniciar TTS
         speechSynthesis.onvoiceschanged = function() {
             checkAndStartTTS();
         };
 
-        // Checa se já estamos sem usuário logado e inicia TTS
+        // Checa se NÃO há usuário logado e inicia TTS (repetindo a cada 5s)
         function checkAndStartTTS() {
             const user = firebase.auth().currentUser;
             if (!user) {
                 if (!ttsInterval) {
-                    // Fala a primeira vez imediatamente
                     speakSamuelMessage();
-                    // Depois repete a cada 30s
-                    ttsInterval = setInterval(speakSamuelMessage, 30000);
+                    ttsInterval = setInterval(speakSamuelMessage, 5000); // repete a cada 5s
                 }
             } else {
-                // Se estiver logado, interrompe o intervalo, se existir
+                // Se estiver logado, para o intervalo de TTS
                 if (ttsInterval) {
                     clearInterval(ttsInterval);
                     ttsInterval = null;
                 }
             }
         }
-        // --- FIM DO BLOCO DE SINTETIZADOR ---
+        // --------------------------------------------------------
+        // FIM do bloco TTS
+        // --------------------------------------------------------
 
-        // Função para exibir o usuário logado e ajustar níveis
+        // Observa mudanças de login
         firebase.auth().onAuthStateChanged(function(user) {
             const loginLink = document.getElementById("loginLink");
             const userDropdown = document.getElementById("userDropdown");
             const invitationContainer = document.getElementById("invitationContainer");
 
             if (user) {
-                // Se estiver logado, para o sintetizador
+                // Se houver usuário logado, garante que paramos TTS
                 if (ttsInterval) {
                     clearInterval(ttsInterval);
                     ttsInterval = null;
@@ -268,6 +291,7 @@
                     // Atualiza a interface do usuário
                     loginLink.innerHTML = `<img src="${userAvatar}" alt="User Icon" class="user-icon"><p class="user-name">${userName}</p>`;
                     loginLink.removeAttribute('href'); // Remove o link do login após o login
+                    // Oculta a imagem de convite
                     invitationContainer.style.display = "none";
 
                     // Define o dashboard conforme o tipo de usuário
@@ -336,11 +360,11 @@
                     });
                 });
             } else {
-                // Se NÃO estiver logado:
-                loginLink.setAttribute('href', 'Formulario/login.html'); // Adiciona o link de login
-                bloquearTodosNiveis();
+                // Se NÃO estiver logado, exibe convite e inicia TTS
                 invitationContainer.style.display = "flex";
-                checkAndStartTTS(); // Inicia o TTS se não começou ainda
+                loginLink.setAttribute('href', 'Formulario/login.html');
+                bloquearTodosNiveis();
+                checkAndStartTTS(); 
             }
         });
 
@@ -365,7 +389,7 @@
             });
         }
 
-        // Alternar dropdown ao clicar
+        // Alternar dropdown ao clicar no loginContainer
         document.getElementById("loginContainer").addEventListener("click", function(event) {
             const user = firebase.auth().currentUser;
             if (!user) return; // Evita abrir dropdown se não estiver logado
