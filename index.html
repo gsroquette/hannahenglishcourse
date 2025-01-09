@@ -121,50 +121,23 @@
       background-color: #f2f2f2;
     }
 
-    /* Centraliza o convite (agora GIF direto) */
-    .invitation-container {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      margin: 20px 0; /* Espaçamento entre o título e o texto */
-    }
-
-    .invitation-button {
-      max-width: 80%;
-      height: auto;
-      cursor: pointer;
-      border-radius: 10px;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-      transition: all 0.3s ease;
-    }
-
-    .invitation-button:hover {
-      transform: scale(1.05);
-      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
-    }
-
-    /* --------------------
-       ROBÔ E PLAY BUTTON
-       -------------------- */
+    /* Contêiner para o robô e botão (logo abaixo do título) */
     .robo-container {
-      position: absolute;
-      left: 20px; 
-      top: 150px; 
-      z-index: 100; /* ficar sobre o convite.gif */
-      display: flex;
+      display: none; /* só aparece se não logado */
       flex-direction: column;
       align-items: center;
+      margin: 20px auto;
     }
 
     .robo-img {
-      width: 180px;
-      /* altura auto, ajusta se precisar */
-      cursor: default; 
+      width: 300px; /* maior */
+      height: auto;
+      cursor: default;
     }
 
     /* Botão "PLAY" - estilo branco com canto arredondado */
     .play-button {
-      margin-top: -40px; /* fica sobreposto na base do robô */
+      margin-top: -40px; /* fica sobreposto na base do robô? ajusta conforme sua imagem */
       padding: 8px 16px;
       border: 2px solid #ccc;
       border-radius: 20px;
@@ -182,7 +155,28 @@
       background-color: #eee;
     }
 
-    /* Ícone "play" (►) via pseudo ou caractere? Aqui basta um caractere na string. */
+    /* Centraliza a imagem de convite (agora sempre animada) */
+    .invitation-container {
+      display: none; /* só aparece se não logado */
+      justify-content: center;
+      align-items: center;
+      margin: 20px 0; /* Espaçamento */
+    }
+
+    .invitation-button {
+      max-width: 80%;
+      height: auto;
+      cursor: pointer;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      transition: all 0.3s ease;
+    }
+
+    .invitation-button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+    }
+
   </style>
 </head>
 
@@ -201,20 +195,20 @@
       </div>
     </header>
 
-    <!-- O convite agora é sempre "convite.gif" -->
-    <div class="invitation-container" id="invitationContainer">
-      <img src="imagens/convite.gif" 
-           alt="Convite Animado" 
-           class="invitation-button" 
-           id="invitationButton"/>
-    </div>
-
-    <!-- NOVO: Contêiner do robô estático + Botão PLAY -->
+    <!-- ROBÔ e BOTÃO PLAY (ficam ENTRE o título e o convite.gif) -->
     <div class="robo-container" id="roboContainer">
       <img src="imagens/robo_estatico.png" alt="Robô" class="robo-img" id="roboImage">
       <button class="play-button" id="playTTSBtn">
         <span>▶</span> Play
       </button>
+    </div>
+
+    <!-- O CONVITE.GIF (roda direto) só aparece se não logado -->
+    <div class="invitation-container" id="invitationContainer">
+      <img src="imagens/convite.gif" 
+           alt="Convite Animado" 
+           class="invitation-button" 
+           id="invitationButton"/>
     </div>
 
     <main>
@@ -247,7 +241,7 @@
     firebase.initializeApp(firebaseConfig);
 
     // ------------------------------------------------------
-    // 2) Variáveis globais de TTS (caso queira usar)
+    // 2) Variáveis globais TTS
     // ------------------------------------------------------
     let englishVoice = null;     // Armazena alguma voz "en"
     let hasEnglishVoice = false; // Se existe ao menos 1 voz com "en"
@@ -258,7 +252,7 @@
     function pickAnyEnglishVoice() {
       const voices = speechSynthesis.getVoices() || [];
       for (let v of voices) {
-        // Exemplo: "en-US", "en-GB", "en-AU"
+        // Ex.: "en-US", "en-GB", "en-AU"
         if (v.lang.toLowerCase().includes("en")) {
           hasEnglishVoice = true;
           return v;
@@ -269,46 +263,51 @@
     }
 
     // ------------------------------------------------------
-    // 4) Função principal de fala (acionada ao clicar no botão "PLAY")
+    // 4) Fala do robô ao clicar em "PLAY"
     // ------------------------------------------------------
     function speakRobotMessage() {
-      // Texto a ser falado
-      const text = "Hello there!, I'm Samuel, your friendly English helper! Click that bouncy button to discover the best way to learn English, or log in to start studying. Let's learn together!";
+      // Mensagem
+      const text = "Hello! I'm your friendly English helper. Let's learn together!";
       const utterance = new SpeechSynthesisUtterance(text);
 
-      // Se encontramos voz em inglês, aplica
+      // Se achou voz em inglês, aplica
       if (englishVoice) {
         utterance.voice = englishVoice;
       }
 
-      // Ao iniciar fala -> troca robo_estatico para robo_fala
+      // Ao iniciar fala -> muda para robo_fala.gif
       utterance.onstart = function() {
         const roboImage = document.getElementById("roboImage");
         roboImage.src = "imagens/robo_fala.gif";
       };
 
-      // Ao terminar fala -> volta pra robo_estatico
+      // Ao terminar fala -> volta robo_estatico.png
       utterance.onend = function() {
         const roboImage = document.getElementById("roboImage");
         roboImage.src = "imagens/robo_estatico.png";
       };
 
-      // Se não tem nenhuma voz em inglês, ainda podemos falar com outra voz (nativa do sistema).
-      // Mas, se for zero total de vozes, será silencioso.
+      // Se não tiver nenhuma voz "en", ainda fala com a voz padrão do sistema. 
       // Dispara a fala
       speechSynthesis.speak(utterance);
     }
 
     // ------------------------------------------------------
-    // 5) Observa mudanças de login do Firebase
+    // 5) Observa mudança de login do Firebase
     // ------------------------------------------------------
     firebase.auth().onAuthStateChanged(function(user) {
       const loginLink = document.getElementById("loginLink");
       const userDropdown = document.getElementById("userDropdown");
+
+      const roboContainer      = document.getElementById("roboContainer");
       const invitationContainer = document.getElementById("invitationContainer");
 
       if (user) {
-        // Está logado
+        // Usuário logado => esconde tudo
+        roboContainer.style.display      = "none";
+        invitationContainer.style.display = "none";
+
+        // Carrega dados do user no BD
         const userRef = firebase.database().ref("usuarios/" + user.uid);
         userRef.once("value").then((snapshot) => {
           const userData = snapshot.val() || {};
@@ -318,9 +317,6 @@
           // Atualiza a interface do usuário
           loginLink.innerHTML = `<img src="${userAvatar}" alt="User Icon" class="user-icon"><p class="user-name">${userName}</p>`;
           loginLink.removeAttribute("href");
-
-          // Oculta o convite (se quiser)
-          invitationContainer.style.display = "none";
 
           // Define o dashboard
           let dashboardLink = "";
@@ -332,18 +328,17 @@
             liberarNiveis(["Level0", "Level1", "Level2", "Level3", "Level4"]);
           } else if (userData.role === "aluno") {
             dashboardLink = '<a href="painel_aluno.html" class="dashboard-link">STUDENT DASHBOARD</a>';
-
-            // Verifica se o aluno está atrelado a um professor
+            // Se o aluno está atrelado a professor
             if (userData.atrelado_professor) {
               const professorRef = firebase.database().ref("usuarios/" + userData.atrelado_professor);
-              professorRef.once("value").then(profSnapshot => {
+              professorRef.once("value").then((profSnapshot) => {
                 const professorData = profSnapshot.val();
-                const turmaId = "-O8mdLgStvNqNf6x-O5l"; // Ajuste ao seu BD
+                const turmaId = "-O8mdLgStvNqNf6x-O5l"; // Ajuste conforme seu BD
                 const alunoId = user.uid;
 
                 const profStudent = 
-                  professorData && 
-                  professorData.turmas && 
+                  professorData &&
+                  professorData.turmas &&
                   professorData.turmas[turmaId] &&
                   professorData.turmas[turmaId].students &&
                   professorData.turmas[turmaId].students[alunoId];
@@ -357,7 +352,7 @@
                   console.error("Nenhum nível definido pelo professor.");
                   liberarNiveis(["Level1"]);
                 }
-              }).catch(err => {
+              }).catch((err) => {
                 console.error("Erro ao buscar dados do professor:", err);
                 liberarNiveis(["Level1"]);
               });
@@ -375,7 +370,7 @@
             ${dashboardLink}
             <a href="#" id="logout">LEAVE</a>
           `;
-          document.querySelectorAll(".dashboard-link").forEach(link => {
+          document.querySelectorAll(".dashboard-link").forEach((link) => {
             link.addEventListener("click", function(event) {
               event.preventDefault();
               window.location.href = this.getAttribute("href");
@@ -383,23 +378,26 @@
           });
         });
       } else {
-        // Não está logado
+        // Não está logado => exibe robô + convite
+        roboContainer.style.display      = "flex";
+        invitationContainer.style.display = "flex";
+
         loginLink.setAttribute("href", "Formulario/login.html");
         bloquearTodosNiveis();
       }
     });
 
     // ------------------------------------------------------
-    // 6) Funções de bloqueio/liberação de níveis
+    // 6) Bloquear/liberar níveis
     // ------------------------------------------------------
     function bloquearTodosNiveis() {
-      document.querySelectorAll(".level-button").forEach(button => {
+      document.querySelectorAll(".level-button").forEach((button) => {
         button.style.filter = "grayscale(100%)";
         button.style.pointerEvents = "none";
       });
     }
     function liberarNiveis(niveis) {
-      document.querySelectorAll(".level-button").forEach(button => {
+      document.querySelectorAll(".level-button").forEach((button) => {
         const level = button.id;
         if (niveis.includes(level)) {
           button.style.filter = "none";
@@ -475,7 +473,7 @@
     });
 
     // ------------------------------------------------------
-    // 12) Parar TTS ao sair da página (se quiser)
+    // 12) Parar TTS ao sair da página (opcional)
     // ------------------------------------------------------
     window.addEventListener("beforeunload", function() {
       speechSynthesis.cancel();
