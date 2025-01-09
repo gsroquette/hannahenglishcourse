@@ -159,7 +159,7 @@
             </div>
         </header>
         
-        <!-- A imagem começa congelada (imagem estática) -->
+        <!-- A imagem começa ESTÁTICA -->
         <div class="invitation-container" id="invitationContainer">
             <img src="imagens/convite_still.png" 
                  alt="Convite" 
@@ -181,6 +181,9 @@
 
     <!-- Firebase Auth Script -->
     <script>
+        // ------------------------------------------------------
+        // 1) Configuração do Firebase
+        // ------------------------------------------------------
         var firebaseConfig = {
             apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
             authDomain: "hannahenglishcourse.firebaseapp.com",
@@ -191,96 +194,109 @@
             appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
             measurementId: "G-07VVJG9LRS"
         };
-
-        // Inicializando Firebase
         firebase.initializeApp(firebaseConfig);
 
-        // --------------------------------------------------------
-        // SINTETIZADOR DE VOZ (TTS) para quando NÃO estiver logado
-        // --------------------------------------------------------
-        let ttsInterval = null;
-        let warnedNoVoice = false;
+        // ------------------------------------------------------
+        // 2) Variáveis globais para TTS
+        // ------------------------------------------------------
+        let ttsInterval = null; // Intervalo que repete a fala
+        let englishVoice = null; // Guardará alguma voz em inglês (qualquer sotaque)
+        let isUserLoggedIn = false; // Flag para saber se o usuário está logado
+        let hasAnyEnglishVoice = false; // Se existe ao menos 1 voz em inglês
+        let invitationButton = null;
 
-        // Função que dispara a fala e alterna a imagem para o GIF quando em fala
+        // ------------------------------------------------------
+        // 3) Funções de seleção e fala
+        // ------------------------------------------------------
+        // Pega a primeira voz que tenha "en" em seu lang (por ex. en-US, en-GB, en-AU, etc.)
+        function pickAnyEnglishVoice() {
+            const voices = speechSynthesis.getVoices();
+            for (let v of voices) {
+                if (v.lang.toLowerCase().includes("en")) {
+                    // Achou alguma voz em inglês
+                    hasAnyEnglishVoice = true;
+                    return v;
+                }
+            }
+            // Se não achou nenhuma voz com "en"
+            hasAnyEnglishVoice = false;
+            return null;
+        }
+
+        // Fala a mensagem e faz o controle do GIF
         function speakSamuelMessage() {
             const text = "Hi, I'm Samuel. Click that bouncy button and discover the best way to learn English!";
             const utterance = new SpeechSynthesisUtterance(text);
 
-            const invitationButton = document.getElementById("invitationButton");
-            const availableVoices = speechSynthesis.getVoices();
-            let foundEnglishVoice = false;
-
-            // Tenta selecionar uma voz en-US
-            for (let voice of availableVoices) {
-                if (voice.lang.toLowerCase().includes("en-us")) {
-                    utterance.voice = voice;
-                    foundEnglishVoice = true;
-                    break;
-                }
+            // Se temos alguma voz em inglês, define:
+            if (englishVoice) {
+                utterance.voice = englishVoice;
             }
 
-            // Se não encontrou voz en-US, alerta e mantém a imagem congelada
-            if (!foundEnglishVoice) {
-                if (!warnedNoVoice) {
-                    alert("You need to activate an English (US) voice in your device or browser to enjoy this interactive audio. Please check your speech settings or install an English (US) voice.");
-                    warnedNoVoice = true;
-                }
-                // Mantém imagem estática
-                invitationButton.src = "imagens/convite_still.png";
-                return;
-            }
-
-            // Ao começar a falar, troca para GIF
+            // Ao começar a falar -> mostra o GIF
             utterance.onstart = function() {
-                invitationButton.src = "imagens/convite.gif";
+                // Se tiver voz, mostra o GIF animado
+                if (hasAnyEnglishVoice) {
+                    invitationButton.src = "imagens/convite.gif";
+                }
             };
 
-            // Ao terminar de falar, volta pra imagem estática
+            // Ao finalizar -> volta pra imagem estática
             utterance.onend = function() {
-                invitationButton.src = "imagens/convite_still.png";
+                if (hasAnyEnglishVoice) {
+                    invitationButton.src = "imagens/convite_still.png";
+                }
             };
 
-            // Dispara a fala
+            // Se não tem nenhuma voz em inglês
+            // => Fica sem TTS, mas GIF deve ficar animado direto
+            if (!hasAnyEnglishVoice) {
+                invitationButton.src = "imagens/convite.gif";
+                return; // não faz speechSynthesis.speak
+            }
+
+            // Se tem voz, dispara
             speechSynthesis.speak(utterance);
         }
 
-        // Ao carregar as vozes, verifica se precisa iniciar TTS
-        speechSynthesis.onvoiceschanged = function() {
-            checkAndStartTTS();
-        };
+        // ------------------------------------------------------
+        // 4) Funções para iniciar/parar a repetição
+        // ------------------------------------------------------
+        function startTTSLoop() {
+            // Já para qualquer fala antiga
+            speechSynthesis.cancel();
 
-        // Checa se NÃO há usuário logado e inicia TTS (repetindo a cada 5s)
-        function checkAndStartTTS() {
-            const user = firebase.auth().currentUser;
-            if (!user) {
-                if (!ttsInterval) {
-                    speakSamuelMessage();
-                    ttsInterval = setInterval(speakSamuelMessage, 5000); // repete a cada 5s
-                }
-            } else {
-                // Se estiver logado, para o intervalo de TTS
-                if (ttsInterval) {
-                    clearInterval(ttsInterval);
-                    ttsInterval = null;
-                }
-            }
+            // Se já existe intervalo, não recria
+            if (ttsInterval) return;
+
+            // Primeira fala imediata
+            speakSamuelMessage();
+            // Depois, repete a cada 5 segundos
+            ttsInterval = setInterval(speakSamuelMessage, 5000);
         }
-        // --------------------------------------------------------
-        // FIM do bloco TTS
-        // --------------------------------------------------------
 
-        // Observa mudanças de login
+        function stopTTSLoop() {
+            if (ttsInterval) {
+                clearInterval(ttsInterval);
+                ttsInterval = null;
+            }
+            // Cancela qualquer fala em andamento
+            speechSynthesis.cancel();
+        }
+
+        // ------------------------------------------------------
+        // 5) Lógica de login / logout do Firebase
+        // ------------------------------------------------------
         firebase.auth().onAuthStateChanged(function(user) {
             const loginLink = document.getElementById("loginLink");
             const userDropdown = document.getElementById("userDropdown");
             const invitationContainer = document.getElementById("invitationContainer");
+            invitationButton = document.getElementById("invitationButton");
 
             if (user) {
-                // Se houver usuário logado, garante que paramos TTS
-                if (ttsInterval) {
-                    clearInterval(ttsInterval);
-                    ttsInterval = null;
-                }
+                isUserLoggedIn = true;
+                // Se estava rodando TTS, para
+                stopTTSLoop();
 
                 const userRef = firebase.database().ref('usuarios/' + user.uid);
                 userRef.once('value').then((snapshot) => {
@@ -360,15 +376,20 @@
                     });
                 });
             } else {
-                // Se NÃO estiver logado, exibe convite e inicia TTS
+                // Não está logado
+                isUserLoggedIn = false;
                 invitationContainer.style.display = "flex";
                 loginLink.setAttribute('href', 'Formulario/login.html');
                 bloquearTodosNiveis();
-                checkAndStartTTS(); 
+
+                // Iniciar TTS se a página estiver pronta
+                startTTSLoop();
             }
         });
 
-        // Funções de bloqueio e desbloqueio de níveis
+        // ------------------------------------------------------
+        // 6) Lógica de bloqueio/liberação de níveis
+        // ------------------------------------------------------
         function bloquearTodosNiveis() {
             document.querySelectorAll('.level-button').forEach(button => {
                 button.style.filter = 'grayscale(100%)';
@@ -389,7 +410,9 @@
             });
         }
 
-        // Alternar dropdown ao clicar no loginContainer
+        // ------------------------------------------------------
+        // 7) Dropdown do usuário
+        // ------------------------------------------------------
         document.getElementById("loginContainer").addEventListener("click", function(event) {
             const user = firebase.auth().currentUser;
             if (!user) return; // Evita abrir dropdown se não estiver logado
@@ -399,12 +422,19 @@
             dropdown.style.display = (dropdown.style.display === 'none' || dropdown.style.display === '') ? 'block' : 'none';
         });
 
-        // Clique na imagem de convite redireciona para propaganda.html
-        document.getElementById("invitationButton").addEventListener("click", function() {
-            window.location.href = "Apresentacao/propaganda.html"; 
+        // ------------------------------------------------------
+        // 8) Clique no convite -> vai para propaganda
+        // ------------------------------------------------------
+        document.addEventListener("DOMContentLoaded", function() {
+            invitationButton = document.getElementById("invitationButton");
+            invitationButton.addEventListener("click", function() {
+                window.location.href = "Apresentacao/propaganda.html"; 
+            });
         });
 
-        // Fecha o dropdown ao clicar fora dele
+        // ------------------------------------------------------
+        // 9) Fecha o dropdown ao clicar fora dele
+        // ------------------------------------------------------
         window.addEventListener("click", function(event) {
             const dropdown = document.getElementById("userDropdown");
             const loginContainer = document.getElementById("loginContainer");
@@ -413,7 +443,9 @@
             }
         });
 
-        // Função para deslogar
+        // ------------------------------------------------------
+        // 10) Logout
+        // ------------------------------------------------------
         document.addEventListener("click", function(event) {
             if (event.target.id === "logout") {
                 firebase.auth().signOut().then(() => {
@@ -423,6 +455,32 @@
                     console.error("Erro ao deslogar:", error);
                 });
             }
+        });
+
+        // ------------------------------------------------------
+        // 11) Detecção das vozes e pick da voz em inglês
+        //     Iniciamos assim que a página estiver pronta
+        // ------------------------------------------------------
+        function setupVoices() {
+            // Tenta pegar qualquer voz em inglês
+            englishVoice = pickAnyEnglishVoice();
+        }
+
+        // Assim que as vozes estiverem carregadas ou mudarem, escolhemos a voz
+        speechSynthesis.onvoiceschanged = function() {
+            setupVoices();
+        };
+
+        // Também chamamos ao carregar a página
+        document.addEventListener("DOMContentLoaded", function() {
+            setupVoices();
+        });
+
+        // ------------------------------------------------------
+        // 12) Parar TTS ao sair da página
+        // ------------------------------------------------------
+        window.addEventListener("beforeunload", function() {
+            stopTTSLoop();
         });
     </script>
 </body>
