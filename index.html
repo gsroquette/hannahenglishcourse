@@ -1,26 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Hannah English - Learning English through Bible Stories</title>
   <!-- Favicon padrão -->
-  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="icon" type="image/x-icon" href="favicon.ico"/>
 
   <!-- Favicon para navegadores com tamanhos específicos -->
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png"/>
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png"/>
 
   <!-- Favicon para Android (Web App Manifest) -->
-  <link rel="icon" type="image/png" sizes="192x192" href="android-chrome-192x192.png">
-  <link rel="icon" type="image/png" sizes="512x512" href="android-chrome-512x512.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="android-chrome-192x192.png"/>
+  <link rel="icon" type="image/png" sizes="512x512" href="android-chrome-512x512.png"/>
 
   <!-- Ícone para dispositivos Apple -->
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png"/>
 
-  <link rel="stylesheet" href="CSS/styles.css" />
+  <link rel="stylesheet" href="CSS/styles.css"/>
   <!-- Manifesto para PWA -->
-  <link rel="manifest" href="manifest.json" />
+  <link rel="manifest" href="manifest.json"/>
   <!-- Firebase Libraries -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
@@ -121,7 +121,7 @@
       background-color: #f2f2f2;
     }
 
-    /* Centraliza a imagem de convite e ajusta responsividade */
+    /* Centraliza o convite (agora GIF direto) */
     .invitation-container {
       display: flex;
       justify-content: center;
@@ -142,6 +142,47 @@
       transform: scale(1.05);
       box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
     }
+
+    /* --------------------
+       ROBÔ E PLAY BUTTON
+       -------------------- */
+    .robo-container {
+      position: absolute;
+      left: 20px; 
+      top: 150px; 
+      z-index: 100; /* ficar sobre o convite.gif */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .robo-img {
+      width: 180px;
+      /* altura auto, ajusta se precisar */
+      cursor: default; 
+    }
+
+    /* Botão "PLAY" - estilo branco com canto arredondado */
+    .play-button {
+      margin-top: -40px; /* fica sobreposto na base do robô */
+      padding: 8px 16px;
+      border: 2px solid #ccc;
+      border-radius: 20px;
+      background-color: #fff;
+      color: #000; 
+      font-weight: bold;
+      font-size: 16px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .play-button:hover {
+      background-color: #eee;
+    }
+
+    /* Ícone "play" (►) via pseudo ou caractere? Aqui basta um caractere na string. */
   </style>
 </head>
 
@@ -155,17 +196,25 @@
       </div>
 
       <div class="logo-title">
-        <img src="imagens/hannah_logo.png" alt="Hannah English Logo" class="logo" />
+        <img src="imagens/hannah_logo.png" alt="Hannah English Logo" class="logo"/>
         <h1>Hannah English<br>Learning English through Bible Stories</h1>
       </div>
     </header>
 
-    <!-- Começa com imagem ESTÁTICA -->
+    <!-- O convite agora é sempre "convite.gif" -->
     <div class="invitation-container" id="invitationContainer">
-      <img src="imagens/convite_still.png" 
-           alt="Convite" 
+      <img src="imagens/convite.gif" 
+           alt="Convite Animado" 
            class="invitation-button" 
-           id="invitationButton" />
+           id="invitationButton"/>
+    </div>
+
+    <!-- NOVO: Contêiner do robô estático + Botão PLAY -->
+    <div class="robo-container" id="roboContainer">
+      <img src="imagens/robo_estatico.png" alt="Robô" class="robo-img" id="roboImage">
+      <button class="play-button" id="playTTSBtn">
+        <span>▶</span> Play
+      </button>
     </div>
 
     <main>
@@ -182,9 +231,9 @@
 
   <!-- Firebase Auth Script -->
   <script>
-    // ----------------------------------------------------
+    // ------------------------------------------------------
     // 1) Configuração do Firebase
-    // ----------------------------------------------------
+    // ------------------------------------------------------
     var firebaseConfig = {
       apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
       authDomain: "hannahenglishcourse.firebaseapp.com",
@@ -197,127 +246,81 @@
     };
     firebase.initializeApp(firebaseConfig);
 
-    // ----------------------------------------------------
-    // 2) Variáveis para TTS e controle
-    // ----------------------------------------------------
-    let invitationButton = null;
-    let isUserLoggedIn = false;
-
+    // ------------------------------------------------------
+    // 2) Variáveis globais de TTS (caso queira usar)
+    // ------------------------------------------------------
     let englishVoice = null;     // Armazena alguma voz "en"
     let hasEnglishVoice = false; // Se existe ao menos 1 voz com "en"
-    let mustStopTTS = false;     // Se TTS deve parar
-    let firstSpeechTriggered = false; // Se já falamos a primeira vez
 
-    // ----------------------------------------------------
-    // 3) Busca vozes e escolhe qualquer "en"
-    // ----------------------------------------------------
+    // ------------------------------------------------------
+    // 3) Função para buscar voz em inglês
+    // ------------------------------------------------------
     function pickAnyEnglishVoice() {
-      console.log("[pickAnyEnglishVoice] Checking voices...");
-      const voices = speechSynthesis.getVoices();
-      console.log("[pickAnyEnglishVoice] Available voices:", voices);
-
-      for (let voice of voices) {
-        // Ex: 'en-US', 'en-GB', 'en-AU'
-        if (voice.lang.toLowerCase().includes("en")) {
-          console.log("[pickAnyEnglishVoice] Found an English voice:", voice.name, voice.lang);
+      const voices = speechSynthesis.getVoices() || [];
+      for (let v of voices) {
+        // Exemplo: "en-US", "en-GB", "en-AU"
+        if (v.lang.toLowerCase().includes("en")) {
           hasEnglishVoice = true;
-          return voice;
+          return v;
         }
       }
-      console.warn("[pickAnyEnglishVoice] No English voice found!");
       hasEnglishVoice = false;
       return null;
     }
 
-    // ----------------------------------------------------
-    // 4) Função principal de fala
-    // ----------------------------------------------------
-    function speakSamuelMessage() {
-      // Se já pediram para parar ou se usuário logou, não fala
-      if (mustStopTTS || isUserLoggedIn) {
-        console.log("[speakSamuelMessage] mustStopTTS or isUserLoggedIn => not speaking.");
-        return;
-      }
-
-      console.log("[speakSamuelMessage] Start speaking attempt...");
-      // Mensagem a ser falada
-      const text = "Hi, I'm Samuel. Click that bouncy button to discover the best way to learn English! Or log in to start studying.";
+    // ------------------------------------------------------
+    // 4) Função principal de fala (acionada ao clicar no botão "PLAY")
+    // ------------------------------------------------------
+    function speakRobotMessage() {
+      // Texto a ser falado
+      const text = "Hello there! I'm your friendly English helper. Let's learn together!";
       const utterance = new SpeechSynthesisUtterance(text);
 
-      // Se houver voz em inglês, define
+      // Se encontramos voz em inglês, aplica
       if (englishVoice) {
-        console.log("[speakSamuelMessage] Using English voice:", englishVoice.name);
         utterance.voice = englishVoice;
-      } else {
-        console.warn("[speakSamuelMessage] No English voice -> won't speak. Keep GIF animated?");
       }
 
-      // Ao iniciar a fala -> troca para convite.gif
+      // Ao iniciar fala -> troca robo_estatico para robo_fala
       utterance.onstart = function() {
-        console.log("[TTS onstart] => Switch to GIF");
-        if (hasEnglishVoice) {
-          invitationButton.src = "imagens/convite.gif";
-        } else {
-          // Se não tem voz "en", mantém GIF animado permanentemente
-          invitationButton.src = "imagens/convite.gif";
-        }
+        const roboImage = document.getElementById("roboImage");
+        roboImage.src = "imagens/robo_fala.gif";
       };
 
-      // Ao terminar -> volta para still e agenda nova fala
+      // Ao terminar fala -> volta pra robo_estatico
       utterance.onend = function() {
-        console.log("[TTS onend] => Switch to STILL. Next speech in 5s?");
-        if (hasEnglishVoice) {
-          invitationButton.src = "imagens/convite_still.png";
-        }
-
-        // Espera 5s e repete, se não pararmos e não logarmos
-        setTimeout(() => {
-          if (!isUserLoggedIn && !mustStopTTS) {
-            console.log("[TTS onend -> setTimeout] => Re-speak after 5s...");
-            speakSamuelMessage();
-          }
-        }, 5000);
+        const roboImage = document.getElementById("roboImage");
+        roboImage.src = "imagens/robo_estatico.png";
       };
 
-      // Se não tem nenhuma voz em inglês, não chama speak (sem TTS real)
-      // Mas deixa o GIF animado direto
-      if (!hasEnglishVoice) {
-        console.warn("[speakSamuelMessage] No English voice. Not calling speechSynthesis.speak");
-        invitationButton.src = "imagens/convite.gif";
-        return;
-      }
-
-      console.log("[speakSamuelMessage] *** calling speechSynthesis.speak() ***");
+      // Se não tem nenhuma voz em inglês, ainda podemos falar com outra voz (nativa do sistema).
+      // Mas, se for zero total de vozes, será silencioso.
+      // Dispara a fala
       speechSynthesis.speak(utterance);
     }
 
-    // ----------------------------------------------------
-    // 5) Observa estado de login do Firebase
-    // ----------------------------------------------------
+    // ------------------------------------------------------
+    // 5) Observa mudanças de login do Firebase
+    // ------------------------------------------------------
     firebase.auth().onAuthStateChanged(function(user) {
-      console.log("[onAuthStateChanged] user:", user);
       const loginLink = document.getElementById("loginLink");
       const userDropdown = document.getElementById("userDropdown");
       const invitationContainer = document.getElementById("invitationContainer");
-      invitationButton = document.getElementById("invitationButton");
 
       if (user) {
-        console.log("[onAuthStateChanged] We have a user -> STOP TTS");
-        isUserLoggedIn = true;
-        mustStopTTS = true;
-        speechSynthesis.cancel(); // Cancela qualquer fala pendente
-        invitationContainer.style.display = "none"; // Esconde o convite
-
-        // Carrega dados do user
+        // Está logado
         const userRef = firebase.database().ref("usuarios/" + user.uid);
-        userRef.once("value").then(snapshot => {
+        userRef.once("value").then((snapshot) => {
           const userData = snapshot.val() || {};
           const userName = userData.nome || user.email;
           const userAvatar = userData.avatar ? `imagens/${userData.avatar}` : "imagens/bonecologin1.png";
 
-          // Atualiza interface
+          // Atualiza a interface do usuário
           loginLink.innerHTML = `<img src="${userAvatar}" alt="User Icon" class="user-icon"><p class="user-name">${userName}</p>`;
           loginLink.removeAttribute("href");
+
+          // Oculta o convite (se quiser)
+          invitationContainer.style.display = "none";
 
           // Define o dashboard
           let dashboardLink = "";
@@ -337,17 +340,17 @@
                 const professorData = profSnapshot.val();
                 const turmaId = "-O8mdLgStvNqNf6x-O5l"; // Ajuste ao seu BD
                 const alunoId = user.uid;
+
                 const profStudent = 
-                  professorData &&
-                  professorData.turmas &&
+                  professorData && 
+                  professorData.turmas && 
                   professorData.turmas[turmaId] &&
                   professorData.turmas[turmaId].students &&
                   professorData.turmas[turmaId].students[alunoId];
-                
+
                 const nivelLiberado = profStudent && profStudent.nivel_em_curso
                                       ? profStudent.nivel_em_curso
                                       : null;
-                
                 if (nivelLiberado) {
                   liberarNiveis([nivelLiberado]);
                 } else {
@@ -381,25 +384,14 @@
         });
       } else {
         // Não está logado
-        console.log("[onAuthStateChanged] No user -> TTS can start");
-        isUserLoggedIn = false;
-        mustStopTTS = false;
-        invitationContainer.style.display = "flex";
         loginLink.setAttribute("href", "Formulario/login.html");
         bloquearTodosNiveis();
-
-        // Dispara TTS somente se ainda não falamos
-        if (!firstSpeechTriggered) {
-          firstSpeechTriggered = true;
-          console.log("[onAuthStateChanged] Starting TTS cycle...");
-          speakSamuelMessage();
-        }
       }
     });
 
-    // ----------------------------------------------------
-    // 6) Libera/Bloqueia níveis
-    // ----------------------------------------------------
+    // ------------------------------------------------------
+    // 6) Funções de bloqueio/liberação de níveis
+    // ------------------------------------------------------
     function bloquearTodosNiveis() {
       document.querySelectorAll(".level-button").forEach(button => {
         button.style.filter = "grayscale(100%)";
@@ -419,31 +411,30 @@
       });
     }
 
-    // ----------------------------------------------------
+    // ------------------------------------------------------
     // 7) Dropdown do usuário
-    // ----------------------------------------------------
-    document.getElementById("loginContainer").addEventListener("click", function(e) {
+    // ------------------------------------------------------
+    document.getElementById("loginContainer").addEventListener("click", function(event) {
       const user = firebase.auth().currentUser;
-      if (!user) return;
-      e.preventDefault();
+      if (!user) return; // Evita abrir dropdown se não estiver logado
+      event.preventDefault();
       const dropdown = document.getElementById("userDropdown");
       dropdown.style.display = (dropdown.style.display === "none" || dropdown.style.display === "") ? "block" : "none";
     });
 
-    // ----------------------------------------------------
+    // ------------------------------------------------------
     // 8) Clique no convite -> propaganda
-    // ----------------------------------------------------
+    // ------------------------------------------------------
     document.addEventListener("DOMContentLoaded", function() {
-      invitationButton = document.getElementById("invitationButton");
+      const invitationButton = document.getElementById("invitationButton");
       invitationButton.addEventListener("click", function() {
-        console.log("[invitationButton click] => Go to propaganda.html");
         window.location.href = "Apresentacao/propaganda.html";
       });
     });
 
-    // ----------------------------------------------------
-    // 9) Fecha dropdown ao clicar fora
-    // ----------------------------------------------------
+    // ------------------------------------------------------
+    // 9) Fecha o dropdown ao clicar fora dele
+    // ------------------------------------------------------
     window.addEventListener("click", function(event) {
       const dropdown = document.getElementById("userDropdown");
       const loginContainer = document.getElementById("loginContainer");
@@ -452,45 +443,41 @@
       }
     });
 
-    // ----------------------------------------------------
+    // ------------------------------------------------------
     // 10) Logout
-    // ----------------------------------------------------
-    document.addEventListener("click", function(e) {
-      if (e.target.id === "logout") {
-        console.log("[LOGOUT] => Firebase signOut()");
+    // ------------------------------------------------------
+    document.addEventListener("click", function(event) {
+      if (event.target.id === "logout") {
         firebase.auth().signOut().then(() => {
-          console.log("[LOGOUT] => Done. Reloading page.");
-          location.reload();
+          console.log("Usuário deslogado");
+          location.reload(); // Recarrega a página após deslogar
         }).catch((error) => {
-          console.error("[LOGOUT] => Error:", error);
+          console.error("Erro ao deslogar:", error);
         });
       }
     });
 
-    // ----------------------------------------------------
-    // 11) Carregar vozes
-    // ----------------------------------------------------
+    // ------------------------------------------------------
+    // 11) Set up voices (TTS)
+    // ------------------------------------------------------
     function setupVoices() {
       englishVoice = pickAnyEnglishVoice();
     }
-    // Quando vozes forem carregadas ou mudarem
     speechSynthesis.onvoiceschanged = function() {
-      console.log("[onvoiceschanged] => Setting up voices...");
       setupVoices();
     };
-
-    // Também chamamos quando a página carrega
     document.addEventListener("DOMContentLoaded", function() {
-      console.log("[DOMContentLoaded] => Setting up voices now...");
       setupVoices();
+
+      // Ao clicar no botão PLAY => chama speakRobotMessage()
+      const playBtn = document.getElementById("playTTSBtn");
+      playBtn.addEventListener("click", speakRobotMessage);
     });
 
-    // ----------------------------------------------------
-    // 12) Ao sair da página, parar TTS
-    // ----------------------------------------------------
+    // ------------------------------------------------------
+    // 12) Parar TTS ao sair da página (se quiser)
+    // ------------------------------------------------------
     window.addEventListener("beforeunload", function() {
-      console.log("[beforeunload] => Must stop TTS");
-      mustStopTTS = true;
       speechSynthesis.cancel();
     });
   </script>
