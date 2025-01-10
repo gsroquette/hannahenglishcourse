@@ -100,6 +100,18 @@
       font-weight: bold;
     }
 
+    /* MOSTRADOR DE PONTOS PESSOAIS DO USUÁRIO (SOMENTE PARA USERS LOGADOS) */
+    #personal-score-section {
+      margin-top: 10px;
+      text-align: center;
+      display: none; /* só mostraremos via JS se não for guest */
+    }
+    #owner-game-counter {
+      margin-top: 6px;
+      text-align: center;
+      display: none; /* só mostraremos via JS se for 'proprietario' */
+    }
+
     /* ÁREA PRINCIPAL DO JOGO */
     #main-content {
       margin-left: 260px;
@@ -192,6 +204,16 @@
 <div id="scoreboard-section">
   <h3>Top 20</h3>
   <ol id="score-list"></ol>
+
+  <!-- MOSTRADOR DE PONTOS DO USUÁRIO (APENAS PARA O PRÓPRIO USUÁRIO) -->
+  <div id="personal-score-section">
+    <p>Your Points: <span id="personalScore"></span></p>
+  </div>
+
+  <!-- CONTADOR DE PARTIDAS (APENAS PARA ROLE=PROPRIETARIO) -->
+  <div id="owner-game-counter">
+    <p>Total Games: <span id="ownerGamesCount"></span></p>
+  </div>
 </div>
 
 <!-- ÁREA PRINCIPAL -->
@@ -247,6 +269,7 @@ let currentWord = "";
 let currentStatus = "idle"; 
 let currentDifficulty = "easy";
 let totalPoints = 0;
+let totalGames = 0; // Para proprietario
 
 // Função para carregar o dicionário do servidor
 async function loadDictionary() {
@@ -298,6 +321,15 @@ function speakText(text) {
   synth.speak(utterance);
 }
 
+// Mensagens aleatórias de incentivo para serem ditas após cada tentativa
+const encouragementMessages = [
+  "Nice attempt!",
+  "Keep going!",
+  "You're almost there!",
+  "Don't give up!",
+  "Keep trying!"
+];
+
 /*******************************************************
  * 4) LOGIN
  *******************************************************/
@@ -310,6 +342,7 @@ auth.onAuthStateChanged(async (user) => {
     userName = data.nome || data.email || "User";
     userRole = data.role || "aluno";
     totalPoints = data.points || 0;
+    totalGames = data.gamesPlayed || 0;
   } else {
     userUid = null;
     isGuest = true;
@@ -321,6 +354,7 @@ auth.onAuthStateChanged(async (user) => {
   }
   loadScoreboard();
   listenGameState();
+  showPersonalScore();
 });
 
 /*******************************************************
@@ -363,7 +397,7 @@ function listenGameState() {
       currentLetters = [];
       renderAllAttempts();
       updateUI();
-      disableInput(); // Certifique-se de desabilitar os inputs ao reiniciar
+      disableInput(); 
       return;
     }
 
@@ -383,36 +417,34 @@ function listenGameState() {
     // Exibe a mensagem para usuários não logados apenas uma vez
     if (isGuest && !localStorage.getItem("guestMessageShown")) {
       speakText("You're playing as a guest. Your progress won't be saved.");
-      localStorage.setItem("guestMessageShown", "true"); // Evita repetição da mensagem
+      localStorage.setItem("guestMessageShown", "true"); 
     }
 
     // Permitir input apenas se a partida está ativa
     if (currentStatus === "in_progress" && currentWord) {
-      enableInput(); // Habilita inputs para todos os jogadores
+      enableInput(); 
     } else {
-      disableInput(); // Desabilita inputs caso o jogo tenha terminado ou esteja ocioso
+      disableInput(); 
     }
+  });
 
-    // Atualização adicional para o guest:
-    // Garante que a tentativa do guest seja registrada no Firebase
-    if (isGuest) {
-      db.ref("games/currentGame/attempts").on("child_added", (snapshot) => {
-        const attempt = snapshot.val();
-        if (!attemptsArray.some((a) => a.timestamp === attempt.timestamp)) {
-          attemptsArray.push(attempt);
-          renderAllAttempts();
-        }
-      });
+  // Sempre que qualquer nova tentativa for adicionada, atualizamos localmente e re-renderizamos
+  db.ref("games/currentGame/attempts").on("child_added", (snapshot) => {
+    const attempt = snapshot.val();
+    // Evita duplicar na memória local
+    if (!attemptsArray.some((a) => a.timestamp === attempt.timestamp)) {
+      attemptsArray.push(attempt);
+      renderAllAttempts();
     }
   });
 }
 
 function enableInput() {
-  document.addEventListener("keydown", handleKeyPress); // Habilita eventos de teclado
+  document.addEventListener("keydown", handleKeyPress); 
 }
 
 function disableInput() {
-  document.removeEventListener("keydown", handleKeyPress); // Remove eventos de teclado
+  document.removeEventListener("keydown", handleKeyPress); 
 }
 
 /*******************************************************
@@ -425,6 +457,14 @@ async function startGame() {
   if (currentStatus === "in_progress" && userRole !== "proprietario") {
     speakText("A game is already in progress. Please wait.");
     return;
+  }
+
+  // Se for proprietario, incrementa o contador de jogos
+  if (userRole === "proprietario" && userUid) {
+    totalGames++;
+    await db.ref("usuarios/" + userUid).update({ gamesPlayed: totalGames });
+    // Atualiza exibição
+    showPersonalScore();
   }
 
   // Remove o jogo atual (se houver)
@@ -470,7 +510,6 @@ async function pickWordWithDefinition(diff) {
   if (diff === "medium") { minLen=4; maxLen=5; }
   if (diff === "hard")   { minLen=6; maxLen=7; }
 
-  // Exemplo: filtrar no dictionarySet
   const allWords = [...dictionarySet].filter(w => w.length >= minLen && w.length <= maxLen);
   if (allWords.length < 1) return "cat";
 
@@ -478,6 +517,7 @@ async function pickWordWithDefinition(diff) {
     const cand = allWords[Math.floor(Math.random()*allWords.length)];
     if (await hasDefinition(cand)) return cand;
   }
+  // Se não achou em 30 tentativas, pega qualquer
   return allWords[Math.floor(Math.random()*allWords.length)];
 }
 
@@ -529,11 +569,10 @@ function renderAllAttempts() {
     const newRowDiv = document.createElement("div");
     newRowDiv.classList.add("attempt-row");
 
-    // Gera os blocos vazios para a palavra atual
     for (let i = 0; i < currentWord.length; i++) {
       const block = document.createElement("div");
       block.classList.add("letter-block");
-      block.textContent = currentLetters[i] ? currentLetters[i].toUpperCase() : ""; // Insere apenas letras digitadas
+      block.textContent = currentLetters[i] ? currentLetters[i].toUpperCase() : "";
       newRowDiv.appendChild(block);
     }
     board.appendChild(newRowDiv);
@@ -547,7 +586,7 @@ function updateUI() {
   const startBtn = document.getElementById("start-game");
   const tryBtn = document.getElementById("try-button");
 
-  // Ativa "Start Game" para todos os jogadores
+  // Ativa "Start Game" para quem não é proprietario somente se não houver jogo ativo
   if (currentStatus === "in_progress" && userRole !== "proprietario") {
     startBtn.disabled = true;
   } else {
@@ -566,7 +605,7 @@ function updateUI() {
  * 11) DIGITAR LETRAS => Keydown
  *******************************************************/
 function handleKeyPress(e) {
-  if (currentStatus !== "in_progress" || !currentWord) return; // Apenas se o jogo estiver ativo
+  if (currentStatus !== "in_progress" || !currentWord) return; 
 
   if (e.key === "Backspace" && currentLetters.length > 0) {
     currentLetters.pop();
@@ -614,12 +653,12 @@ async function submitCurrentRow() {
 
   const feedback = getFeedback(guessClean, currentWord);
 
-  // Salva tentativa no Firebase (para todos os jogadores, incluindo convidados)
+  // Salva tentativa no Firebase
   const pushRef = db.ref("games/currentGame/attempts").push();
   await pushRef.set({
     guess: guessClean,
     feedback,
-    playerName: isGuest ? "Guest" : userName, // Nome será "Guest" para jogadores não logados
+    playerName: isGuest ? "Guest" : userName,
     timestamp: Date.now()
   });
 
@@ -633,19 +672,24 @@ async function submitCurrentRow() {
     if (definition) msg += ` Definition: ${definition}`;
     speakText(msg);
 
-    // Adiciona pontos apenas para jogadores logados
+    // Adiciona pontos para quem não é guest
     if (!isGuest && userUid) {
       let pts = currentDifficulty === "medium" ? 20 : currentDifficulty === "hard" ? 35 : 10;
       totalPoints += pts;
       await db.ref("usuarios/" + userUid).update({ points: totalPoints });
+      showPersonalScore(); 
     }
 
     // Finaliza o jogo no Firebase
     db.ref("games/currentGame").update({ status: "ended" });
-    disableInput(); // Desabilita inputs ao terminar o jogo
+    disableInput(); 
+  } else {
+    // Se a palavra não foi encontrada ainda, fala uma mensagem de incentivo
+    const randomMsg = encouragementMessages[Math.floor(Math.random() * encouragementMessages.length)];
+    speakText(randomMsg);
   }
 
-  // Renderiza as tentativas (incluindo a tentativa atual)
+  // Renderiza as tentativas
   renderAllAttempts();
 }
 
@@ -705,6 +749,30 @@ document.getElementById("invite-button").addEventListener("click", () => {
     window.open(wUrl, "_blank");
   }
 });
+
+/*******************************************************
+ * 17) MOSTRAR PONTOS E CONTADOR DE PARTIDAS (CASO PROPRIETÁRIO)
+ *******************************************************/
+function showPersonalScore() {
+  // Mostrar/atualizar pontuação do usuário logado
+  const personalScoreSection = document.getElementById("personal-score-section");
+  const ownerCounterSection = document.getElementById("owner-game-counter");
+
+  if (!isGuest) {
+    personalScoreSection.style.display = "block";
+    document.getElementById("personalScore").textContent = totalPoints;
+  } else {
+    personalScoreSection.style.display = "none";
+  }
+
+  // Se for proprietário, mostramos o contador de partidas
+  if (userRole === "proprietario") {
+    ownerCounterSection.style.display = "block";
+    document.getElementById("ownerGamesCount").textContent = totalGames;
+  } else {
+    ownerCounterSection.style.display = "none";
+  }
+}
 </script>
 </body>
 </html>
