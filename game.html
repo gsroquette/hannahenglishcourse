@@ -18,9 +18,7 @@
       min-height: 100vh;
       font-family: Arial, sans-serif;
       background: linear-gradient(to bottom right, #e3f2fd, #bbdefb);
-      /* padding extra para não ficar coberto pelo robô fixo */
       padding: 20px; 
-      /* dar espaço para rolar caso a torre fique grande */
       overflow-y: auto;
     }
 
@@ -29,18 +27,18 @@
       position: fixed;
       top: 20px; 
       left: 20px;
-      width: 220px; /* Ajustei para ficar maior */
-      z-index: 200; /* acima do layout normal */
+      width: 220px;
+      z-index: 200; 
       display: flex; 
       flex-direction: column;
       align-items: center;
     }
     #robot-image {
-      width: 100%; /* preenche a largura de 220px */
+      width: 100%;
     }
     #robot-balloon {
       position: absolute;
-      top: 220px; /* logo abaixo do robô */
+      top: 220px; 
       left: 0; 
       max-width: 220px;
       background: #fff;
@@ -70,8 +68,8 @@
 
     /* LAYOUT DO JOGO (CENTRO) */
     #main-content {
-      margin-left: 260px; /* espaço para o robô fixo */
-      margin-right: 260px; /* espaço p/ scoreboard (básico) */
+      margin-left: 260px; 
+      margin-right: 260px; 
       padding: 20px;
     }
 
@@ -229,7 +227,7 @@
     <span id="message"></span>
   </div>
 
-  <div id="board"><!-- AQUI IRÃO AS TENTATIVAS --></div>
+  <div id="board"></div>
 </div>
 
 <!-- BOTÃO TRY FIXO -->
@@ -237,19 +235,11 @@
 
 <script>
 /*****************************************************
- * 1) Firebase Config
+ * 1) Evitar múltipla inicialização do Firebase
  *****************************************************/
-var firebaseConfig = {
-  apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
-  authDomain: "hannahenglishcourse.firebaseapp.com",
-  databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "hannahenglishcourse",
-  storageBucket: "hannahenglishcourse.appspot.com",
-  messagingSenderId: "449818788486",
-  appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
-  measurementId: "G-07VVJG9LRS"
-};
-firebase.initializeApp(firebaseConfig);
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
 
 const db = firebase.database();
 const auth = firebase.auth();
@@ -257,17 +247,16 @@ const auth = firebase.auth();
 /*****************************************************
  * 2) Variáveis Globais
  *****************************************************/
-let dictionarySet = new Set(); // Carregado do words_alpha, mas aqui assumimos que já existe
+let dictionarySet = new Set(); // Ex.: Pode ser carregado via fetch no futuro
 let userName  = "Guest";
 let userUid   = null;
 let isGuest   = true;
-let userRole  = "aluno"; // ou "proprietario", etc.
+let userRole  = "aluno"; 
 let currentWord = "";
-let currentStatus = "idle"; // "in_progress" | "ended"
+let currentStatus = "idle"; 
 let currentDifficulty = "easy";
 let totalPoints = 0;
-let currentRow = []; // array de letras digitadas
-let attemptsLocal = []; // array local de tentativas { guess, feedback, playerName }
+let attemptsLocal = []; // array de tentativas { guess, feedback, playerName }
 
 /*****************************************************
  * 3) Robot / TTS
@@ -295,7 +284,7 @@ function speakText(text) {
 }
 
 /*****************************************************
- * 4) Auth - Quem é o usuário, role, etc.
+ * 4) Auth - Quem é o usuário
  *****************************************************/
 auth.onAuthStateChanged(async (user) => {
   if (user) {
@@ -312,14 +301,12 @@ auth.onAuthStateChanged(async (user) => {
     userName = "Guest";
     userRole = "guest";
   }
-  // Carregar scoreboard
   loadScoreboard();
-  // Carregar estado atual do jogo
-  listenGameState();
+  listenGameState(); // Carrega estado do jogo
 });
 
 /*****************************************************
- * 5) Scoreboard
+ * 5) Scoreboard (Top 20)
  *****************************************************/
 function loadScoreboard() {
   const scoreList = document.getElementById("score-list");
@@ -361,10 +348,10 @@ function listenGameState() {
     currentWord   = data.word   || "";
     currentStatus = data.status || "idle";
     currentDifficulty = data.difficulty || "easy";
-    // Pegar tentativas (obj -> array)
+    
     const attemptsObj = data.attempts || {};
     attemptsLocal = Object.keys(attemptsObj).map(key => attemptsObj[key]);
-    // Renderiza novamente a torre
+
     renderAttempts();
     updateUI();
   });
@@ -376,7 +363,6 @@ function listenGameState() {
 document.getElementById("start-game").addEventListener("click", startGame);
 
 async function startGame() {
-  // Só permite se status != in_progress ou se userRole=proprietario
   if (currentStatus === "in_progress" && userRole !== "proprietario") {
     speakText("A game is already in progress. Please wait.");
     return;
@@ -384,14 +370,12 @@ async function startGame() {
   // Limpar no DB
   await db.ref("games/currentGame").remove();
 
-  // Set up nova partida
   currentDifficulty = document.getElementById("difficulty-select").value;
-  const word = await pickWordWithDefinition(currentDifficulty); // assume que existe ou substitua
-  const status = "in_progress";
-  // Salvar no DB
+  const word = await pickWordWithDefinition(currentDifficulty);
+  
   db.ref("games/currentGame").set({
     word,
-    status,
+    status: "in_progress",
     difficulty: currentDifficulty,
     attempts: {}
   });
@@ -399,27 +383,26 @@ async function startGame() {
 }
 
 /*****************************************************
- * 8) Pick Word (Com Definição e Filtro)
+ * 8) Pick Word (Filtro + Definição)
  *****************************************************/
 async function pickWordWithDefinition(diff) {
-  // Filtrar de acordo com as regras:
-  // easy = 3 letras
-  // medium = 4 ou 5
-  // hard = 6 ou 7
-  let minLen = 3, maxLen = 3, points=10;
-  if (diff === "medium") { minLen=4; maxLen=5; points=20; }
-  if (diff === "hard")   { minLen=6; maxLen=7; points=35; }
+  // easy = 3 letras, medium=4..5, hard=6..7
+  let minLen = 3, maxLen = 3;
+  if (diff === "medium") { minLen=4; maxLen=5; }
+  if (diff === "hard")   { minLen=6; maxLen=7; }
 
+  // Exemplo: filtra do dictionarySet
   const allWords = [...dictionarySet].filter(w => w.length >= minLen && w.length <= maxLen);
   if (allWords.length < 1) return "cat"; // fallback
 
+  // Tenta achar uma c/ definição
   for (let i = 0; i < 30; i++) {
     const rand = allWords[Math.floor(Math.random()*allWords.length)];
     if (await hasDefinition(rand)) {
       return rand;
     }
   }
-  // Se não achou com definicao, devolve qualquer
+  // Se não achou, devolve qualquer
   return allWords[Math.floor(Math.random()*allWords.length)];
 }
 
@@ -435,18 +418,16 @@ async function hasDefinition(word) {
 }
 
 /*****************************************************
- * 9) Render Attempts (Torre)
+ * 9) Render Attempts
  *****************************************************/
 function renderAttempts() {
   const board = document.getElementById("board");
   board.innerHTML = "";
 
-  // Para cada attempt, criar "row" visual
   attemptsLocal.forEach((attemptObj) => {
     const rowDiv = document.createElement("div");
     rowDiv.classList.add("attempt-row");
 
-    // Cada letra
     const guessArr = attemptObj.guess.split("");
     guessArr.forEach((letter, i) => {
       const block = document.createElement("div");
@@ -458,7 +439,6 @@ function renderAttempts() {
       rowDiv.appendChild(block);
     });
 
-    // Nome do jogador
     const playerSpan = document.createElement("span");
     playerSpan.classList.add("player-name");
     playerSpan.textContent = `- ${attemptObj.playerName || "Unknown"}`;
@@ -469,7 +449,7 @@ function renderAttempts() {
 }
 
 /*****************************************************
- * 10) Update UI (Enable/Disable Start)
+ * 10) Update UI
  *****************************************************/
 function updateUI() {
   const startBtn = document.getElementById("start-game");
@@ -486,12 +466,11 @@ function updateUI() {
 }
 
 /*****************************************************
- * 11) TRY BUTTON (envia a tentativa)
+ * 11) TRY BUTTON
  *****************************************************/
 document.getElementById("try-button").addEventListener("click", handleTry);
 
 async function handleTry() {
-  // Se não há partida in_progress, nada a fazer
   if (currentStatus !== "in_progress") {
     speakText("No active game right now.");
     return;
@@ -501,28 +480,20 @@ async function handleTry() {
     return;
   }
 
-  // Obter as letras digitadas de "currentRow"
-  // ou do "UI" se vc estiver usando um approach de colunas
-  // AQUI faremos algo simples: prompt (para exemplo).
-  // OU vc usa um array local que é alimentado no keydown, etc.
-  // Exemplo (substitua logicamente com seu array):
+  // Exemplo simples: prompt
   const guess = prompt("Type your guess (all letters filled):") || "";
   const guessClean = guess.trim().toLowerCase();
 
-  // Validar tamanho
   if (guessClean.length !== currentWord.length) {
     speakText(`You must type exactly ${currentWord.length} letters!`);
     return;
   }
-  // Se não existe no dictionary, avisa
   if (!dictionarySet.has(guessClean)) {
     speakText("That word is not in our dictionary!");
     return;
   }
 
-  // Gerar feedback
   const feedback = getFeedback(guessClean, currentWord);
-  // Salvar no DB
   const pushRef = db.ref("games/currentGame/attempts").push();
   await pushRef.set({
     guess: guessClean,
@@ -531,10 +502,8 @@ async function handleTry() {
     timestamp: Date.now()
   });
 
-  // Checar se é allGreen
   const allGreen = feedback.every(c => c === "green");
   if (allGreen) {
-    // Buscar definicao
     const definition = await getDefinition(guessClean);
     let msg = `Congratulations, ${userName}! You found the word "${guessClean}".`;
     if (definition) {
@@ -542,8 +511,7 @@ async function handleTry() {
     }
     speakText(msg);
 
-    // Pontos
-    let pts = 10; // easy
+    let pts = 10; 
     if (currentDifficulty === "medium") pts = 20;
     if (currentDifficulty === "hard")   pts = 35;
 
@@ -552,26 +520,25 @@ async function handleTry() {
       await db.ref("usuarios/"+userUid).update({ points: totalPoints });
     }
 
-    // Fim do jogo
     db.ref("games/currentGame").update({ status: "ended" });
   }
 }
 
 /*****************************************************
- * 12) Função getFeedback
+ * 12) getFeedback
  *****************************************************/
 function getFeedback(guess, realWord) {
   const feedback = Array(guess.length).fill("red");
   const realArr  = realWord.split("");
 
-  // Marcando green
+  // greens
   for (let i = 0; i < guess.length; i++) {
     if (guess[i] === realArr[i]) {
       feedback[i] = "green";
       realArr[i] = "*";
     }
   }
-  // Marcando yellow
+  // yellows
   for (let i = 0; i < guess.length; i++) {
     if (feedback[i] === "green") continue;
     const idx = realArr.indexOf(guess[i]);
@@ -609,7 +576,6 @@ document.getElementById("invite-button").addEventListener("click", () => {
   if (navigator.share) {
     navigator.share(shareData).catch(() => {});
   } else {
-    // fallback: whatsapp
     const wUrl = "https://wa.me/?text=" + encodeURIComponent(shareData.text + " " + shareData.url);
     window.open(wUrl, "_blank");
   }

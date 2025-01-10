@@ -138,7 +138,7 @@
 
     /* Botão "PLAY" - estilo branco com canto arredondado */
     .play-button {
-      margin-top: -40px; /* fica sobreposto na base do robô? ajusta conforme sua imagem */
+      margin-top: -40px; /* fica sobreposto na base do robô? ajusta conforme a imagem */
       padding: 8px 16px;
       border: 2px solid #ccc;
       border-radius: 20px;
@@ -212,9 +212,10 @@
     </div>
 
     <main>
-      <!-- 1) TÍTULO HANNAHGAME E IFRAME ANTES DE "Choose your level" -->
+      <!-- TÍTULO + IFRAME DO JOGO -->
       <h2>HannahGame</h2>
       <iframe 
+        id="gameIframe"
         src="game.html" 
         width="100%" 
         height="800px" 
@@ -236,19 +237,11 @@
   <!-- Firebase Auth Script -->
   <script>
     // ------------------------------------------------------
-    // 1) Configuração do Firebase
+    // 1) Evitar múltipla inicialização do Firebase
     // ------------------------------------------------------
-    var firebaseConfig = {
-      apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
-      authDomain: "hannahenglishcourse.firebaseapp.com",
-      databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "hannahenglishcourse",
-      storageBucket: "hannahenglishcourse.appspot.com",
-      messagingSenderId: "449818788486",
-      appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
-      measurementId: "G-07VVJG9LRS"
-    };
-    firebase.initializeApp(firebaseConfig);
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
 
     // ------------------------------------------------------
     // 2) Variáveis globais TTS
@@ -276,29 +269,23 @@
     // 4) Fala do robô ao clicar em "PLAY"
     // ------------------------------------------------------
     function speakRobotMessage() {
-      // Mensagem
       const text = "Hi, I'm Samuel, your friendly English helper! Click that bouncy button to discover the best way to learn English, or log in to start studying! Let's learn together!";
       const utterance = new SpeechSynthesisUtterance(text);
 
-      // Se achou voz em inglês, aplica
       if (englishVoice) {
         utterance.voice = englishVoice;
       }
 
-      // Ao iniciar fala -> muda para robo_fala.gif
       utterance.onstart = function() {
         const roboImage = document.getElementById("roboImage");
         roboImage.src = "imagens/robo_fala.gif";
       };
 
-      // Ao terminar fala -> volta robo_estatico.png
       utterance.onend = function() {
         const roboImage = document.getElementById("roboImage");
         roboImage.src = "imagens/robo_estatico.png";
       };
 
-      // Se não tiver nenhuma voz "en", ainda fala com a voz padrão do sistema. 
-      // Dispara a fala
       speechSynthesis.speak(utterance);
     }
 
@@ -313,7 +300,7 @@
       const invitationContainer = document.getElementById("invitationContainer");
 
       if (user) {
-        // Usuário logado => esconde tudo
+        // Usuário logado => esconde o robô + convite
         roboContainer.style.display       = "none";
         invitationContainer.style.display = "none";
 
@@ -322,10 +309,15 @@
         userRef.once("value").then((snapshot) => {
           const userData = snapshot.val() || {};
           const userName = userData.nome || user.email;
-          const userAvatar = userData.avatar ? `imagens/${userData.avatar}` : "imagens/bonecologin1.png";
+          const userAvatar = userData.avatar
+            ? `imagens/${userData.avatar}`
+            : "imagens/bonecologin1.png";
 
           // Atualiza a interface do usuário
-          loginLink.innerHTML = `<img src="${userAvatar}" alt="User Icon" class="user-icon"><p class="user-name">${userName}</p>`;
+          loginLink.innerHTML = `
+            <img src="${userAvatar}" alt="User Icon" class="user-icon">
+            <p class="user-name">${userName}</p>
+          `;
           loginLink.removeAttribute("href");
 
           // Define o dashboard
@@ -346,14 +338,14 @@
                 const turmaId = "-O8mdLgStvNqNf6x-O5l"; // Ajuste conforme seu BD
                 const alunoId = user.uid;
 
-                const profStudent = 
+                const profStudent =
                   professorData &&
                   professorData.turmas &&
                   professorData.turmas[turmaId] &&
                   professorData.turmas[turmaId].students &&
                   professorData.turmas[turmaId].students[alunoId];
 
-                const nivelLiberado = profStudent && profStudent.nivel_em_curso
+                const nivelLiberado = (profStudent && profStudent.nivel_em_curso)
                                       ? profStudent.nivel_em_curso
                                       : null;
                 if (nivelLiberado) {
