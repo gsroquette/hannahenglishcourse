@@ -392,6 +392,18 @@ function listenGameState() {
     } else {
       disableInput(); // Desabilita inputs caso o jogo tenha terminado ou esteja ocioso
     }
+
+    // Atualização adicional para o guest:
+    // Garante que a tentativa do guest seja registrada no Firebase
+    if (isGuest) {
+      db.ref("games/currentGame/attempts").on("child_added", (snapshot) => {
+        const attempt = snapshot.val();
+        if (!attemptsArray.some((a) => a.timestamp === attempt.timestamp)) {
+          attemptsArray.push(attempt);
+          renderAllAttempts();
+        }
+      });
+    }
   });
 }
 
@@ -402,6 +414,7 @@ function enableInput() {
 function disableInput() {
   document.removeEventListener("keydown", handleKeyPress); // Remove eventos de teclado
 }
+
 /*******************************************************
  * 7) START GAME
  *******************************************************/
@@ -429,15 +442,23 @@ async function startGame() {
     attempts: {}
   });
 
-  // Mensagem para jogadores convidados
+  // Mensagem inicial para todos os jogadores
+  speakText(`${userName} started a new game! Difficulty: ${currentDifficulty}. Good luck!`);
+
+  // Mensagem adicional para jogadores convidados
   if (isGuest) {
     speakText("You're playing as a guest. Your progress won't be saved.");
   }
 
-  // Mensagem inicial do jogo
-  speakText(`${userName} started a new game! Difficulty: ${currentDifficulty}. Good luck!`);
+  // Atualiza o estado local do jogo
+  currentWord = chosenWord;
+  currentStatus = "in_progress";
+  currentLetters = [];
+  attemptsArray = [];
 
-  // Habilita os inputs para o jogo
+  // Renderiza o jogo e habilita os inputs
+  renderAllAttempts();
+  updateUI();
   enableInput();
 }
 
@@ -593,43 +614,38 @@ async function submitCurrentRow() {
 
   const feedback = getFeedback(guessClean, currentWord);
 
-  if (!isGuest) {
-    // Jogador logado: salva tentativa no Firebase
-    const pushRef = db.ref("games/currentGame/attempts").push();
-    await pushRef.set({
-      guess: guessClean,
-      feedback,
-      playerName: userName,
-      timestamp: Date.now()
-    });
-  } else {
-    // Jogador não logado: salva tentativa localmente
-    attemptsArray.push({
-      guess: guessClean,
-      feedback,
-      playerName: userName,
-      timestamp: Date.now()
-    });
-  }
+  // Salva tentativa no Firebase (para todos os jogadores, incluindo convidados)
+  const pushRef = db.ref("games/currentGame/attempts").push();
+  await pushRef.set({
+    guess: guessClean,
+    feedback,
+    playerName: isGuest ? "Guest" : userName, // Nome será "Guest" para jogadores não logados
+    timestamp: Date.now()
+  });
 
+  // Limpa o array de letras digitadas para a próxima tentativa
   currentLetters = [];
 
+  // Verifica se a palavra foi encontrada
   if (feedback.every(c => c === "green")) {
     const definition = await getDefinition(guessClean);
-    let msg = `Congratulations, ${userName}! You found the word "${guessClean}".`;
+    let msg = `Congratulations, ${isGuest ? "Guest" : userName}! You found the word "${guessClean}".`;
     if (definition) msg += ` Definition: ${definition}`;
     speakText(msg);
 
+    // Adiciona pontos apenas para jogadores logados
     if (!isGuest && userUid) {
       let pts = currentDifficulty === "medium" ? 20 : currentDifficulty === "hard" ? 35 : 10;
       totalPoints += pts;
       await db.ref("usuarios/" + userUid).update({ points: totalPoints });
     }
 
+    // Finaliza o jogo no Firebase
     db.ref("games/currentGame").update({ status: "ended" });
-    disableInput();
+    disableInput(); // Desabilita inputs ao terminar o jogo
   }
 
+  // Renderiza as tentativas (incluindo a tentativa atual)
   renderAllAttempts();
 }
 
