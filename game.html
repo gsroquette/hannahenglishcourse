@@ -350,46 +350,64 @@ function loadScoreboard() {
 function listenGameState() {
   db.ref("games/currentGame").on("value", (snap) => {
     const data = snap.val();
+
     if (!data) {
+      // Se não há partida, reseta tudo para estado inicial
       currentStatus = "idle";
-      currentWord   = "";
+      currentWord = "";
       attemptsArray = [];
       currentRowIndex = 0;
-      currentLetters  = [];
+      currentLetters = [];
       renderAllAttempts();
       updateUI();
       return;
     }
 
-    currentWord      = data.word || "";
-    currentStatus    = data.status || "idle";
-    currentDifficulty= data.difficulty || "easy";
+    // Atualiza o estado da partida
+    currentWord = data.word || "";
+    currentStatus = data.status || "idle";
+    currentDifficulty = data.difficulty || "easy";
 
-    // Monta attemptsArray a partir do DB:
-    let attemptsObj  = data.attempts || {};
-    attemptsArray = Object.keys(attemptsObj).map(key => attemptsObj[key]);
+    // Converte as tentativas do banco em array local
+    const attemptsObj = data.attempts || {};
+    attemptsArray = Object.keys(attemptsObj).map((key) => attemptsObj[key]);
 
+    // Renderiza o estado sincronizado
     renderAllAttempts();
+
+    // Permitir input apenas se a partida está ativa
     updateUI();
+
+    if (currentStatus === "in_progress" && currentWord) {
+      enableInput(); // Habilita inputs para todos os usuários
+    } else {
+      disableInput(); // Desabilita inputs caso o jogo tenha terminado ou esteja ocioso
+    }
   });
 }
 
+function enableInput() {
+  document.addEventListener("keydown", handleKeyPress); // Habilita eventos de teclado
+}
+
+function disableInput() {
+  document.removeEventListener("keydown", handleKeyPress); // Remove eventos de teclado
+}
 /*******************************************************
  * 7) START GAME
  *******************************************************/
 document.getElementById("start-game").addEventListener("click", startGame);
 
 async function startGame() {
-  // Se already in_progress e user não for proprietario => não pode
   if (currentStatus === "in_progress" && userRole !== "proprietario") {
     speakText("A game is already in progress. Please wait.");
     return;
   }
-  // Remove
+
   await db.ref("games/currentGame").remove();
 
   currentDifficulty = document.getElementById("difficulty-select").value;
-  const chosenWord   = await pickWordWithDefinition(currentDifficulty);
+  const chosenWord = await pickWordWithDefinition(currentDifficulty);
 
   db.ref("games/currentGame").set({
     word: chosenWord,
@@ -399,6 +417,8 @@ async function startGame() {
   });
 
   speakText(`${userName} started a new game! Difficulty: ${currentDifficulty}. Good luck!`);
+
+  enableInput(); // Habilita inputs ao iniciar o jogo
 }
 
 /*******************************************************
@@ -498,29 +518,25 @@ function updateUI() {
 /*******************************************************
  * 11) DIGITAR LETRAS => Keydown
  *******************************************************/
-document.addEventListener("keydown", (e) => {
-  // Só se o jogo estiver in_progress e tivermos a currentWord
-  if (currentStatus !== "in_progress" || !currentWord) return;
+function handleKeyPress(e) {
+  if (currentStatus !== "in_progress" || !currentWord) return; // Apenas se o jogo estiver ativo
 
-  // Backspace
   if (e.key === "Backspace" && currentLetters.length > 0) {
     currentLetters.pop();
     renderAllAttempts();
     return;
   }
 
-  // Se a key for A-Z e temos espaço
   if (e.key.match(/^[a-z]$/i) && currentLetters.length < currentWord.length) {
     currentLetters.push(e.key.toLowerCase());
     renderAllAttempts();
     return;
   }
 
-  // Enter => submete a linha
   if (e.key === "Enter") {
     submitCurrentRow();
   }
-});
+}
 
 /*******************************************************
  * 12) BOTÃO "TRY" => submete a linha
@@ -567,27 +583,26 @@ async function submitCurrentRow() {
 
   // Verifica se o palpite está correto (todos "green")
   const allGreen = feedback.every(c => c === "green");
-  if (allGreen) {
-    const definition = await getDefinition(guessClean);
-    let msg = `Congratulations, ${userName}! You found the word "${guessClean}".`;
-    if (definition) {
-      msg += ` Definition: ${definition}`;
-    }
-    speakText(msg);
-
-    // Atualiza os pontos
-    let pts = 10;
-    if (currentDifficulty === "medium") pts = 20;
-    if (currentDifficulty === "hard") pts = 35;
-
-    if (!isGuest && userUid) {
-      totalPoints += pts;
-      await db.ref("usuarios/" + userUid).update({ points: totalPoints });
-    }
-
-    // Finaliza o jogo
-    db.ref("games/currentGame").update({ status: "ended" });
+ if (allGreen) {
+  const definition = await getDefinition(guessClean);
+  let msg = `Congratulations, ${userName}! You found the word "${guessClean}".`;
+  if (definition) {
+    msg += ` Definition: ${definition}`;
   }
+  speakText(msg);
+
+  let pts = 10;
+  if (currentDifficulty === "medium") pts = 20;
+  if (currentDifficulty === "hard") pts = 35;
+
+  if (!isGuest && userUid) {
+    totalPoints += pts;
+    await db.ref("usuarios/" + userUid).update({ points: totalPoints });
+  }
+
+  db.ref("games/currentGame").update({ status: "ended" });
+  disableInput(); // Desabilita inputs ao terminar o jogo
+}
 
   // Renderiza novamente as tentativas
   renderAllAttempts();
