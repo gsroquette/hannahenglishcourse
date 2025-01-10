@@ -319,9 +319,41 @@ let currentLetters   = [];
 let activeIndex      = 0; // posição atual para digitação
 
 const hiddenInput    = document.getElementById("hidden-input");
+const board          = document.getElementById("board");
+const robotSection   = document.getElementById("robot-section");
 
 /*******************************************************
- * 3) CARREGAR O DICIONÁRIO
+ * 3) FUNÇÕES DE SCROLL
+ *******************************************************/
+/**
+ * scrollToElement: Rola suavemente para um elemento no viewport
+ * @param {HTMLElement} el - elemento alvo
+ * @param {string} block - start, center, end, etc.
+ */
+function scrollToElement(el, block="center") {
+  if (!el) return;
+  el.scrollIntoView({
+    behavior: "smooth",
+    block: block
+  });
+}
+
+/** 
+ * scrollToRobot: rola a tela até o robô
+ */
+function scrollToRobot() {
+  scrollToElement(robotSection, "start");
+}
+
+/** 
+ * scrollToBoard: rola a tela até o tabuleiro
+ */
+function scrollToBoard() {
+  scrollToElement(board, "start");
+}
+
+/*******************************************************
+ * 4) CARREGAR O DICIONÁRIO
  *******************************************************/
 async function loadDictionary() {
   try {
@@ -338,16 +370,22 @@ async function loadDictionary() {
 loadDictionary();
 
 /*******************************************************
- * 4) ROBÔ E TTS
+ * 5) ROBÔ E TTS
  *******************************************************/
 const robotImage   = document.getElementById("robot-image");
 const robotBalloon = document.getElementById("robot-balloon");
 const synth        = window.speechSynthesis;
 
+/**
+ * speakText: faz o robô falar, rola até o robô antes
+ * e ao finalizar, rola de volta ao tabuleiro.
+ */
 function speakText(text) {
   if (!text) return;
+  scrollToRobot(); // rola até o robô para visualização
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang  = "en-US";
+
   utterance.onstart = () => {
     robotImage.src = "imagens/robo_fala.gif";
     robotBalloon.textContent = text;
@@ -358,6 +396,9 @@ function speakText(text) {
     setTimeout(() => {
       robotBalloon.style.display = "none";
     }, 800);
+
+    // Depois de falar, rola de volta para o tabuleiro (para continuar jogando)
+    scrollToBoard();
   };
   synth.speak(utterance);
 }
@@ -371,7 +412,7 @@ const encouragementMessages = [
 ];
 
 /*******************************************************
- * 5) BOTÃO RULES
+ * 6) BOTÃO RULES
  *******************************************************/
 document.getElementById("rules-button").addEventListener("click", () => {
   alert(
@@ -387,7 +428,7 @@ document.getElementById("rules-button").addEventListener("click", () => {
 });
 
 /*******************************************************
- * 6) LOGIN
+ * 7) LOGIN
  *******************************************************/
 auth.onAuthStateChanged(async (user) => {
   if (user) {
@@ -413,7 +454,7 @@ auth.onAuthStateChanged(async (user) => {
 });
 
 /*******************************************************
- * 7) ATUALIZAR EXIBIÇÃO DO SCORE (TOPO)
+ * 8) ATUALIZAR EXIBIÇÃO DO SCORE (TOPO)
  *******************************************************/
 function updatePlayerScoreDisplay() {
   const scoreDisplay = document.getElementById("player-score-display");
@@ -426,7 +467,7 @@ function updatePlayerScoreDisplay() {
 }
 
 /*******************************************************
- * 8) SCOREBOARD
+ * 9) SCOREBOARD
  *******************************************************/
 function loadScoreboard() {
   const scoreList = document.getElementById("score-list");
@@ -450,7 +491,7 @@ function loadScoreboard() {
 }
 
 /*******************************************************
- * 9) OUVIR ESTADO DO JOGO
+ * 10) OUVIR ESTADO DO JOGO
  *******************************************************/
 function listenGameState() {
   db.ref("games/currentGame").on("value", (snap) => {
@@ -491,7 +532,7 @@ function listenGameState() {
 }
 
 /*******************************************************
- * 10) START GAME
+ * 11) START GAME
  *******************************************************/
 document.getElementById("start-game").addEventListener("click", startGame);
 
@@ -537,7 +578,7 @@ async function startGame() {
 }
 
 /*******************************************************
- * 11) ESCOLHER PALAVRA
+ * 12) ESCOLHER PALAVRA
  *******************************************************/
 async function pickWordWithDefinition(diff) {
   let minLen=3, maxLen=3;
@@ -566,10 +607,9 @@ async function hasDefinition(word) {
 }
 
 /*******************************************************
- * 12) RENDERIZAR
+ * 13) RENDERIZAR
  *******************************************************/
 function renderAllAttempts() {
-  const board = document.getElementById("board");
   board.innerHTML = "";
 
   // Render tentativas passadas
@@ -609,16 +649,21 @@ function renderAllAttempts() {
       block.addEventListener("click", () => {
         activeIndex = i;
         hiddenInput.focus();
+        // Ao focar, rola a tela para esse bloco
+        scrollToElement(block, "center");
       });
 
       newRowDiv.appendChild(block);
     }
     board.appendChild(newRowDiv);
+
+    // Sempre que a torre se atualiza, garantimos que a linha atual fique visível
+    scrollToElement(newRowDiv, "center");
   }
 }
 
 /*******************************************************
- * 13) UPDATE UI
+ * 14) UPDATE UI
  *******************************************************/
 function updateUI() {
   const startBtn = document.getElementById("start-game");
@@ -639,7 +684,7 @@ function updateUI() {
 }
 
 /*******************************************************
- * 14) INPUT EVENT (PARA MOBILE E DESKTOP)
+ * 15) INPUT EVENT (PARA MOBILE E DESKTOP)
  *******************************************************/
 // Quando digitamos algo no hiddenInput
 hiddenInput.addEventListener("input", (e) => {
@@ -684,7 +729,7 @@ hiddenInput.addEventListener("keydown", (e) => {
 });
 
 /*******************************************************
- * 15) BOTÃO TRY
+ * 16) BOTÃO TRY
  *******************************************************/
 document.getElementById("try-button").addEventListener("click", () => {
   if (currentStatus !== "in_progress") {
@@ -695,7 +740,7 @@ document.getElementById("try-button").addEventListener("click", () => {
 });
 
 /*******************************************************
- * 16) SUBMETER TENTATIVA
+ * 17) SUBMETER TENTATIVA
  *******************************************************/
 async function submitCurrentRow() {
   if (!currentWord || currentLetters.length !== currentWord.length) {
@@ -747,7 +792,7 @@ async function submitCurrentRow() {
 }
 
 /*******************************************************
- * 17) FEEDBACK (green, yellow, red)
+ * 18) FEEDBACK (green, yellow, red)
  *******************************************************/
 function getFeedback(guess, realWord) {
   const feedback = Array(guess.length).fill("red");
@@ -773,7 +818,7 @@ function getFeedback(guess, realWord) {
 }
 
 /*******************************************************
- * 18) DEFINIÇÃO
+ * 19) DEFINIÇÃO
  *******************************************************/
 async function getDefinition(word) {
   try {
@@ -787,7 +832,7 @@ async function getDefinition(word) {
 }
 
 /*******************************************************
- * 19) CONVITE
+ * 20) CONVITE
  *******************************************************/
 document.getElementById("invite-button").addEventListener("click", () => {
   const shareData = {
@@ -804,7 +849,7 @@ document.getElementById("invite-button").addEventListener("click", () => {
 });
 
 /*******************************************************
- * 20) MOSTRAR PONTOS & CONTADOR PARTIDAS
+ * 21) MOSTRAR PONTOS & CONTADOR PARTIDAS
  *******************************************************/
 function showPersonalScore() {
   const personalScoreSection = document.getElementById("personal-score-section");
