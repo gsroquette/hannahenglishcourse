@@ -307,14 +307,17 @@ auth.onAuthStateChanged(async (user) => {
     isGuest = false;
     const snap = await db.ref("usuarios/" + userUid).once("value");
     const data = snap.val() || {};
-    userName  = data.nome  || data.email || "User";
-    userRole  = data.role  || "aluno";
+    userName = data.nome || data.email || "User";
+    userRole = data.role || "aluno";
     totalPoints = data.points || 0;
   } else {
     userUid = null;
     isGuest = true;
     userName = "Guest";
     userRole = "guest";
+
+    // Informa ao jogador não logado que ele é um "Guest"
+    speakText("You're playing as a guest. Your progress won't be saved.");
   }
   loadScoreboard();
   listenGameState();
@@ -378,6 +381,10 @@ function listenGameState() {
     // Permitir input apenas se a partida está ativa
     updateUI();
 
+   if (isGuest) {
+      speakText("You're playing as a guest. Your progress won't be saved.");
+    }
+
     if (currentStatus === "in_progress" && currentWord) {
       enableInput(); // Habilita inputs para todos os usuários
     } else {
@@ -415,6 +422,10 @@ async function startGame() {
     difficulty: currentDifficulty,
     attempts: {}
   });
+
+if (isGuest) {
+    speakText("You're playing as a guest. Your progress won't be saved.");
+  }
 
   speakText(`${userName} started a new game! Difficulty: ${currentDifficulty}. Good luck!`);
 
@@ -558,7 +569,6 @@ async function submitCurrentRow() {
     return;
   }
 
-  // Monta o palpite
   const guessClean = currentLetters.join("").toLowerCase();
 
   if (!dictionarySet.has(guessClean)) {
@@ -566,45 +576,45 @@ async function submitCurrentRow() {
     return;
   }
 
-  // Gera o feedback
   const feedback = getFeedback(guessClean, currentWord);
 
-  // Salva no DB
-  let pushRef = db.ref("games/currentGame/attempts").push();
-  await pushRef.set({
-    guess: guessClean,
-    feedback,
-    playerName: userName,
-    timestamp: Date.now()
-  });
+  if (!isGuest) {
+    // Jogador logado: salva tentativa no Firebase
+    const pushRef = db.ref("games/currentGame/attempts").push();
+    await pushRef.set({
+      guess: guessClean,
+      feedback,
+      playerName: userName,
+      timestamp: Date.now()
+    });
+  } else {
+    // Jogador não logado: salva tentativa localmente
+    attemptsArray.push({
+      guess: guessClean,
+      feedback,
+      playerName: userName,
+      timestamp: Date.now()
+    });
+  }
 
-  // Limpa o array currentLetters para preparar a nova linha
   currentLetters = [];
 
-  // Verifica se o palpite está correto (todos "green")
-  const allGreen = feedback.every(c => c === "green");
- if (allGreen) {
-  const definition = await getDefinition(guessClean);
-  let msg = `Congratulations, ${userName}! You found the word "${guessClean}".`;
-  if (definition) {
-    msg += ` Definition: ${definition}`;
-  }
-  speakText(msg);
+  if (feedback.every(c => c === "green")) {
+    const definition = await getDefinition(guessClean);
+    let msg = `Congratulations, ${userName}! You found the word "${guessClean}".`;
+    if (definition) msg += ` Definition: ${definition}`;
+    speakText(msg);
 
-  let pts = 10;
-  if (currentDifficulty === "medium") pts = 20;
-  if (currentDifficulty === "hard") pts = 35;
+    if (!isGuest && userUid) {
+      let pts = currentDifficulty === "medium" ? 20 : currentDifficulty === "hard" ? 35 : 10;
+      totalPoints += pts;
+      await db.ref("usuarios/" + userUid).update({ points: totalPoints });
+    }
 
-  if (!isGuest && userUid) {
-    totalPoints += pts;
-    await db.ref("usuarios/" + userUid).update({ points: totalPoints });
+    db.ref("games/currentGame").update({ status: "ended" });
+    disableInput();
   }
 
-  db.ref("games/currentGame").update({ status: "ended" });
-  disableInput(); // Desabilita inputs ao terminar o jogo
-}
-
-  // Renderiza novamente as tentativas
   renderAllAttempts();
 }
 
