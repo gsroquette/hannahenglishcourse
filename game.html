@@ -12,7 +12,9 @@
   <style>
     /* RESET BÁSICO */
     * {
-      margin: 0; padding: 0; box-sizing: border-box;
+      margin: 0; 
+      padding: 0; 
+      box-sizing: border-box;
     }
     body {
       min-height: 100vh;
@@ -22,7 +24,7 @@
       overflow-y: auto;
     }
 
-    /* ROBOT FIXO NO CANTO SUPERIOR ESQUERDO */
+    /* ROBÔ NO CANTO SUPERIOR ESQUERDO */
     #robot-section {
       position: fixed;
       top: 20px; 
@@ -227,7 +229,7 @@
     <span id="message"></span>
   </div>
 
-  <div id="board"></div>
+  <div id="board"><!-- TENTATIVAS --></div>
 </div>
 
 <!-- BOTÃO TRY FIXO -->
@@ -235,8 +237,18 @@
 
 <script>
 /*****************************************************
- * 1) Evitar múltipla inicialização do Firebase
+ * 1) Config Firebase (API Key completa)
  *****************************************************/
+var firebaseConfig = {
+  apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+  authDomain: "hannahenglishcourse.firebaseapp.com",
+  databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "hannahenglishcourse",
+  storageBucket: "hannahenglishcourse.appspot.com",
+  messagingSenderId: "449818788486",
+  appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+  measurementId: "G-07VVJG9LRS"
+};
 if (!firebase.apps.length) {
   firebase.initializeApp(firebaseConfig);
 }
@@ -247,7 +259,8 @@ const auth = firebase.auth();
 /*****************************************************
  * 2) Variáveis Globais
  *****************************************************/
-let dictionarySet = new Set(); // Ex.: Pode ser carregado via fetch no futuro
+// Filtraremos as palavras do dicionário (easy=3, medium=4..5, hard=6..7)
+let dictionarySet = new Set(); 
 let userName  = "Guest";
 let userUid   = null;
 let isGuest   = true;
@@ -284,7 +297,7 @@ function speakText(text) {
 }
 
 /*****************************************************
- * 4) Auth - Quem é o usuário
+ * 4) Autenticação - Identificar usuário
  *****************************************************/
 auth.onAuthStateChanged(async (user) => {
   if (user) {
@@ -302,11 +315,11 @@ auth.onAuthStateChanged(async (user) => {
     userRole = "guest";
   }
   loadScoreboard();
-  listenGameState(); // Carrega estado do jogo
+  listenGameState();
 });
 
 /*****************************************************
- * 5) Scoreboard (Top 20)
+ * 5) Scoreboard Top 20
  *****************************************************/
 function loadScoreboard() {
   const scoreList = document.getElementById("score-list");
@@ -332,12 +345,14 @@ function loadScoreboard() {
 
 /*****************************************************
  * 6) Sincronizar Partida (games/currentGame)
+ *    1) status (in_progress, ended, idle)
+ *    2) word, difficulty
+ *    3) attempts: { pushId: { guess, feedback, playerName } }
  *****************************************************/
 function listenGameState() {
   db.ref("games/currentGame").on("value", (snap) => {
     const data = snap.val();
     if (!data) {
-      // Não existe partida -> estado idle
       currentStatus = "idle";
       currentWord   = "";
       attemptsLocal = [];
@@ -358,23 +373,24 @@ function listenGameState() {
 }
 
 /*****************************************************
- * 7) Start Game
+ * 7) Start Game => Limpa "games/currentGame" e cria nova
  *****************************************************/
 document.getElementById("start-game").addEventListener("click", startGame);
 
 async function startGame() {
+  // Se status=in_progress e user não for proprietário, proíbe
   if (currentStatus === "in_progress" && userRole !== "proprietario") {
     speakText("A game is already in progress. Please wait.");
     return;
   }
-  // Limpar no DB
+  // Apaga dados anteriores
   await db.ref("games/currentGame").remove();
 
   currentDifficulty = document.getElementById("difficulty-select").value;
-  const word = await pickWordWithDefinition(currentDifficulty);
-  
+  const chosenWord = await pickWordWithDefinition(currentDifficulty);
+
   db.ref("games/currentGame").set({
-    word,
+    word: chosenWord,
     status: "in_progress",
     difficulty: currentDifficulty,
     attempts: {}
@@ -383,26 +399,25 @@ async function startGame() {
 }
 
 /*****************************************************
- * 8) Pick Word (Filtro + Definição)
+ * 8) Pick Word => easy=3, medium=4..5, hard=6..7
+ *    Verifica definição na Free Dictionary
  *****************************************************/
 async function pickWordWithDefinition(diff) {
-  // easy = 3 letras, medium=4..5, hard=6..7
-  let minLen = 3, maxLen = 3;
+  let minLen=3, maxLen=3;
   if (diff === "medium") { minLen=4; maxLen=5; }
   if (diff === "hard")   { minLen=6; maxLen=7; }
 
-  // Exemplo: filtra do dictionarySet
+  // Se dictionarySet estiver vazio, crie seu loadDictionary() ou algo similar
   const allWords = [...dictionarySet].filter(w => w.length >= minLen && w.length <= maxLen);
-  if (allWords.length < 1) return "cat"; // fallback
+  if (allWords.length < 1) return "cat"; 
 
-  // Tenta achar uma c/ definição
-  for (let i = 0; i < 30; i++) {
-    const rand = allWords[Math.floor(Math.random()*allWords.length)];
-    if (await hasDefinition(rand)) {
-      return rand;
+  for (let i=0; i<30; i++) {
+    const candidate = allWords[Math.floor(Math.random()*allWords.length)];
+    if (await hasDefinition(candidate)) {
+      return candidate;
     }
   }
-  // Se não achou, devolve qualquer
+  // Se não achou nenhuma com definição, pega qualquer
   return allWords[Math.floor(Math.random()*allWords.length)];
 }
 
@@ -418,7 +433,7 @@ async function hasDefinition(word) {
 }
 
 /*****************************************************
- * 9) Render Attempts
+ * 9) Render Attempts => desenha a torre
  *****************************************************/
 function renderAttempts() {
   const board = document.getElementById("board");
@@ -449,7 +464,7 @@ function renderAttempts() {
 }
 
 /*****************************************************
- * 10) Update UI
+ * 10) Update UI => habilitar/desabilitar "StartGame"
  *****************************************************/
 function updateUI() {
   const startBtn = document.getElementById("start-game");
@@ -466,7 +481,7 @@ function updateUI() {
 }
 
 /*****************************************************
- * 11) TRY BUTTON
+ * 11) Botão "Try" => envia tentativa
  *****************************************************/
 document.getElementById("try-button").addEventListener("click", handleTry);
 
@@ -480,8 +495,8 @@ async function handleTry() {
     return;
   }
 
-  // Exemplo simples: prompt
-  const guess = prompt("Type your guess (all letters filled):") || "";
+  // Exemplo: prompt() => substitua por blocos se quiser
+  const guess = prompt("Type your guess (all letters):") || "";
   const guessClean = guess.trim().toLowerCase();
 
   if (guessClean.length !== currentWord.length) {
@@ -506,12 +521,11 @@ async function handleTry() {
   if (allGreen) {
     const definition = await getDefinition(guessClean);
     let msg = `Congratulations, ${userName}! You found the word "${guessClean}".`;
-    if (definition) {
-      msg += ` Definition: ${definition}`;
-    }
+    if (definition) msg += ` Definition: ${definition}`;
     speakText(msg);
 
-    let pts = 10; 
+    // Pontos => easy=10, medium=20, hard=35
+    let pts = 10;
     if (currentDifficulty === "medium") pts = 20;
     if (currentDifficulty === "hard")   pts = 35;
 
@@ -525,20 +539,20 @@ async function handleTry() {
 }
 
 /*****************************************************
- * 12) getFeedback
+ * 12) getFeedback => "green"/"yellow"/"red"
  *****************************************************/
 function getFeedback(guess, realWord) {
   const feedback = Array(guess.length).fill("red");
   const realArr  = realWord.split("");
 
-  // greens
+  // green
   for (let i = 0; i < guess.length; i++) {
     if (guess[i] === realArr[i]) {
       feedback[i] = "green";
       realArr[i] = "*";
     }
   }
-  // yellows
+  // yellow
   for (let i = 0; i < guess.length; i++) {
     if (feedback[i] === "green") continue;
     const idx = realArr.indexOf(guess[i]);
@@ -551,7 +565,7 @@ function getFeedback(guess, realWord) {
 }
 
 /*****************************************************
- * 13) getDefinition
+ * 13) getDefinition => Free Dictionary
  *****************************************************/
 async function getDefinition(word) {
   try {
