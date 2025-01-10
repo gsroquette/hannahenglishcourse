@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <title>English Word Guess Game</title>
-
-  <!-- Firebase -->
+  
+  <!-- Firebase v8.x -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
   <style>
-    /* Reset */
+    /* ===== Reset básico ===== */
     * {
-      margin: 0;
+      margin: 0; 
       padding: 0;
       box-sizing: border-box;
     }
@@ -27,7 +27,7 @@
       padding: 20px;
     }
 
-    /* Main container */
+    /* ===== Container principal ===== */
     #game-container {
       width: 100%;
       max-width: 1200px;
@@ -38,7 +38,7 @@
       overflow: hidden;
     }
 
-    /* Robot section (left) */
+    /* ===== Seção do robô (esquerda) ===== */
     #robot-section {
       width: 200px;
       background: #fff;
@@ -80,16 +80,16 @@
       background-color: #fb8c00;
     }
 
-    /* Board section (center) */
+    /* ===== Seção do jogo (centro) ===== */
     #board-section {
       flex: 1;
       padding: 20px;
     }
-    #difficulty-container {
+    #top-controls {
       display: flex;
       align-items: center;
-      margin-bottom: 16px;
       gap: 10px;
+      margin-bottom: 16px;
     }
     #difficulty-select {
       padding: 6px;
@@ -136,34 +136,37 @@
       font-size: 18px;
       color: #000;
       box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
-      transition: transform 0.1s;
-    }
-    .letter-block:hover {
-      transform: translate(-2px, -2px);
     }
 
-    /* Colors feedback */
-    .correct {
+    /* Cores de feedback */
+    .green {
       background-color: #66bb6a; 
-      color: #fff; 
+      color: #fff;
     }
-    .exists {
+    .yellow {
       background-color: #ffeb3b;
       color: #000;
     }
-    .wrong {
+    .red {
       background-color: #f44336;
       color: #fff;
     }
 
-    .player-label {
-      margin-top: 5px;
-      font-size: 14px;
-      font-style: italic;
-      color: #666;
+    /* Botão TRY */
+    #try-button {
+      background-color: #4caf50;
+      color: #fff;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    #try-button:hover {
+      background-color: #388e3c;
     }
 
-    /* Scoreboard (right) */
+    /* ===== Seção do placar (direita) ===== */
     #scoreboard-section {
       width: 250px;
       background: #fff;
@@ -194,87 +197,366 @@
 <body>
 
 <div id="game-container">
-  <!-- LEFT: Robot -->
+
+  <!-- ESQUERDA: ROBÔ -->
   <div id="robot-section">
     <img id="robot-image" src="imagens/robo_estatico.png" alt="Robot Samuel">
     <div id="robot-balloon"></div>
     <button class="btn-invite" id="invite-button">Invite Friends</button>
   </div>
 
-  <!-- CENTER: Board -->
+  <!-- CENTRO: BOARD -->
   <div id="board-section">
-    
-    <!-- Difficulty + Start -->
-    <div id="difficulty-container">
-      <label for="difficulty-select">Choose difficulty:</label>
+    <div id="top-controls">
+      <label for="difficulty-select">Difficulty:</label>
       <select id="difficulty-select">
         <option value="easy">Easy</option>
         <option value="medium">Medium</option>
         <option value="hard">Hard</option>
       </select>
       <button id="start-game">Start Game</button>
+      <!-- Botão TRY -->
+      <button id="try-button">Try</button>
     </div>
-
-    <!-- Where attempts (rows) appear -->
     <div id="board"></div>
   </div>
 
-  <!-- RIGHT: Scoreboard -->
+  <!-- DIREITA: PLACAR -->
   <div id="scoreboard-section">
     <h3>Top 20</h3>
     <ol id="score-list"></ol>
   </div>
+
 </div>
 
 <script>
-/******************************************************
- * 1) FIREBASE CONFIG (Your exact keys)
- ******************************************************/
+/*****************************************************
+ * 1) FIREBASE CONFIG (SUAS CHAVES)
+ *****************************************************/
 const firebaseConfig = {
   apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
   authDomain: "hannahenglishcourse.firebaseapp.com",
+  databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "hannahenglishcourse",
   storageBucket: "hannahenglishcourse.appspot.com",
   messagingSenderId: "449818788486",
   appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
-  measurementId: "G-07VVJG9LRS",
-  databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+  measurementId: "G-07VVJG9LRS"
 };
 firebase.initializeApp(firebaseConfig);
 
-const db = firebase.database();
+const db   = firebase.database();
 const auth = firebase.auth();
 
-/******************************************************
- * 2) GLOBAL VARIABLES
- ******************************************************/
-// Local dictionary. You can expand with more words.
-const WORDS = {
-  easy:   ["fire", "chair", "apple", "water", "light"],
-  medium: ["coffee", "orange", "banana", "purple", "flight"],
-  hard:   ["software", "question", "terrible", "mountain", "elephant"]
-};
+/*****************************************************
+ * 2) VARIÁVEIS GLOBAIS
+ *****************************************************/
+let dictionarySet = new Set();  // Carregado de words_alpha.txt
+let chosenWord    = "";         // Palavra escolhida para a rodada
+let rowBlocks     = [];         // Cada linha de blocos
+let currentRow    = 0;          // Linha atual
+let currentCol    = 0;          // Coluna atual (bloco)
+let userName      = "Guest";
+let userUid       = null;
+let isGuest       = true;
+let totalPoints   = 0;
+let difficulty    = "easy";
 
-let chosenWord      = ""; // The target word
-let currentRow      = 0;  // Which row the user is editing
-let currentCol      = 0;  // Which col within the row
-let maxAttempts     = 30; // Arbitrary high, so we build a "tower" if needed
-let rowBlocks       = []; // Will hold arrays of divs for each row
-let userName        = "Guest";
-let userUid         = null; 
-let isGuest         = true;
-let totalPoints     = 0;
-let difficulty      = "easy";
+// Robot
+const robotImage   = document.getElementById("robot-image");
+const robotBalloon = document.getElementById("robot-balloon");
+const synth        = window.speechSynthesis;
 
-const robotImage     = document.getElementById("robot-image");
-const robotBalloon   = document.getElementById("robot-balloon");
-const synth          = window.speechSynthesis;
-const boardEl        = document.getElementById("board");
-const scoreboardList = document.getElementById("score-list");
+// Elementos
+const boardEl      = document.getElementById("board");
+const scoreboardEl = document.getElementById("score-list");
 
-/******************************************************
- * 3) SPEECH
- ******************************************************/
+/*****************************************************
+ * 3) CARREGAR DICIONÁRIO (words_alpha.txt)
+ *****************************************************/
+async function loadDictionary() {
+  try {
+    const response = await fetch("dictionaries/words_alpha.txt");
+    if (!response.ok) throw new Error("Failed to load dictionary file.");
+    const text = await response.text();
+    const words = text.split("\n").map(w => w.trim().toLowerCase()).filter(Boolean);
+    dictionarySet = new Set(words);
+    console.log("Dictionary loaded:", dictionarySet.size, "words");
+  } catch (err) {
+    console.error("Error loading dictionary:", err);
+  }
+}
+
+/*****************************************************
+ * 4) AUTH STATE (para saber se é Guest ou usuário)
+ *****************************************************/
+auth.onAuthStateChanged(async (user) => {
+  if (user) {
+    isGuest = false;
+    userUid = user.uid;
+    const snap = await db.ref("usuarios/" + userUid).once("value");
+    const data = snap.val() || {};
+    userName   = data.nome || data.email || "User";
+    totalPoints= data.points || 0;
+  } else {
+    isGuest = true;
+    userName= "Guest";
+    userUid = null;
+  }
+  loadScoreboard();
+});
+
+/*****************************************************
+ * 5) PLACAR TOP 20
+ *****************************************************/
+function loadScoreboard() {
+  scoreboardEl.innerHTML = "...";
+  db.ref("usuarios").orderByChild("points").limitToLast(20).on("value", (snap) => {
+    const val = snap.val() || {};
+    let arr = [];
+    Object.keys(val).forEach((uid) => {
+      const u = val[uid];
+      const nm= u.nome || u.email || "Unknown";
+      const pts= u.points || 0;
+      arr.push({ name: nm, points: pts });
+    });
+    // Ordenar decrescente
+    arr.sort((a,b) => b.points - a.points);
+
+    scoreboardEl.innerHTML = "";
+    arr.forEach((item, idx) => {
+      const li = document.createElement("li");
+      li.innerHTML = `<span>${idx+1}.</span> ${item.name} <span>${item.points} pts</span>`;
+      scoreboardEl.appendChild(li);
+    });
+  });
+}
+
+/*****************************************************
+ * 6) ESCOLHER PALAVRA (com definição garantida)
+ *****************************************************/
+async function pickWordWithDefinition() {
+  // Faz um filtro simples de tamanho (4 a 8 letras) para não ficar muito grande
+  const candidates = [...dictionarySet].filter(w => w.length >= 4 && w.length <= 8);
+  // Tentamos no máximo 50 vezes achar uma com definição
+  for (let i = 0; i < 50; i++) {
+    const randomWord = candidates[Math.floor(Math.random() * candidates.length)].toLowerCase();
+    const defOk = await hasDefinition(randomWord);
+    if (defOk) {
+      return randomWord;
+    }
+  }
+  // Se não achou nenhuma com definição, pega qualquer uma
+  return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
+/*****************************************************
+ * 7) VERIFICAR SE TEM DEFINIÇÃO NA FREE DICTIONARY
+ *****************************************************/
+async function hasDefinition(word) {
+  try {
+    const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+    if (!res.ok) return false;
+    const data = await res.json();
+    // Verifica se realmente tem algo
+    if (!data || !data[0]?.meanings?.[0]?.definitions?.[0]?.definition) return false;
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+/*****************************************************
+ * 8) START GAME
+ *****************************************************/
+async function startGame() {
+  boardEl.innerHTML = "";
+  rowBlocks = [];
+  currentRow = 0;
+  currentCol = 0;
+  difficulty = document.getElementById("difficulty-select").value;
+
+  speakText(`Hello, ${userName}. Difficulty is ${difficulty}. Please wait while I pick a word...`);
+
+  chosenWord = await pickWordWithDefinition();
+  console.log("Chosen word:", chosenWord); // debug
+
+  // Cria a primeira linha de blocos
+  createRow();
+  speakText(`I have chosen a word with ${chosenWord.length} letters. Type your guess and press Try!`);
+}
+
+/*****************************************************
+ * 9) CRIAR LINHA DE BLOCOS
+ *****************************************************/
+function createRow() {
+  const rowDiv = document.createElement("div");
+  rowDiv.classList.add("attempt-row");
+
+  const blocksArr = [];
+  for (let i = 0; i < chosenWord.length; i++) {
+    const block = document.createElement("div");
+    block.classList.add("letter-block");
+    block.textContent = "";
+    rowDiv.appendChild(block);
+    blocksArr.push(block);
+  }
+
+  boardEl.appendChild(rowDiv);
+  rowBlocks.push(blocksArr);
+}
+
+/*****************************************************
+ * 10) DIGITAR LETRAS
+ *****************************************************/
+document.addEventListener("keydown", (e) => {
+  // Se não temos chosenWord, não faz nada
+  if (!chosenWord) return;
+
+  // Linha atual
+  const blocks = rowBlocks[currentRow];
+  if (!blocks) return;
+
+  // Entrada A-Z
+  if (e.key.match(/^[a-z]$/i) && currentCol < chosenWord.length) {
+    blocks[currentCol].textContent = e.key.toUpperCase();
+    currentCol++;
+  }
+  // Backspace
+  else if (e.key === "Backspace" && currentCol > 0) {
+    currentCol--;
+    blocks[currentCol].textContent = "";
+  }
+  // Se digitar Enter, faz "submitRow()"
+  else if (e.key === "Enter") {
+    submitRow();
+  }
+});
+
+/*****************************************************
+ * 11) BOTÃO TRY
+ *****************************************************/
+document.getElementById("try-button").addEventListener("click", () => {
+  submitRow();
+});
+
+/*****************************************************
+ * 12) SUBMIT ROW
+ *****************************************************/
+async function submitRow() {
+  const blocks = rowBlocks[currentRow];
+  if (!blocks) return;
+
+  // Verifica se todos os blocos estão preenchidos
+  for (let i = 0; i < blocks.length; i++) {
+    if (!blocks[i].textContent.trim()) {
+      speakText("Please fill all letters first!");
+      return;
+    }
+  }
+
+  // Monta a string do palpite
+  const guess = blocks.map(b => b.textContent.toLowerCase()).join("");
+  // Checa se existe no dicionário
+  if (!dictionarySet.has(guess)) {
+    speakText("That word is not in our dictionary. Try again!");
+    return;
+  }
+
+  // Aplica o feedback
+  const feedback = getFeedback(guess, chosenWord);
+  for (let i = 0; i < feedback.length; i++) {
+    blocks[i].classList.add(feedback[i]);
+  }
+
+  // Verifica se acertou tudo
+  const allGreen = feedback.every(c => c === "green");
+  if (allGreen) {
+    // Buscar definição
+    const definition = await getDefinition(guess);
+    let msg = `Congratulations, ${userName}! You found the word "${guess}".`;
+    if (definition) {
+      msg += ` Definition: ${definition}`;
+    }
+    speakText(msg);
+
+    // Pontos
+    let points = 10;
+    if (difficulty === "medium") points = 20;
+    if (difficulty === "hard")   points = 30;
+    if (!isGuest && userUid) {
+      totalPoints += points;
+      await db.ref("usuarios/" + userUid).update({ points: totalPoints });
+    }
+
+    // Inicia novo jogo
+    setTimeout(startGame, 3000);
+  } else {
+    // Frase motivacional
+    const phrases = [
+      "Almost there, NAME! Keep trying!",
+      "Nice try, NAME! You're getting closer!",
+      "Don't give up, NAME! You can do it!",
+      "You're on the right track, NAME!",
+      "Stay focused, NAME! You're doing great!"
+    ];
+    const idx = Math.floor(Math.random() * phrases.length);
+    const phrase = phrases[idx].replace("NAME", userName);
+    speakText(phrase);
+
+    // Cria nova linha
+    currentRow++;
+    currentCol = 0;
+    createRow();
+  }
+}
+
+/*****************************************************
+ * 13) FEEDBACK DE CORES
+ *****************************************************/
+function getFeedback(guess, real) {
+  // feedback[i] = "green" | "yellow" | "red"
+  const feedback = Array(guess.length).fill("red");
+  const realArr  = real.split("");
+
+  // Marcar green
+  for (let i = 0; i < guess.length; i++) {
+    if (guess[i] === realArr[i]) {
+      feedback[i] = "green";
+      realArr[i] = "*"; // remove do "estoque"
+    }
+  }
+
+  // Marcar yellow
+  for (let i = 0; i < guess.length; i++) {
+    if (feedback[i] === "green") continue;
+    const char = guess[i];
+    const idx  = realArr.indexOf(char);
+    if (idx !== -1) {
+      feedback[i] = "yellow";
+      realArr[idx] = "*";
+    }
+  }
+  return feedback;
+}
+
+/*****************************************************
+ * 14) GET DEFINITION (FREE DICTIONARY)
+ *****************************************************/
+async function getDefinition(word) {
+  try {
+    const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+    if (!res.ok) return "";
+    const data = await res.json();
+    return data[0]?.meanings?.[0]?.definitions?.[0]?.definition || "";
+  } catch {
+    return "";
+  }
+}
+
+/*****************************************************
+ * 15) FALA DO ROBÔ
+ *****************************************************/
 function speakText(text) {
   if (!text) return;
   const utterance = new SpeechSynthesisUtterance(text);
@@ -289,256 +571,15 @@ function speakText(text) {
     robotImage.src = "imagens/robo_estatico.png";
     setTimeout(() => {
       robotBalloon.style.display = "none";
-    }, 700);
+    }, 800);
   };
   synth.speak(utterance);
 }
 
-/******************************************************
- * 4) CHECK AUTH
- ******************************************************/
-auth.onAuthStateChanged(async (user) => {
-  if (user) {
-    isGuest = false;
-    userUid = user.uid;
-    const snap = await db.ref("usuarios/" + userUid).once("value");
-    const data = snap.val() || {};
-    userName  = data.nome || data.email || "User";
-    totalPoints = data.points || 0;
-  } else {
-    isGuest = true;
-    userName = "Guest";
-    userUid  = null;
-  }
-  loadScoreboard();
-});
-
-/******************************************************
- * 5) SCOREBOARD
- ******************************************************/
-function loadScoreboard() {
-  scoreboardList.innerHTML = "...";
-  db.ref("usuarios").orderByChild("points").limitToLast(20).on("value", (snap) => {
-    const val = snap.val() || {};
-    const arr = [];
-    Object.keys(val).forEach((uid) => {
-      const u = val[uid];
-      const nm = u.nome || u.email || "Unknown";
-      const pts= u.points || 0;
-      arr.push({ name: nm, points: pts });
-    });
-    // Sort descending
-    arr.sort((a,b) => b.points - a.points);
-
-    scoreboardList.innerHTML = "";
-    arr.forEach((item, idx) => {
-      const li = document.createElement("li");
-      li.innerHTML = `<span>${idx+1}.</span> ${item.name} <span>${item.points} pts</span>`;
-      scoreboardList.appendChild(li);
-    });
-  });
-}
-
-/******************************************************
- * 6) PICK WORD AND BUILD INITIAL ROW
- ******************************************************/
-function startGame() {
-  difficulty = document.getElementById("difficulty-select").value;
-  const dict = WORDS[difficulty];
-  chosenWord = dict[Math.floor(Math.random() * dict.length)].toLowerCase();
-
-  // Clear old data
-  rowBlocks = [];
-  boardEl.innerHTML = "";
-  currentRow = 0;
-  currentCol = 0;
-
-  speakText(`Hello, ${userName}. Difficulty is ${difficulty}. The word has ${chosenWord.length} letters. Let's play!`);
-
-  // Create the first row right away
-  createRow();
-}
-
-/******************************************************
- * 7) CREATE A NEW ROW OF BLOCKS
- ******************************************************/
-function createRow() {
-  const rowDiv = document.createElement("div");
-  rowDiv.classList.add("attempt-row");
-
-  const blocksArr = [];
-  for (let i = 0; i < chosenWord.length; i++) {
-    const block = document.createElement("div");
-    block.classList.add("letter-block");
-    block.textContent = ""; 
-    rowDiv.appendChild(block);
-    blocksArr.push(block);
-  }
-  boardEl.appendChild(rowDiv);
-  rowBlocks.push(blocksArr);
-
-  // We can show player's name on the side if you want:
-  const playerLabel = document.createElement("div");
-  playerLabel.classList.add("player-label");
-  playerLabel.textContent = `- Attempt by ${userName}`;
-  rowDiv.appendChild(playerLabel);
-}
-
-/******************************************************
- * 8) HANDLE KEYBOARD FOR FILLING BLOCKS
- ******************************************************/
-document.addEventListener("keydown", (e) => {
-  // If no chosenWord, do nothing
-  if (!chosenWord) return;
-
-  // If we've already built too many rows, do nothing
-  if (currentRow >= maxAttempts) return;
-
-  // Get current row blocks
-  const blocks = rowBlocks[currentRow];
-  if (!blocks) return;
-
-  // Letters A-Z
-  if (e.key.match(/^[a-z]$/i) && currentCol < chosenWord.length) {
-    blocks[currentCol].textContent = e.key.toUpperCase();
-    currentCol++;
-  }
-  // Backspace
-  else if (e.key === "Backspace" && currentCol > 0) {
-    currentCol--;
-    blocks[currentCol].textContent = "";
-  }
-  // Enter => submit attempt
-  else if (e.key === "Enter") {
-    // If row not fully filled, ignore
-    if (currentCol < chosenWord.length) {
-      speakText("Please fill all letters!");
-      return;
-    }
-    submitRow();
-  }
-});
-
-/******************************************************
- * 9) SUBMIT ROW => CHECK WORD
- ******************************************************/
-async function submitRow() {
-  const blocks = rowBlocks[currentRow];
-  const guess = blocks.map(b => b.textContent.toLowerCase()).join("");
-
-  // 9.1 Validate if guess is in dictionary
-  if (!isValidWord(guess)) {
-    speakText("This word doesn't exist in our dictionary!");
-    return;
-  }
-
-  // 9.2 Color feedback
-  const feedback = getFeedback(guess, chosenWord);
-  for (let i = 0; i < feedback.length; i++) {
-    if (feedback[i] === "green") blocks[i].classList.add("correct");
-    else if (feedback[i] === "yellow") blocks[i].classList.add("exists");
-    else blocks[i].classList.add("wrong");
-  }
-
-  // 9.3 Check if success
-  const allGreen = feedback.every(f => f === "green");
-  if (allGreen) {
-    // Definition
-    const definition = await getDefinition(guess);
-    let msg = `Congratulations, ${userName}! You found the word "${guess}".`;
-    if (definition) msg += ` Definition: ${definition}`;
-    speakText(msg);
-
-    // Points
-    let pts = 10;
-    if (difficulty === "medium") pts = 20;
-    if (difficulty === "hard")   pts = 30;
-    if (!isGuest && userUid) {
-      totalPoints += pts;
-      await db.ref("usuarios/" + userUid).update({ points: totalPoints });
-    }
-
-    // Start new game after short delay
-    setTimeout(startGame, 3000);
-    return;
-  }
-
-  // Not all green => motivational
-  const motivational = [
-    "Almost there, NAME! Keep trying!",
-    "Nice try, NAME! You're getting closer!",
-    "Don't give up, NAME! You can do it!",
-    "You're on the right track, NAME!",
-    "Stay focused, NAME! You're doing great!"
-  ];
-  const rIndex = Math.floor(Math.random() * motivational.length);
-  const phrase = motivational[rIndex].replace("NAME", userName);
-  speakText(phrase);
-
-  // Create new row
-  currentRow++;
-  currentCol = 0;
-  createRow();
-}
-
-/******************************************************
- * 10) CHECK WORD AGAINST LOCAL DICTIONARY
- ******************************************************/
-function isValidWord(w) {
-  w = w.toLowerCase();
-  const all = [...WORDS.easy, ...WORDS.medium, ...WORDS.hard].map(x=>x.toLowerCase());
-  return all.includes(w);
-}
-
-/******************************************************
- * 11) COLOR FEEDBACK
- ******************************************************/
-function getFeedback(guess, real) {
-  const feedback = Array(guess.length).fill("");
-  const guessLetters = guess.split("");
-  const realLetters  = real.split("");
-
-  // Mark greens
-  for (let i = 0; i < guessLetters.length; i++) {
-    if (guessLetters[i] === realLetters[i]) {
-      feedback[i] = "green";
-      realLetters[i] = "*"; // used
-      guessLetters[i] = "#"; 
-    }
-  }
-  // Mark yellows/reds
-  for (let i = 0; i < guessLetters.length; i++) {
-    if (guessLetters[i] === "#") continue; // already green
-    const idx = realLetters.indexOf(guessLetters[i]);
-    if (idx !== -1) {
-      feedback[i] = "yellow";
-      realLetters[idx] = "*";
-    } else {
-      feedback[i] = "red";
-    }
-  }
-  return feedback;
-}
-
-/******************************************************
- * 12) FREE DICTIONARY API
- ******************************************************/
-async function getDefinition(word) {
-  try {
-    const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
-    if (!res.ok) throw new Error();
-    const data = await res.json();
-    const def = data[0]?.meanings?.[0]?.definitions?.[0]?.definition || "";
-    return def;
-  } catch {
-    return "";
-  }
-}
-
-/******************************************************
- * 13) INVITE FRIENDS
- ******************************************************/
-function inviteFriends() {
+/*****************************************************
+ * 16) COMPARTILHAR (INVITE FRIENDS)
+ *****************************************************/
+document.getElementById("invite-button").addEventListener("click", () => {
   const shareData = {
     title: "Hannah English Course",
     text: "Come play this English word game with me!",
@@ -551,13 +592,17 @@ function inviteFriends() {
     const wUrl = "https://wa.me/?text=" + encodeURIComponent(shareData.text + " " + shareData.url);
     window.open(wUrl, "_blank");
   }
-}
-document.getElementById("invite-button").addEventListener("click", inviteFriends);
+});
 
-/******************************************************
- * 14) START GAME ON BUTTON CLICK
- ******************************************************/
+/*****************************************************
+ * 17) ON LOAD
+ *****************************************************/
+document.addEventListener("DOMContentLoaded", async () => {
+  await loadDictionary();
+  // Assim que carrega o dicionário, o usuário pode clicar em "Start Game"
+});
 document.getElementById("start-game").addEventListener("click", startGame);
+
 </script>
 </body>
 </html>
