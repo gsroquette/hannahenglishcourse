@@ -363,6 +363,7 @@ function listenGameState() {
       currentLetters = [];
       renderAllAttempts();
       updateUI();
+      disableInput(); // Certifique-se de desabilitar os inputs ao reiniciar
       return;
     }
 
@@ -377,16 +378,17 @@ function listenGameState() {
 
     // Renderiza o estado sincronizado
     renderAllAttempts();
-
-    // Permitir input apenas se a partida está ativa
     updateUI();
 
-   if (isGuest) {
+    // Exibe a mensagem para usuários não logados apenas uma vez
+    if (isGuest && !localStorage.getItem("guestMessageShown")) {
       speakText("You're playing as a guest. Your progress won't be saved.");
+      localStorage.setItem("guestMessageShown", "true"); // Evita repetição da mensagem
     }
 
+    // Permitir input apenas se a partida está ativa
     if (currentStatus === "in_progress" && currentWord) {
-      enableInput(); // Habilita inputs para todos os usuários
+      enableInput(); // Habilita inputs para todos os jogadores
     } else {
       disableInput(); // Desabilita inputs caso o jogo tenha terminado ou esteja ocioso
     }
@@ -406,30 +408,37 @@ function disableInput() {
 document.getElementById("start-game").addEventListener("click", startGame);
 
 async function startGame() {
+  // Verifica se já existe um jogo em andamento e impede novos jogos (exceto para o proprietário)
   if (currentStatus === "in_progress" && userRole !== "proprietario") {
     speakText("A game is already in progress. Please wait.");
     return;
   }
 
+  // Remove o jogo atual (se houver)
   await db.ref("games/currentGame").remove();
 
+  // Define a dificuldade escolhida
   currentDifficulty = document.getElementById("difficulty-select").value;
   const chosenWord = await pickWordWithDefinition(currentDifficulty);
 
-  db.ref("games/currentGame").set({
+  // Configura o novo jogo no banco de dados
+  await db.ref("games/currentGame").set({
     word: chosenWord,
     status: "in_progress",
     difficulty: currentDifficulty,
     attempts: {}
   });
 
-if (isGuest) {
+  // Mensagem para jogadores convidados
+  if (isGuest) {
     speakText("You're playing as a guest. Your progress won't be saved.");
   }
 
+  // Mensagem inicial do jogo
   speakText(`${userName} started a new game! Difficulty: ${currentDifficulty}. Good luck!`);
 
-  enableInput(); // Habilita inputs ao iniciar o jogo
+  // Habilita os inputs para o jogo
+  enableInput();
 }
 
 /*******************************************************
@@ -515,14 +524,20 @@ function renderAllAttempts() {
  *******************************************************/
 function updateUI() {
   const startBtn = document.getElementById("start-game");
-  if (currentStatus === "in_progress") {
-    if (userRole === "proprietario") {
-      startBtn.disabled = false;
-    } else {
-      startBtn.disabled = true;
-    }
+  const tryBtn = document.getElementById("try-button");
+
+  // Ativa "Start Game" para todos os jogadores
+  if (currentStatus === "in_progress" && userRole !== "proprietario") {
+    startBtn.disabled = true;
   } else {
     startBtn.disabled = false;
+  }
+
+  // Ativa "Try" apenas se o jogo está ativo
+  if (currentStatus === "in_progress") {
+    tryBtn.disabled = false;
+  } else {
+    tryBtn.disabled = true;
   }
 }
 
