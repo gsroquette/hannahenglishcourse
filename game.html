@@ -104,12 +104,12 @@
     #personal-score-section {
       margin-top: 10px;
       text-align: center;
-      display: none; /* só mostraremos via JS se não for guest */
+      display: none; /* Exibido via JS apenas se não for guest */
     }
     #owner-game-counter {
       margin-top: 6px;
       text-align: center;
-      display: none; /* só mostraremos via JS se for 'proprietario' */
+      display: none; /* Exibido via JS apenas se for proprietario */
     }
 
     /* ÁREA PRINCIPAL DO JOGO */
@@ -269,7 +269,7 @@ let currentWord = "";
 let currentStatus = "idle"; 
 let currentDifficulty = "easy";
 let totalPoints = 0;
-let totalGames = 0; // Para proprietario
+let totalGames = 0; // Para o proprietário
 
 // Função para carregar o dicionário do servidor
 async function loadDictionary() {
@@ -292,7 +292,6 @@ loadDictionary();
 // Guardamos TODAS as linhas (tentativas) vindas do DB
 let attemptsArray = []; 
 // A linha atual (blocos que o usuário está digitando agora):
-let currentRowIndex = 0; 
 let currentLetters  = []; 
 
 /*******************************************************
@@ -321,7 +320,7 @@ function speakText(text) {
   synth.speak(utterance);
 }
 
-// Mensagens aleatórias de incentivo para serem ditas após cada tentativa
+// Mensagens aleatórias de incentivo para serem ditas após cada tentativa (quando não acerta)
 const encouragementMessages = [
   "Nice attempt!",
   "Keep going!",
@@ -339,15 +338,15 @@ auth.onAuthStateChanged(async (user) => {
     isGuest = false;
     const snap = await db.ref("usuarios/" + userUid).once("value");
     const data = snap.val() || {};
-    userName = data.nome || data.email || "User";
-    userRole = data.role || "aluno";
-    totalPoints = data.points || 0;
+    userName   = data.nome || data.email || "User";
+    userRole   = data.role || "aluno";
+    totalPoints= data.points || 0;
     totalGames = data.gamesPlayed || 0;
   } else {
-    userUid = null;
-    isGuest = true;
-    userName = "Guest";
-    userRole = "guest";
+    userUid    = null;
+    isGuest    = true;
+    userName   = "Guest";
+    userRole   = "guest";
 
     // Informa ao jogador não logado que ele é um "Guest"
     speakText("You're playing as a guest. Your progress won't be saved.");
@@ -385,16 +384,16 @@ function loadScoreboard() {
  * 6) ESTADO DO JOGO (games/currentGame)
  *******************************************************/
 function listenGameState() {
+  // Escuta as mudanças no "currentGame"
   db.ref("games/currentGame").on("value", (snap) => {
     const data = snap.val();
 
     if (!data) {
-      // Se não há partida, reseta tudo para estado inicial
+      // Se não há partida ativa, resetamos variáveis
       currentStatus = "idle";
-      currentWord = "";
+      currentWord   = "";
       attemptsArray = [];
-      currentRowIndex = 0;
-      currentLetters = [];
+      currentLetters= [];
       renderAllAttempts();
       updateUI();
       disableInput(); 
@@ -402,33 +401,33 @@ function listenGameState() {
     }
 
     // Atualiza o estado da partida
-    currentWord = data.word || "";
-    currentStatus = data.status || "idle";
+    currentWord       = data.word || "";
+    currentStatus     = data.status || "idle";
     currentDifficulty = data.difficulty || "easy";
 
-    // Converte as tentativas do banco em array local
+    // Converte as tentativas (objeto) em array local
     const attemptsObj = data.attempts || {};
-    attemptsArray = Object.keys(attemptsObj).map((key) => attemptsObj[key]);
+    attemptsArray     = Object.keys(attemptsObj).map((key) => attemptsObj[key]);
 
     // Renderiza o estado sincronizado
     renderAllAttempts();
     updateUI();
 
-    // Exibe a mensagem para usuários não logados apenas uma vez
+    // Exibe a mensagem de guest só uma vez
     if (isGuest && !localStorage.getItem("guestMessageShown")) {
       speakText("You're playing as a guest. Your progress won't be saved.");
       localStorage.setItem("guestMessageShown", "true"); 
     }
 
-    // Permitir input apenas se a partida está ativa
+    // Se há jogo em progresso, permite input a todos (inclusive guest)
     if (currentStatus === "in_progress" && currentWord) {
-      enableInput(); 
+      enableInput();
     } else {
-      disableInput(); 
+      disableInput();
     }
   });
 
-  // Sempre que qualquer nova tentativa for adicionada, atualizamos localmente e re-renderizamos
+  // Sempre que qualquer nova tentativa for adicionada, atualiza localmente e re-renderiza
   db.ref("games/currentGame/attempts").on("child_added", (snapshot) => {
     const attempt = snapshot.val();
     // Evita duplicar na memória local
@@ -453,7 +452,7 @@ function disableInput() {
 document.getElementById("start-game").addEventListener("click", startGame);
 
 async function startGame() {
-  // Verifica se já existe um jogo em andamento e impede novos jogos (exceto para o proprietário)
+  // Verifica se já existe jogo em andamento e impede novos jogos se não for proprietario
   if (currentStatus === "in_progress" && userRole !== "proprietario") {
     speakText("A game is already in progress. Please wait.");
     return;
@@ -463,8 +462,7 @@ async function startGame() {
   if (userRole === "proprietario" && userUid) {
     totalGames++;
     await db.ref("usuarios/" + userUid).update({ gamesPlayed: totalGames });
-    // Atualiza exibição
-    showPersonalScore();
+    showPersonalScore(); 
   }
 
   // Remove o jogo atual (se houver)
@@ -472,9 +470,9 @@ async function startGame() {
 
   // Define a dificuldade escolhida
   currentDifficulty = document.getElementById("difficulty-select").value;
-  const chosenWord = await pickWordWithDefinition(currentDifficulty);
+  const chosenWord   = await pickWordWithDefinition(currentDifficulty);
 
-  // Configura o novo jogo no banco de dados
+  // Cria novo jogo no DB
   await db.ref("games/currentGame").set({
     word: chosenWord,
     status: "in_progress",
@@ -482,21 +480,20 @@ async function startGame() {
     attempts: {}
   });
 
-  // Mensagem inicial para todos os jogadores
+  // Mensagem inicial
   speakText(`${userName} started a new game! Difficulty: ${currentDifficulty}. Good luck!`);
 
-  // Mensagem adicional para jogadores convidados
+  // Mensagem adicional para guest
   if (isGuest) {
     speakText("You're playing as a guest. Your progress won't be saved.");
   }
 
-  // Atualiza o estado local do jogo
-  currentWord = chosenWord;
-  currentStatus = "in_progress";
+  // Atualiza estado local e UI
+  currentWord    = chosenWord;
+  currentStatus  = "in_progress";
   currentLetters = [];
-  attemptsArray = [];
+  attemptsArray  = [];
 
-  // Renderiza o jogo e habilita os inputs
   renderAllAttempts();
   updateUI();
   enableInput();
@@ -513,11 +510,12 @@ async function pickWordWithDefinition(diff) {
   const allWords = [...dictionarySet].filter(w => w.length >= minLen && w.length <= maxLen);
   if (allWords.length < 1) return "cat";
 
+  // Tenta até 30 vezes achar palavra com definição
   for (let i=0; i<30; i++) {
     const cand = allWords[Math.floor(Math.random()*allWords.length)];
     if (await hasDefinition(cand)) return cand;
   }
-  // Se não achou em 30 tentativas, pega qualquer
+  // Se não achou, pega qualquer
   return allWords[Math.floor(Math.random()*allWords.length)];
 }
 
@@ -539,7 +537,7 @@ function renderAllAttempts() {
   const board = document.getElementById("board");
   board.innerHTML = "";
 
-  // Render as tentativas antigas (do DB)
+  // Render as tentativas que já estão no DB
   attemptsArray.forEach((att) => {
     const rowDiv = document.createElement("div");
     rowDiv.classList.add("attempt-row");
@@ -564,7 +562,7 @@ function renderAllAttempts() {
     board.appendChild(rowDiv);
   });
 
-  // Render a "current row" (blocos vazios para a tentativa atual)
+  // Render a "current row" (blocos vazios para a tentativa em digitação)
   if (currentStatus === "in_progress" && currentWord) {
     const newRowDiv = document.createElement("div");
     newRowDiv.classList.add("attempt-row");
@@ -580,13 +578,13 @@ function renderAllAttempts() {
 }
 
 /*******************************************************
- * 10) UPDATE UI => habilitar/desabilitar Start
+ * 10) UPDATE UI => habilitar/desabilitar Start e Try
  *******************************************************/
 function updateUI() {
   const startBtn = document.getElementById("start-game");
-  const tryBtn = document.getElementById("try-button");
+  const tryBtn   = document.getElementById("try-button");
 
-  // Ativa "Start Game" para quem não é proprietario somente se não houver jogo ativo
+  // Desabilita "Start Game" se já estiver em progresso E você não for proprietario
   if (currentStatus === "in_progress" && userRole !== "proprietario") {
     startBtn.disabled = true;
   } else {
@@ -613,7 +611,7 @@ function handleKeyPress(e) {
     return;
   }
 
-  if (e.key.match(/^[a-z]$/i) && currentLetters.length < currentWord.length) {
+  if (e.key.match(/^[a-zA-Z]$/) && currentLetters.length < currentWord.length) {
     currentLetters.push(e.key.toLowerCase());
     renderAllAttempts();
     return;
@@ -646,6 +644,7 @@ async function submitCurrentRow() {
 
   const guessClean = currentLetters.join("").toLowerCase();
 
+  // Verifica se existe no dicionário
   if (!dictionarySet.has(guessClean)) {
     speakText("That word is not in our dictionary!");
     return;
@@ -662,34 +661,36 @@ async function submitCurrentRow() {
     timestamp: Date.now()
   });
 
-  // Limpa o array de letras digitadas para a próxima tentativa
+  // Limpa para a próxima
   currentLetters = [];
 
-  // Verifica se a palavra foi encontrada
+  // Se acertou
   if (feedback.every(c => c === "green")) {
     const definition = await getDefinition(guessClean);
     let msg = `Congratulations, ${isGuest ? "Guest" : userName}! You found the word "${guessClean}".`;
     if (definition) msg += ` Definition: ${definition}`;
     speakText(msg);
 
-    // Adiciona pontos para quem não é guest
+    // Adiciona pontos se não for guest
     if (!isGuest && userUid) {
-      let pts = currentDifficulty === "medium" ? 20 : currentDifficulty === "hard" ? 35 : 10;
+      let pts = 10;
+      if (currentDifficulty === "medium") pts = 20;
+      if (currentDifficulty === "hard")   pts = 35;
+
       totalPoints += pts;
       await db.ref("usuarios/" + userUid).update({ points: totalPoints });
       showPersonalScore(); 
     }
 
-    // Finaliza o jogo no Firebase
+    // Finaliza jogo
     db.ref("games/currentGame").update({ status: "ended" });
     disableInput(); 
   } else {
-    // Se a palavra não foi encontrada ainda, fala uma mensagem de incentivo
+    // Não acertou => fala mensagem de incentivo
     const randomMsg = encouragementMessages[Math.floor(Math.random() * encouragementMessages.length)];
     speakText(randomMsg);
   }
 
-  // Renderiza as tentativas
   renderAllAttempts();
 }
 
@@ -754,10 +755,10 @@ document.getElementById("invite-button").addEventListener("click", () => {
  * 17) MOSTRAR PONTOS E CONTADOR DE PARTIDAS (CASO PROPRIETÁRIO)
  *******************************************************/
 function showPersonalScore() {
-  // Mostrar/atualizar pontuação do usuário logado
   const personalScoreSection = document.getElementById("personal-score-section");
-  const ownerCounterSection = document.getElementById("owner-game-counter");
+  const ownerCounterSection  = document.getElementById("owner-game-counter");
 
+  // Se não for guest, mostra a pontuação
   if (!isGuest) {
     personalScoreSection.style.display = "block";
     document.getElementById("personalScore").textContent = totalPoints;
@@ -765,7 +766,7 @@ function showPersonalScore() {
     personalScoreSection.style.display = "none";
   }
 
-  // Se for proprietário, mostramos o contador de partidas
+  // Se for proprietário, mostra o contador de partidas
   if (userRole === "proprietario") {
     ownerCounterSection.style.display = "block";
     document.getElementById("ownerGamesCount").textContent = totalGames;
