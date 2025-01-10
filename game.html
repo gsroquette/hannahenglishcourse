@@ -541,7 +541,8 @@ async function submitCurrentRow() {
     speakText(`You must fill exactly ${currentWord.length} letters!`);
     return;
   }
-  // Monta guess
+
+  // Monta o palpite
   const guessClean = currentLetters.join("").toLowerCase();
 
   if (!dictionarySet.has(guessClean)) {
@@ -549,7 +550,7 @@ async function submitCurrentRow() {
     return;
   }
 
-  // Gera feedback
+  // Gera o feedback
   const feedback = getFeedback(guessClean, currentWord);
 
   // Salva no DB
@@ -561,9 +562,10 @@ async function submitCurrentRow() {
     timestamp: Date.now()
   });
 
-  // Limpa currentLetters
+  // Limpa o array currentLetters para preparar a nova linha
   currentLetters = [];
-  // Se acertou => finaliza
+
+  // Verifica se o palpite está correto (todos "green")
   const allGreen = feedback.every(c => c === "green");
   if (allGreen) {
     const definition = await getDefinition(guessClean);
@@ -573,19 +575,22 @@ async function submitCurrentRow() {
     }
     speakText(msg);
 
-    // Pontos => easy=10, medium=20, hard=35
+    // Atualiza os pontos
     let pts = 10;
     if (currentDifficulty === "medium") pts = 20;
-    if (currentDifficulty === "hard")   pts = 35;
+    if (currentDifficulty === "hard") pts = 35;
 
     if (!isGuest && userUid) {
       totalPoints += pts;
-      await db.ref("usuarios/"+userUid).update({ points: totalPoints });
+      await db.ref("usuarios/" + userUid).update({ points: totalPoints });
     }
 
-    // Fim do jogo
+    // Finaliza o jogo
     db.ref("games/currentGame").update({ status: "ended" });
   }
+
+  // Renderiza novamente as tentativas
+  renderAllAttempts();
 }
 
 /*******************************************************
