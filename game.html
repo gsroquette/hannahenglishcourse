@@ -100,18 +100,6 @@
       font-weight: bold;
     }
 
-    /* MOSTRADOR DE PONTOS PESSOAIS DO USUÁRIO (SOMENTE PARA USERS LOGADOS) */
-    #personal-score-section {
-      margin-top: 10px;
-      text-align: center;
-      display: none; /* Exibido via JS apenas se não for guest */
-    }
-    #owner-game-counter {
-      margin-top: 6px;
-      text-align: center;
-      display: none; /* Exibido via JS apenas se for proprietario */
-    }
-
     /* ÁREA PRINCIPAL DO JOGO */
     #main-content {
       margin-left: 260px;
@@ -121,6 +109,7 @@
     #top-controls {
       display: flex;
       align-items: center;
+      flex-wrap: wrap; /* permite quebrar linha em telas pequenas */
       gap: 10px;
       margin-bottom: 16px;
     }
@@ -140,6 +129,26 @@
       background-color: #bbb;
       cursor: not-allowed;
     }
+
+    /* BOTÃO RULES E EXIBIÇÃO DE SCORE PESSOAL */
+    #rules-button {
+      background-color: #009688;
+      color: #fff;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 4px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    #rules-button:hover {
+      background-color: #00897b;
+    }
+    #player-score-display {
+      font-weight: bold;
+      margin-left: 10px;
+    }
+
+    /* TABULEIRO */
     #board {
       min-height: 200px;
       background: #fff;
@@ -154,6 +163,7 @@
       align-items: center;
       margin-bottom: 5px;
       gap: 5px;
+      flex-wrap: wrap; /* quebrar se ficar muito apertado */
     }
     .letter-block {
       width: 45px;
@@ -189,6 +199,37 @@
       background-color: #f44336;
       color: #fff;
     }
+
+    /* MOSTRADOR DE PONTOS PESSOAIS DO USUÁRIO (SOMENTE PARA USERS LOGADOS) */
+    #personal-score-section {
+      margin-top: 10px;
+      text-align: center;
+      display: none; 
+    }
+    /* CONTADOR DE PARTIDAS PARA PROPRIETÁRIO */
+    #owner-game-counter {
+      margin-top: 6px;
+      text-align: center;
+      display: none;
+    }
+
+    /* RESPONSIVIDADE - telas até 768px */
+    @media (max-width: 768px) {
+      /* O robot-section e scoreboard-section passam para posição estática para não ficarem sobre o conteúdo */
+      #robot-section, #scoreboard-section {
+        position: static;
+        width: 100%;
+        margin-bottom: 20px;
+      }
+      #main-content {
+        margin: 0;
+      }
+      /* Ajustar o padding do body para evitar cortes */
+      body {
+        padding: 10px;
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -226,11 +267,15 @@
       <option value="hard">Hard</option>
     </select>
     <button id="start-game">Start Game</button>
+
+    <!-- BOTÃO RULES E SCORE PESSOAL DO JOGADOR -->
+    <button id="rules-button">Rules</button>
+    <span id="player-score-display" style="display:none;"></span>
   </div>
 
-  <div id="board"><!-- Linha(s) de blocos --></div>
+  <div id="board"></div>
 
-  <!-- BOTÃO TRY ABAIXO DA TORRE -->
+  <!-- BOTÃO TRY -->
   <button id="try-button" style="margin-top: 15px; padding: 8px 14px; border:none; background-color:#4caf50; color:#fff; border-radius:4px; font-weight:bold; cursor:pointer;">
     Try
   </button>
@@ -269,33 +314,29 @@ let currentWord = "";
 let currentStatus = "idle"; 
 let currentDifficulty = "easy";
 let totalPoints = 0;
-let totalGames = 0; // Para o proprietário
+let totalGames = 0; 
+let attemptsArray = []; 
+let currentLetters = [];
 
-// Função para carregar o dicionário do servidor
+/*******************************************************
+ * 3) CARREGAR O DICIONÁRIO
+ *******************************************************/
 async function loadDictionary() {
   try {
-    const response = await fetch("dictionaries/words_alpha.txt"); // Verifique o caminho correto do arquivo
+    const response = await fetch("dictionaries/words_alpha.txt"); 
     if (!response.ok) {
       throw new Error(`Failed to load dictionary: ${response.statusText}`);
     }
     const text = await response.text();
     dictionarySet = new Set(text.split("\n").map(word => word.trim().toLowerCase()));
-    console.log("Dicionário carregado com sucesso. Total de palavras:", dictionarySet.size);
   } catch (error) {
     console.error("Erro ao carregar o dicionário:", error);
   }
 }
-
-// Chamar a função para carregar o dicionário
 loadDictionary();
 
-// Guardamos TODAS as linhas (tentativas) vindas do DB
-let attemptsArray = []; 
-// A linha atual (blocos que o usuário está digitando agora):
-let currentLetters  = []; 
-
 /*******************************************************
- * 3) ROBÔ E TTS
+ * 4) ROBÔ E TTS
  *******************************************************/
 const robotImage   = document.getElementById("robot-image");
 const robotBalloon = document.getElementById("robot-balloon");
@@ -320,7 +361,7 @@ function speakText(text) {
   synth.speak(utterance);
 }
 
-// Mensagens aleatórias de incentivo para serem ditas após cada tentativa (quando não acerta)
+// Mensagens aleatórias de incentivo
 const encouragementMessages = [
   "Nice attempt!",
   "Keep going!",
@@ -330,7 +371,23 @@ const encouragementMessages = [
 ];
 
 /*******************************************************
- * 4) LOGIN
+ * 5) REGRAS DO JOGO (BOTÃO RULES)
+ *******************************************************/
+document.getElementById("rules-button").addEventListener("click", () => {
+  alert(
+    "Simple Rules of the Game:\n\n" +
+    "1. A random English word is chosen.\n" +
+    "2. Type letters (A-Z) to form a guess.\n" +
+    "3. Press 'Try' to submit your guess.\n" +
+    "4. Green = correct letter & position.\n" +
+    "5. Yellow = correct letter, wrong position.\n" +
+    "6. Red = letter not in the word.\n\n" +
+    "Good luck!"
+  );
+});
+
+/*******************************************************
+ * 6) LOGIN
  *******************************************************/
 auth.onAuthStateChanged(async (user) => {
   if (user) {
@@ -343,21 +400,33 @@ auth.onAuthStateChanged(async (user) => {
     totalPoints= data.points || 0;
     totalGames = data.gamesPlayed || 0;
   } else {
-    userUid    = null;
-    isGuest    = true;
-    userName   = "Guest";
-    userRole   = "guest";
-
-    // Informa ao jogador não logado que ele é um "Guest"
+    userUid  = null;
+    isGuest  = true;
+    userName = "Guest";
+    userRole = "guest";
     speakText("You're playing as a guest. Your progress won't be saved.");
   }
   loadScoreboard();
   listenGameState();
   showPersonalScore();
+  updatePlayerScoreDisplay(); 
 });
 
 /*******************************************************
- * 5) SCOREBOARD
+ * 7) ATUALIZAR EXIBIÇÃO DO SCORE PESSOAL (TOPO)
+ *******************************************************/
+function updatePlayerScoreDisplay() {
+  const scoreDisplay = document.getElementById("player-score-display");
+  if (!isGuest) {
+    scoreDisplay.style.display = "inline-block";
+    scoreDisplay.textContent = `Your Score: ${totalPoints}`;
+  } else {
+    scoreDisplay.style.display = "none";
+  }
+}
+
+/*******************************************************
+ * 8) SCOREBOARD
  *******************************************************/
 function loadScoreboard() {
   const scoreList = document.getElementById("score-list");
@@ -381,15 +450,12 @@ function loadScoreboard() {
 }
 
 /*******************************************************
- * 6) ESTADO DO JOGO (games/currentGame)
+ * 9) LISTEN GAME STATE
  *******************************************************/
 function listenGameState() {
-  // Escuta as mudanças no "currentGame"
   db.ref("games/currentGame").on("value", (snap) => {
     const data = snap.val();
-
     if (!data) {
-      // Se não há partida ativa, resetamos variáveis
       currentStatus = "idle";
       currentWord   = "";
       attemptsArray = [];
@@ -399,27 +465,21 @@ function listenGameState() {
       disableInput(); 
       return;
     }
-
-    // Atualiza o estado da partida
     currentWord       = data.word || "";
     currentStatus     = data.status || "idle";
     currentDifficulty = data.difficulty || "easy";
 
-    // Converte as tentativas (objeto) em array local
     const attemptsObj = data.attempts || {};
     attemptsArray     = Object.keys(attemptsObj).map((key) => attemptsObj[key]);
 
-    // Renderiza o estado sincronizado
     renderAllAttempts();
     updateUI();
 
-    // Exibe a mensagem de guest só uma vez
     if (isGuest && !localStorage.getItem("guestMessageShown")) {
       speakText("You're playing as a guest. Your progress won't be saved.");
       localStorage.setItem("guestMessageShown", "true"); 
     }
 
-    // Se há jogo em progresso, permite input a todos (inclusive guest)
     if (currentStatus === "in_progress" && currentWord) {
       enableInput();
     } else {
@@ -427,10 +487,8 @@ function listenGameState() {
     }
   });
 
-  // Sempre que qualquer nova tentativa for adicionada, atualiza localmente e re-renderiza
   db.ref("games/currentGame/attempts").on("child_added", (snapshot) => {
     const attempt = snapshot.val();
-    // Evita duplicar na memória local
     if (!attemptsArray.some((a) => a.timestamp === attempt.timestamp)) {
       attemptsArray.push(attempt);
       renderAllAttempts();
@@ -447,32 +505,27 @@ function disableInput() {
 }
 
 /*******************************************************
- * 7) START GAME
+ * 10) START GAME
  *******************************************************/
 document.getElementById("start-game").addEventListener("click", startGame);
 
 async function startGame() {
-  // Verifica se já existe jogo em andamento e impede novos jogos se não for proprietario
   if (currentStatus === "in_progress" && userRole !== "proprietario") {
     speakText("A game is already in progress. Please wait.");
     return;
   }
 
-  // Se for proprietario, incrementa o contador de jogos
+  // Se for proprietário, incrementa o contador de partidas
   if (userRole === "proprietario" && userUid) {
     totalGames++;
     await db.ref("usuarios/" + userUid).update({ gamesPlayed: totalGames });
-    showPersonalScore(); 
   }
 
-  // Remove o jogo atual (se houver)
   await db.ref("games/currentGame").remove();
 
-  // Define a dificuldade escolhida
   currentDifficulty = document.getElementById("difficulty-select").value;
   const chosenWord   = await pickWordWithDefinition(currentDifficulty);
 
-  // Cria novo jogo no DB
   await db.ref("games/currentGame").set({
     word: chosenWord,
     status: "in_progress",
@@ -480,15 +533,9 @@ async function startGame() {
     attempts: {}
   });
 
-  // Mensagem inicial
   speakText(`${userName} started a new game! Difficulty: ${currentDifficulty}. Good luck!`);
+  if (isGuest) speakText("You're playing as a guest. Your progress won't be saved.");
 
-  // Mensagem adicional para guest
-  if (isGuest) {
-    speakText("You're playing as a guest. Your progress won't be saved.");
-  }
-
-  // Atualiza estado local e UI
   currentWord    = chosenWord;
   currentStatus  = "in_progress";
   currentLetters = [];
@@ -497,10 +544,12 @@ async function startGame() {
   renderAllAttempts();
   updateUI();
   enableInput();
+
+  showPersonalScore();
 }
 
 /*******************************************************
- * 8) SORTEAR PALAVRA + DEFINIÇÃO
+ * 11) PICK WORD + DEFINITION
  *******************************************************/
 async function pickWordWithDefinition(diff) {
   let minLen=3, maxLen=3;
@@ -510,12 +559,10 @@ async function pickWordWithDefinition(diff) {
   const allWords = [...dictionarySet].filter(w => w.length >= minLen && w.length <= maxLen);
   if (allWords.length < 1) return "cat";
 
-  // Tenta até 30 vezes achar palavra com definição
   for (let i=0; i<30; i++) {
     const cand = allWords[Math.floor(Math.random()*allWords.length)];
     if (await hasDefinition(cand)) return cand;
   }
-  // Se não achou, pega qualquer
   return allWords[Math.floor(Math.random()*allWords.length)];
 }
 
@@ -531,13 +578,12 @@ async function hasDefinition(word) {
 }
 
 /*******************************************************
- * 9) RENDERIZAR (BLOCOS) => attempts + "current row"
+ * 12) RENDERIZAR TABULEIRO
  *******************************************************/
 function renderAllAttempts() {
   const board = document.getElementById("board");
   board.innerHTML = "";
 
-  // Render as tentativas que já estão no DB
   attemptsArray.forEach((att) => {
     const rowDiv = document.createElement("div");
     rowDiv.classList.add("attempt-row");
@@ -552,8 +598,6 @@ function renderAllAttempts() {
       }
       rowDiv.appendChild(block);
     });
-
-    // Nome do jogador
     const playerSpan = document.createElement("span");
     playerSpan.classList.add("player-name");
     playerSpan.textContent = `- ${att.playerName || "Unknown"}`;
@@ -562,7 +606,6 @@ function renderAllAttempts() {
     board.appendChild(rowDiv);
   });
 
-  // Render a "current row" (blocos vazios para a tentativa em digitação)
   if (currentStatus === "in_progress" && currentWord) {
     const newRowDiv = document.createElement("div");
     newRowDiv.classList.add("attempt-row");
@@ -578,20 +621,18 @@ function renderAllAttempts() {
 }
 
 /*******************************************************
- * 10) UPDATE UI => habilitar/desabilitar Start e Try
+ * 13) UPDATE UI
  *******************************************************/
 function updateUI() {
   const startBtn = document.getElementById("start-game");
   const tryBtn   = document.getElementById("try-button");
 
-  // Desabilita "Start Game" se já estiver em progresso E você não for proprietario
   if (currentStatus === "in_progress" && userRole !== "proprietario") {
     startBtn.disabled = true;
   } else {
     startBtn.disabled = false;
   }
 
-  // Ativa "Try" apenas se o jogo está ativo
   if (currentStatus === "in_progress") {
     tryBtn.disabled = false;
   } else {
@@ -600,7 +641,7 @@ function updateUI() {
 }
 
 /*******************************************************
- * 11) DIGITAR LETRAS => Keydown
+ * 14) EVENTO DE DIGITAR LETRAS
  *******************************************************/
 function handleKeyPress(e) {
   if (currentStatus !== "in_progress" || !currentWord) return; 
@@ -623,7 +664,7 @@ function handleKeyPress(e) {
 }
 
 /*******************************************************
- * 12) BOTÃO "TRY" => submete a linha
+ * 15) BOTÃO TRY
  *******************************************************/
 document.getElementById("try-button").addEventListener("click", () => {
   if (currentStatus !== "in_progress") {
@@ -634,7 +675,7 @@ document.getElementById("try-button").addEventListener("click", () => {
 });
 
 /*******************************************************
- * 13) SUBMETER A LINHA (blocos digitados)
+ * 16) SUBMETER TENTATIVA
  *******************************************************/
 async function submitCurrentRow() {
   if (!currentWord || currentLetters.length !== currentWord.length) {
@@ -644,7 +685,6 @@ async function submitCurrentRow() {
 
   const guessClean = currentLetters.join("").toLowerCase();
 
-  // Verifica se existe no dicionário
   if (!dictionarySet.has(guessClean)) {
     speakText("That word is not in our dictionary!");
     return;
@@ -652,7 +692,6 @@ async function submitCurrentRow() {
 
   const feedback = getFeedback(guessClean, currentWord);
 
-  // Salva tentativa no Firebase
   const pushRef = db.ref("games/currentGame/attempts").push();
   await pushRef.set({
     guess: guessClean,
@@ -661,32 +700,27 @@ async function submitCurrentRow() {
     timestamp: Date.now()
   });
 
-  // Limpa para a próxima
   currentLetters = [];
 
-  // Se acertou
   if (feedback.every(c => c === "green")) {
     const definition = await getDefinition(guessClean);
     let msg = `Congratulations, ${isGuest ? "Guest" : userName}! You found the word "${guessClean}".`;
     if (definition) msg += ` Definition: ${definition}`;
     speakText(msg);
 
-    // Adiciona pontos se não for guest
     if (!isGuest && userUid) {
       let pts = 10;
       if (currentDifficulty === "medium") pts = 20;
       if (currentDifficulty === "hard")   pts = 35;
-
       totalPoints += pts;
       await db.ref("usuarios/" + userUid).update({ points: totalPoints });
-      showPersonalScore(); 
+      showPersonalScore();
+      updatePlayerScoreDisplay();
     }
 
-    // Finaliza jogo
     db.ref("games/currentGame").update({ status: "ended" });
-    disableInput(); 
+    disableInput();
   } else {
-    // Não acertou => fala mensagem de incentivo
     const randomMsg = encouragementMessages[Math.floor(Math.random() * encouragementMessages.length)];
     speakText(randomMsg);
   }
@@ -695,20 +729,18 @@ async function submitCurrentRow() {
 }
 
 /*******************************************************
- * 14) FUNÇÃO getFeedback => green, yellow, red
+ * 17) GET FEEDBACK
  *******************************************************/
 function getFeedback(guess, realWord) {
   const feedback = Array(guess.length).fill("red");
   const realArr  = realWord.split("");
 
-  // green
   for (let i=0; i<guess.length; i++) {
     if (guess[i] === realArr[i]) {
       feedback[i] = "green";
       realArr[i]  = "*";
     }
   }
-  // yellow
   for (let i=0; i<guess.length; i++) {
     if (feedback[i] === "green") continue;
     const idx = realArr.indexOf(guess[i]);
@@ -721,7 +753,7 @@ function getFeedback(guess, realWord) {
 }
 
 /*******************************************************
- * 15) BUSCAR DEFINIÇÃO => FREE DICTIONARY
+ * 18) OBTER DEFINIÇÃO
  *******************************************************/
 async function getDefinition(word) {
   try {
@@ -735,7 +767,7 @@ async function getDefinition(word) {
 }
 
 /*******************************************************
- * 16) BOTÃO INVITE FRIENDS
+ * 19) BOTÃO INVITE FRIENDS
  *******************************************************/
 document.getElementById("invite-button").addEventListener("click", () => {
   const shareData = {
@@ -752,13 +784,12 @@ document.getElementById("invite-button").addEventListener("click", () => {
 });
 
 /*******************************************************
- * 17) MOSTRAR PONTOS E CONTADOR DE PARTIDAS (CASO PROPRIETÁRIO)
+ * 20) MOSTRAR PONTOS & CONTADOR PARTIDAS
  *******************************************************/
 function showPersonalScore() {
   const personalScoreSection = document.getElementById("personal-score-section");
   const ownerCounterSection  = document.getElementById("owner-game-counter");
 
-  // Se não for guest, mostra a pontuação
   if (!isGuest) {
     personalScoreSection.style.display = "block";
     document.getElementById("personalScore").textContent = totalPoints;
@@ -766,7 +797,6 @@ function showPersonalScore() {
     personalScoreSection.style.display = "none";
   }
 
-  // Se for proprietário, mostra o contador de partidas
   if (userRole === "proprietario") {
     ownerCounterSection.style.display = "block";
     document.getElementById("ownerGamesCount").textContent = totalGames;
