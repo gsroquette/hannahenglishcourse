@@ -1,72 +1,60 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>English Word Guess Game</title>
-  
-  <!-- Firebase v8.x -->
+
+  <!-- Firebase (v8.x) -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
   <style>
-    /* ===== Reset básico ===== */
+    /* RESET BÁSICO */
     * {
-      margin: 0; 
-      padding: 0;
-      box-sizing: border-box;
+      margin: 0; padding: 0; box-sizing: border-box;
     }
-
     body {
       min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
       font-family: Arial, sans-serif;
       background: linear-gradient(to bottom right, #e3f2fd, #bbdefb);
-      padding: 20px;
+      /* padding extra para não ficar coberto pelo robô fixo */
+      padding: 20px; 
+      /* dar espaço para rolar caso a torre fique grande */
+      overflow-y: auto;
     }
 
-    /* ===== Container principal ===== */
-    #game-container {
-      width: 100%;
-      max-width: 1200px;
-      display: flex;
-      background-color: #fafafa;
-      box-shadow: 0 0 10px rgba(0,0,0,0.15);
-      border-radius: 8px;
-      overflow: hidden;
-    }
-
-    /* ===== Seção do robô (esquerda) ===== */
+    /* ROBOT FIXO NO CANTO SUPERIOR ESQUERDO */
     #robot-section {
-      width: 200px;
-      background: #fff;
-      padding: 20px;
-      position: relative;
-      border-right: 1px solid #ddd;
-      display: flex;
+      position: fixed;
+      top: 20px; 
+      left: 20px;
+      width: 220px; /* Ajustei para ficar maior */
+      z-index: 200; /* acima do layout normal */
+      display: flex; 
       flex-direction: column;
       align-items: center;
     }
     #robot-image {
-      width: 120px;
-      margin-bottom: 10px;
+      width: 100%; /* preenche a largura de 220px */
     }
     #robot-balloon {
       position: absolute;
-      top: 20px;
-      left: 180px;
-      max-width: 230px;
+      top: 220px; /* logo abaixo do robô */
+      left: 0; 
+      max-width: 220px;
       background: #fff;
       border: 2px solid #ccc;
       padding: 10px;
       border-radius: 8px;
       box-shadow: 2px 2px 6px rgba(0,0,0,0.2);
       display: none;
+      z-index: 999;
     }
+
+    /* BOTÃO INVITE FRIENDS */
     .btn-invite {
-      margin-top: 20px;
+      margin-top: 8px;
       border: none;
       background-color: #ff9800;
       color: #fff;
@@ -80,19 +68,18 @@
       background-color: #fb8c00;
     }
 
-    /* ===== Seção do jogo (centro) ===== */
-    #board-section {
-      flex: 1;
+    /* LAYOUT DO JOGO (CENTRO) */
+    #main-content {
+      margin-left: 260px; /* espaço para o robô fixo */
+      margin-right: 260px; /* espaço p/ scoreboard (básico) */
       padding: 20px;
     }
+
     #top-controls {
       display: flex;
       align-items: center;
       gap: 10px;
       margin-bottom: 16px;
-    }
-    #difficulty-select {
-      padding: 6px;
     }
     #start-game {
       background-color: #03a9f4;
@@ -103,44 +90,54 @@
       font-weight: bold;
       cursor: pointer;
     }
-    #start-game:hover {
-      background-color: #0288d1;
+    #start-game:disabled {
+      background-color: #bbb;
+      cursor: not-allowed;
+    }
+    #difficulty-select {
+      padding: 6px;
+    }
+    #message {
+      color: #444;
+      font-style: italic;
     }
 
     #board {
       min-height: 200px;
+      background: #fff;
       padding: 10px;
-      background-color: #fff;
       border: 1px solid #ddd;
       border-radius: 8px;
     }
-
     .attempt-row {
       display: flex;
+      align-items: center;
       margin-bottom: 5px;
-      justify-content: flex-start;
       gap: 5px;
     }
-
     .letter-block {
-      width: 45px;
+      width: 45px; 
       height: 45px;
       background-color: #cfd8dc;
       border: 1px solid #999;
       border-radius: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-transform: uppercase;
       font-weight: bold;
       font-size: 18px;
+      text-transform: uppercase;
+      display: flex;
+      justify-content: center;
+      align-items: center;
       color: #000;
-      box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
     }
-
-    /* Cores de feedback */
+    .player-name {
+      font-size: 14px;
+      margin-left: 6px;
+      font-style: italic;
+      color: #666;
+    }
+    /* FEEDBACK CORES */
     .green {
-      background-color: #66bb6a; 
+      background-color: #66bb6a;
       color: #fff;
     }
     .yellow {
@@ -152,29 +149,39 @@
       color: #fff;
     }
 
-    /* Botão TRY */
+    /* BOTÃO TRY => FIXO NO CANTO INFERIOR DIREITO */
     #try-button {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      z-index: 999;
+      border: none;
       background-color: #4caf50;
       color: #fff;
-      border: none;
-      padding: 8px 14px;
-      border-radius: 4px;
-      cursor: pointer;
+      padding: 12px 18px;
+      border-radius: 50px;
       font-weight: bold;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      cursor: pointer;
     }
     #try-button:hover {
       background-color: #388e3c;
     }
 
-    /* ===== Seção do placar (direita) ===== */
+    /* SCOREBOARD SIMPLES (DIREITA) */
     #scoreboard-section {
-      width: 250px;
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      width: 220px;
       background: #fff;
-      border-left: 1px solid #ddd;
-      padding: 20px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 10px;
+      z-index: 200;
     }
     #scoreboard-section h3 {
-      margin-bottom: 10px;
+      margin-bottom: 8px;
       text-align: center;
     }
     #score-list {
@@ -184,7 +191,7 @@
     }
     #score-list li {
       border-bottom: 1px solid #eee;
-      padding: 6px 0;
+      padding: 4px 0;
       display: flex;
       justify-content: space-between;
       font-size: 14px;
@@ -196,44 +203,43 @@
 </head>
 <body>
 
-<div id="game-container">
-
-  <!-- ESQUERDA: ROBÔ -->
-  <div id="robot-section">
-    <img id="robot-image" src="imagens/robo_estatico.png" alt="Robot Samuel">
-    <div id="robot-balloon"></div>
-    <button class="btn-invite" id="invite-button">Invite Friends</button>
-  </div>
-
-  <!-- CENTRO: BOARD -->
-  <div id="board-section">
-    <div id="top-controls">
-      <label for="difficulty-select">Difficulty:</label>
-      <select id="difficulty-select">
-        <option value="easy">Easy</option>
-        <option value="medium">Medium</option>
-        <option value="hard">Hard</option>
-      </select>
-      <button id="start-game">Start Game</button>
-      <!-- Botão TRY -->
-      <button id="try-button">Try</button>
-    </div>
-    <div id="board"></div>
-  </div>
-
-  <!-- DIREITA: PLACAR -->
-  <div id="scoreboard-section">
-    <h3>Top 20</h3>
-    <ol id="score-list"></ol>
-  </div>
-
+<!-- ROBÔ FIXO -->
+<div id="robot-section">
+  <img id="robot-image" src="imagens/robo_estatico.png" alt="Robot Samuel">
+  <div id="robot-balloon"></div>
+  <button class="btn-invite" id="invite-button">Invite Friends</button>
 </div>
+
+<!-- SCOREBOARD FIXO (DIREITA) -->
+<div id="scoreboard-section">
+  <h3>Top 20</h3>
+  <ol id="score-list"></ol>
+</div>
+
+<!-- CONTEÚDO PRINCIPAL (CENTRO) -->
+<div id="main-content">
+  <div id="top-controls">
+    <label for="difficulty-select">Difficulty:</label>
+    <select id="difficulty-select">
+      <option value="easy">Easy</option>
+      <option value="medium">Medium</option>
+      <option value="hard">Hard</option>
+    </select>
+    <button id="start-game">Start Game</button>
+    <span id="message"></span>
+  </div>
+
+  <div id="board"><!-- AQUI IRÃO AS TENTATIVAS --></div>
+</div>
+
+<!-- BOTÃO TRY FIXO -->
+<button id="try-button">Try</button>
 
 <script>
 /*****************************************************
- * 1) FIREBASE CONFIG (SUAS CHAVES)
+ * 1) Firebase Config
  *****************************************************/
-const firebaseConfig = {
+var firebaseConfig = {
   apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
   authDomain: "hannahenglishcourse.firebaseapp.com",
   databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
@@ -245,293 +251,330 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 
-const db   = firebase.database();
+const db = firebase.database();
 const auth = firebase.auth();
 
 /*****************************************************
- * 2) VARIÁVEIS GLOBAIS
+ * 2) Variáveis Globais
  *****************************************************/
-let dictionarySet = new Set();  // Carregado de words_alpha.txt
-let chosenWord    = "";         // Palavra escolhida para a rodada
-let rowBlocks     = [];         // Cada linha de blocos
-let currentRow    = 0;          // Linha atual
-let currentCol    = 0;          // Coluna atual (bloco)
-let userName      = "Guest";
-let userUid       = null;
-let isGuest       = true;
-let totalPoints   = 0;
-let difficulty    = "easy";
+let dictionarySet = new Set(); // Carregado do words_alpha, mas aqui assumimos que já existe
+let userName  = "Guest";
+let userUid   = null;
+let isGuest   = true;
+let userRole  = "aluno"; // ou "proprietario", etc.
+let currentWord = "";
+let currentStatus = "idle"; // "in_progress" | "ended"
+let currentDifficulty = "easy";
+let totalPoints = 0;
+let currentRow = []; // array de letras digitadas
+let attemptsLocal = []; // array local de tentativas { guess, feedback, playerName }
 
-// Robot
+/*****************************************************
+ * 3) Robot / TTS
+ *****************************************************/
 const robotImage   = document.getElementById("robot-image");
 const robotBalloon = document.getElementById("robot-balloon");
 const synth        = window.speechSynthesis;
 
-// Elementos
-const boardEl      = document.getElementById("board");
-const scoreboardEl = document.getElementById("score-list");
-
-/*****************************************************
- * 3) CARREGAR DICIONÁRIO (words_alpha.txt)
- *****************************************************/
-async function loadDictionary() {
-  try {
-    const response = await fetch("dictionaries/words_alpha.txt");
-    if (!response.ok) throw new Error("Failed to load dictionary file.");
-    const text = await response.text();
-    const words = text.split("\n").map(w => w.trim().toLowerCase()).filter(Boolean);
-    dictionarySet = new Set(words);
-    console.log("Dictionary loaded:", dictionarySet.size, "words");
-  } catch (err) {
-    console.error("Error loading dictionary:", err);
-  }
+function speakText(text) {
+  if (!text) return;
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.lang = "en-US";
+  utt.onstart = () => {
+    robotImage.src = "imagens/robo_fala.gif";
+    robotBalloon.textContent = text;
+    robotBalloon.style.display = "block";
+  };
+  utt.onend = () => {
+    robotImage.src = "imagens/robo_estatico.png";
+    setTimeout(() => {
+      robotBalloon.style.display = "none";
+    }, 800);
+  };
+  synth.speak(utt);
 }
 
 /*****************************************************
- * 4) AUTH STATE (para saber se é Guest ou usuário)
+ * 4) Auth - Quem é o usuário, role, etc.
  *****************************************************/
 auth.onAuthStateChanged(async (user) => {
   if (user) {
-    isGuest = false;
     userUid = user.uid;
+    isGuest = false;
     const snap = await db.ref("usuarios/" + userUid).once("value");
     const data = snap.val() || {};
-    userName   = data.nome || data.email || "User";
-    totalPoints= data.points || 0;
+    userName  = data.nome  || data.email || "User";
+    userRole  = data.role  || "aluno";
+    totalPoints = data.points || 0;
   } else {
-    isGuest = true;
-    userName= "Guest";
     userUid = null;
+    isGuest = true;
+    userName = "Guest";
+    userRole = "guest";
   }
+  // Carregar scoreboard
   loadScoreboard();
+  // Carregar estado atual do jogo
+  listenGameState();
 });
 
 /*****************************************************
- * 5) PLACAR TOP 20
+ * 5) Scoreboard
  *****************************************************/
 function loadScoreboard() {
-  scoreboardEl.innerHTML = "...";
+  const scoreList = document.getElementById("score-list");
   db.ref("usuarios").orderByChild("points").limitToLast(20).on("value", (snap) => {
     const val = snap.val() || {};
     let arr = [];
-    Object.keys(val).forEach((uid) => {
+    Object.keys(val).forEach(uid => {
       const u = val[uid];
-      const nm= u.nome || u.email || "Unknown";
+      const nm = u.nome || u.email || "User";
       const pts= u.points || 0;
       arr.push({ name: nm, points: pts });
     });
     // Ordenar decrescente
     arr.sort((a,b) => b.points - a.points);
-
-    scoreboardEl.innerHTML = "";
-    arr.forEach((item, idx) => {
+    scoreList.innerHTML = "";
+    arr.forEach((item, i) => {
       const li = document.createElement("li");
-      li.innerHTML = `<span>${idx+1}.</span> ${item.name} <span>${item.points} pts</span>`;
-      scoreboardEl.appendChild(li);
+      li.innerHTML = `<span>${i+1}.</span> ${item.name} <span>${item.points} pts</span>`;
+      scoreList.appendChild(li);
     });
   });
 }
 
 /*****************************************************
- * 6) ESCOLHER PALAVRA (com definição garantida)
+ * 6) Sincronizar Partida (games/currentGame)
  *****************************************************/
-async function pickWordWithDefinition() {
-  // Faz um filtro simples de tamanho (4 a 8 letras) para não ficar muito grande
-  const candidates = [...dictionarySet].filter(w => w.length >= 4 && w.length <= 8);
-  // Tentamos no máximo 50 vezes achar uma com definição
-  for (let i = 0; i < 50; i++) {
-    const randomWord = candidates[Math.floor(Math.random() * candidates.length)].toLowerCase();
-    const defOk = await hasDefinition(randomWord);
-    if (defOk) {
-      return randomWord;
+function listenGameState() {
+  db.ref("games/currentGame").on("value", (snap) => {
+    const data = snap.val();
+    if (!data) {
+      // Não existe partida -> estado idle
+      currentStatus = "idle";
+      currentWord   = "";
+      attemptsLocal = [];
+      renderAttempts();
+      updateUI();
+      return;
     }
-  }
-  // Se não achou nenhuma com definição, pega qualquer uma
-  return candidates[Math.floor(Math.random() * candidates.length)];
+    currentWord   = data.word   || "";
+    currentStatus = data.status || "idle";
+    currentDifficulty = data.difficulty || "easy";
+    // Pegar tentativas (obj -> array)
+    const attemptsObj = data.attempts || {};
+    attemptsLocal = Object.keys(attemptsObj).map(key => attemptsObj[key]);
+    // Renderiza novamente a torre
+    renderAttempts();
+    updateUI();
+  });
 }
 
 /*****************************************************
- * 7) VERIFICAR SE TEM DEFINIÇÃO NA FREE DICTIONARY
+ * 7) Start Game
  *****************************************************/
+document.getElementById("start-game").addEventListener("click", startGame);
+
+async function startGame() {
+  // Só permite se status != in_progress ou se userRole=proprietario
+  if (currentStatus === "in_progress" && userRole !== "proprietario") {
+    speakText("A game is already in progress. Please wait.");
+    return;
+  }
+  // Limpar no DB
+  await db.ref("games/currentGame").remove();
+
+  // Set up nova partida
+  currentDifficulty = document.getElementById("difficulty-select").value;
+  const word = await pickWordWithDefinition(currentDifficulty); // assume que existe ou substitua
+  const status = "in_progress";
+  // Salvar no DB
+  db.ref("games/currentGame").set({
+    word,
+    status,
+    difficulty: currentDifficulty,
+    attempts: {}
+  });
+  speakText(`${userName} started a new game! Difficulty: ${currentDifficulty}. Good luck!`);
+}
+
+/*****************************************************
+ * 8) Pick Word (Com Definição e Filtro)
+ *****************************************************/
+async function pickWordWithDefinition(diff) {
+  // Filtrar de acordo com as regras:
+  // easy = 3 letras
+  // medium = 4 ou 5
+  // hard = 6 ou 7
+  let minLen = 3, maxLen = 3, points=10;
+  if (diff === "medium") { minLen=4; maxLen=5; points=20; }
+  if (diff === "hard")   { minLen=6; maxLen=7; points=35; }
+
+  const allWords = [...dictionarySet].filter(w => w.length >= minLen && w.length <= maxLen);
+  if (allWords.length < 1) return "cat"; // fallback
+
+  for (let i = 0; i < 30; i++) {
+    const rand = allWords[Math.floor(Math.random()*allWords.length)];
+    if (await hasDefinition(rand)) {
+      return rand;
+    }
+  }
+  // Se não achou com definicao, devolve qualquer
+  return allWords[Math.floor(Math.random()*allWords.length)];
+}
+
 async function hasDefinition(word) {
   try {
     const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
     if (!res.ok) return false;
     const data = await res.json();
-    // Verifica se realmente tem algo
-    if (!data || !data[0]?.meanings?.[0]?.definitions?.[0]?.definition) return false;
-    return true;
-  } catch (err) {
+    return !!(data[0]?.meanings?.[0]?.definitions?.[0]?.definition);
+  } catch {
     return false;
   }
 }
 
 /*****************************************************
- * 8) START GAME
+ * 9) Render Attempts (Torre)
  *****************************************************/
-async function startGame() {
-  boardEl.innerHTML = "";
-  rowBlocks = [];
-  currentRow = 0;
-  currentCol = 0;
-  difficulty = document.getElementById("difficulty-select").value;
+function renderAttempts() {
+  const board = document.getElementById("board");
+  board.innerHTML = "";
 
-  speakText(`Hello, ${userName}. Difficulty is ${difficulty}. Please wait while I pick a word...`);
+  // Para cada attempt, criar "row" visual
+  attemptsLocal.forEach((attemptObj) => {
+    const rowDiv = document.createElement("div");
+    rowDiv.classList.add("attempt-row");
 
-  chosenWord = await pickWordWithDefinition();
-  console.log("Chosen word:", chosenWord); // debug
+    // Cada letra
+    const guessArr = attemptObj.guess.split("");
+    guessArr.forEach((letter, i) => {
+      const block = document.createElement("div");
+      block.classList.add("letter-block");
+      block.textContent = letter.toUpperCase();
+      if (attemptObj.feedback && attemptObj.feedback[i]) {
+        block.classList.add(attemptObj.feedback[i]);
+      }
+      rowDiv.appendChild(block);
+    });
 
-  // Cria a primeira linha de blocos
-  createRow();
-  speakText(`I have chosen a word with ${chosenWord.length} letters. Type your guess and press Try!`);
+    // Nome do jogador
+    const playerSpan = document.createElement("span");
+    playerSpan.classList.add("player-name");
+    playerSpan.textContent = `- ${attemptObj.playerName || "Unknown"}`;
+    rowDiv.appendChild(playerSpan);
+
+    board.appendChild(rowDiv);
+  });
 }
 
 /*****************************************************
- * 9) CRIAR LINHA DE BLOCOS
+ * 10) Update UI (Enable/Disable Start)
  *****************************************************/
-function createRow() {
-  const rowDiv = document.createElement("div");
-  rowDiv.classList.add("attempt-row");
-
-  const blocksArr = [];
-  for (let i = 0; i < chosenWord.length; i++) {
-    const block = document.createElement("div");
-    block.classList.add("letter-block");
-    block.textContent = "";
-    rowDiv.appendChild(block);
-    blocksArr.push(block);
-  }
-
-  boardEl.appendChild(rowDiv);
-  rowBlocks.push(blocksArr);
-}
-
-/*****************************************************
- * 10) DIGITAR LETRAS
- *****************************************************/
-document.addEventListener("keydown", (e) => {
-  // Se não temos chosenWord, não faz nada
-  if (!chosenWord) return;
-
-  // Linha atual
-  const blocks = rowBlocks[currentRow];
-  if (!blocks) return;
-
-  // Entrada A-Z
-  if (e.key.match(/^[a-z]$/i) && currentCol < chosenWord.length) {
-    blocks[currentCol].textContent = e.key.toUpperCase();
-    currentCol++;
-  }
-  // Backspace
-  else if (e.key === "Backspace" && currentCol > 0) {
-    currentCol--;
-    blocks[currentCol].textContent = "";
-  }
-  // Se digitar Enter, faz "submitRow()"
-  else if (e.key === "Enter") {
-    submitRow();
-  }
-});
-
-/*****************************************************
- * 11) BOTÃO TRY
- *****************************************************/
-document.getElementById("try-button").addEventListener("click", () => {
-  submitRow();
-});
-
-/*****************************************************
- * 12) SUBMIT ROW
- *****************************************************/
-async function submitRow() {
-  const blocks = rowBlocks[currentRow];
-  if (!blocks) return;
-
-  // Verifica se todos os blocos estão preenchidos
-  for (let i = 0; i < blocks.length; i++) {
-    if (!blocks[i].textContent.trim()) {
-      speakText("Please fill all letters first!");
-      return;
+function updateUI() {
+  const startBtn = document.getElementById("start-game");
+  if (currentStatus === "in_progress") {
+    if (userRole === "proprietario") {
+      startBtn.disabled = false; 
+    } else {
+      startBtn.disabled = true;
     }
+  } else {
+    // ended ou idle
+    startBtn.disabled = false;
   }
+}
 
-  // Monta a string do palpite
-  const guess = blocks.map(b => b.textContent.toLowerCase()).join("");
-  // Checa se existe no dicionário
-  if (!dictionarySet.has(guess)) {
-    speakText("That word is not in our dictionary. Try again!");
+/*****************************************************
+ * 11) TRY BUTTON (envia a tentativa)
+ *****************************************************/
+document.getElementById("try-button").addEventListener("click", handleTry);
+
+async function handleTry() {
+  // Se não há partida in_progress, nada a fazer
+  if (currentStatus !== "in_progress") {
+    speakText("No active game right now.");
+    return;
+  }
+  if (!currentWord) {
+    speakText("No word chosen yet!");
     return;
   }
 
-  // Aplica o feedback
-  const feedback = getFeedback(guess, chosenWord);
-  for (let i = 0; i < feedback.length; i++) {
-    blocks[i].classList.add(feedback[i]);
+  // Obter as letras digitadas de "currentRow"
+  // ou do "UI" se vc estiver usando um approach de colunas
+  // AQUI faremos algo simples: prompt (para exemplo).
+  // OU vc usa um array local que é alimentado no keydown, etc.
+  // Exemplo (substitua logicamente com seu array):
+  const guess = prompt("Type your guess (all letters filled):") || "";
+  const guessClean = guess.trim().toLowerCase();
+
+  // Validar tamanho
+  if (guessClean.length !== currentWord.length) {
+    speakText(`You must type exactly ${currentWord.length} letters!`);
+    return;
+  }
+  // Se não existe no dictionary, avisa
+  if (!dictionarySet.has(guessClean)) {
+    speakText("That word is not in our dictionary!");
+    return;
   }
 
-  // Verifica se acertou tudo
+  // Gerar feedback
+  const feedback = getFeedback(guessClean, currentWord);
+  // Salvar no DB
+  const pushRef = db.ref("games/currentGame/attempts").push();
+  await pushRef.set({
+    guess: guessClean,
+    feedback,
+    playerName: userName,
+    timestamp: Date.now()
+  });
+
+  // Checar se é allGreen
   const allGreen = feedback.every(c => c === "green");
   if (allGreen) {
-    // Buscar definição
-    const definition = await getDefinition(guess);
-    let msg = `Congratulations, ${userName}! You found the word "${guess}".`;
+    // Buscar definicao
+    const definition = await getDefinition(guessClean);
+    let msg = `Congratulations, ${userName}! You found the word "${guessClean}".`;
     if (definition) {
       msg += ` Definition: ${definition}`;
     }
     speakText(msg);
 
     // Pontos
-    let points = 10;
-    if (difficulty === "medium") points = 20;
-    if (difficulty === "hard")   points = 30;
+    let pts = 10; // easy
+    if (currentDifficulty === "medium") pts = 20;
+    if (currentDifficulty === "hard")   pts = 35;
+
     if (!isGuest && userUid) {
-      totalPoints += points;
-      await db.ref("usuarios/" + userUid).update({ points: totalPoints });
+      totalPoints += pts;
+      await db.ref("usuarios/"+userUid).update({ points: totalPoints });
     }
 
-    // Inicia novo jogo
-    setTimeout(startGame, 3000);
-  } else {
-    // Frase motivacional
-    const phrases = [
-      "Almost there, NAME! Keep trying!",
-      "Nice try, NAME! You're getting closer!",
-      "Don't give up, NAME! You can do it!",
-      "You're on the right track, NAME!",
-      "Stay focused, NAME! You're doing great!"
-    ];
-    const idx = Math.floor(Math.random() * phrases.length);
-    const phrase = phrases[idx].replace("NAME", userName);
-    speakText(phrase);
-
-    // Cria nova linha
-    currentRow++;
-    currentCol = 0;
-    createRow();
+    // Fim do jogo
+    db.ref("games/currentGame").update({ status: "ended" });
   }
 }
 
 /*****************************************************
- * 13) FEEDBACK DE CORES
+ * 12) Função getFeedback
  *****************************************************/
-function getFeedback(guess, real) {
-  // feedback[i] = "green" | "yellow" | "red"
+function getFeedback(guess, realWord) {
   const feedback = Array(guess.length).fill("red");
-  const realArr  = real.split("");
+  const realArr  = realWord.split("");
 
-  // Marcar green
+  // Marcando green
   for (let i = 0; i < guess.length; i++) {
     if (guess[i] === realArr[i]) {
       feedback[i] = "green";
-      realArr[i] = "*"; // remove do "estoque"
+      realArr[i] = "*";
     }
   }
-
-  // Marcar yellow
+  // Marcando yellow
   for (let i = 0; i < guess.length; i++) {
     if (feedback[i] === "green") continue;
-    const char = guess[i];
-    const idx  = realArr.indexOf(char);
+    const idx = realArr.indexOf(guess[i]);
     if (idx !== -1) {
       feedback[i] = "yellow";
       realArr[idx] = "*";
@@ -541,7 +584,7 @@ function getFeedback(guess, real) {
 }
 
 /*****************************************************
- * 14) GET DEFINITION (FREE DICTIONARY)
+ * 13) getDefinition
  *****************************************************/
 async function getDefinition(word) {
   try {
@@ -555,29 +598,7 @@ async function getDefinition(word) {
 }
 
 /*****************************************************
- * 15) FALA DO ROBÔ
- *****************************************************/
-function speakText(text) {
-  if (!text) return;
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "en-US";
-
-  utterance.onstart = () => {
-    robotImage.src = "imagens/robo_fala.gif";
-    robotBalloon.textContent = text;
-    robotBalloon.style.display = "block";
-  };
-  utterance.onend = () => {
-    robotImage.src = "imagens/robo_estatico.png";
-    setTimeout(() => {
-      robotBalloon.style.display = "none";
-    }, 800);
-  };
-  synth.speak(utterance);
-}
-
-/*****************************************************
- * 16) COMPARTILHAR (INVITE FRIENDS)
+ * 14) Invite Friends
  *****************************************************/
 document.getElementById("invite-button").addEventListener("click", () => {
   const shareData = {
@@ -588,21 +609,11 @@ document.getElementById("invite-button").addEventListener("click", () => {
   if (navigator.share) {
     navigator.share(shareData).catch(() => {});
   } else {
-    // fallback: WhatsApp
+    // fallback: whatsapp
     const wUrl = "https://wa.me/?text=" + encodeURIComponent(shareData.text + " " + shareData.url);
     window.open(wUrl, "_blank");
   }
 });
-
-/*****************************************************
- * 17) ON LOAD
- *****************************************************/
-document.addEventListener("DOMContentLoaded", async () => {
-  await loadDictionary();
-  // Assim que carrega o dicionário, o usuário pode clicar em "Start Game"
-});
-document.getElementById("start-game").addEventListener("click", startGame);
-
 </script>
 </body>
 </html>
