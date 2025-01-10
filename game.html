@@ -1,121 +1,203 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Jogo de Palavras em Inglês</title>
+  <title>Hannah Game</title>
+
+  <!-- Firebase (versão 8.x) -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
   <style>
-    /* ===== RESET BÁSICO ===== */
+    /* ===== RESET ===== */
     * {
-      box-sizing: border-box;
       margin: 0;
       padding: 0;
+      box-sizing: border-box;
     }
 
     body {
-      display: flex;
       min-height: 100vh;
-      background: #f0f0f0;
       font-family: Arial, sans-serif;
+      background: linear-gradient(to bottom right, #e3f2fd, #bbdefb);
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 20px;
     }
 
     /* ===== CONTAINER GERAL ===== */
     #game-container {
-      flex: 1;
-      position: relative;
-      padding: 20px;
+      width: 100%;
+      max-width: 1200px;
       display: flex;
-      flex-direction: row;
-      justify-content: space-between;
-      align-items: flex-start;
+      background-color: #fafafa;
+      box-shadow: 0 0 10px rgba(0,0,0,0.15);
+      border-radius: 8px;
+      overflow: hidden;
     }
 
-    /* ===== SEÇÃO ESQUERDA: ROBÔ ===== */
+    /* ===== SEÇÃO ESQUERDA: ROBOT ===== */
     #robot-section {
-      width: 150px;
+      width: 200px;
+      background: #fff;
+      padding: 20px;
       position: relative;
+      border-right: 1px solid #ddd;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
 
     #robot-image {
-      width: 100%;
-      display: block;
+      width: 120px;
       margin-bottom: 10px;
     }
 
     #robot-balloon {
       position: absolute;
-      top: 0;
-      left: 160px; /* deslocamento para o balão ficar à direita do robô */
+      top: 20px;
+      left: 180px; /* Balão à direita do robô */
       max-width: 250px;
       background: #fff;
       border: 2px solid #ccc;
       padding: 10px;
       border-radius: 8px;
       box-shadow: 2px 2px 6px rgba(0,0,0,0.2);
-      display: none; /* ficará visível em certos momentos */
+      display: none; 
+    }
+
+    /* Botão Invite */
+    .btn-invite {
+      margin-top: 20px;
+      border: none;
+      background-color: #ff9800;
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 14px;
+    }
+    .btn-invite:hover {
+      background-color: #fb8c00;
     }
 
     /* ===== SEÇÃO CENTRAL: JOGO ===== */
     #board-section {
       flex: 1;
-      margin: 0 20px;
+      padding: 20px;
     }
 
     #difficulty-selection {
-      margin-bottom: 10px;
+      margin-bottom: 20px;
     }
 
+    #difficulty-select {
+      padding: 6px;
+      margin-left: 8px;
+    }
+
+    #start-game {
+      margin-left: 10px;
+      background-color: #03a9f4;
+    }
+    #start-game:hover {
+      background-color: #0288d1;
+    }
+
+    /* Word container */
     #word-container {
       margin-bottom: 20px;
+      min-height: 120px; /* espaço para as tentativas */
+      padding: 10px;
+      background-color: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
     }
 
     .attempt-row {
       display: flex;
       align-items: center;
       margin-bottom: 5px;
+      justify-content: flex-start;
     }
 
     .letter-box {
       width: 40px;
       height: 40px;
-      border: 1px solid #666;
-      border-radius: 4px;
       margin-right: 5px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+      border-radius: 4px;
       font-weight: bold;
       font-size: 18px;
       text-transform: uppercase;
+      background: #cfd8dc;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #000;
+      /* Efeito 3D */
+      box-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+      border: 1px solid #999;
+      transition: transform 0.1s ease;
+    }
+    .letter-box:hover {
+      transform: translate(-2px, -2px);
     }
 
+    /* Cores feedback */
     .green {
-      background-color: #4caf50;
+      background-color: #66bb6a; 
       color: #fff;
     }
-
     .yellow {
-      background-color: #ffeb3b;
+      background-color: #ffeb3b; 
       color: #000;
     }
-
     .red {
-      background-color: #f44336;
+      background-color: #f44336; 
       color: #fff;
     }
 
     .player-name {
-      margin-left: 10px;
+      margin-left: 8px;
       font-size: 14px;
-      color: #555;
+      font-style: italic;
+      color: #666;
     }
 
-    /* ===== SEÇÃO DIREITA: PLACAR ===== */
-    #scoreboard-section {
-      width: 200px;
-      background: #fff;
+    /* Campo de input + botão */
+    #attempt-area {
+      margin-top: 10px;
+    }
+    #attempt-input {
+      width: 250px;
+      padding: 6px;
+      margin-right: 5px;
       border: 1px solid #ccc;
       border-radius: 4px;
-      padding: 10px;
+    }
+    #try-button {
+      border: none;
+      background-color: #4caf50;
+      color: #fff;
+      padding: 8px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+    }
+    #try-button:hover {
+      background-color: #388e3c;
+    }
+
+    /* ===== SEÇÃO DIREITA: SCOREBOARD ===== */
+    #scoreboard-section {
+      width: 250px;
+      background: #fff;
+      border-left: 1px solid #ddd;
+      padding: 20px;
     }
 
     #scoreboard-section h3 {
@@ -125,367 +207,433 @@
 
     #scoreboard-list {
       list-style: none;
+      padding-left: 0;
+      margin: 0;
     }
-
     #scoreboard-list li {
       padding: 5px 0;
       border-bottom: 1px solid #eee;
-    }
-
-    /* ===== ESTILOS GERAIS ===== */
-    .btn {
-      display: inline-block;
-      margin: 5px 0;
-      padding: 8px 12px;
-      border: none;
-      background-color: #2196f3;
-      color: #fff;
-      border-radius: 4px;
-      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
       font-size: 14px;
     }
-
-    .btn:hover {
-      background-color: #1e88e5;
-    }
-
-    #attempt-input {
-      width: 200px;
-      padding: 6px;
-      margin-right: 5px;
+    #scoreboard-list li span {
+      font-weight: bold;
     }
   </style>
 </head>
 <body>
 
+<!-- Container principal -->
 <div id="game-container">
   
-  <!-- Seção Esquerda: Robot Samuel -->
+  <!-- Robot Section -->
   <div id="robot-section">
     <img id="robot-image" src="imagens/robo_estatico.png" alt="Robot Samuel">
     <div id="robot-balloon"></div>
+
+    <!-- Button to share/invite friends -->
+    <button class="btn-invite" id="invite-friends-btn">
+      Invite Friends
+    </button>
   </div>
 
-  <!-- Seção Central: Jogo em si -->
+  <!-- Board Section: main game -->
   <div id="board-section">
+    
     <div id="difficulty-selection">
-      <label for="difficulty-select">Escolha a dificuldade:</label>
+      <label for="difficulty-select">Choose difficulty:</label>
       <select id="difficulty-select">
-        <option value="facil">Fácil</option>
-        <option value="medio">Médio</option>
-        <option value="dificil">Difícil</option>
+        <option value="easy">Easy</option>
+        <option value="medium">Medium</option>
+        <option value="hard">Hard</option>
       </select>
-      <button class="btn" id="start-game">Iniciar Partida</button>
+      <button id="start-game">Start Game</button>
     </div>
     
     <div id="word-container">
-      <!-- Aqui aparecem as linhas (tentativas) da "torre" de blocos -->
+      <!-- Attempts tower goes here -->
     </div>
 
-    <div>
-      <input type="text" id="attempt-input" placeholder="Tente uma palavra em inglês" />
-      <button class="btn" id="try-button">Enviar Tentativa</button>
+    <div id="attempt-area">
+      <input type="text" id="attempt-input" placeholder="Type an English word" />
+      <button id="try-button">Submit</button>
     </div>
   </div>
 
-  <!-- Seção Direita: Placar -->
+  <!-- Scoreboard Section -->
   <div id="scoreboard-section">
     <h3>Top 20 Players</h3>
     <ol id="scoreboard-list">
-      <!-- Exemplo de dados estáticos -->
-      <li>Maria - 250 pts</li>
-      <li>João - 230 pts</li>
-      <li>Sarah - 210 pts</li>
+      <!-- Dynamically filled from Firebase -->
     </ol>
   </div>
 
 </div>
 
 <script>
-  /********************************************************
-   *           EXEMPLO DE DADOS E VARIÁVEIS GLOBAIS
-   ********************************************************/
-  // Exemplo de dicionários locais (palavras por dificuldade)
-  // Em produção, você pode colocar milhares de palavras ou buscar no Firebase.
-  const WORDS = {
-    facil: ["apple", "banana", "table", "chair", "water"],
-    medio: ["coffee", "purple", "orange", "banana", "answer"],
-    dificil: ["software", "elephant", "mountain", "terrible", "question"]
+/********************************************************
+ * 1) FIREBASE CONFIG & INIT
+ ********************************************************/
+const firebaseConfig = {
+   apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+            authDomain: "hannahenglishcourse.firebaseapp.com",
+            projectId: "hannahenglishcourse",
+            storageBucket: "hannahenglishcourse.appspot.com",
+            messagingSenderId: "449818788486",
+            appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+            measurementId: "G-07VVJG9LRS",
+            databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+};
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+
+const db = firebase.database();
+const auth = firebase.auth();
+
+/********************************************************
+ * 2) GLOBAL VARIABLES
+ ********************************************************/
+// Words by difficulty (could be large or from DB)
+const WORDS = {
+  easy:    ["apple", "chair", "water", "hello", "music"],
+  medium:  ["coffee", "orange", "purple", "answer", "banana"],
+  hard:    ["software", "elephant", "mountain", "terrible", "question"]
+};
+
+// Motivational phrases
+const motivationalPhrases = [
+  "Almost there, NAME! Keep trying!",
+  "Nice try, NAME! You're getting closer!",
+  "Don't give up, NAME! You can do it!",
+  "You're on the right track, NAME!",
+  "Stay focused, NAME! You're doing great!"
+];
+
+let chosenWord       = "";
+let currentDifficulty= "easy";
+let userName         = "";    // Will come from Firebase or prompt
+let userGuest        = true;  // If not logged in
+let attemptsArray    = [];    // To display tower
+let userUid          = null;  // Logged user ID (if any)
+let totalPoints      = 0;     // Points for logged user
+
+// Robot references
+const robotImage   = document.getElementById("robot-image");
+const robotBalloon = document.getElementById("robot-balloon");
+const synth        = window.speechSynthesis;
+
+/********************************************************
+ * 3) SPEECH SYNTHESIS FUNCTION
+ ********************************************************/
+function speakText(text) {
+  if (!text) return;
+  
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "en-US"; 
+
+  utterance.onstart = () => {
+    robotImage.src = "imagens/robo_fala.gif";
+    robotBalloon.textContent = text;
+    robotBalloon.style.display = "block";
+  };
+  utterance.onend = () => {
+    robotImage.src = "imagens/robo_estatico.png";
+    setTimeout(() => {
+      robotBalloon.style.display = "none";
+    }, 800);
   };
 
-  // Frases motivacionais
-  const motivationalPhrases = [
-    "Almost there, NAME! Keep trying!",
-    "Nice try, NAME! You're getting closer!",
-    "Don't give up, NAME! You can do it!",
-    "You're on the right track, NAME!",
-    "Stay focused, NAME! You're doing great!"
-  ];
+  synth.speak(utterance);
+}
 
-  let chosenWord = "";       // Palavra que o usuário deve adivinhar
-  let currentDifficulty = "facil";
-  let userName = "";         // Nome do jogador atual (poderia vir do Firebase)
-  let attemptsArray = [];    // Armazena todas as tentativas e seus resultados
+/********************************************************
+ * 4) FREE DICTIONARY API (definition)
+ ********************************************************/
+async function getDefinition(word) {
+  try {
+    const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+    if (!response.ok) throw new Error("Definition not found");
+    const data = await response.json();
+    // Get the first definition
+    const definition = data[0].meanings[0].definitions[0].definition;
+    return definition;
+  } catch (error) {
+    console.error("Error fetching definition:", error);
+    return "";
+  }
+}
 
-  // Abaixo, definimos o Robot Samuel e sua fala
-  const robotImage = document.getElementById("robot-image");
-  const robotBalloon = document.getElementById("robot-balloon");
-  const synth = window.speechSynthesis;
-
-  /********************************************************
-   *           FUNÇÃO DE SÍNTESE DE VOZ
-   ********************************************************/
-  function speakText(text) {
-    if (!text) return;
+/********************************************************
+ * 5) CHECK USER STATUS (Auth)
+ ********************************************************/
+auth.onAuthStateChanged(async (user) => {
+  if (user) {
+    userGuest = false;
+    userUid   = user.uid;
     
-    // Configurações da fala
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "en-US"; // forçando inglês
+    // Load user info from DB
+    const snap = await db.ref("usuarios/" + userUid).once("value");
+    const userData = snap.val() || {};
+    userName  = userData.nome || user.email || "User";
+    totalPoints = userData.points || 0;
 
-    // Ao iniciar a fala...
-    utterance.onstart = () => {
-      // Trocar imagem do robô para o GIF
-      robotImage.src = "imagens/robo_fala.gif";
-      // Exibir balão com o texto
-      robotBalloon.textContent = text;
-      robotBalloon.style.display = "block";
-    };
-
-    // Ao terminar a fala...
-    utterance.onend = () => {
-      // Volta pra imagem estática
-      robotImage.src = "imagens/robo_estatico.png";
-      // Esconde o balão depois de um pequeno delay
-      setTimeout(() => {
-        robotBalloon.style.display = "none";
-      }, 1000);
-    };
-
-    synth.speak(utterance);
+  } else {
+    // Not logged => treat as guest
+    userGuest = true;
+    userName  = "Guest";
+    userUid   = null;
   }
 
-  /********************************************************
-   *     FUNÇÃO PARA PEGAR DEFINIÇÃO NA FREE DICTIONARY API
-   ********************************************************/
-  async function getDefinition(word) {
-    try {
-      const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
-      if (!response.ok) {
-        throw new Error("Definição não encontrada");
-      }
-      const data = await response.json();
-      // Pega a primeira definição encontrada
-      const definition = data[0].meanings[0].definitions[0].definition;
-      return definition;
-    } catch (error) {
-      console.error("Erro ao buscar definição:", error);
-      return "";
+  // Load scoreboard
+  loadTop20Players();
+});
+
+/********************************************************
+ * 6) VALIDATE WORD
+ ********************************************************/
+function isValidWord(word) {
+  word = word.toLowerCase();
+  const allWords = [...WORDS.easy, ...WORDS.medium, ...WORDS.hard];
+  return allWords.includes(word);
+}
+
+/********************************************************
+ * 7) FEEDBACK (GREEN, YELLOW, RED)
+ ********************************************************/
+function getFeedbackForAttempt(attempt, actualWord) {
+  const attemptLetters = attempt.toLowerCase().split("");
+  const actualLetters  = actualWord.toLowerCase().split("");
+  const feedback = [];
+
+  // Mark greens
+  for (let i = 0; i < attemptLetters.length; i++) {
+    if (attemptLetters[i] === actualLetters[i]) feedback.push("green");
+    else feedback.push("");
+  }
+
+  // Count letters
+  const letterCount = {};
+  for (let char of actualLetters) {
+    if (!letterCount[char]) letterCount[char] = 0;
+    letterCount[char]++;
+  }
+
+  // Remove greens from count
+  for (let i = 0; i < attemptLetters.length; i++) {
+    if (feedback[i] === "green") {
+      letterCount[attemptLetters[i]]--;
     }
   }
 
-  /********************************************************
-   *              VALIDAÇÃO DE PALAVRA
-   ********************************************************/
-  // Exemplo simples: confere se a palavra existe em qualquer lista
-  // (Idealmente, você teria uma lista grande ou validaria no servidor)
-  function isValidWord(word) {
-    const allWords = [...WORDS.facil, ...WORDS.medio, ...WORDS.dificil];
-    return allWords.includes(word.toLowerCase());
-  }
-
-  /********************************************************
-   *     FUNÇÃO PARA CALCULAR FEEDBACK DE CORES NA TENTATIVA
-   ********************************************************/
-  function getFeedbackForAttempt(attempt, actualWord) {
-    // Converte tudo pra minúsculo, por garantia
-    const attemptLetters = attempt.toLowerCase().split("");
-    const actualLetters = actualWord.toLowerCase().split("");
-
-    // Array pra armazenar as classes de cor (green, yellow, red)
-    const feedback = [];
-
-    // Primeiro, marca as letras green
-    for (let i = 0; i < attemptLetters.length; i++) {
-      if (attemptLetters[i] === actualLetters[i]) {
-        feedback.push("green");
+  // Mark yellows or reds
+  for (let i = 0; i < attemptLetters.length; i++) {
+    if (feedback[i] === "") {
+      const letter = attemptLetters[i];
+      if (letterCount[letter] && letterCount[letter] > 0) {
+        feedback[i] = "yellow";
+        letterCount[letter]--;
       } else {
-        feedback.push("");
+        feedback[i] = "red";
       }
     }
-
-    // Agora, marca amarelo ou vermelho
-    // (cuidando para não contar duplicatas)
-    const letterCount = {};
-
-    // Conta quantas vezes cada letra aparece na palavra real
-    for (let char of actualLetters) {
-      if (!letterCount[char]) letterCount[char] = 0;
-      letterCount[char]++;
-    }
-
-    // Remove as letras já marcadas como verde do count
-    for (let i = 0; i < attemptLetters.length; i++) {
-      if (feedback[i] === "green") {
-        letterCount[attemptLetters[i]]--;
-      }
-    }
-
-    // Define amarelo ou vermelho
-    for (let i = 0; i < attemptLetters.length; i++) {
-      if (feedback[i] === "") {
-        const letter = attemptLetters[i];
-        if (letterCount[letter] && letterCount[letter] > 0) {
-          feedback[i] = "yellow";
-          letterCount[letter]--;
-        } else {
-          feedback[i] = "red";
-        }
-      }
-    }
-
-    return feedback;
   }
 
-  /********************************************************
-   *        FUNÇÃO PARA RENDERIZAR A TORRE DE TENTATIVAS
-   ********************************************************/
-  function renderAttempts() {
-    const wordContainer = document.getElementById("word-container");
-    wordContainer.innerHTML = ""; // limpa antes de renderizar novamente
+  return feedback;
+}
 
-    attemptsArray.forEach((attemptObj) => {
-      const { attempt, feedback, player } = attemptObj;
+/********************************************************
+ * 8) RENDER ATTEMPTS (TOWER)
+ ********************************************************/
+function renderAttempts() {
+  const wordContainer = document.getElementById("word-container");
+  wordContainer.innerHTML = "";
 
-      const rowDiv = document.createElement("div");
-      rowDiv.classList.add("attempt-row");
+  attemptsArray.forEach((attemptObj) => {
+    const { attempt, feedback, player } = attemptObj;
 
-      // Cria os bloquinhos de letra
-      for (let i = 0; i < attempt.length; i++) {
-        const letterBox = document.createElement("div");
-        letterBox.classList.add("letter-box");
-        letterBox.textContent = attempt[i].toUpperCase();
-        if (feedback && feedback[i]) {
-          letterBox.classList.add(feedback[i]);
-        }
-        rowDiv.appendChild(letterBox);
+    const rowDiv = document.createElement("div");
+    rowDiv.classList.add("attempt-row");
+
+    for (let i = 0; i < attempt.length; i++) {
+      const letterBox = document.createElement("div");
+      letterBox.classList.add("letter-box");
+      letterBox.textContent = attempt[i].toUpperCase();
+      if (feedback && feedback[i]) {
+        letterBox.classList.add(feedback[i]);
       }
+      rowDiv.appendChild(letterBox);
+    }
 
-      // Nome do jogador
-      const playerSpan = document.createElement("span");
-      playerSpan.classList.add("player-name");
-      playerSpan.textContent = `- ${player}`;
-      rowDiv.appendChild(playerSpan);
+    const playerSpan = document.createElement("span");
+    playerSpan.classList.add("player-name");
+    playerSpan.textContent = `- ${player}`;
+    rowDiv.appendChild(playerSpan);
 
-      wordContainer.appendChild(rowDiv);
+    wordContainer.appendChild(rowDiv);
+  });
+}
+
+/********************************************************
+ * 9) START NEW GAME
+ ********************************************************/
+function startNewGame() {
+  // If user is guest, ask name once
+  if (userGuest) {
+    const namePrompt = prompt("What is your name? (Leave empty to stay as Guest)") || "";
+    if (namePrompt.trim()) {
+      userName = namePrompt.trim();
+    }
+  }
+
+  // Difficulty
+  const difficultySelect = document.getElementById("difficulty-select");
+  currentDifficulty = difficultySelect.value;
+
+  // Pick random word
+  const wordsArray = WORDS[currentDifficulty];
+  chosenWord = wordsArray[Math.floor(Math.random() * wordsArray.length)];
+
+  // Reset attempts
+  attemptsArray = [];
+  renderAttempts();
+
+  speakText(`Hello, ${userName}! Difficulty set to ${currentDifficulty}. Let's play!`);
+}
+
+/********************************************************
+ * 10) HANDLE ATTEMPT
+ ********************************************************/
+async function handleAttempt() {
+  const attemptInput = document.getElementById("attempt-input");
+  let attempt = attemptInput.value.trim().toLowerCase();
+  attemptInput.value = "";
+
+  if (!attempt) return;
+
+  // Validate
+  if (!isValidWord(attempt)) {
+    speakText(`Sorry, ${userName}, this word is not in our dictionary.`);
+    return;
+  }
+
+  // Feedback
+  const feedback = getFeedbackForAttempt(attempt, chosenWord);
+
+  // Save attempt locally (not storing in DB to avoid clutter)
+  attemptsArray.push({ attempt, feedback, player: userName });
+  renderAttempts();
+
+  // Check if all green
+  const isAllGreen = feedback.every((color) => color === "green");
+
+  if (isAllGreen) {
+    // Assign points
+    let pointsToAdd = 10;
+    if (currentDifficulty === "medium")  pointsToAdd = 20;
+    if (currentDifficulty === "hard")    pointsToAdd = 30;
+
+    const definition = await getDefinition(chosenWord);
+    let message = `Congratulations, ${userName}! You found the word "${chosenWord}".`;
+    if (definition) {
+      message += ` Definition: ${definition}`;
+    }
+    speakText(message);
+
+    // If user is logged in, update points
+    if (!userGuest && userUid) {
+      totalPoints += pointsToAdd;
+      await db.ref("usuarios/" + userUid).update({ points: totalPoints });
+    }
+
+    // Wait a bit, then start new game
+    setTimeout(() => {
+      startNewGame();
+    }, 3000);
+
+  } else {
+    // Motivational phrase
+    const randomIndex = Math.floor(Math.random() * motivationalPhrases.length);
+    const phrase = motivationalPhrases[randomIndex].replace("NAME", userName);
+    speakText(phrase);
+  }
+}
+
+/********************************************************
+ * 11) SCOREBOARD (TOP 20)
+ ********************************************************/
+function loadTop20Players() {
+  const scoreboardList = document.getElementById("scoreboard-list");
+  scoreboardList.innerHTML = "Loading...";
+
+  // We'll assume 'usuarios/{uid}/points' holds the user's total
+  db.ref("usuarios")
+    .orderByChild("points")
+    .limitToLast(20) // top 20 in ascending order
+    .on("value", (snapshot) => {
+      const data = snapshot.val() || {};
+      // Convert to array
+      let arr = [];
+      Object.keys(data).forEach(uid => {
+        const userInfo = data[uid];
+        const name = userInfo.nome || userInfo.email || "User";
+        const pts  = userInfo.points || 0;
+        arr.push({name, points: pts});
+      });
+
+      // Sort descending
+      arr.sort((a,b) => b.points - a.points);
+
+      scoreboardList.innerHTML = "";
+      arr.forEach((item, index) => {
+        const li = document.createElement("li");
+        li.innerHTML = `<span>${index+1}.</span> ${item.name} <span>${item.points} pts</span>`;
+        scoreboardList.appendChild(li);
+      });
     });
-  }
+}
 
-  /********************************************************
-   *        FUNÇÃO PARA INICIAR UMA NOVA PARTIDA
-   ********************************************************/
-  function startNewGame() {
-    // Pergunta o nome do usuário (aqui simplificado, mas pode vir do Firebase)
-    userName = prompt("Qual seu nome? (Ex: Maria)") || "Guest";
+/********************************************************
+ * 12) INVITE FRIENDS (WEB SHARE API + FALLBACK)
+ ********************************************************/
+function inviteFriends() {
+  const shareData = {
+    title: "Hannah Game",
+    text: "Join me in this fun English word game!",
+    url: "https://hannahenglishcourse.vercel.app/"
+  };
 
-    // Seta a dificuldade
-    const difficultySelect = document.getElementById("difficulty-select");
-    currentDifficulty = difficultySelect.value;
-
-    // Sorteia uma palavra
-    const wordsArray = WORDS[currentDifficulty];
-    chosenWord = wordsArray[Math.floor(Math.random() * wordsArray.length)];
-
-    // Limpa as tentativas
-    attemptsArray = [];
-    renderAttempts();
-
-    // Fala algo motivacional na abertura
-    speakText(`Hello ${userName}, let's play! You chose ${currentDifficulty} level!`);
-  }
-
-  /********************************************************
-   *       FUNÇÃO QUANDO O USUÁRIO ENVIA UMA TENTATIVA
-   ********************************************************/
-  async function handleAttempt() {
-    const attemptInput = document.getElementById("attempt-input");
-    let attempt = attemptInput.value.trim().toLowerCase();
-    attemptInput.value = "";
-
-    if (!attempt) return;
-    
-    // Verifica se a palavra é válida
-    if (!isValidWord(attempt)) {
-      speakText(`Sorry, ${userName}, this word is not valid in our dictionary.`);
-      return;
-    }
-
-    // Calcula feedback (cores)
-    const feedback = getFeedbackForAttempt(attempt, chosenWord);
-
-    // Salva nos attempts
-    attemptsArray.push({
-      attempt: attempt,
-      feedback,
-      player: userName
+  if (navigator.share) {
+    navigator.share(shareData).catch((err) => {
+      console.error("Share failed:", err);
     });
-
-    // Renderiza novamente
-    renderAttempts();
-
-    // Verifica se acertou (todas letras verdes)
-    const isAllGreen = feedback.every((color) => color === "green");
-    if (isAllGreen) {
-      // Usuário ganhou pontos (lógica de pontuação aqui)
-      // Ex: easy: +10, medium: +20, hard: +30
-      let points = 10;
-      if (currentDifficulty === "medio") points = 20;
-      if (currentDifficulty === "dificil") points = 30;
-
-      // Busca definição
-      const definition = await getDefinition(chosenWord);
-
-      // Robot fala parabéns
-      let message = `Congratulations ${userName}! The word is '${chosenWord}'.`;
-      if (definition) {
-        message += ` Definition: ${definition}`;
-      }
-      speakText(message);
-
-      // Aqui você atualizaria o placar no Firebase
-      // ...
-
-      // Iniciar nova partida ou aguardar o usuário clicar
-      // Exemplo simples: iniciar após 3s
-      setTimeout(() => {
-        startNewGame();
-      }, 3000);
-
-    } else {
-      // Se não acertou, fala algo motivacional
-      const randomIndex = Math.floor(Math.random() * motivationalPhrases.length);
-      const phrase = motivationalPhrases[randomIndex].replace("NAME", userName);
-      speakText(phrase);
-    }
+  } else {
+    // Fallback: WhatsApp link
+    const fallbackUrl = "https://wa.me/?text=" 
+      + encodeURIComponent("Join me in this fun English word game! " + shareData.url);
+    window.open(fallbackUrl, "_blank");
   }
+}
 
-  /********************************************************
-   *           EVENTOS DE BOTÕES
-   ********************************************************/
-  document.getElementById("start-game").addEventListener("click", () => {
-    startNewGame();
-  });
+/********************************************************
+ * 13) EVENT LISTENERS
+ ********************************************************/
+document.getElementById("start-game").addEventListener("click", startNewGame);
+document.getElementById("try-button").addEventListener("click", handleAttempt);
+document.getElementById("attempt-input").addEventListener("keypress", (e) => {
+  if (e.key === "Enter") handleAttempt();
+});
 
-  document.getElementById("try-button").addEventListener("click", () => {
-    handleAttempt();
-  });
+// Invite button
+document.getElementById("invite-friends-btn").addEventListener("click", inviteFriends);
 
-  // Permitir pressionar Enter no campo de input
-  document.getElementById("attempt-input").addEventListener("keypress", (e) => {
-    if (e.key === "Enter") {
-      handleAttempt();
-    }
-  });
+/********************************************************
+ * 14) ON LOAD
+ ********************************************************/
+window.addEventListener("DOMContentLoaded", () => {
+  // We rely on auth.onAuthStateChanged to set userName or Guest
+  // So just do nothing here. The scoreboard is loaded once auth is detected.
+});
 </script>
-
 </body>
 </html>
