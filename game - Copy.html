@@ -69,6 +69,21 @@
       background-color: #fb8c00;
     }
 
+#hidden-input {
+  position: absolute; /* Para permitir o posicionamento dinâmico */
+  width: 80%; /* Largura ajustável, opcional */
+  max-width: 300px; /* Opcional, para limitar a largura */
+  margin: 0 auto; /* Centraliza horizontalmente */
+  left: 50%; /* Começa centralizado */
+  transform: translateX(-50%); /* Alinha ao centro */
+  font-size: 18px; /* Para combinar com os blocos */
+  padding: 10px; /* Espaçamento interno */
+  border: 1px solid #ccc; /* Estilo de borda */
+  border-radius: 8px; /* Deixa as bordas arredondadas */
+  outline: none; /* Remove a borda azul ao focar */
+  display: none; /* Inicialmente oculto */
+}
+
     /* ÁREA PRINCIPAL (O JOGO, BOTÕES, ETC) */
     #main-content {
       margin-bottom: 30px; /* para dar espaço antes do scoreboard */
@@ -150,24 +165,9 @@
       color: #666;
     }
 
-    /* CAMPO DE TEXTO VISÍVEL */
-    #hidden-input {
-      width: 100%;
-      max-width: 300px;
-      margin: 15px auto;
-      display: block;
-      font-size: 18px;
-      padding: 10px;
-      border: 2px solid #4caf50;
-      border-radius: 8px;
-      outline: none;
-      text-align: center;
-    }
-
     /* BOTÃO TRY */
     #try-button {
-      display: block;
-      margin: 0 auto 20px auto;
+      margin-top: 15px;
       padding: 8px 14px;
       border: none;
       background-color: #4caf50;
@@ -243,9 +243,6 @@
       .btn-invite {
         margin-left: 0;
       }
-      #hidden-input {
-        max-width: 100%;
-      }
     }
   </style>
 </head>
@@ -273,15 +270,6 @@
   </div>
 
   <div id="board"></div>
-  <input 
-    type="text"
-    id="hidden-input"
-    autocomplete="off"
-    autocorrect="off"
-    autocapitalize="none"
-    spellcheck="false"
-    placeholder="Digite sua palavra aqui"
-  >
   <button id="try-button">Try</button>
 </div>
 
@@ -302,11 +290,19 @@
 </div>
 
 <!-- INPUT OCULTO PARA DIGITAÇÃO NO MOBILE/DESKTOP -->
-<!-- Removido, pois o campo de texto agora está visível acima -->
+<input 
+  type="text"
+  id="hidden-input"
+  autocomplete="off"
+  autocorrect="off"
+  autocapitalize="none"
+  spellcheck="false"
+  style="position:absolute; left:-9999px; top:-9999px; opacity:0;"
+>
 
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
 <script>
 /*******************************************************
@@ -409,8 +405,8 @@ document.getElementById("rules-button").addEventListener("click", () => {
   alert(
     "Simple Rules of the Game:\n\n" +
     "1. A random English word is chosen.\n" +
-    "2. Type your guess into the text field below.\n" +
-    "3. Press 'Try' or hit 'Enter' to submit.\n" +
+    "2. Tap any square and type letters to form your guess.\n" +
+    "3. Press 'Try' to submit.\n" +
     "4. Green = correct letter & position.\n" +
     "5. Yellow = correct letter, wrong position.\n" +
     "6. Red = letter not in the word.\n\n" +
@@ -563,14 +559,29 @@ async function startGame() {
   activeIndex     = 0;
   attemptsArray   = [];
 
-  // Define o tamanho do campo de texto
-  hiddenInput.maxLength = currentWord.length;
-  hiddenInput.value = "";
-  hiddenInput.placeholder = `Digite uma palavra de ${currentWord.length} letras`;
-
   renderAllAttempts();
+  positionHiddenInput(); // Reposiciona o input
   updateUI();
   showPersonalScore();
+}
+
+/*******************************************************
+ * 13) REPOSICIONAR INPUT
+ *******************************************************/
+function positionHiddenInput() {
+  if (!board || currentStatus !== "in_progress") return;
+
+  const currentRow = board.lastElementChild; // Última linha adicionada ao tabuleiro
+  if (!currentRow) return;
+
+  const rowBounds = currentRow.getBoundingClientRect(); // Pega as coordenadas da linha
+  const input = hiddenInput;
+
+  // Calcula a posição abaixo da linha atual
+  input.style.top = `${rowBounds.bottom + window.scrollY + 10}px`; // 10px de espaço abaixo da linha
+  input.style.left = `${rowBounds.left + window.scrollX}px`; // Alinha horizontalmente
+  input.style.width = `${rowBounds.width}px`; // Ajusta a largura ao tamanho da linha
+  input.style.display = "block"; // Torna o input visível
 }
 
 /*******************************************************
@@ -632,7 +643,27 @@ function renderAllAttempts() {
     board.appendChild(rowDiv);
   });
 
-  // Não renderizar a linha ativa, pois agora usamos o campo de texto
+  // Render a linha atual se o jogo estiver ativo
+  if (currentStatus === "in_progress" && currentWord) {
+    const newRowDiv = document.createElement("div");
+    newRowDiv.classList.add("attempt-row");
+    for (let i = 0; i < currentWord.length; i++) {
+      const block = document.createElement("div");
+      block.classList.add("letter-block");
+      block.textContent = currentLetters[i] ? currentLetters[i].toUpperCase() : "";
+
+      // Ao clicar, mudamos a posição ativa e focamos no hidden input
+      block.addEventListener("click", () => {
+        activeIndex = i;
+        hiddenInput.focus();       
+        positionHiddenInput(); // Reposiciona o input abaixo da linha
+      });
+
+      newRowDiv.appendChild(block);
+    }
+    board.appendChild(newRowDiv);
+    
+  }
 }
 
 /*******************************************************
@@ -699,13 +730,12 @@ document.getElementById("try-button").addEventListener("click", () => {
  * 18) SUBMETER TENTATIVA
  *******************************************************/
 async function submitCurrentRow() {
-  const guessClean = hiddenInput.value.trim().toLowerCase();
-
-  if (!currentWord || guessClean.length !== currentWord.length) {
+  if (!currentWord || currentLetters.length !== currentWord.length) {
     speakText(`You must fill exactly ${currentWord.length} letters!`);
     return;
   }
 
+  const guessClean = currentLetters.join("").toLowerCase();
   if (!dictionarySet.has(guessClean)) {
     speakText("That word is not in our dictionary!");
     return;
@@ -720,9 +750,9 @@ async function submitCurrentRow() {
     timestamp: Date.now()
   });
 
-  // Limpa o campo de texto após a tentativa
-  hiddenInput.value = "";
-  hiddenInput.focus();
+  // Limpa a linha atual após a tentativa
+  currentLetters = [];
+  activeIndex    = 0;
 
   if (feedback.every(c => c === "green")) {
     const definition = await getDefinition(guessClean);
@@ -747,8 +777,9 @@ async function submitCurrentRow() {
     speakText(randomMsg);
   }
 
-  // Re-renderiza as tentativas e mantém o input pronto para a próxima tentativa
+  // Re-renderiza as tentativas e reposiciona o input
   renderAllAttempts();
+  positionHiddenInput(); // Ajusta a posição do input abaixo da nova linha
   hiddenInput.focus(); // Foca automaticamente no input após a tentativa
 }
 
