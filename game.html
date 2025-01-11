@@ -70,11 +70,18 @@
     }
 
 #hidden-input {
-  position: absolute;
-  left: -9999px; /* Garante que ele esteja fora da área visível */
-  top: -9999px;  /* Mantém ele bem fora da tela */
-  opacity: 0;    /* Torna o campo invisível */
-  z-index: -1;   /* Certifica-se de que ele não apareça sobre outros elementos */
+  position: absolute; /* Para permitir o posicionamento dinâmico */
+  width: 80%; /* Largura ajustável, opcional */
+  max-width: 300px; /* Opcional, para limitar a largura */
+  margin: 0 auto; /* Centraliza horizontalmente */
+  left: 50%; /* Começa centralizado */
+  transform: translateX(-50%); /* Alinha ao centro */
+  font-size: 18px; /* Para combinar com os blocos */
+  padding: 10px; /* Espaçamento interno */
+  border: 1px solid #ccc; /* Estilo de borda */
+  border-radius: 8px; /* Deixa as bordas arredondadas */
+  outline: none; /* Remove a borda azul ao focar */
+  display: none; /* Inicialmente oculto */
 }
 
     /* ÁREA PRINCIPAL (O JOGO, BOTÕES, ETC) */
@@ -553,8 +560,28 @@ async function startGame() {
   attemptsArray   = [];
 
   renderAllAttempts();
+  positionHiddenInput(); // Reposiciona o input
   updateUI();
   showPersonalScore();
+}
+
+/*******************************************************
+ * 13) REPOSICIONAR INPUT
+ *******************************************************/
+function positionHiddenInput() {
+  if (!board || currentStatus !== "in_progress") return;
+
+  const currentRow = board.lastElementChild; // Última linha adicionada ao tabuleiro
+  if (!currentRow) return;
+
+  const rowBounds = currentRow.getBoundingClientRect(); // Pega as coordenadas da linha
+  const input = hiddenInput;
+
+  // Calcula a posição abaixo da linha atual
+  input.style.top = `${rowBounds.bottom + window.scrollY + 10}px`; // 10px de espaço abaixo da linha
+  input.style.left = `${rowBounds.left + window.scrollX}px`; // Alinha horizontalmente
+  input.style.width = `${rowBounds.width}px`; // Ajusta a largura ao tamanho da linha
+  input.style.display = "block"; // Torna o input visível
 }
 
 /*******************************************************
@@ -629,6 +656,7 @@ function renderAllAttempts() {
       block.addEventListener("click", () => {
         activeIndex = i;
         hiddenInput.focus();       
+        positionHiddenInput(); // Reposiciona o input abaixo da linha
       });
 
       newRowDiv.appendChild(block);
@@ -663,42 +691,27 @@ function updateUI() {
  * 16) INPUT EVENT (PARA MOBILE E DESKTOP)
  *******************************************************/
 hiddenInput.addEventListener("input", (e) => {
-  e.preventDefault(); // Bloqueia comportamentos padrão do navegador
-  if (currentStatus !== "in_progress" || !currentWord) return;
-  const val = e.target.value;
-  if (!val) return; // se estiver vazio, ignore
+  const val = e.target.value.trim().toLowerCase(); // Captura o valor digitado
+  if (!val || currentStatus !== "in_progress" || !currentWord) return;
 
-  // Pegamos apenas o último char digitado
-  const char = val[val.length - 1].toLowerCase();
-  if (char.match(/[a-z]/i)) {
-    currentLetters[activeIndex] = char;
-    if (activeIndex < currentWord.length - 1) {
-      activeIndex++;
-    }
-    e.target.value = ""; 
-    renderAllAttempts();
-  } else {
-    e.target.value = "";
+  // Limita o valor ao tamanho da palavra atual
+  if (val.length > currentWord.length) {
+    e.target.value = val.slice(0, currentWord.length); 
   }
 });
 
-// Para backspace e Enter
 hiddenInput.addEventListener("keydown", (e) => {
-  e.preventDefault(); // Bloqueia comportamentos padrão de todas as teclas
   if (currentStatus !== "in_progress" || !currentWord) return;
 
   if (e.key === "Backspace") {
-    if (currentLetters[activeIndex]) {
-      currentLetters[activeIndex] = "";
-    } else if (activeIndex > 0) {
-      activeIndex--;
-      currentLetters[activeIndex] = "";
-    }
-    renderAllAttempts();
+    // Remove o último caractere do input
+    const val = hiddenInput.value.trim();
+    hiddenInput.value = val.slice(0, -1);
   }
-  
+
   if (e.key === "Enter") {
-    submitCurrentRow();
+    e.preventDefault(); // Evita comportamentos padrão
+    submitCurrentRow(); // Envia a tentativa atual
   }
 });
 
@@ -737,6 +750,7 @@ async function submitCurrentRow() {
     timestamp: Date.now()
   });
 
+  // Limpa a linha atual após a tentativa
   currentLetters = [];
   activeIndex    = 0;
 
@@ -756,13 +770,17 @@ async function submitCurrentRow() {
       updatePlayerScoreDisplay();
     }
 
+    // Atualiza o status do jogo
     db.ref("games/currentGame").update({ status: "ended" });
   } else {
     const randomMsg = encouragementMessages[Math.floor(Math.random() * encouragementMessages.length)];
     speakText(randomMsg);
   }
 
+  // Re-renderiza as tentativas e reposiciona o input
   renderAllAttempts();
+  positionHiddenInput(); // Ajusta a posição do input abaixo da nova linha
+  hiddenInput.focus(); // Foca automaticamente no input após a tentativa
 }
 
 /*******************************************************
