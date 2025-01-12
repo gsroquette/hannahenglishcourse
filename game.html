@@ -1050,61 +1050,72 @@ function updateUI() {
     });
 
     /*******************************************************
-     * 19) SUBMETER TENTATIVA
-     *******************************************************/
-    async function submitCurrentRow() {
-      const guessClean = hiddenInput.value.trim().toLowerCase();
+ * 19) SUBMETER TENTATIVA
+ *******************************************************/
+async function submitCurrentRow() {
+  const guessClean = hiddenInput.value.trim().toLowerCase();
 
-      if (!currentWord || guessClean.length !== currentWord.length) {
-        speakText(`You must fill exactly ${currentWord.length} letters!`);
-        return;
-      }
+  if (!currentWord || guessClean.length !== currentWord.length) {
+    speakText(`You must fill exactly ${currentWord.length} letters!`);
+    return;
+  }
 
-      if (!dictionarySet.has(guessClean)) {
-        speakText("That word is not in our dictionary!");
-        return;
-      }
+  if (!dictionarySet.has(guessClean)) {
+    speakText("That word is not in our dictionary!");
+    return;
+  }
 
-      const feedback = getFeedback(guessClean, currentWord);
-      const pushRef  = db.ref("games/currentGame/attempts").push();
-      await pushRef.set({
-        guess: guessClean,
-        feedback,
-        playerName: isGuest ? "Guest" : userName,
-        timestamp: Date.now()
-      });
+  const feedback = getFeedback(guessClean, currentWord);
+  const pushRef = db.ref("games/currentGame/attempts").push();
+  await pushRef.set({
+    guess: guessClean,
+    feedback,
+    playerName: isGuest ? "Guest" : userName,
+    timestamp: Date.now()
+  });
 
-      // Limpa o campo de texto após a tentativa
-      hiddenInput.value = "";
-      hiddenInput.focus();
+  // Limpa o campo de texto após a tentativa
+  hiddenInput.value = "";
+  hiddenInput.focus();
 
-      if (feedback.every(c => c === "green")) {
-        const definition = await getDefinition(guessClean);
-        let msg = `Congratulations, ${isGuest ? "Guest" : userName}! You found the word "${guessClean}".`;
-        if (definition) msg += ` Definition: ${definition}`;
-        speakText(msg, true); // Passa true para scrollar
+  if (feedback.every(c => c === "green")) {
+    const definition = await getDefinition(guessClean);
+    let msg = `Congratulations, ${isGuest ? "Guest" : userName}! You found the word "${guessClean}".`;
+    if (definition) msg += ` Definition: ${definition}`;
+    speakText(msg, true); // Passa true para scrollar
 
-        if (!isGuest && userUid) {
-          let pts = 10;
-          if (currentDifficulty === "medium") pts = 20;
-          if (currentDifficulty === "hard")   pts = 35;
-          totalPoints += pts;
-          await db.ref("usuarios/" + userUid).update({ points: totalPoints });
-          showPersonalScore();
-          updatePlayerScoreDisplay();
-        }
+    // Atualizar pontuação apenas para usuários logados
+    if (!isGuest && userUid) {
+      let pts = 10;
+      if (currentDifficulty === "medium") pts = 20;
+      if (currentDifficulty === "hard") pts = 35;
 
-        // Atualiza o status do jogo
-        db.ref("games/currentGame").update({ status: "ended" });
-      } else {
-        const randomMsg = encouragementMessages[Math.floor(Math.random() * encouragementMessages.length)];
-        speakText(randomMsg);
-      }
+      // Recuperar e atualizar pontos no banco de dados
+      const userRef = db.ref("usuarios/" + userUid);
+      const userSnap = await userRef.once("value");
+      const userData = userSnap.val() || {};
+      const currentPoints = userData.points || 0; // Pontos existentes ou 0
+      const updatedPoints = currentPoints + pts; // Soma os pontos ganhos
 
-      // Re-renderiza as tentativas e mantém o input pronto para a próxima tentativa
-      renderAllAttempts();
-      hiddenInput.focus(); // Foca automaticamente no input após a tentativa
+      await userRef.update({ points: updatedPoints }); // Atualiza no Firebase
+
+      // Atualizar variável local e interface
+      totalPoints = updatedPoints;
+      showPersonalScore();
+      updatePlayerScoreDisplay();
     }
+
+    // Atualiza o status do jogo
+    db.ref("games/currentGame").update({ status: "ended" });
+  } else {
+    const randomMsg = encouragementMessages[Math.floor(Math.random() * encouragementMessages.length)];
+    speakText(randomMsg);
+  }
+
+  // Re-renderiza as tentativas e mantém o input pronto para a próxima tentativa
+  renderAllAttempts();
+  hiddenInput.focus(); // Foca automaticamente no input após a tentativa
+}
 
     /*******************************************************
      * 20) FEEDBACK (green, yellow, red)
