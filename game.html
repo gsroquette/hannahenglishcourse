@@ -677,30 +677,36 @@
     /*******************************************************
      * 6) LOGIN
      *******************************************************/
-    auth.onAuthStateChanged(async (user) => {
-      console.log("Auth state changed:", user); // Adicionado para debug
-      if (user) {
-        userUid   = user.uid;
-        isGuest   = false;
-        const snap= await db.ref("usuarios/" + userUid).once("value");
-        const data= snap.val() || {};
-        userName  = data.nome || data.email || "User";
-        userRole  = data.role || "aluno";
-        totalPoints = data.points || 0;
-        totalGames  = data.gamesPlayed || 0;
-      } else {
-        userUid  = null;
-        isGuest  = true;
-        userName = "Guest";
-        userRole = "guest";
-        speakText("You're playing as a guest. Your progress won't be saved.");
-      }
-      loadScoreboard();
-      listenGameState();
-      showPersonalScore();
-      updatePlayerScoreDisplay();
-      updateLoginButtonVisibility(); // Atualiza a visibilidade do botão de login
-    });
+   auth.onAuthStateChanged(async (user) => {
+  if (user) {
+    userUid = user.uid;
+    isGuest = false;
+    const snap = await db.ref("usuarios/" + userUid).once("value");
+    const data = snap.val() || {};
+    userName = data.nome || data.email || "User";
+
+    // Adiciona o jogador ao jogo atual
+    const playerRef = db.ref("games/currentGame/players/" + userUid);
+    playerRef.set({ name: userName, joinedAt: Date.now() });
+    playerRef.onDisconnect().remove(); // Remove o jogador ao desconectar
+  } else {
+    userUid = null;
+    isGuest = true;
+    userName = "Guest";
+
+    // Adiciona um jogador convidado
+    const guestId = `guest_${Date.now()}`;
+    const playerRef = db.ref("games/currentGame/players/" + guestId);
+    playerRef.set({ name: "Guest", joinedAt: Date.now() });
+    playerRef.onDisconnect().remove(); // Remove o jogador ao desconectar
+  }
+
+  loadScoreboard();
+  listenGameState();
+  showPersonalScore();
+  updatePlayerScoreDisplay();
+  updateLoginButtonVisibility();
+});
 
     /*******************************************************
      * 7) ATUALIZAR EXIBIÇÃO DO SCORE (TOPO)
