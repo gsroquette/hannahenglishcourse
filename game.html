@@ -721,40 +721,50 @@
       );
     });
 
-    /*******************************************************
-     * 6) LOGIN
-     *******************************************************/
-   auth.onAuthStateChanged(async (user) => {
+   /*******************************************************
+ * 6) LOGIN
+ *******************************************************/
+auth.onAuthStateChanged(async (user) => {
+  let playerRef = null; // Referência do jogador no nó players
+
   if (user) {
+    // Usuário logado
     userUid = user.uid;
     isGuest = false;
+
+    // Recupera os dados do usuário no Firebase
     const snap = await db.ref("usuarios/" + userUid).once("value");
     const data = snap.val() || {};
     userName = data.nome || data.email || "User";
-    userRole = data.role || ""; // Definindo userRole com base nos dados do Firebase, vazio se não definido
+    userRole = data.role || ""; // Obtém o role do usuário logado (se disponível)
 
-    // Adiciona o jogador ao jogo atual
-    const playerRef = db.ref("games/currentGame/players/" + userUid);
+    // Adiciona o jogador logado ao nó players
+    playerRef = db.ref("games/currentGame/players/" + userUid);
     playerRef.set({ name: userName, joinedAt: Date.now() });
-    playerRef.onDisconnect().remove(); // Remove o jogador ao desconectar
   } else {
+    // Usuário convidado (não logado)
     userUid = null;
     isGuest = true;
     userName = "Guest";
-    userRole = ""; // Não atribuir nenhum role para convidados
+    userRole = ""; // Não atribuir role para convidados
 
-    // Adiciona um jogador convidado
+    // Gera um ID único para o convidado
     const guestId = `guest_${Date.now()}`;
-    const playerRef = db.ref("games/currentGame/players/" + guestId);
+    playerRef = db.ref("games/currentGame/players/" + guestId);
     playerRef.set({ name: "Guest", joinedAt: Date.now() });
-    playerRef.onDisconnect().remove(); // Remove o jogador ao desconectar
   }
 
-  loadScoreboard();
-  listenGameState();
-  showPersonalScore();
-  updatePlayerScoreDisplay();
-  updateLoginButtonVisibility();
+  // Remove o jogador do nó players ao desconectar
+  if (playerRef) {
+    playerRef.onDisconnect().remove();
+  }
+
+  // Atualiza a interface e funcionalidades
+  loadScoreboard(); // Atualiza o placar
+  listenGameState(); // Monitora o estado do jogo e jogadores ativos
+  showPersonalScore(); // Exibe a pontuação pessoal
+  updatePlayerScoreDisplay(); // Atualiza o placar individual
+  updateLoginButtonVisibility(); // Ajusta a visibilidade do botão de login
 });
 
     /*******************************************************
