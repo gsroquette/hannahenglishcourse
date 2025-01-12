@@ -642,37 +642,22 @@
     const loginButton      = document.getElementById("login-button");
 
     /*******************************************************
- * 3) CARREGAR OS DICIONÁRIOS
- *******************************************************/
-let oxfordDictionarySet = new Set(); // Para sortear palavras do jogo
-let validationDictionarySet = new Set(); // Para validar palavras digitadas
-
-async function loadDictionaries() {
-  try {
-    // Carregar o Oxford 3000 Word List para sortear palavras
-    const oxfordResponse = await fetch("dictionaries/Oxford 3000 Word List.txt");
-    if (!oxfordResponse.ok) {
-      throw new Error(`Failed to load Oxford 3000 Word List: ${oxfordResponse.statusText}`);
+     * 3) CARREGAR O DICIONÁRIO
+     *******************************************************/
+    async function loadDictionary() {
+      try {
+        // Ajuste para o seu dicionário ou manter a path original
+        const response = await fetch("dictionaries/Oxford 3000 Word List.txt");
+        if (!response.ok) {
+          throw new Error(`Failed to load dictionary: ${response.statusText}`);
+        }
+        const text = await response.text();
+        dictionarySet = new Set(text.split("\n").map(word => word.trim().toLowerCase()));
+      } catch (error) {
+        console.error("Erro ao carregar o dicionário:", error);
+      }
     }
-    const oxfordText = await oxfordResponse.text();
-    oxfordDictionarySet = new Set(oxfordText.split("\n").map(word => word.trim().toLowerCase()));
-
-    // Carregar o words_alpha.txt para validar palavras digitadas
-    const alphaResponse = await fetch("dictionaries/words_alpha.txt");
-    if (!alphaResponse.ok) {
-      throw new Error(`Failed to load words_alpha.txt: ${alphaResponse.statusText}`);
-    }
-    const alphaText = await alphaResponse.text();
-    validationDictionarySet = new Set(alphaText.split("\n").map(word => word.trim().toLowerCase()));
-
-    console.log("Dicionários carregados com sucesso!");
-  } catch (error) {
-    console.error("Erro ao carregar os dicionários:", error);
-  }
-}
-
-// Chamar a função para carregar os dicionários
-loadDictionaries();
+    loadDictionary();
 
     /*******************************************************
      * 4) ROBÔ E TTS
@@ -961,41 +946,34 @@ loadDictionaries();
     updateGameStats(); // Atualizar "Your Score" e "Total Games"
   }
 
-  /*******************************************************
- * 11) ESCOLHER PALAVRA
- *******************************************************/
-async function pickWordWithDefinition(diff) {
-  let minLen = 3, maxLen = 3;
-  if (diff === "medium") { minLen = 4; maxLen = 5; }
-  if (diff === "hard") { minLen = 6; maxLen = 7; }
+    /*******************************************************
+   * 11) ESCOLHER PALAVRA
+   *******************************************************/
+  async function pickWordWithDefinition(diff) {
+    let minLen=3, maxLen=3;
+    if (diff === "medium") { minLen=4; maxLen=5; }
+    if (diff === "hard")   { minLen=6; maxLen=7; }
 
-  // Filtrar palavras do Oxford 3000 Word List com base no tamanho
-  const allWords = [...oxfordDictionarySet].filter(w => w.length >= minLen && w.length <= maxLen);
-  if (allWords.length < 1) return "cat"; // Palavra fallback caso nenhuma seja encontrada
+    const allWords = [...dictionarySet].filter(w => w.length >= minLen && w.length <= maxLen);
+    if (allWords.length < 1) return "cat";
 
-  // Tentar encontrar uma palavra com definição válida
-  for (let i = 0; i < 30; i++) {
-    const cand = allWords[Math.floor(Math.random() * allWords.length)];
-    if (await hasDefinition(cand)) return cand;
+    for (let i=0; i<30; i++) {
+      const cand = allWords[Math.floor(Math.random()*allWords.length)];
+      if (await hasDefinition(cand)) return cand;
+    }
+    return allWords[Math.floor(Math.random()*allWords.length)];
   }
 
-  // Fallback para o caso de não encontrar nenhuma palavra válida com definição
-  return allWords[Math.floor(Math.random() * allWords.length)];
-}
-
-/*******************************************************
- * 12) VERIFICAR DEFINIÇÃO NA API
- *******************************************************/
-async function hasDefinition(word) {
-  try {
-    const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
-    if (!res.ok) return false;
-    const data = await res.json();
-    return !!(data[0]?.meanings?.[0]?.definitions?.[0]?.definition);
-  } catch {
-    return false;
+  async function hasDefinition(word) {
+    try {
+      const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+      if (!res.ok) return false;
+      const data = await res.json();
+      return !!(data[0]?.meanings?.[0]?.definitions?.[0]?.definition);
+    } catch {
+      return false;
+    }
   }
-}
 
     /*******************************************************
    * 12) RENDERIZAR
@@ -1127,77 +1105,72 @@ async function hasDefinition(word) {
     window.location.href = "https://hannahenglishcourse.vercel.app/Formulario/login.html";
   });
 
- /*******************************************************
- * 19) SUBMETER TENTATIVA
- *******************************************************/
-async function submitCurrentRow() {
-  const guessClean = hiddenInput.value.trim().toLowerCase();
+    /*******************************************************
+   * 19) SUBMETER TENTATIVA
+   *******************************************************/
+  async function submitCurrentRow() {
+    const guessClean = hiddenInput.value.trim().toLowerCase();
 
-  // Verificar se há uma palavra ativa e se o comprimento está correto
-  if (!currentWord || guessClean.length !== currentWord.length) {
-    speakText(`You must fill exactly ${currentWord.length} letters!`);
-    return;
-  }
-
-  // Validar se a palavra digitada existe no validationDictionarySet
-  if (!validationDictionarySet.has(guessClean)) {
-    speakText("That word is not in our dictionary!");
-    return;
-  }
-
-  // Obter feedback para a palavra digitada
-  const feedback = getFeedback(guessClean, currentWord);
-  const pushRef = db.ref("HannahGames/guessTheWord/currentGame/attempts").push();
-  await pushRef.set({
-    guess: guessClean,
-    feedback,
-    playerName: isGuest ? "Guest" : userName,
-    timestamp: Date.now()
-  });
-
-  // Limpar o campo de texto após a tentativa
-  hiddenInput.value = "";
-  hiddenInput.focus();
-
-  // Verificar se a palavra foi adivinhada corretamente
-  if (feedback.every(c => c === "green")) {
-    const definition = await getDefinition(guessClean);
-    let msg = `Congratulations, ${isGuest ? "Guest" : userName}! You found the word "${guessClean}".`;
-    if (definition) msg += ` Definition: ${definition}`;
-    speakText(msg, true); // Passa true para scrollar
-
-    // Atualizar pontuação apenas para usuários logados
-    if (!isGuest && userUid) {
-      let pts = 10;
-      if (currentDifficulty === "medium") pts = 20;
-      if (currentDifficulty === "hard") pts = 35;
-
-      // Recuperar e atualizar pontos no banco de dados
-      const userRef = db.ref("usuarios/" + userUid);
-      const userSnap = await userRef.once("value");
-      const userData = userSnap.val() || {};
-      const currentPoints = userData.points || 0; // Pontos existentes ou 0
-      const updatedPoints = currentPoints + pts; // Soma os pontos ganhos
-
-      await userRef.update({ points: updatedPoints }); // Atualiza no Firebase
-
-      // Atualizar variável local e interface
-      totalPoints = updatedPoints;
-      updateGameStats(); // Atualiza "Your Score" e outras estatísticas
+    if (!currentWord || guessClean.length !== currentWord.length) {
+      speakText(`You must fill exactly ${currentWord.length} letters!`);
+      return;
     }
 
-    // Atualiza o status do jogo
-    db.ref("HannahGames/guessTheWord/currentGame").update({ status: "ended" });
-  } else {
-    // Mostrar mensagem de incentivo
-    const randomMsg = encouragementMessages[Math.floor(Math.random() * encouragementMessages.length)];
-    speakText(randomMsg);
-  }
+    if (!dictionarySet.has(guessClean)) {
+      speakText("That word is not in our dictionary!");
+      return;
+    }
 
-  // Re-renderizar tentativas e manter o foco no input
-  renderAllAttempts();
-  hiddenInput.focus(); // Foca automaticamente no input após a tentativa
-}
+    const feedback = getFeedback(guessClean, currentWord);
+    const pushRef = db.ref("HannahGames/guessTheWord/currentGame/attempts").push();
+    await pushRef.set({
+      guess: guessClean,
+      feedback,
+      playerName: isGuest ? "Guest" : userName,
+      timestamp: Date.now()
+    });
+
+    // Limpa o campo de texto após a tentativa
+    hiddenInput.value = "";
+    hiddenInput.focus();
+
+    if (feedback.every(c => c === "green")) {
+      const definition = await getDefinition(guessClean);
+      let msg = `Congratulations, ${isGuest ? "Guest" : userName}! You found the word "${guessClean}".`;
+      if (definition) msg += ` Definition: ${definition}`;
+      speakText(msg, true); // Passa true para scrollar
+
+      // Atualizar pontuação apenas para usuários logados
+      if (!isGuest && userUid) {
+        let pts = 10;
+        if (currentDifficulty === "medium") pts = 20;
+        if (currentDifficulty === "hard") pts = 35;
+
+        // Recuperar e atualizar pontos no banco de dados
+        const userRef = db.ref("usuarios/" + userUid);
+        const userSnap = await userRef.once("value");
+        const userData = userSnap.val() || {};
+        const currentPoints = userData.points || 0; // Pontos existentes ou 0
+        const updatedPoints = currentPoints + pts; // Soma os pontos ganhos
+
+        await userRef.update({ points: updatedPoints }); // Atualiza no Firebase
+
+        // Atualizar variável local e interface
+        totalPoints = updatedPoints;
+        updateGameStats(); // Atualiza "Your Score"
+      }
+
+      // Atualiza o status do jogo
+      db.ref("HannahGames/guessTheWord/currentGame").update({ status: "ended" });
+    } else {
+      const randomMsg = encouragementMessages[Math.floor(Math.random() * encouragementMessages.length)];
+      speakText(randomMsg);
+    }
+
+    // Re-renderiza as tentativas e mantém o input pronto para a próxima tentativa
+    renderAllAttempts();
+    hiddenInput.focus(); // Foca automaticamente no input após a tentativa
+  }
 
     /*******************************************************
    * 20) FEEDBACK (green, yellow, red)
