@@ -739,7 +739,7 @@ auth.onAuthStateChanged(async (user) => {
     userRole = data.role || ""; // Obtém o role do usuário logado (se disponível)
 
     // Adiciona o jogador logado ao nó players
-    playerRef = db.ref("games/currentGame/players/" + userUid);
+    playerRef = db.ref("HannahGames/guessTheWord/currentGame/players/" + userUid);
     playerRef.set({ name: userName, joinedAt: Date.now() });
   } else {
     // Usuário convidado (não logado)
@@ -750,7 +750,7 @@ auth.onAuthStateChanged(async (user) => {
 
     // Gera um ID único para o convidado
     const guestId = `guest_${Date.now()}`;
-    playerRef = db.ref("games/currentGame/players/" + guestId);
+    playerRef = db.ref("HannahGames/guessTheWord/currentGame/players/" + guestId);
     playerRef.set({ name: "Guest", joinedAt: Date.now() });
   }
 
@@ -765,6 +765,7 @@ auth.onAuthStateChanged(async (user) => {
   showPersonalScore(); // Exibe a pontuação pessoal
   updatePlayerScoreDisplay(); // Atualiza o placar individual
   updateLoginButtonVisibility(); // Ajusta a visibilidade do botão de login
+  showGamesPlayed(); // Atualiza o contador global de jogos
 });
 
     /*******************************************************
@@ -808,7 +809,7 @@ auth.onAuthStateChanged(async (user) => {
  * 9) OUVIR ESTADO DO JOGO
  *******************************************************/
 function listenGameState() {
-  db.ref("games/currentGame").on("value", (snap) => {
+  db.ref("HannahGames/guessTheWord/currentGame").on("value", (snap) => {
     const data = snap.val();
 
     if (!data) {
@@ -852,7 +853,7 @@ function listenGameState() {
   });
 
   // Monitora o número de jogadores ativos
-  db.ref("games/currentGame/players").on("value", (snap) => {
+  db.ref("HannahGames/guessTheWord/currentGame/players").on("value", (snap) => {
     const players = snap.val() || {};
     const activePlayersCount = Object.keys(players).length;
 
@@ -862,9 +863,9 @@ function listenGameState() {
 }
 
     /*******************************************************
-     * 10) START GAME
-     *******************************************************/
-    document.getElementById("start-game").addEventListener("click", startGame);
+ * 10) START GAME
+ *******************************************************/
+document.getElementById("start-game").addEventListener("click", startGame);
 
 async function startGame() {
   // Permitir que o proprietário inicie o jogo mesmo com um jogo ativo
@@ -873,19 +874,25 @@ async function startGame() {
     return;
   }
 
-  // Incrementar contador de partidas apenas para o proprietário
+  // Incrementar contador global de partidas
+  const gamesPlayedRef = db.ref("HannahGames/guessTheWord/gamesPlayed");
+  const snapshot = await gamesPlayedRef.once("value");
+  const currentGamesPlayed = snapshot.val() || 0; // Caso não exista, começa do 0
+  const updatedGamesPlayed = currentGamesPlayed + 1;
+  await gamesPlayedRef.set(updatedGamesPlayed); // Atualizar no Firebase
+
+  // Mensagem de confirmação para o proprietário
   if (userUid && userRole === "proprietario") {
-    totalGames++;
-    await db.ref("usuarios/" + userUid).update({ gamesPlayed: totalGames });
+    speakText(`This is game number ${updatedGamesPlayed}.`);
   }
 
   // Reiniciar o jogo
-  await db.ref("games/currentGame").remove(); // Remove dados do jogo atual
+  await db.ref("HannahGames/guessTheWord/currentGame").remove(); // Remove dados do jogo atual
   currentDifficulty = document.getElementById("difficulty-select").value;
   const chosenWord = await pickWordWithDefinition(currentDifficulty);
 
   // Garantir que a palavra e o comprimento sejam registrados no banco de dados
-  await db.ref("games/currentGame").set({
+  await db.ref("HannahGames/guessTheWord/currentGame").set({
     word: chosenWord,
     length: chosenWord.length, // Adiciona o comprimento da palavra
     status: "in_progress",
@@ -912,10 +919,11 @@ async function startGame() {
   hiddenInput.value = ""; // Limpa o valor atual do input
   hiddenInput.placeholder = `Type a word of ${currentWord.length} letters`; // Atualiza o placeholder
 
-  // Renderizar tentativas, atualizar a interface e exibir pontuação
+  // Renderizar tentativas, atualizar a interface e exibir informações do jogo
   renderAllAttempts();
   updateUI();
-  showPersonalScore();
+  showGamesPlayed(); // Atualizar contador global na interface
+  showPersonalScore(); // Atualizar pontuação pessoal, se aplicável
 }
 
     /*******************************************************
@@ -1094,7 +1102,7 @@ async function submitCurrentRow() {
   }
 
   const feedback = getFeedback(guessClean, currentWord);
-  const pushRef = db.ref("games/currentGame/attempts").push();
+  const pushRef = db.ref("HannahGames/guessTheWord/currentGame/attempts").push();
   await pushRef.set({
     guess: guessClean,
     feedback,
@@ -1134,7 +1142,7 @@ async function submitCurrentRow() {
     }
 
     // Atualiza o status do jogo
-    db.ref("games/currentGame").update({ status: "ended" });
+    db.ref("HannahGames/guessTheWord/currentGame").update({ status: "ended" });
   } else {
     const randomMsg = encouragementMessages[Math.floor(Math.random() * encouragementMessages.length)];
     speakText(randomMsg);
@@ -1200,6 +1208,14 @@ async function submitCurrentRow() {
         personalScoreSection.style.display = "none";
       }
     }
+
+function showGamesPlayed() {
+  const gamesPlayedRef = db.ref("HannahGames/guessTheWord/gamesPlayed");
+  gamesPlayedRef.on("value", (snapshot) => {
+    const totalGames = snapshot.val() || 0; // Caso ainda não exista, exibir 0
+    document.getElementById("ownerGamesCount").textContent = totalGames;
+  });
+}
 
     /*******************************************************
      * 23) ATUALIZAR VISIBILIDADE DO BOTÃO DE LOGIN
