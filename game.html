@@ -731,6 +731,7 @@
     const snap = await db.ref("usuarios/" + userUid).once("value");
     const data = snap.val() || {};
     userName = data.nome || data.email || "User";
+    userRole = data.role || ""; // Definindo userRole com base nos dados do Firebase, vazio se não definido
 
     // Adiciona o jogador ao jogo atual
     const playerRef = db.ref("games/currentGame/players/" + userUid);
@@ -740,6 +741,7 @@
     userUid = null;
     isGuest = true;
     userName = "Guest";
+    userRole = ""; // Não atribuir nenhum role para convidados
 
     // Adiciona um jogador convidado
     const guestId = `guest_${Date.now()}`;
@@ -840,14 +842,14 @@
      *******************************************************/
     document.getElementById("start-game").addEventListener("click", startGame);
 
-  async function startGame() {
+ async function startGame() {
   // Permitir que o proprietário inicie o jogo mesmo com um jogo ativo
   if (currentStatus === "in_progress" && userRole !== "proprietario") {
     speakText("A game is already in progress. Please wait.");
     return;
   }
 
-  // Incrementar contador de partidas para o proprietário
+  // Incrementar contador de partidas apenas para o proprietário
   if (userUid && userRole === "proprietario") {
     totalGames++;
     await db.ref("usuarios/" + userUid).update({ gamesPlayed: totalGames });
@@ -864,7 +866,14 @@
     status: "in_progress",
     difficulty: currentDifficulty,
     attempts: {},
+    players: {} // Resetar jogadores
   });
+
+  // Mensagem de início
+  speakText(`${userName} started a new game! Difficulty: ${currentDifficulty}. Good luck!`);
+  if (isGuest) {
+    speakText("You're playing as a guest. Your progress won't be saved.");
+  }
 
   // Atualizar estado local do jogo
   currentWord = chosenWord;
@@ -875,12 +884,6 @@
   hiddenInput.maxLength = currentWord.length;
   hiddenInput.value = "";
   hiddenInput.placeholder = `Type a word of ${currentWord.length} letters`;
-
-  // Mensagem de início
-  speakText(`${userName} started a new game! Difficulty: ${currentDifficulty}. Good luck!`);
-  if (isGuest) {
-    speakText("You're playing as a guest. Your progress won't be saved.");
-  }
 
   renderAllAttempts();
   updateUI();
@@ -962,7 +965,7 @@ function updateUI() {
     startBtn.disabled = false;
     difficultySelect.disabled = false;
   } else {
-    // Para usuários comuns, aplicar restrições
+    // Para usuários comuns e convidados, aplicar restrições
     if (currentStatus === "in_progress") {
       startBtn.disabled = true;
       difficultySelect.disabled = true;
