@@ -840,50 +840,51 @@
      *******************************************************/
     document.getElementById("start-game").addEventListener("click", startGame);
 
-    async function startGame() {
-      if (currentStatus === "in_progress" && userRole !== "proprietario") {
-        speakText("A game is already in progress. Please wait.");
-        return;
-      }
+   async function startGame() {
+  // Permitir que o proprietário inicie um novo jogo, mesmo com jogo ativo
+  if (currentStatus === "in_progress" && userRole !== "proprietario") {
+    speakText("A game is already in progress. Please wait.");
+    return;
+  }
 
-      // Se for proprietário, incrementa o contador
-      if (userUid && userRole === "proprietario") {
-        totalGames++;
-        await db.ref("usuarios/" + userUid).update({ gamesPlayed: totalGames });
-      }
+  // Incrementar contador apenas para o proprietário
+  if (userUid && userRole === "proprietario") {
+    totalGames++;
+    await db.ref("usuarios/" + userUid).update({ gamesPlayed: totalGames });
+  }
 
-      await db.ref("games/currentGame").remove();
-      currentDifficulty = document.getElementById("difficulty-select").value;
-      const chosenWord   = await pickWordWithDefinition(currentDifficulty);
+  // Reiniciar jogo no Firebase
+  await db.ref("games/currentGame").remove();
+  currentDifficulty = document.getElementById("difficulty-select").value;
+  const chosenWord = await pickWordWithDefinition(currentDifficulty);
 
-      await db.ref("games/currentGame").set({
-         word: chosenWord,
-         length: chosenWord.length, // Adiciona o comprimento da palavra no BD
-         status: "in_progress",
-         difficulty: currentDifficulty,
-         attempts: {}
-      });
+  await db.ref("games/currentGame").set({
+    word: chosenWord,
+    length: chosenWord.length,
+    status: "in_progress",
+    difficulty: currentDifficulty,
+    attempts: {},
+  });
 
-      speakText(`${userName} started a new game! Difficulty: ${currentDifficulty}. Good luck!`);
-      if (isGuest) {
-        speakText("You're playing as a guest. Your progress won't be saved.");
-      }
+  speakText(`${userName} started a new game! Difficulty: ${currentDifficulty}. Good luck!`);
+  if (isGuest) {
+    speakText("You're playing as a guest. Your progress won't be saved.");
+  }
 
-      currentWord     = chosenWord;
-      currentStatus   = "in_progress";
-      currentLetters  = [];
-      activeIndex     = 0;
-      attemptsArray   = [];
+  // Atualizar estado local do jogo
+  currentWord = chosenWord;
+  currentStatus = "in_progress";
+  currentLetters = [];
+  activeIndex = 0;
+  attemptsArray = [];
+  hiddenInput.maxLength = currentWord.length;
+  hiddenInput.value = "";
+  hiddenInput.placeholder = `Type a word of ${currentWord.length} letters`;
 
-      // Define o tamanho do campo de texto
-      hiddenInput.maxLength = currentWord.length;
-      hiddenInput.value = "";
-      hiddenInput.placeholder = `Type a word of ${currentWord.length} letters`;
-
-      renderAllAttempts();
-      updateUI();
-      showPersonalScore();
-    }
+  renderAllAttempts();
+  updateUI();
+  showPersonalScore();
+}
 
     /*******************************************************
      * 11) ESCOLHER PALAVRA
@@ -950,17 +951,17 @@
     /*******************************************************
      * 13) UPDATE UI
      *******************************************************/
-    function updateUI() {
+   function updateUI() {
   const startBtn = document.getElementById("start-game");
-  const tryBtn = document.getElementById("try-button");
   const difficultySelect = document.getElementById("difficulty-select");
+  const tryBtn = document.getElementById("try-button");
 
   // Sempre liberar para o proprietário
   if (userRole === "proprietario") {
     startBtn.disabled = false; // Proprietário sempre pode usar Start Game
     difficultySelect.disabled = false; // Proprietário sempre pode mudar a dificuldade
   } else {
-    // Lógica para usuários comuns
+    // Restrições para outros usuários
     if (currentStatus === "in_progress") {
       startBtn.disabled = true;
       difficultySelect.disabled = true;
@@ -971,12 +972,7 @@
   }
 
   // Lógica para o botão Try (apenas se o jogo estiver ativo)
-  if (currentStatus === "in_progress") {
-    tryBtn.disabled = false;
-    hiddenInput.focus();
-  } else {
-    tryBtn.disabled = true;
-  }
+  tryBtn.disabled = currentStatus !== "in_progress";
 }
 
     /*******************************************************
