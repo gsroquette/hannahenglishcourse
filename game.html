@@ -177,6 +177,19 @@
       display: none;
     }
 
+#active-players-section {
+  margin: 15px 0; /* Espaçamento entre os elementos acima e abaixo */
+  text-align: center;
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #333; /* Cor do texto */
+}
+
+#active-players-count {
+  font-size: 1rem;
+  color: #555; /* Cor mais suave */
+}
+
     /* TABULEIRO */
     #board {
       width: 100%;
@@ -501,35 +514,41 @@
 
   <!-- ÁREA PRINCIPAL (O JOGO) -->
   <div id="main-content">
-    <div id="top-controls">
-  <h2 id="game-title">Guess the Word</h2>
-  <label for="difficulty-select">Difficulty:</label>
-  <select id="difficulty-select">
-    <option value="easy">Easy</option>
-    <option value="medium">Medium</option>
-    <option value="hard">Hard</option>
-  </select>
-  <button id="start-game">Start Game</button>
-  <button id="rules-button">Rules</button>
-  <span id="player-score-display"></span>
-</div>
-    </div>
-
-    <div id="board"></div>
-    <input 
-      type="text"
-      id="hidden-input"
-      autocomplete="off"
-      autocorrect="off"
-      autocapitalize="none"
-      spellcheck="false"
-      placeholder="Type a word of X letters"
-    >
-    <button id="try-button">Try</button>
-    <!-- Botão de Login Adicionado Aqui -->
-    <button id="login-button">Login</button>
-    <button id="invite-button-main">Invite Friends</button>
+  <div id="top-controls">
+    <h2 id="game-title">Guess the Word</h2>
+    <label for="difficulty-select">Difficulty:</label>
+    <select id="difficulty-select">
+      <option value="easy">Easy</option>
+      <option value="medium">Medium</option>
+      <option value="hard">Hard</option>
+    </select>
+    <button id="start-game">Start Game</button>
+    <button id="rules-button">Rules</button>
+    <span id="player-score-display"></span>
   </div>
+
+  <div id="board"></div>
+  <input 
+    type="text"
+    id="hidden-input"
+    autocomplete="off"
+    autocorrect="off"
+    autocapitalize="none"
+    spellcheck="false"
+    placeholder="Type a word of X letters"
+  >
+  <button id="try-button">Try</button>
+  <!-- Botão de Login -->
+  <button id="login-button">Login</button>
+
+  <!-- Contador de Jogadores Ativos -->
+  <div id="active-players-section">
+    <p id="active-players-count">Active Players: 0</p>
+  </div>
+
+  <!-- Botão Invite Friends -->
+  <button id="invite-button-main">Invite Friends</button>
+</div>
 
   <!-- SUBTÍTULO E IMAGEM DE CONVITE -->
   <div id="invite-section">
@@ -749,38 +768,44 @@
      * 9) OUVIR ESTADO DO JOGO
      *******************************************************/
     function listenGameState() {
-      db.ref("games/currentGame").on("value", (snap) => {
-  const data = snap.val();
-  if (!data) {
-    currentStatus = "idle";
-    currentWord = "";
-    attemptsArray = [];
-    currentLetters = [];
-    activeIndex = 0;
+  db.ref("games/currentGame").on("value", (snap) => {
+    const data = snap.val();
+    if (!data) {
+      currentStatus = "idle";
+      currentWord = "";
+      attemptsArray = [];
+      currentLetters = [];
+      activeIndex = 0;
+      renderAllAttempts();
+      updateUI();
+      return;
+    }
+
+    currentWord = data.word || "";
+    currentStatus = data.status || "idle";
+    currentDifficulty = data.difficulty || "easy";
+
+    const attemptsObj = data.attempts || {};
+    attemptsArray = Object.keys(attemptsObj).map((key) => attemptsObj[key]);
+
     renderAllAttempts();
     updateUI();
-    return;
-  }
 
-  currentWord = data.word || "";
-  currentStatus = data.status || "idle";
-  currentDifficulty = data.difficulty || "easy";
+    if (isGuest && !localStorage.getItem("guestMessageShown")) {
+      speakText("You're playing as a guest. Your progress won't be saved.");
+      localStorage.setItem("guestMessageShown", "true");
+    }
+  });
 
-  // Recupera o número de letras e atualiza o placeholder
-  const wordLength = data.length || 0;
-  hiddenInput.placeholder = `Type a word of ${wordLength} letters`;
+  // Monitora o número de jogadores ativos
+  db.ref("games/currentGame/players").on("value", (snap) => {
+    const players = snap.val() || {};
+    const activePlayersCount = Object.keys(players).length;
 
-  const attemptsObj = data.attempts || {};
-  attemptsArray = Object.keys(attemptsObj).map((key) => attemptsObj[key]);
-
-  renderAllAttempts();
-  updateUI();
-
-  if (isGuest && !localStorage.getItem("guestMessageShown")) {
-    speakText("You're playing as a guest. Your progress won't be saved.");
-    localStorage.setItem("guestMessageShown", "true");
-  }
-});
+    // Atualiza a exibição de jogadores ativos
+    document.getElementById("active-players-count").textContent = `Active Players: ${activePlayersCount}`;
+  });
+}
 
     /*******************************************************
      * 10) START GAME
