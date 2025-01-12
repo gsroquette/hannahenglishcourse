@@ -804,23 +804,29 @@ auth.onAuthStateChanged(async (user) => {
       });
     }
 
-    /*******************************************************
-     * 9) OUVIR ESTADO DO JOGO
-     *******************************************************/
-    function listenGameState() {
+   /*******************************************************
+ * 9) OUVIR ESTADO DO JOGO
+ *******************************************************/
+function listenGameState() {
   db.ref("games/currentGame").on("value", (snap) => {
     const data = snap.val();
+
     if (!data) {
+      // Jogo inativo: resetar estado local e interface
       currentStatus = "idle";
       currentWord = "";
       attemptsArray = [];
       currentLetters = [];
       activeIndex = 0;
+
       renderAllAttempts();
       updateUI();
+      hiddenInput.placeholder = "Waiting for a new game...";
+      hiddenInput.maxLength = ""; // Remove o limite do input
       return;
     }
 
+    // Atualizar estado local com os dados do jogo
     currentWord = data.word || "";
     currentStatus = data.status || "idle";
     currentDifficulty = data.difficulty || "easy";
@@ -828,9 +834,17 @@ auth.onAuthStateChanged(async (user) => {
     const attemptsObj = data.attempts || {};
     attemptsArray = Object.keys(attemptsObj).map((key) => attemptsObj[key]);
 
+    // Atualizar o campo de entrada com o comprimento da palavra
+    if (data.length) {
+      hiddenInput.maxLength = data.length; // Define o tamanho máximo do input
+      hiddenInput.placeholder = `Type a word of ${data.length} letters`; // Atualiza o placeholder
+    }
+
+    // Renderizar tentativas e atualizar interface
     renderAllAttempts();
     updateUI();
 
+    // Exibir mensagem para convidados, apenas uma vez
     if (isGuest && !localStorage.getItem("guestMessageShown")) {
       speakText("You're playing as a guest. Your progress won't be saved.");
       localStorage.setItem("guestMessageShown", "true");
@@ -866,17 +880,18 @@ async function startGame() {
   }
 
   // Reiniciar o jogo
-  await db.ref("games/currentGame").remove();
+  await db.ref("games/currentGame").remove(); // Remove dados do jogo atual
   currentDifficulty = document.getElementById("difficulty-select").value;
   const chosenWord = await pickWordWithDefinition(currentDifficulty);
 
+  // Garantir que a palavra e o comprimento sejam registrados no banco de dados
   await db.ref("games/currentGame").set({
     word: chosenWord,
-    length: chosenWord.length,
+    length: chosenWord.length, // Adiciona o comprimento da palavra
     status: "in_progress",
     difficulty: currentDifficulty,
-    attempts: {},
-    players: {} // Resetar jogadores
+    attempts: {}, // Reinicia as tentativas
+    players: {} // Reinicia os jogadores
   });
 
   // Mensagem de início
@@ -891,10 +906,13 @@ async function startGame() {
   currentLetters = [];
   activeIndex = 0;
   attemptsArray = [];
-  hiddenInput.maxLength = currentWord.length;
-  hiddenInput.value = "";
-  hiddenInput.placeholder = `Type a word of ${currentWord.length} letters`;
 
+  // Atualizar o campo de entrada com base no comprimento da palavra
+  hiddenInput.maxLength = currentWord.length; // Define o tamanho máximo do input
+  hiddenInput.value = ""; // Limpa o valor atual do input
+  hiddenInput.placeholder = `Type a word of ${currentWord.length} letters`; // Atualiza o placeholder
+
+  // Renderizar tentativas, atualizar a interface e exibir pontuação
   renderAllAttempts();
   updateUI();
   showPersonalScore();
