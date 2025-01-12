@@ -744,42 +744,37 @@
      *******************************************************/
     function listenGameState() {
       db.ref("games/currentGame").on("value", (snap) => {
-        const data = snap.val();
-        if (!data) {
-          currentStatus   = "idle";
-          currentWord     = "";
-          attemptsArray   = [];
-          currentLetters  = [];
-          activeIndex     = 0;
-          renderAllAttempts();
-          updateUI();
-          return;
-        }
-        currentWord       = data.word || "";
-        currentStatus     = data.status || "idle";
-        currentDifficulty = data.difficulty || "easy";
+  const data = snap.val();
+  if (!data) {
+    currentStatus = "idle";
+    currentWord = "";
+    attemptsArray = [];
+    currentLetters = [];
+    activeIndex = 0;
+    renderAllAttempts();
+    updateUI();
+    return;
+  }
 
-        const attemptsObj = data.attempts || {};
-        attemptsArray     = Object.keys(attemptsObj).map((key) => attemptsObj[key]);
+  currentWord = data.word || "";
+  currentStatus = data.status || "idle";
+  currentDifficulty = data.difficulty || "easy";
 
-        renderAllAttempts();
-        updateUI();
+  // Recupera o número de letras e atualiza o placeholder
+  const wordLength = data.length || 0;
+  hiddenInput.placeholder = `Type a word of ${wordLength} letters`;
 
-        if (isGuest && !localStorage.getItem("guestMessageShown")) {
-          speakText("You're playing as a guest. Your progress won't be saved.");
-          localStorage.setItem("guestMessageShown", "true");
-        }
-      });
+  const attemptsObj = data.attempts || {};
+  attemptsArray = Object.keys(attemptsObj).map((key) => attemptsObj[key]);
 
-      // Sempre que uma nova tentativa chega
-      db.ref("games/currentGame/attempts").on("child_added", (snapshot) => {
-        const attempt = snapshot.val();
-        if (!attemptsArray.some((a) => a.timestamp === attempt.timestamp)) {
-          attemptsArray.push(attempt);
-          renderAllAttempts();
-        }
-      });
-    }
+  renderAllAttempts();
+  updateUI();
+
+  if (isGuest && !localStorage.getItem("guestMessageShown")) {
+    speakText("You're playing as a guest. Your progress won't be saved.");
+    localStorage.setItem("guestMessageShown", "true");
+  }
+});
 
     /*******************************************************
      * 10) START GAME
@@ -803,10 +798,11 @@
       const chosenWord   = await pickWordWithDefinition(currentDifficulty);
 
       await db.ref("games/currentGame").set({
-        word: chosenWord,
-        status: "in_progress",
-        difficulty: currentDifficulty,
-        attempts: {}
+         word: chosenWord,
+         length: chosenWord.length, // Adiciona o comprimento da palavra no BD
+         status: "in_progress",
+         difficulty: currentDifficulty,
+         attempts: {}
       });
 
       speakText(`${userName} started a new game! Difficulty: ${currentDifficulty}. Good luck!`);
