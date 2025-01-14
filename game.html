@@ -196,10 +196,10 @@
     }
 
     #guess-title {
-      font-size: 1.2rem; /* Tamanho do texto */
-      color: #333;       /* Cor do texto */
-      font-weight: bold; /* Negrito */
-      margin-bottom: 4px; /* Espaço entre o texto e o campo de entrada */
+      font-size: 1.2rem; 
+      color: #333;       
+      font-weight: bold; 
+      margin-bottom: 4px;
     }
 
     #hidden-input {
@@ -220,9 +220,9 @@
       width: 100%;
       max-width: 600px;
       min-height: 200px;
-      background: transparent; /* Tornar transparente */
+      background: transparent; 
       padding: 10px;
-      border: none; /* Remover borda */
+      border: none; 
       border-radius: 8px;
       display: flex;
       flex-direction: column;
@@ -251,7 +251,7 @@
       justify-content: center;
       align-items: center;
       color: #000;
-      cursor: pointer; /* para indicar que é clicável */
+      cursor: pointer; 
       box-shadow: 2px 2px 4px rgba(0,0,0,0.1);
       transition: background-color 0.3s, border-color 0.3s;
     }
@@ -261,7 +261,7 @@
       margin-left: 10px;
       font-style: italic;
       color: #666;
-      min-width: 80px; /* Definir largura mínima para alinhamento */
+      min-width: 80px; 
       text-align: left;
     }
 
@@ -293,7 +293,7 @@
     #login-button {
       background-color: #2196F3;
       color: #fff;
-      display: none; /* Inicialmente oculto */
+      display: none; 
     }
 
     #login-button:hover {
@@ -347,11 +347,11 @@
       border-color: #e53935;
     }
 
-    /* SCOREBOARD (NO FINAL) */
+    /* SCOREBOARD */
     #scoreboard-section {
       width: 100%;
       max-width: 600px;
-      background: #f0f0f0; /* Cinza não muito claro */
+      background: #f0f0f0;
       border: 1px solid #ddd;
       border-radius: 8px;
       padding: 20px;
@@ -499,7 +499,6 @@
   </style>
 </head>
 <body>
-
   <!-- HEADER COM TÍTULO -->
   <header>
     <h1>Hannah Games</h1>
@@ -583,14 +582,12 @@
 
   <script>
     /*******************************************************
-     * SCROLL PARA O TOPO AO CARREGAR A PÁGINA
+     * 0) SCROLL PARA O TOPO AO CARREGAR
      *******************************************************/
     window.addEventListener("load", () => {
+      // Rola sempre para o topo assim que a página carrega ou recarrega
       window.scrollTo(0, 0);
     });
-
-    let firstSpeechDone    = false;  // para controlar a fala inicial
-    let alreadyScrolledTry = false;  // para controlar scroll ao botão Try
 
     /*******************************************************
      * 1) CONFIGURANDO FIREBASE
@@ -627,22 +624,22 @@
     let totalGames       = 0; 
     let attemptsArray    = [];
     let currentLetters   = [];
-    let activeIndex      = 0; // posição atual para digitação
+    let activeIndex      = 0;
 
-    const hiddenInput      = document.getElementById("hidden-input");
-    const board            = document.getElementById("board");
-    const robotSection     = document.getElementById("robot-section");
-    const robotBalloon     = document.getElementById("robot-balloon");
-    const backButton       = document.getElementById("back-button");
+    const hiddenInput   = document.getElementById("hidden-input");
+    const board         = document.getElementById("board");
+    const robotImage    = document.getElementById("robot-image");
+    const robotBalloon  = document.getElementById("robot-balloon");
+    const backButton    = document.getElementById("back-button");
     const inviteButtonMain = document.getElementById("invite-button-main");
-    const loginButton      = document.getElementById("login-button");
-    const tryButton        = document.getElementById("try-button");
+    const loginButton   = document.getElementById("login-button");
+    const tryButton     = document.getElementById("try-button");
 
     /*******************************************************
      * 3) CARREGAR OS DICIONÁRIOS
      *******************************************************/
-    let oxfordDictionarySet      = new Set();
-    let validationDictionarySet  = new Set();
+    let oxfordDictionarySet     = new Set();
+    let validationDictionarySet = new Set();
 
     async function loadDictionaries() {
       try {
@@ -670,11 +667,10 @@
     /*******************************************************
      * 4) ROBÔ E TTS
      *******************************************************/
-    const robotImage = document.getElementById("robot-image");
-    const synth      = window.speechSynthesis;
+    const synth = window.speechSynthesis;
 
     function speakText(text) {
-      if (!text) return; 
+      if (!text) return;
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang  = "en-US";
 
@@ -689,13 +685,9 @@
         setTimeout(() => {
           robotBalloon.style.display = "none";
 
-          // Se for a primeira fala e ainda não rolamos para o botão Try
-          if (!firstSpeechDone && !alreadyScrolledTry) {
-            alreadyScrolledTry = true; 
-            firstSpeechDone    = true;
-            tryButton.scrollIntoView({ behavior: "smooth", block: "center" });
-            tryButton.focus();
-          }
+          // Após cada fala inicial, rola para o botão "Try" e foca
+          tryButton.scrollIntoView({ behavior: "smooth", block: "center" });
+          tryButton.focus();
         }, 700);
       };
 
@@ -732,52 +724,44 @@
     auth.onAuthStateChanged(async (user) => {
       let playerRef = null;
 
+      // Se usuário está logado (não convidado)
       if (user) {
-        // Usuário logado
         userUid = user.uid;
         isGuest = false;
 
         const snap = await db.ref("usuarios/" + userUid).once("value");
         const data = snap.val() || {};
-        userName = data.nome || data.email || "User";
-        userRole = data.role || "";
+        userName   = data.nome || data.email || "User";
+        userRole   = data.role || "";
 
+        // Referência do jogador logado
         playerRef = db.ref("HannahGames/guessTheWord/players/" + userUid);
-        playerRef.set({
-          name: userName,
-          joinedAt: Date.now(),
-        });
+        playerRef.set({ name: userName, joinedAt: Date.now() });
 
-        // Forçando a exibição novamente, usando novas chaves do localStorage
-        if (!localStorage.getItem("welcomeMessageShown_v2")) {
-          speakText(`Hello ${userName}! Take your guess and try to be the first to discover the hidden word. Use the Invite button to call your friends and make the game more fun!`);
-          localStorage.setItem("welcomeMessageShown_v2", "true");
-        }
+        // Fala de boas-vindas: SEM localStorage, sempre que a página for carregada
+        speakText(`Hello ${userName}! Take your guess and try to be the first to discover the hidden word. Use the Invite button to call your friends and make the game more fun!`);
+
       } else {
         // Usuário convidado
         userUid = null;
         isGuest = true;
-        userName = "Guest";
-        userRole = "";
+        userName= "Guest";
+        userRole= "";
 
+        // Gera ID único para convidado
         const guestId = `guest_${Date.now()}`;
         playerRef = db.ref("HannahGames/guessTheWord/players/" + guestId);
-        playerRef.set({
-          name: "Guest",
-          joinedAt: Date.now(),
-        });
+        playerRef.set({ name: "Guest", joinedAt: Date.now() });
 
-        // Forçando a exibição novamente, usando novas chaves do localStorage
-        if (!localStorage.getItem("guestMessageShown_v2")) {
-          speakText("You're playing as a guest. Your progress won't be saved.");
-          localStorage.setItem("guestMessageShown_v2", "true");
-        }
+        // Fala para convidados: SEM localStorage, sempre
+        speakText("You're playing as a guest. Your progress won't be saved.");
       }
 
       if (playerRef) {
         playerRef.onDisconnect().remove();
       }
 
+      // Outras inicializações
       loadScoreboard();
       listenGameState();
       updateGameStats();
@@ -791,11 +775,13 @@
       const gamesPlayedRef = db.ref("HannahGames/guessTheWord/gamesPlayed");
       const scoreDisplay   = document.getElementById("player-score-display");
 
+      // Atualizar "Total Games"
       gamesPlayedRef.on("value", (snapshot) => {
         const totalGames = snapshot.val() || 0;
         document.getElementById("ownerGamesCount").textContent = totalGames;
       });
 
+      // Mostrar pontuação se logado; esconder se convidado
       if (!isGuest && userUid) {
         db.ref("usuarios/" + userUid).on("value", (snapshot) => {
           const userData = snapshot.val() || {};
@@ -869,16 +855,17 @@
         updateUI();
       });
 
+      // Contador de players ativos
       db.ref("HannahGames/guessTheWord/players").on("value", (snap) => {
         const players = snap.val() || {};
         const activePlayersCount = Object.keys(players).length;
-
         const activePlayersElement = document.getElementById("active-players-count");
         if (activePlayersElement) {
           activePlayersElement.textContent = `Active Players: ${activePlayersCount}`;
         }
       });
 
+      // Contador global de jogos jogados
       const gamesPlayedRef = db.ref("HannahGames/guessTheWord/gamesPlayed");
       gamesPlayedRef.on("value", (snapshot) => {
         const gamesPlayed = snapshot.val() || 0;
@@ -906,6 +893,7 @@
       const updatedGames   = currentGames + 1;
       await gamesPlayedRef.set(updatedGames);
 
+      // Remove jogo atual e cria um novo
       await db.ref("HannahGames/guessTheWord/currentGame").remove();
       currentDifficulty = document.getElementById("difficulty-select").value;
       const chosenWord  = await pickWordWithDefinition(currentDifficulty);
