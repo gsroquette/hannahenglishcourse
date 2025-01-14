@@ -626,6 +626,9 @@
     let currentLetters   = [];
     let activeIndex      = 0;
 
+    // Controla se a definição já foi falada para evitar duplicação
+    let hasDefinitionBeenSpoken = false;
+
     const hiddenInput   = document.getElementById("hidden-input");
     const board         = document.getElementById("board");
     const robotImage    = document.getElementById("robot-image");
@@ -665,11 +668,11 @@
     loadDictionaries();
 
     /*******************************************************
-     * 4) ROBÔ E TTS
+     * 4) ROBÔ E TTS (com callback opcional)
      *******************************************************/
     const synth = window.speechSynthesis;
 
-    function speakText(text) {
+    function speakText(text, onEndCallback) {
       if (!text) return;
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang  = "en-US";
@@ -684,10 +687,14 @@
         robotImage.src = "imagens/robo_estatico.png";
         setTimeout(() => {
           robotBalloon.style.display = "none";
-
           // Após cada fala inicial, rola para o botão "Try" e foca
           tryButton.scrollIntoView({ behavior: "smooth", block: "center" });
           tryButton.focus();
+
+          // Se houver callback, chamamos
+          if (onEndCallback) {
+            onEndCallback();
+          }
         }, 700);
       };
 
@@ -831,6 +838,7 @@
           attemptsArray = [];
           currentLetters= [];
           activeIndex   = 0;
+          hasDefinitionBeenSpoken = false; // zera para um novo jogo
 
           renderAllAttempts();
           updateUI();
@@ -853,6 +861,22 @@
 
         renderAllAttempts();
         updateUI();
+
+        // Se o jogo terminou (status = ended) e ainda não falamos a definição
+        if (currentStatus === "ended" && data.definition && !hasDefinitionBeenSpoken) {
+          hasDefinitionBeenSpoken = true;
+
+          // 1) Scroll para o topo para mostrar o robô
+          window.scrollTo({ top: 0, behavior: "smooth" });
+
+          // 2) Falar a definição para todos
+          speakText(`Definition of ${currentWord}: ${data.definition}`, () => {
+            // Quando terminar a fala, scroll para o Start Game
+            const startBtn = document.getElementById("start-game");
+            startBtn.scrollIntoView({ behavior: "smooth", block: "center" });
+            startBtn.focus();
+          });
+        }
       });
 
       // Contador de players ativos
@@ -896,13 +920,19 @@
       // Remove jogo atual e cria um novo
       await db.ref("HannahGames/guessTheWord/currentGame").remove();
       currentDifficulty = document.getElementById("difficulty-select").value;
-      const chosenWord  = await pickWordWithDefinition(currentDifficulty);
 
+      // 1) Escolhe a palavra
+      const chosenWord  = await pickWordWithDefinition(currentDifficulty);
+      // 2) Busca a definição dessa palavra
+      const wordDefinition = await getDefinition(chosenWord);
+
+      // 3) Cria o novo jogo já com a definition salva
       await db.ref("HannahGames/guessTheWord/currentGame").set({
         word: chosenWord,
         length: chosenWord.length,
         status: "in_progress",
         difficulty: currentDifficulty,
+        definition: wordDefinition || "",
         attempts: {},
         players: {}
       });
@@ -917,6 +947,7 @@
       currentLetters= [];
       activeIndex   = 0;
       attemptsArray = [];
+      hasDefinitionBeenSpoken = false;
 
       hiddenInput.maxLength  = currentWord.length;
       hiddenInput.value      = "";
@@ -960,13 +991,11 @@
     }
 
     /*******************************************************
-     * 12) RENDERIZAR
+     * 13) RENDERIZAR
      *******************************************************/
     function renderAllAttempts() {
       board.innerHTML = "";
 
-      // Mantém a ordem do array (mais antiga primeiro, mais nova por último).
-      // Assim, a tentativa mais nova fica no final, próxima do campo "Take a guess!".
       attemptsArray.forEach((att) => {
         const rowDiv = document.createElement("div");
         rowDiv.classList.add("attempt-row");
@@ -992,7 +1021,7 @@
     }
 
     /*******************************************************
-     * 13) UPDATE UI
+     * 14) UPDATE UI
      *******************************************************/
     function updateUI() {
       const startBtn        = document.getElementById("start-game");
@@ -1016,7 +1045,7 @@
     }
 
     /*******************************************************
-     * 14) INPUT EVENT
+     * 15) INPUT EVENT
      *******************************************************/
     hiddenInput.addEventListener("input", (e) => {
       const val = e.target.value.trim().toLowerCase();
@@ -1041,7 +1070,7 @@
     });
 
     /*******************************************************
-     * 15) BOTÃO TRY
+     * 16) BOTÃO TRY
      *******************************************************/
     tryButton.addEventListener("click", () => {
       if (currentStatus !== "in_progress") {
@@ -1049,13 +1078,6 @@
         return;
       }
       submitCurrentRow();
-    });
-
-    /*******************************************************
-     * 16) BOTÃO BACK
-     *******************************************************/
-    backButton.addEventListener("click", () => {
-      window.history.back();
     });
 
     /*******************************************************
@@ -1111,11 +1133,11 @@
       hiddenInput.focus();
 
       if (feedback.every(c => c === "green")) {
-        const definition = await getDefinition(guessClean);
+        // Jogador acertou
         let msg = `Congratulations, ${isGuest ? "Guest" : userName}! You found the word "${guessClean}".`;
-        if (definition) msg += ` Definition: ${definition}`;
         speakText(msg);
 
+        // Se for usuário logado, atualiza pontuação
         if (!isGuest && userUid) {
           let pts = 10;
           if (currentDifficulty === "medium") pts = 20;
@@ -1126,14 +1148,15 @@
           const userData  = userSnap.val() || {};
           const currScore = userData.points || 0;
           const newScore  = currScore + pts;
-
           await userRef.update({ points: newScore });
           totalPoints = newScore;
           updateGameStats();
         }
 
+        // Muda status do jogo para ended
         db.ref("HannahGames/guessTheWord/currentGame").update({ status: "ended" });
       } else {
+        // Jogador não acertou
         const randomMsg = encouragementMessages[Math.floor(Math.random() * encouragementMessages.length)];
         speakText(randomMsg);
       }
