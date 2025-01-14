@@ -203,12 +203,16 @@
     }
 
     #hidden-input {
-      width: 90%;          /* Largura do campo de entrada */
-      max-width: 300px;    /* Largura máxima */
-      padding: 10px;       /* Espaçamento interno */
-      font-size: 1rem;     /* Tamanho do texto */
-      border: 2px solid #4CAF50; /* Borda estilizada */
-      border-radius: 8px;  /* Cantos arredondados */
+      width: 90%;
+      max-width: 300px;
+      padding: 15px;
+      margin: 20px 0;
+      font-size: 1.5rem;
+      border: 2px solid #4CAF50;
+      border-radius: 8px;
+      outline: none;
+      text-align: center;
+      font-family: Arial, sans-serif;
     }
 
     /* TABULEIRO */
@@ -259,20 +263,6 @@
       color: #666;
       min-width: 80px; /* Definir largura mínima para alinhamento */
       text-align: left;
-    }
-
-    /* CAMPO DE TEXTO VISÍVEL */
-    #hidden-input {
-      width: 90%;
-      max-width: 300px;
-      padding: 15px;
-      margin: 20px 0;
-      font-size: 1.5rem;
-      border: 2px solid #4CAF50;
-      border-radius: 8px;
-      outline: none;
-      text-align: center;
-      font-family: Arial, sans-serif;
     }
 
     /* BOTÕES */
@@ -502,7 +492,6 @@
         font-size: 1rem;
       }
 
-      /* Atualizado para refletir a nova função */
       #owner-game-counter {
         font-size: 1rem;
       }
@@ -570,38 +559,39 @@
     <button id="invite-button-main">Invite Friends</button>
   </div>
 
-    <!-- SUBTÍTULO E IMAGEM DE CONVITE -->
-    <div id="invite-section">
-      <div class="scoreboard-subtitle">Do you want to learn English while having fun?</div>
-      <a href="https://hannahenglishcourse.vercel.app/Apresentacao/propaganda.html">
-        <img src="imagens/convite.gif" alt="Invitation" class="invite-image">
-      </a>
+  <!-- SUBTÍTULO E IMAGEM DE CONVITE -->
+  <div id="invite-section">
+    <div class="scoreboard-subtitle">Do you want to learn English while having fun?</div>
+    <a href="https://hannahenglishcourse.vercel.app/Apresentacao/propaganda.html">
+      <img src="imagens/convite.gif" alt="Invitation" class="invite-image">
+    </a>
+  </div>
+
+  <!-- SCOREBOARD POR ÚLTIMO -->
+  <div id="scoreboard-section">
+    <h3>Top 20</h3>
+    <ol id="score-list"></ol>
+
+    <!-- CONTADOR DE PARTIDAS (VISÍVEL PARA TODOS) -->
+    <div id="owner-game-counter">
+      <p>Total Games: <span id="ownerGamesCount"></span></p>
     </div>
+  </div>
 
-    <!-- SCOREBOARD POR ÚLTIMO -->
-    <div id="scoreboard-section">
-      <h3>Top 20</h3>
-      <ol id="score-list"></ol>
-
-      <!-- CONTADOR DE PARTIDAS (VISÍVEL PARA TODOS) -->
-      <div id="owner-game-counter">
-        <p>Total Games: <span id="ownerGamesCount"></span></p>
-      </div>
-    </div>
-
-    <!-- BOTÃO BACK (Último elemento da página) -->
-    <button id="back-button">Back</button>
+  <!-- BOTÃO BACK (Último elemento da página) -->
+  <button id="back-button">Back</button>
 
   <script>
     /*******************************************************
-     * 0) SCROLL PARA O TOPO NO CARREGAMENTO
+     * SCROLL PARA O TOPO AO CARREGAR A PÁGINA
      *******************************************************/
     window.addEventListener("load", () => {
-      // Rola para o topo imediatamente ao carregar a página
       window.scrollTo(0, 0);
     });
 
-    let alreadyScrolledToTry = false; // para garantir que só role/foca uma vez
+    // Usaremos estas flags para controlar a exibição e o scroll para o botão "Try" somente uma vez
+    let firstSpeechDone    = false;
+    let alreadyScrolledTry = false;
 
     /*******************************************************
      * 1) CONFIGURANDO FIREBASE
@@ -688,10 +678,6 @@
     const robotImage = document.getElementById("robot-image");
     const synth      = window.speechSynthesis;
 
-    // Removemos qualquer parâmetro de scroll antigo, e iremos controlar manualmente
-    // o scroll para o botão "Try" somente depois da primeira fala.
-    let isFirstSpeech = true;
-
     function speakText(text) {
       if (!text) return; 
       const utterance = new SpeechSynthesisUtterance(text);
@@ -702,19 +688,24 @@
         robotBalloon.textContent = text;
         robotBalloon.style.display = "block";
       };
+
       utterance.onend = () => {
         robotImage.src = "imagens/robo_estatico.png";
         setTimeout(() => {
           robotBalloon.style.display = "none";
-          // Se for a primeira fala do robô, rola até o botão Try e foca nele
-          if (isFirstSpeech && !alreadyScrolledToTry) {
-            alreadyScrolledToTry = true; 
-            tryButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+          // Se é a primeira fala do robô e ainda não rolamos para o botão Try
+          if (!firstSpeechDone && !alreadyScrolledTry) {
+            alreadyScrolledTry = true; 
+            firstSpeechDone    = true;
+
+            // Scroll para o botão "Try" + focus
+            tryButton.scrollIntoView({ behavior: "smooth", block: "center" });
             tryButton.focus();
           }
-          isFirstSpeech = false;
-        }, 800);
+        }, 800);   
       };
+
       synth.speak(utterance);
     }
 
@@ -766,11 +757,12 @@
           joinedAt: Date.now(),
         });
 
-        // Mensagem para usuários logados (primeira vez)
+        // Mensagem inicial para usuário logado, somente uma vez
         if (!localStorage.getItem("welcomeMessageShown")) {
           speakText(`Hello ${userName}! Take your guess and try to be the first to discover the hidden word. Use the Invite button to call your friends and make the game more fun!`);
           localStorage.setItem("welcomeMessageShown", "true");
         }
+
       } else {
         // Usuário convidado (não logado)
         userUid = null;
@@ -786,7 +778,7 @@
           joinedAt: Date.now(),
         });
 
-        // Fala do robô para usuários não logados (primeira vez)
+        // Mensagem inicial para convidado, somente uma vez
         if (!localStorage.getItem("guestMessageShown")) {
           speakText("You're playing as a guest. Your progress won't be saved.");
           localStorage.setItem("guestMessageShown", "true");
@@ -810,7 +802,7 @@
      *******************************************************/
     function updateGameStats() {
       const gamesPlayedRef = db.ref("HannahGames/guessTheWord/gamesPlayed");
-      const scoreDisplay = document.getElementById("player-score-display");
+      const scoreDisplay   = document.getElementById("player-score-display");
 
       // Atualizar "Total Games"
       gamesPlayedRef.on("value", (snapshot) => {
@@ -822,9 +814,9 @@
       if (!isGuest && userUid) {
         db.ref("usuarios/" + userUid).on("value", (snapshot) => {
           const userData = snapshot.val() || {};
-          const points = userData.points || 0;
+          const points   = userData.points || 0;
           scoreDisplay.style.display = "block";
-          scoreDisplay.textContent = `Your Score: ${points}`;
+          scoreDisplay.textContent   = `Your Score: ${points}`;
         });
       } else {
         // Esconder "Your Score" para convidados
@@ -866,46 +858,40 @@
         if (!data) {
           // Jogo inativo: resetar estado local e interface
           currentStatus = "idle";
-          currentWord = "";
+          currentWord   = "";
           attemptsArray = [];
-          currentLetters = [];
-          activeIndex = 0;
+          currentLetters= [];
+          activeIndex   = 0;
 
           renderAllAttempts();
           updateUI();
           hiddenInput.placeholder = "Waiting for a new game...";
-          hiddenInput.maxLength = ""; // Remove o limite do input
+          hiddenInput.maxLength   = ""; // Remove o limite do input
           return;
         }
 
         // Atualizar estado local com os dados do jogo
-        currentWord = data.word || "";
-        currentStatus = data.status || "idle";
+        currentWord       = data.word || "";
+        currentStatus     = data.status || "idle";
         currentDifficulty = data.difficulty || "easy";
 
         const attemptsObj = data.attempts || {};
-        attemptsArray = Object.keys(attemptsObj).map((key) => attemptsObj[key]);
+        attemptsArray     = Object.keys(attemptsObj).map((key) => attemptsObj[key]);
 
         // Atualizar o campo de entrada com o comprimento da palavra
         if (data.length) {
-          hiddenInput.maxLength = data.length; // Define o tamanho máximo do input
-          hiddenInput.placeholder = `Type a word of ${data.length} letters`; // Atualiza o placeholder
+          hiddenInput.maxLength  = data.length; 
+          hiddenInput.placeholder= `Type a word of ${data.length} letters`;
         }
 
         // Renderizar tentativas e atualizar interface
         renderAllAttempts();
         updateUI();
 
-        // Exibir mensagem para convidados, apenas uma vez
+        // Exibir mensagem para convidados, apenas uma vez (caso não tenha sido exibida no onAuthStateChanged)
         if (isGuest && !localStorage.getItem("guestMessageShown")) {
           speakText("You're playing as a guest. Your progress won't be saved.");
           localStorage.setItem("guestMessageShown", "true");
-        }
-
-        // Mensagem para usuários logados no início do jogo
-        if (!isGuest && currentStatus === "idle" && !localStorage.getItem("loggedUserGameMessageShown")) {
-          speakText(`Hello ${userName}! The game is ready. Try to guess the hidden word and invite your friends to join the fun!`);
-          localStorage.setItem("loggedUserGameMessageShown", "true");
         }
       });
 
@@ -938,7 +924,6 @@
     document.getElementById("start-game").addEventListener("click", startGame);
 
     async function startGame() {
-      // Permitir que o proprietário inicie o jogo mesmo com um jogo ativo
       if (currentStatus === "in_progress" && userRole !== "proprietario") {
         speakText("A game is already in progress. Please wait.");
         return;
@@ -946,24 +931,24 @@
 
       // Incrementar contador global de partidas
       const gamesPlayedRef = db.ref("HannahGames/guessTheWord/gamesPlayed");
-      const snapshot = await gamesPlayedRef.once("value");
-      const currentGamesPlayed = snapshot.val() || 0; // Caso não exista, começa do 0
-      const updatedGamesPlayed = currentGamesPlayed + 1;
-      await gamesPlayedRef.set(updatedGamesPlayed); // Atualizar no Firebase
+      const snapshot       = await gamesPlayedRef.once("value");
+      const currentGames   = snapshot.val() || 0; 
+      const updatedGames   = currentGames + 1;
+      await gamesPlayedRef.set(updatedGames); 
 
       // Reiniciar o jogo
-      await db.ref("HannahGames/guessTheWord/currentGame").remove(); // Remove dados do jogo atual
+      await db.ref("HannahGames/guessTheWord/currentGame").remove(); 
       currentDifficulty = document.getElementById("difficulty-select").value;
-      const chosenWord = await pickWordWithDefinition(currentDifficulty);
+      const chosenWord  = await pickWordWithDefinition(currentDifficulty);
 
       // Garantir que a palavra e o comprimento sejam registrados no banco de dados
       await db.ref("HannahGames/guessTheWord/currentGame").set({
         word: chosenWord,
-        length: chosenWord.length, // Adiciona o comprimento da palavra
+        length: chosenWord.length,
         status: "in_progress",
         difficulty: currentDifficulty,
-        attempts: {}, // Reinicia as tentativas
-        players: {} // Reinicia os jogadores
+        attempts: {},
+        players: {}
       });
 
       // Mensagem de início
@@ -973,21 +958,19 @@
       }
 
       // Atualizar estado local do jogo
-      currentWord = chosenWord;
+      currentWord   = chosenWord;
       currentStatus = "in_progress";
-      currentLetters = [];
-      activeIndex = 0;
+      currentLetters= [];
+      activeIndex   = 0;
       attemptsArray = [];
 
-      // Atualizar o campo de entrada com base no comprimento da palavra
-      hiddenInput.maxLength = currentWord.length; // Define o tamanho máximo do input
-      hiddenInput.value = ""; // Limpa o valor atual do input
-      hiddenInput.placeholder = `Type a word of ${currentWord.length} letters`; // Atualiza o placeholder
+      hiddenInput.maxLength  = currentWord.length;
+      hiddenInput.value      = "";
+      hiddenInput.placeholder= `Type a word of ${currentWord.length} letters`;
 
-      // Renderizar tentativas, atualizar a interface e exibir informações do jogo
       renderAllAttempts();
       updateUI();
-      updateGameStats(); // Atualizar "Your Score" e "Total Games"
+      updateGameStats();
     }
 
     /*******************************************************
@@ -996,19 +979,15 @@
     async function pickWordWithDefinition(diff) {
       let minLen = 3, maxLen = 3;
       if (diff === "medium") { minLen = 4; maxLen = 5; }
-      if (diff === "hard") { minLen = 6; maxLen = 7; }
+      if (diff === "hard")   { minLen = 6; maxLen = 7; }
 
-      // Filtrar palavras do Oxford 3000 Word List com base no tamanho
       const allWords = [...oxfordDictionarySet].filter(w => w.length >= minLen && w.length <= maxLen);
-      if (allWords.length < 1) return "cat"; // Palavra fallback caso nenhuma seja encontrada
+      if (allWords.length < 1) return "cat"; // fallback
 
-      // Tentar encontrar uma palavra com definição válida
       for (let i = 0; i < 30; i++) {
         const cand = allWords[Math.floor(Math.random() * allWords.length)];
         if (await hasDefinition(cand)) return cand;
       }
-
-      // Fallback para o caso de não encontrar nenhuma palavra válida com definição
       return allWords[Math.floor(Math.random() * allWords.length)];
     }
 
@@ -1061,33 +1040,33 @@
      * 13) UPDATE UI
      *******************************************************/
     function updateUI() {
-      const startBtn = document.getElementById("start-game");
-      const difficultySelect = document.getElementById("difficulty-select");
+      const startBtn        = document.getElementById("start-game");
+      const difficultySelect= document.getElementById("difficulty-select");
+      const tryBtn          = document.getElementById("try-button");
 
       if (userRole === "proprietario") {
         // Sempre habilitar botões para o proprietário
-        startBtn.disabled = false;
-        difficultySelect.disabled = false;
+        startBtn.disabled        = false;
+        difficultySelect.disabled= false;
       } else {
-        // Para usuários comuns e convidados, aplicar restrições
         if (currentStatus === "in_progress") {
-          startBtn.disabled = true;
-          difficultySelect.disabled = true;
+          startBtn.disabled        = true;
+          difficultySelect.disabled= true;
         } else {
-          startBtn.disabled = false;
-          difficultySelect.disabled = false;
+          startBtn.disabled        = false;
+          difficultySelect.disabled= false;
         }
       }
 
       // Botão "Try" só é habilitado durante um jogo ativo
-      tryButton.disabled = currentStatus !== "in_progress";
+      tryBtn.disabled = currentStatus !== "in_progress";
     }
 
     /*******************************************************
      * 14) INPUT EVENT (PARA MOBILE E DESKTOP)
      *******************************************************/
     hiddenInput.addEventListener("input", (e) => {
-      const val = e.target.value.trim().toLowerCase(); // Captura o valor digitado
+      const val = e.target.value.trim().toLowerCase(); 
       if (!val || currentStatus !== "in_progress" || !currentWord) return;
 
       // Limita o valor ao tamanho da palavra atual
@@ -1100,14 +1079,13 @@
       if (currentStatus !== "in_progress" || !currentWord) return;
 
       if (e.key === "Backspace") {
-        // Remove o último caractere do input
         const val = hiddenInput.value.trim();
         hiddenInput.value = val.slice(0, -1);
       }
 
       if (e.key === "Enter") {
-        e.preventDefault(); // Evita comportamentos padrão
-        submitCurrentRow(); // Envia a tentativa atual
+        e.preventDefault();
+        submitCurrentRow();
       }
     });
 
@@ -1135,8 +1113,8 @@
     inviteButtonMain.addEventListener("click", () => {
       const shareData = {
         title: "Hannah English Course",
-        text: "Come play this English word game with me!",
-        url: "https://hannahenglishcourse.vercel.app/game.html"
+        text:  "Come play this English word game with me!",
+        url:   "https://hannahenglishcourse.vercel.app/game.html"
       };
       if (navigator.share) {
         navigator.share(shareData).catch(() => {});
@@ -1173,7 +1151,7 @@
 
       // Obter feedback para a palavra digitada
       const feedback = getFeedback(guessClean, currentWord);
-      const pushRef = db.ref("HannahGames/guessTheWord/currentGame/attempts").push();
+      const pushRef  = db.ref("HannahGames/guessTheWord/currentGame/attempts").push();
       await pushRef.set({
         guess: guessClean,
         feedback,
@@ -1196,20 +1174,18 @@
         if (!isGuest && userUid) {
           let pts = 10;
           if (currentDifficulty === "medium") pts = 20;
-          if (currentDifficulty === "hard") pts = 35;
+          if (currentDifficulty === "hard")   pts = 35;
 
           // Recuperar e atualizar pontos no banco de dados
-          const userRef = db.ref("usuarios/" + userUid);
-          const userSnap = await userRef.once("value");
-          const userData = userSnap.val() || {};
-          const currentPoints = userData.points || 0; // Pontos existentes ou 0
-          const updatedPoints = currentPoints + pts; // Soma os pontos ganhos
+          const userRef   = db.ref("usuarios/" + userUid);
+          const userSnap  = await userRef.once("value");
+          const userData  = userSnap.val() || {};
+          const currScore = userData.points || 0;
+          const newScore  = currScore + pts;
 
-          await userRef.update({ points: updatedPoints }); // Atualiza no Firebase
-
-          // Atualizar variável local e interface
-          totalPoints = updatedPoints;
-          updateGameStats(); // Atualiza "Your Score" e outras estatísticas
+          await userRef.update({ points: newScore });
+          totalPoints = newScore;
+          updateGameStats();
         }
 
         // Atualiza o status do jogo
@@ -1222,7 +1198,7 @@
 
       // Re-renderizar tentativas e manter o foco no input
       renderAllAttempts();
-      hiddenInput.focus(); // Foca automaticamente no input após a tentativa
+      hiddenInput.focus();
     }
 
     /*******************************************************
