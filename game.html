@@ -725,57 +725,69 @@ loadDictionaries();
         "Good luck!"
       );
     });
+/*******************************************************
+ * 6) LOGIN
+ *******************************************************/
+auth.onAuthStateChanged(async (user) => {
+  let playerRef = null; // Referência do jogador no nó players
 
-    /*******************************************************
-     * 6) LOGIN
-     *******************************************************/
-    auth.onAuthStateChanged(async (user) => {
-      let playerRef = null; // Referência do jogador no nó players
+  if (user) {
+    // Usuário logado
+    userUid = user.uid;
+    isGuest = false;
 
-      if (user) {
-        // Usuário logado
-        userUid = user.uid;
-        isGuest = false;
+    // Recupera os dados do usuário no Firebase
+    const snap = await db.ref("usuarios/" + userUid).once("value");
+    const data = snap.val() || {};
+    userName = data.nome || data.email || "User";
+    userRole = data.role || ""; // Obtém o role do usuário logado (se disponível)
 
-        // Recupera os dados do usuário no Firebase
-        const snap = await db.ref("usuarios/" + userUid).once("value");
-        const data = snap.val() || {};
-        userName = data.nome || data.email || "User";
-        userRole = data.role || ""; // Obtém o role do usuário logado (se disponível)
-
-        // Adiciona o jogador logado ao nó global players
-        playerRef = db.ref("HannahGames/guessTheWord/players/" + userUid);
-        playerRef.set({
-          name: userName,
-          joinedAt: Date.now(),
-        });
-      } else {
-        // Usuário convidado (não logado)
-        userUid = null;
-        isGuest = true;
-        userName = "Guest";
-        userRole = ""; // Não atribuir role para convidados
-
-        // Gera um ID único para o convidado
-        const guestId = `guest_${Date.now()}`;
-        playerRef = db.ref("HannahGames/guessTheWord/players/" + guestId);
-        playerRef.set({
-          name: "Guest",
-          joinedAt: Date.now(),
-        });
-      }
-
-      // Remove o jogador do nó players ao desconectar
-      if (playerRef) {
-        playerRef.onDisconnect().remove();
-      }
-
-      // Atualiza a interface e funcionalidades
-      loadScoreboard(); // Atualiza o placar
-      listenGameState(); // Monitora o estado do jogo e jogadores ativos
-      updateGameStats(); // Atualiza "Your Score" e "Total Games"
-      updateLoginButtonVisibility(); // Ajusta a visibilidade do botão de login
+    // Adiciona o jogador logado ao nó global players
+    playerRef = db.ref("HannahGames/guessTheWord/players/" + userUid);
+    playerRef.set({
+      name: userName,
+      joinedAt: Date.now(),
     });
+
+    // Nova fala para usuários logados
+    if (!localStorage.getItem("welcomeMessageShown")) {
+      speakText(`Hello ${userName}! Take your guess and try to be the first to figure out the hidden word. Hit the Invite button to bring your friends along and make the game even more exciting!`);
+      localStorage.setItem("welcomeMessageShown", "true");
+    }
+
+  } else {
+    // Usuário convidado (não logado)
+    userUid = null;
+    isGuest = true;
+    userName = "Guest";
+    userRole = ""; // Não atribuir role para convidados
+
+    // Gera um ID único para o convidado
+    const guestId = `guest_${Date.now()}`;
+    playerRef = db.ref("HannahGames/guessTheWord/players/" + guestId);
+    playerRef.set({
+      name: "Guest",
+      joinedAt: Date.now(),
+    });
+
+    // Fala do robô para usuários não logados
+    if (!localStorage.getItem("guestMessageShown")) {
+      speakText("You're playing as a guest. Your progress won't be saved.");
+      localStorage.setItem("guestMessageShown", "true");
+    }
+  }
+
+  // Remove o jogador do nó players ao desconectar
+  if (playerRef) {
+    playerRef.onDisconnect().remove();
+  }
+
+  // Atualiza a interface e funcionalidades
+  loadScoreboard(); // Atualiza o placar
+  listenGameState(); // Monitora o estado do jogo e jogadores ativos
+  updateGameStats(); // Atualiza "Your Score" e "Total Games"
+  updateLoginButtonVisibility(); // Ajusta a visibilidade do botão de login
+});
 
     /*******************************************************
      * 7) FUNÇÃO UNIFICADA PARA ATUALIZAR SCORE E GAMES
@@ -829,74 +841,80 @@ loadDictionaries();
     }
 
    /*******************************************************
-   * 9) OUVIR ESTADO DO JOGO
-   *******************************************************/
-  function listenGameState() {
-    db.ref("HannahGames/guessTheWord/currentGame").on("value", (snap) => {
-      const data = snap.val();
+ * 9) OUVIR ESTADO DO JOGO
+ *******************************************************/
+function listenGameState() {
+  db.ref("HannahGames/guessTheWord/currentGame").on("value", (snap) => {
+    const data = snap.val();
 
-      if (!data) {
-        // Jogo inativo: resetar estado local e interface
-        currentStatus = "idle";
-        currentWord = "";
-        attemptsArray = [];
-        currentLetters = [];
-        activeIndex = 0;
+    if (!data) {
+      // Jogo inativo: resetar estado local e interface
+      currentStatus = "idle";
+      currentWord = "";
+      attemptsArray = [];
+      currentLetters = [];
+      activeIndex = 0;
 
-        renderAllAttempts();
-        updateUI();
-        hiddenInput.placeholder = "Waiting for a new game...";
-        hiddenInput.maxLength = ""; // Remove o limite do input
-        return;
-      }
-
-      // Atualizar estado local com os dados do jogo
-      currentWord = data.word || "";
-      currentStatus = data.status || "idle";
-      currentDifficulty = data.difficulty || "easy";
-
-      const attemptsObj = data.attempts || {};
-      attemptsArray = Object.keys(attemptsObj).map((key) => attemptsObj[key]);
-
-      // Atualizar o campo de entrada com o comprimento da palavra
-      if (data.length) {
-        hiddenInput.maxLength = data.length; // Define o tamanho máximo do input
-        hiddenInput.placeholder = `Type a word of ${data.length} letters`; // Atualiza o placeholder
-      }
-
-      // Renderizar tentativas e atualizar interface
       renderAllAttempts();
       updateUI();
+      hiddenInput.placeholder = "Waiting for a new game...";
+      hiddenInput.maxLength = ""; // Remove o limite do input
+      return;
+    }
 
-      // Exibir mensagem para convidados, apenas uma vez
-      if (isGuest && !localStorage.getItem("guestMessageShown")) {
-        speakText("You're playing as a guest. Your progress won't be saved.");
-        localStorage.setItem("guestMessageShown", "true");
-      }
-    });
+    // Atualizar estado local com os dados do jogo
+    currentWord = data.word || "";
+    currentStatus = data.status || "idle";
+    currentDifficulty = data.difficulty || "easy";
 
-    // Monitora o número de jogadores ativos
-    db.ref("HannahGames/guessTheWord/players").on("value", (snap) => {
-      const players = snap.val() || {};
-      const activePlayersCount = Object.keys(players).length;
+    const attemptsObj = data.attempts || {};
+    attemptsArray = Object.keys(attemptsObj).map((key) => attemptsObj[key]);
 
-      // Atualiza a exibição de jogadores ativos
-      const activePlayersElement = document.getElementById("active-players-count");
-      if (activePlayersElement) {
-        activePlayersElement.textContent = `Active Players: ${activePlayersCount}`;
-      }
-    });
+    // Atualizar o campo de entrada com o comprimento da palavra
+    if (data.length) {
+      hiddenInput.maxLength = data.length; // Define o tamanho máximo do input
+      hiddenInput.placeholder = `Type a word of ${data.length} letters`; // Atualiza o placeholder
+    }
 
-    // Atualiza o contador global de jogos jogados
-    const gamesPlayedRef = db.ref("HannahGames/guessTheWord/gamesPlayed");
-    gamesPlayedRef.on("value", (snapshot) => {
-      const gamesPlayed = snapshot.val() || 0;
-      const ownerGamesCountElement = document.getElementById("ownerGamesCount");
-      if (ownerGamesCountElement) {
-        ownerGamesCountElement.textContent = gamesPlayed;
-      }
-    });
-  }
+    // Renderizar tentativas e atualizar interface
+    renderAllAttempts();
+    updateUI();
+
+    // Exibir mensagem para convidados, apenas uma vez
+    if (isGuest && !localStorage.getItem("guestMessageShown")) {
+      speakText("You're playing as a guest. Your progress won't be saved.");
+      localStorage.setItem("guestMessageShown", "true");
+    }
+
+    // Nova fala para usuários logados, apenas no início do jogo
+    if (!isGuest && currentStatus === "idle" && !localStorage.getItem("loggedUserGameMessageShown")) {
+      speakText(`Hello ${userName}! The game is ready. Try to guess the hidden word and invite your friends to join the fun!`);
+      localStorage.setItem("loggedUserGameMessageShown", "true");
+    }
+  });
+
+  // Monitora o número de jogadores ativos
+  db.ref("HannahGames/guessTheWord/players").on("value", (snap) => {
+    const players = snap.val() || {};
+    const activePlayersCount = Object.keys(players).length;
+
+    // Atualiza a exibição de jogadores ativos
+    const activePlayersElement = document.getElementById("active-players-count");
+    if (activePlayersElement) {
+      activePlayersElement.textContent = `Active Players: ${activePlayersCount}`;
+    }
+  });
+
+  // Atualiza o contador global de jogos jogados
+  const gamesPlayedRef = db.ref("HannahGames/guessTheWord/gamesPlayed");
+  gamesPlayedRef.on("value", (snapshot) => {
+    const gamesPlayed = snapshot.val() || 0;
+    const ownerGamesCountElement = document.getElementById("ownerGamesCount");
+    if (ownerGamesCountElement) {
+      ownerGamesCountElement.textContent = gamesPlayed;
+    }
+  });
+}
 
     /*******************************************************
    * 10) START GAME
