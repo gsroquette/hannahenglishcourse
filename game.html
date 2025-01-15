@@ -632,6 +632,9 @@
     // Para evitar repetir a fala de "início de jogo" toda hora
     let previousAnnouncerMessage = "";
 
+    // NOVO: Para garantir que o alerta só apareça uma vez
+    let ttsWarningShown = false;
+
     const hiddenInput    = document.getElementById("hidden-input");
     const board          = document.getElementById("board");
     const robotImage     = document.getElementById("robot-image");
@@ -677,8 +680,35 @@
 
     function speakText(text, onEndCallback) {
       if (!text) return;
+
+      // Verifica se speechSynthesis está disponível
+      if (!synth) {
+        // Exibe alerta apenas uma vez
+        if (!ttsWarningShown) {
+          alert("Your device does not support speech synthesis or it is not enabled. Please enable it or update your device to fully enjoy this game in American English.");
+          ttsWarningShown = true;
+        }
+        return;
+      }
+
+      // Obtém vozes disponíveis
+      const voices = synth.getVoices();
+      // Filtra para encontrar alguma voz en-US
+      let selectedVoice = voices.find((v) => v.lang.toLowerCase().includes("en-us"));
+
+      // Se não achar nenhuma voz 'en-US', alerta apenas uma vez
+      if (!selectedVoice) {
+        if (!ttsWarningShown) {
+          alert("No American English voice found. Please enable or install an American English voice to fully enjoy this game.");
+          ttsWarningShown = true;
+        }
+        return;
+      }
+
+      // Configura o utterance
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang  = "en-US";
+      utterance.voice = selectedVoice;
 
       utterance.onstart = () => {
         robotImage.src = "imagens/robo_fala.gif";
@@ -690,7 +720,6 @@
         robotImage.src = "imagens/robo_estatico.png";
         setTimeout(() => {
           robotBalloon.style.display = "none";
-          // Se houver callback, chamamos
           if (onEndCallback) {
             onEndCallback();
           }
@@ -745,7 +774,6 @@
         playerRef.set({ name: userName, joinedAt: Date.now() });
 
         // Fala de boas-vindas (inicial)
-        // Após a fala, scroll para o try
         speakText(`Hello ${userName}! Take your guess and try to be the first to discover the hidden word. Use the Invite button to call your friends and make the game more fun!`, () => {
           tryButton.scrollIntoView({ behavior: "smooth", block: "center" });
           tryButton.focus();
@@ -764,10 +792,15 @@
         playerRef.set({ name: "Guest", joinedAt: Date.now() });
 
         // Fala para convidados
-        speakText("Welcome, Guest! Please note that your score won’t be saved unless you log in. Take a guess and challenge yourself to be the first to uncover the hidden word. Don’t forget to use the Invite button to bring your friends along and make the game even more exciting!", () => {
-          tryButton.scrollIntoView({ behavior: "smooth", block: "center" });
-          tryButton.focus();
-        });
+        speakText(
+          "Welcome, Guest! Please note that your score won’t be saved unless you log in. " +
+          "Take a guess and challenge yourself to be the first to uncover the hidden word. " +
+          "Don’t forget to use the Invite button to bring your friends along and make the game even more exciting!",
+          () => {
+            tryButton.scrollIntoView({ behavior: "smooth", block: "center" });
+            tryButton.focus();
+          }
+        );
       }
 
       if (playerRef) {
