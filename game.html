@@ -632,9 +632,6 @@
     // Para evitar repetir a fala de "início de jogo" toda hora
     let previousAnnouncerMessage = "";
 
-    // NOVO: Para garantir que o alerta só apareça uma vez
-    let ttsWarningShown = false;
-
     const hiddenInput    = document.getElementById("hidden-input");
     const board          = document.getElementById("board");
     const robotImage     = document.getElementById("robot-image");
@@ -675,55 +672,56 @@
 
     /*******************************************************
      * 4) FUNÇÃO ROBÔ E TTS (COM CALLBACK OPCIONAL)
+     *    - Agora exibe sempre o texto e scrolla para o robô.
+     *    - Tenta usar qualquer voz 'en-' como fallback.
      *******************************************************/
     const synth = window.speechSynthesis;
 
     function speakText(text, onEndCallback) {
       if (!text) return;
 
-      // Verifica se speechSynthesis está disponível
+      // Sempre faz scroll para o robô e exibe o balão de fala
+      document.getElementById("robot-section").scrollIntoView({ behavior: "smooth", block: "center" });
+      robotImage.src = "imagens/robo_fala.gif";
+      robotBalloon.textContent = text;
+      robotBalloon.style.display = "block";
+
+      // Verifica se speechSynthesis existe
       if (!synth) {
-        // Exibe alerta apenas uma vez
-        if (!ttsWarningShown) {
-          alert("Your device does not support speech synthesis or it is not enabled. Please enable it or update your device to fully enjoy this game in American English.");
-          ttsWarningShown = true;
-        }
+        console.warn("SpeechSynthesis not available. Exibindo texto apenas.");
+        // Fecha o balão depois de alguns segundos
+        setTimeout(() => {
+          robotImage.src = "imagens/robo_estatico.png";
+          robotBalloon.style.display = "none";
+          if (onEndCallback) onEndCallback();
+        }, 4000);
         return;
       }
 
-      // Obtém vozes disponíveis
+      // Obtém a lista de vozes
       const voices = synth.getVoices();
-      // Filtra para encontrar alguma voz en-US
-      let selectedVoice = voices.find((v) => v.lang.toLowerCase().includes("en-us"));
-
-      // Se não achar nenhuma voz 'en-US', alerta apenas uma vez
-      if (!selectedVoice) {
-        if (!ttsWarningShown) {
-          alert("No American English voice found. Please enable or install an American English voice to fully enjoy this game.");
-          ttsWarningShown = true;
-        }
+      if (!voices.length) {
+        console.warn("Nenhuma voz disponível. Exibindo texto apenas.");
+        setTimeout(() => {
+          robotImage.src = "imagens/robo_estatico.png";
+          robotBalloon.style.display = "none";
+          if (onEndCallback) onEndCallback();
+        }, 4000);
         return;
       }
+
+      // Tenta achar voz em inglês (qualquer dialeto: en-US, en-GB, etc.)
+      let selectedVoice = voices.find(v => v.lang.toLowerCase().startsWith("en")) || voices[0];
 
       // Configura o utterance
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang  = "en-US";
+      utterance.lang  = selectedVoice.lang;
       utterance.voice = selectedVoice;
-
-      utterance.onstart = () => {
-        robotImage.src = "imagens/robo_fala.gif";
-        robotBalloon.textContent = text;
-        robotBalloon.style.display = "block";
-      };
 
       utterance.onend = () => {
         robotImage.src = "imagens/robo_estatico.png";
-        setTimeout(() => {
-          robotBalloon.style.display = "none";
-          if (onEndCallback) {
-            onEndCallback();
-          }
-        }, 500);
+        robotBalloon.style.display = "none";
+        if (onEndCallback) onEndCallback();
       };
 
       synth.speak(utterance);
@@ -1186,8 +1184,7 @@
       hiddenInput.value = "";
       hiddenInput.focus();
 
-      // Se todas as letras estão green, acabou! Mas agora não falamos
-      // "congratulations" individualmente. Marcamos o winner e definimos "ended".
+      // Se todas as letras estão green, acabou!
       if (feedback.every(c => c === "green")) {
         // Se for usuário logado, atualiza pontuação
         if (!isGuest && userUid) {
@@ -1205,7 +1202,7 @@
           updateGameStats();
         }
 
-        // Aqui informamos quem venceu
+        // Marca o winner e define status como ended
         db.ref("HannahGames/guessTheWord/currentGame").update({
           status: "ended",
           winnerName: isGuest ? "Guest" : userName
@@ -1272,12 +1269,12 @@
       }
     }
 
-/*******************************************************
- * 24) BOTÃO BACK
- *******************************************************/
-backButton.addEventListener("click", () => {
-  window.history.back();
-});
+    /*******************************************************
+     * 24) BOTÃO BACK
+     *******************************************************/
+    backButton.addEventListener("click", () => {
+      window.history.back();
+    });
   </script>
 </body>
 </html>
