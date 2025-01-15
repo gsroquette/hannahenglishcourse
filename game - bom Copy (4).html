@@ -626,20 +626,17 @@
     let currentLetters   = [];
     let activeIndex      = 0;
 
-    // Evita duplicar a fala do significado
+    // Controla se a definição já foi falada para evitar duplicação
     let hasDefinitionBeenSpoken = false;
 
-    // Para evitar repetir a fala de "início de jogo" toda hora
-    let previousAnnouncerMessage = "";
-
-    const hiddenInput    = document.getElementById("hidden-input");
-    const board          = document.getElementById("board");
-    const robotImage     = document.getElementById("robot-image");
-    const robotBalloon   = document.getElementById("robot-balloon");
-    const backButton     = document.getElementById("back-button");
+    const hiddenInput   = document.getElementById("hidden-input");
+    const board         = document.getElementById("board");
+    const robotImage    = document.getElementById("robot-image");
+    const robotBalloon  = document.getElementById("robot-balloon");
+    const backButton    = document.getElementById("back-button");
     const inviteButtonMain = document.getElementById("invite-button-main");
-    const loginButton    = document.getElementById("login-button");
-    const tryButton      = document.getElementById("try-button");
+    const loginButton   = document.getElementById("login-button");
+    const tryButton     = document.getElementById("try-button");
 
     /*******************************************************
      * 3) CARREGAR OS DICIONÁRIOS
@@ -671,7 +668,7 @@
     loadDictionaries();
 
     /*******************************************************
-     * 4) FUNÇÃO ROBÔ E TTS (COM CALLBACK OPCIONAL)
+     * 4) ROBÔ E TTS (com callback opcional)
      *******************************************************/
     const synth = window.speechSynthesis;
 
@@ -690,11 +687,15 @@
         robotImage.src = "imagens/robo_estatico.png";
         setTimeout(() => {
           robotBalloon.style.display = "none";
+          // Após cada fala inicial, rola para o botão "Try" e foca
+          tryButton.scrollIntoView({ behavior: "smooth", block: "center" });
+          tryButton.focus();
+
           // Se houver callback, chamamos
           if (onEndCallback) {
             onEndCallback();
           }
-        }, 500);
+        }, 700);
       };
 
       synth.speak(utterance);
@@ -744,12 +745,8 @@
         playerRef = db.ref("HannahGames/guessTheWord/players/" + userUid);
         playerRef.set({ name: userName, joinedAt: Date.now() });
 
-        // Fala de boas-vindas (inicial)
-        // Após a fala, scroll para o try
-        speakText(`Hello ${userName}! Take your guess and try to be the first to discover the hidden word. Use the Invite button to call your friends and make the game more fun!`, () => {
-          tryButton.scrollIntoView({ behavior: "smooth", block: "center" });
-          tryButton.focus();
-        });
+        // Fala de boas-vindas
+        speakText(`Hello ${userName}! Take your guess and try to be the first to discover the hidden word. Use the Invite button to call your friends and make the game more fun!`);
 
       } else {
         // Usuário convidado
@@ -764,10 +761,7 @@
         playerRef.set({ name: "Guest", joinedAt: Date.now() });
 
         // Fala para convidados
-        speakText("You're playing as a guest. Your progress won't be saved.", () => {
-          tryButton.scrollIntoView({ behavior: "smooth", block: "center" });
-          tryButton.focus();
-        });
+        speakText("You're playing as a guest. Your progress won't be saved.");
       }
 
       if (playerRef) {
@@ -844,8 +838,7 @@
           attemptsArray = [];
           currentLetters= [];
           activeIndex   = 0;
-          hasDefinitionBeenSpoken = false;
-          previousAnnouncerMessage= "";
+          hasDefinitionBeenSpoken = false; // zera para um novo jogo
 
           renderAllAttempts();
           updateUI();
@@ -869,16 +862,6 @@
         renderAllAttempts();
         updateUI();
 
-        // Se houver um announcerMessage, todos escutam (só uma vez por mensagem)
-        if (data.announcerMessage && data.announcerMessage !== previousAnnouncerMessage) {
-          previousAnnouncerMessage = data.announcerMessage;
-          speakText(data.announcerMessage, () => {
-            // Após a fala do anúncio, scroll para Try
-            tryButton.scrollIntoView({ behavior: "smooth", block: "center" });
-            tryButton.focus();
-          });
-        }
-
         // Se o jogo terminou (status = ended) e ainda não falamos a definição
         if (currentStatus === "ended" && data.definition && !hasDefinitionBeenSpoken) {
           hasDefinitionBeenSpoken = true;
@@ -886,12 +869,8 @@
           // 1) Scroll para o topo para mostrar o robô
           window.scrollTo({ top: 0, behavior: "smooth" });
 
-          // 2) Fala final para todos, incluindo o nome do vencedor
-          const theWinner = data.winnerName || "someone";
-          const finalText = `Congratulations, ${theWinner}! You discovered the hidden word: ${currentWord}. ` +
-                            `The word means: ${data.definition}`;
-
-          speakText(finalText, () => {
+          // 2) Falar a definição para todos
+          speakText(`Definition of ${currentWord}: ${data.definition}`, () => {
             // Quando terminar a fala, scroll para o Start Game
             const startBtn = document.getElementById("start-game");
             startBtn.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -947,10 +926,7 @@
       // 2) Busca a definição dessa palavra
       const wordDefinition = await getDefinition(chosenWord);
 
-      // 3) Mensagem de anúncio para todos
-      const announcerText = `${userName} started a new game! Difficulty: ${currentDifficulty}. Good luck!`;
-
-      // 4) Cria o novo jogo já com a definition e announcerMessage
+      // 3) Cria o novo jogo já com a definition salva
       await db.ref("HannahGames/guessTheWord/currentGame").set({
         word: chosenWord,
         length: chosenWord.length,
@@ -958,11 +934,14 @@
         difficulty: currentDifficulty,
         definition: wordDefinition || "",
         attempts: {},
-        players: {},
-        announcerMessage: announcerText
+        players: {}
       });
 
-      // Local updates
+      speakText(`${userName} started a new game! Difficulty: ${currentDifficulty}. Good luck!`);
+      if (isGuest) {
+        speakText("You're playing as a guest. Your progress won't be saved.");
+      }
+
       currentWord   = chosenWord;
       currentStatus = "in_progress";
       currentLetters= [];
@@ -1153,9 +1132,11 @@
       hiddenInput.value = "";
       hiddenInput.focus();
 
-      // Se todas as letras estão green, acabou! Mas agora não falamos
-      // "congratulations" individualmente. Marcamos o winner e definimos "ended".
       if (feedback.every(c => c === "green")) {
+        // Jogador acertou
+        let msg = `Congratulations, ${isGuest ? "Guest" : userName}! You found the word "${guessClean}".`;
+        speakText(msg);
+
         // Se for usuário logado, atualiza pontuação
         if (!isGuest && userUid) {
           let pts = 10;
@@ -1172,12 +1153,8 @@
           updateGameStats();
         }
 
-        // Aqui informamos quem venceu
-        db.ref("HannahGames/guessTheWord/currentGame").update({
-          status: "ended",
-          winnerName: isGuest ? "Guest" : userName
-        });
-
+        // Muda status do jogo para ended
+        db.ref("HannahGames/guessTheWord/currentGame").update({ status: "ended" });
       } else {
         // Jogador não acertou
         const randomMsg = encouragementMessages[Math.floor(Math.random() * encouragementMessages.length)];
