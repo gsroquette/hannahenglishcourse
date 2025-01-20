@@ -84,7 +84,10 @@ function loadConversationDetails(level, unit) {
         // Usa a primeira linha como tópico (se existir)
         const topic = lines.length > 0 ? lines[0].trim() : 'General conversation';
         
-        return { topic, fullContent: fileContent };
+        // Sanitiza o conteúdo completo, removendo ### e numeração
+        const sanitizedContent = fileContent.replace(/###|\d+\.\s/g, '').trim();
+        
+        return { topic, fullContent: sanitizedContent };
     } else {
         console.warn(`⚠️ Arquivo conversa.txt não encontrado: ${filePath}. Usando 'General conversation'.`);
         return { topic: 'General conversation', fullContent: '' };
