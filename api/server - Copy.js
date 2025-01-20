@@ -77,13 +77,8 @@ function loadConversationDetails(level, unit) {
     if (fs.existsSync(filePath)) {
         const fileContent = fs.readFileSync(filePath, 'utf-8').trim();
         console.log("✅ Arquivo conversa.txt carregado com sucesso.");
-        
-        // Divide o conteúdo em linhas e remove linhas vazias
-        const lines = fileContent.split('\n').filter(line => line.trim() !== '');
-        
-        // Usa a primeira linha como tópico (se existir)
-        const topic = lines.length > 0 ? lines[0].trim() : 'General conversation';
-        
+        const lines = fileContent.split('\n');
+        const topic = lines[0] ? lines[0].trim() : 'General conversation';
         return { topic, fullContent: fileContent };
     } else {
         console.warn(`⚠️ Arquivo conversa.txt não encontrado: ${filePath}. Usando 'General conversation'.`);
