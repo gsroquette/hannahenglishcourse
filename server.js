@@ -1,3 +1,5 @@
+require('dotenv').config(); // Carrega variáveis do .env
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
@@ -11,17 +13,32 @@ const textToSpeech = require('@google-cloud/text-to-speech');
 // Instancia o cliente de Text-to-Speech
 const ttsClient = new textToSpeech.TextToSpeechClient();
 
-// Configuração Firebase Admin
-console.log("FIREBASE_SERVICE_ACCOUNT:", process.env.FIREBASE_SERVICE_ACCOUNT || "NÃO DEFINIDO"); // Verifica o valor da variável de ambiente
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || '{}');
+// 🔹 Verifica se a variável FIREBASE_SERVICE_ACCOUNT foi carregada corretamente
+if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+  console.error("❌ ERRO: Variável de ambiente FIREBASE_SERVICE_ACCOUNT não encontrada!");
+  process.exit(1); // Encerra o servidor para evitar erros
+}
+
+// 🔹 Converte a string JSON do .env para um objeto válido do Firebase
+let serviceAccount;
+try {
+  serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  console.log("✅ Chave de serviço Firebase carregada corretamente.");
+} catch (error) {
+  console.error("❌ ERRO ao analisar FIREBASE_SERVICE_ACCOUNT:", error.message);
+  process.exit(1);
+}
+
+// 🔹 Inicializa o Firebase Admin SDK
 try {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
     databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
   });
-  console.log("Firebase inicializado com sucesso!");
+  console.log("✅ Firebase inicializado com sucesso!");
 } catch (error) {
-  console.error("Erro ao inicializar o Firebase:", error.message); // Exibe erro se o JSON for inválido ou incompleto
+  console.error("❌ ERRO ao inicializar o Firebase:", error.message);
+  process.exit(1);
 }
 
 const db = admin.database(); // Inicializa o banco de dados Firebase
