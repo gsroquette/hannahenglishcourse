@@ -1,14 +1,19 @@
-require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') }); // Carrega variáveis do .env corretamente
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const fs = require('fs');
-const path = require('path');
 const { Configuration, OpenAIApi } = require('openai');
 const admin = require('firebase-admin');
 const fetch = require('node-fetch'); // Para chamar o /api/tts internamente
 const textToSpeech = require('@google-cloud/text-to-speech');
+
+// Agora as variáveis de ambiente do .env serão carregadas corretamente
+
+// Instancia o cliente de Text-to-Speech
+const ttsClient = new textToSpeech.TextToSpeechClient();
 
 // 🔹 Verifica se a variável FIREBASE_SERVICE_ACCOUNT foi carregada corretamente
 if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
@@ -35,22 +40,6 @@ try {
   console.log("✅ Firebase inicializado com sucesso!");
 } catch (error) {
   console.error("❌ ERRO ao inicializar o Firebase:", error.message);
-  process.exit(1);
-}
-
-// 🔹 Instancia o cliente de Text-to-Speech com as credenciais do serviceAccount
-let ttsClient;
-try {
-  ttsClient = new textToSpeech.TextToSpeechClient({
-    projectId: serviceAccount.project_id,
-    credentials: {
-      private_key: serviceAccount.private_key,
-      client_email: serviceAccount.client_email,
-    },
-  });
-  console.log("✅ Google Cloud TTS Client inicializado com sucesso!");
-} catch (err) {
-  console.error("❌ ERRO ao inicializar Google Cloud TTS Client:", err.message);
   process.exit(1);
 }
 
