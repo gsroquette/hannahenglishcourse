@@ -248,7 +248,7 @@ app.post('/api/chat', async (req, res) => {
 
         // Chama a OpenAI com o histórico atualizado
         const completion = await openai.createChatCompletion({
-            model: 'chatgpt-4o-latest', // Certifique-se de que este modelo exista na sua conta
+            model: 'gpt-4o-mini-2024-07-18', // Certifique-se de que este modelo exista na sua conta
             messages: conversations[userId],
         });
 
