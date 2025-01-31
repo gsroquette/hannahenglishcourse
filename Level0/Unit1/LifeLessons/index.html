@@ -1,0 +1,468 @@
+<!DOCTYPE html> 
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Life Lessons from the Bible</title>
+    <style>
+        /* Estilos Básicos */
+        body {
+            background-image: url('../../../imagens/fundo.png');
+            background-repeat: repeat;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            min-height: 100vh;
+            margin: 0;
+        }
+        h1 {
+            margin-top: 50px;
+            text-align: center;
+            font-size: 24px;
+            color: #333;
+        }
+        #questions-container {
+            width: 80%;
+            max-width: 600px;
+            padding: 20px;
+            background: transparent;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .clickable-word {
+            display: inline-block;
+            padding: 8px 12px;
+            background-color: #ddd;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            user-select: none;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+        }
+        #answer-area {
+            width: 100%;
+            min-height: 40px;
+            border: 2px dashed #333;
+            margin-top: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+        }
+        #nav-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+        }
+        #back-btn {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background-color: #000;
+            color: #fff;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            z-index: 10;
+        }
+        .nav-btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #generate-pdf-btn {
+            display: none;
+            background-color: #FF5722;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        /* Modal Styling */
+        #modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+        }
+        #modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+        #modal-close {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<button id="back-btn" onclick="goBack()">Back</button>
+
+<h1>Life Lessons from the Bible</h1>
+
+<div id="questions-container">
+    <div id="words-container"></div>
+    <p id="question-text">Loading...</p>
+    <div id="answer-area" onclick="removeAnswer()"></div>
+    
+    <div id="nav-buttons">
+        <button class="nav-btn" onclick="prevQuestion()">Previous</button>
+        <button class="nav-btn" onclick="nextQuestion()">Next</button>
+    </div>
+    <button id="generate-pdf-btn" onclick="generatePDF()">Generate PDF</button>
+</div>
+
+<!-- Modal Structure -->
+<div id="modal">
+    <div id="modal-content">
+        <h2>Well Done!</h2>
+        <p id="modal-message">Congratulations! You have completed the phase.</p>
+        <button id="modal-close" onclick="closeModal()">Close</button>
+    </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-database.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-auth.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+
+<script>
+    // Firebase Configuration
+    const firebaseConfig = {
+        apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+        authDomain: "hannahenglishcourse.firebaseapp.com",
+        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "hannahenglishcourse",
+        storageBucket: "hannahenglishcourse.appspot.com",
+        messagingSenderId: "449818788486",
+        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707"
+    };
+    firebase.initializeApp(firebaseConfig);
+
+    let questions = [];
+    let currentQuestionIndex = 0;
+    let userAnswers = {};
+    let userRole = '';
+
+    // Load questions and answers from perguntas.txt
+    fetch('perguntas.txt')
+        .then(response => response.text())
+        .then(text => {
+            questions = text.trim().split('\n').map(line => {
+                const [question, answer] = line.split(';');
+                return { question: question.trim(), answer: answer.trim() };
+            });
+            initializeActivity();
+        });
+
+function initializeActivity() {
+    firebase.auth().onAuthStateChanged(user => {
+        if (user) {
+            const userId = user.uid;
+            firebase.database().ref(`usuarios/${userId}/role`).once('value')
+                .then(snapshot => {
+                    userRole = snapshot.val();
+                    if (userRole === 'professor' || userRole === 'proprietário') {
+                        document.getElementById('generate-pdf-btn').style.display = 'block';
+                    }
+                });
+        }
+    });
+
+    // Limpa e popula o contêiner de palavras na inicialização
+    const wordsContainer = document.getElementById('words-container');
+    wordsContainer.innerHTML = ''; // Garante que o contêiner esteja vazio antes de preencher
+
+    const words = questions.map(q => q.answer).sort(() => Math.random() - 0.5);
+    words.forEach(word => {
+        const wordElem = createClickableWord(word);
+        wordsContainer.appendChild(wordElem); // Adiciona cada palavra ao contêiner
+    });
+
+    loadQuestion();
+}
+
+   // Função que cria um elemento clicável para cada palavra
+function createClickableWord(word) {
+    const wordElem = document.createElement('div');
+    wordElem.classList.add('clickable-word');
+    wordElem.textContent = word;
+    wordElem.id = `word-${word}`;
+    wordElem.onclick = () => selectAnswer(wordElem, word);
+    return wordElem;
+}
+
+function selectAnswer(wordElem, word) {
+    const answerArea = document.getElementById('answer-area');
+    const wordsContainer = document.getElementById('words-container');
+
+    // Se já houver uma resposta no campo, devolve-a para a área de opções
+    if (answerArea.textContent) {
+        const currentAnswer = answerArea.textContent;
+        if (!document.getElementById(`word-${currentAnswer}`)) {
+            const previousAnswerElem = createClickableWord(currentAnswer);
+            wordsContainer.appendChild(previousAnswerElem);
+        }
+    }
+
+    // Atualiza o campo de resposta com a nova escolha e armazena
+    answerArea.textContent = word;
+    userAnswers[currentQuestionIndex] = word;
+
+    // Remove a nova escolha da área de opções
+    wordElem.remove();
+
+    // Sempre define a borda padrão após uma nova escolha
+    answerArea.style.border = "2px dashed #333";
+}
+
+    // Função para remover uma resposta incorreta do campo de resposta e colocá-la de volta na área de opções
+function removeAnswer() {
+    const answerArea = document.getElementById('answer-area');
+    const wordsContainer = document.getElementById('words-container');
+
+    if (answerArea.textContent) {
+        const word = answerArea.textContent;
+
+        // Remove a resposta do campo e adiciona de volta ao contêiner de opções
+        answerArea.textContent = '';
+        delete userAnswers[currentQuestionIndex];
+
+        // Adiciona de volta se a resposta foi removida
+        if (!document.getElementById(`word-${word}`)) {
+            const wordElem = createClickableWord(word);
+            wordsContainer.appendChild(wordElem);
+        }
+    }
+}
+
+  function loadQuestion() {
+    const questionObj = questions[currentQuestionIndex];
+    document.getElementById('question-text').textContent = questionObj.question;
+    const answerArea = document.getElementById('answer-area');
+    answerArea.textContent = '';
+
+    // Carrega a resposta do usuário, se existir, sem aplicar borda verde prematuramente
+    if (userAnswers[currentQuestionIndex]) {
+        answerArea.textContent = userAnswers[currentQuestionIndex];
+        answerArea.style.border = "2px dashed #333"; // Mantém a borda padrão até que todas as respostas estejam corretas
+    } else {
+        answerArea.style.border = "2px dashed #333"; // Borda padrão
+    }
+}
+
+    function nextQuestion() {
+        if (currentQuestionIndex < questions.length - 1) {
+            currentQuestionIndex++;
+            loadQuestion();
+        } else {
+            checkAnswers();
+        }
+    }
+
+    function prevQuestion() {
+        if (currentQuestionIndex > 0) {
+            currentQuestionIndex--;
+            loadQuestion();
+        }
+    }
+
+function checkAnswers() {
+    let allCorrect = true;
+    const wordsContainer = document.getElementById('words-container');
+    wordsContainer.innerHTML = ""; // Limpa a área de opções para reconstruir apenas as incorretas
+
+    questions.forEach((q, index) => {
+        // Verifica se a resposta está correta
+        if (userAnswers[index] !== q.answer) {
+            allCorrect = false;
+
+            // Adiciona as respostas incorretas de volta à área de opções
+            if (!document.getElementById(`word-${q.answer}`)) {
+                const wordElem = createClickableWord(q.answer);
+                wordsContainer.appendChild(wordElem);
+            }
+        }
+    });
+
+    if (allCorrect) {
+        // Exibe borda verde apenas após todas as respostas estarem corretas
+        document.getElementById('answer-area').style.border = "2px solid green";
+        showModal("Congratulations! You have completed the phase.");
+        updateProgressInDatabase(); // Atualiza progresso após conclusão
+    } else {
+        showModal("Some answers were incorrect. Try again!");
+        resetIncorrectAnswers(); // Reseta respostas incorretas e atualiza a área de respostas
+        currentQuestionIndex = 0; // Reinicia para a primeira questão
+        loadQuestion(); // Recarrega a primeira questão
+    }
+}
+
+function resetIncorrectAnswers() {
+    const answerArea = document.getElementById('answer-area');
+    const wordsContainer = document.getElementById('words-container');
+
+    if (answerArea.textContent) {
+        const word = answerArea.textContent;
+
+        // Retorna a palavra ao contêiner se a resposta estiver incorreta
+        if (userAnswers[currentQuestionIndex] !== questions[currentQuestionIndex].answer) {
+            if (!document.getElementById(`word-${word}`)) {
+                const wordElem = createClickableWord(word);
+                wordsContainer.appendChild(wordElem);
+            }
+            answerArea.textContent = '';
+        }
+    }
+
+    // Remove todas as respostas incorretas armazenadas
+    Object.keys(userAnswers).forEach(index => {
+        if (userAnswers[index] !== questions[index].answer) {
+            delete userAnswers[index];
+        }
+    });
+}
+
+    function showModal(message) {
+        document.getElementById("modal-message").textContent = message;
+        document.getElementById("modal").style.display = "flex";
+    }
+
+    function closeModal() {
+        document.getElementById("modal").style.display = "none";
+    }
+
+function updateProgressInDatabase() {
+    const url = new URL(window.location.href);
+    const params = new URLSearchParams(url.search);
+    const fase = params.get('fase'); // Captura a fase a partir da URL
+    const userId = firebase.auth().currentUser ? firebase.auth().currentUser.uid : null;
+
+    // Extrai o nível e a unidade da URL de maneira segura
+    const pathSegments = url.pathname.split('/');
+    const level = pathSegments.find(segment => segment.startsWith('Level'));
+    const unit = pathSegments.find(segment => segment.startsWith('Unit'));
+
+    if (!userId || !level || !unit) {
+        console.error("Erro: Usuário não autenticado ou caminho inválido.");
+        return;
+    }
+
+    let path;
+
+    // Lógica para determinar o próximo caminho a ser atualizado
+    if (fase === 'end') {
+        const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+        path = `usuarios/${userId}/progresso/${nextLevel}/Unit1/fase1`;
+    } else if (fase === 'last') {
+        const nextUnit = parseInt(unit.replace('Unit', '')) + 1;
+        path = `usuarios/${userId}/progresso/${level}/Unit${nextUnit}/fase1`;
+    } else if (!isNaN(fase)) {
+        const nextFase = parseInt(fase) + 1;
+        path = `usuarios/${userId}/progresso/${level}/${unit}/fase${nextFase}`;
+    } else {
+        console.error("Erro: Fase inválida.");
+        return;
+    }
+
+    // Atualização do Firebase
+    console.log("Atualizando progresso para:", path);
+    firebase.database().ref(path).set(true)
+        .then(() => {
+            console.log("Próxima fase liberada:", path);
+        })
+        .catch(error => {
+            console.error("Erro ao atualizar o progresso no banco de dados:", error);
+        });
+}
+
+   function generatePDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const img = new Image();
+    img.src = '../../../../imagens/hannah_logo.png';
+
+    img.onload = () => {
+        // Adiciona logo, campos de Name e Date
+        doc.addImage(img, 'PNG', 10, 10, 20, 20);
+        doc.setFontSize(12);
+        doc.text("Name:__________________________ Date:______________", 40, 20);
+        
+        // Título da atividade
+        doc.setFontSize(16);
+        doc.text("Life Lessons from the Bible", 10, 40);
+
+        // Adiciona um quadro com as opções de respostas no topo
+        doc.setFontSize(12);
+        // Embaralhar as opções de resposta antes de adicioná-las ao PDF
+          let answerOptions = questions.map(q => q.answer);
+          answerOptions = answerOptions.sort(() => Math.random() - 0.5); // Embaralha as opções
+          let shuffledOptions = answerOptions.join(", ");
+          let splitOptions = doc.splitTextToSize("Answer Options: " + shuffledOptions, 180);
+          doc.text(splitOptions, 10, 50);
+
+
+        // Definições de layout e altura inicial
+        let y = 60 + (splitOptions.length * 10); // Posiciona abaixo das opções de respostas
+        const lineHeight = 10;
+        const questionSpacing = 12; // Espaçamento consistente entre perguntas
+        const pageHeight = doc.internal.pageSize.height;
+
+        // Adiciona perguntas sem qualquer linha de resposta adicional
+        questions.forEach((q, i) => {
+            // Define o texto da pergunta, dividindo-o automaticamente para caber na largura permitida
+            let questionText = `${i + 1}. ${q.question}`;
+            let splitQuestion = doc.splitTextToSize(questionText, 180); // Ajusta largura para caber no espaço
+
+            // Verifica se há espaço suficiente na página para a pergunta
+            if (y + (splitQuestion.length) * lineHeight > pageHeight - 20) {
+                doc.addPage();
+                y = 20;
+                doc.addImage(img, 'PNG', 10, 10, 20, 20); // Adiciona logo na nova página
+                doc.text("Name:__________________________ Date:______________", 40, 20);
+                y += 30; // Espaçamento para o conteúdo
+            }
+
+            // Adiciona a pergunta no PDF sem linhas adicionais de resposta
+            doc.text(splitQuestion, 10, y);
+            y += splitQuestion.length * lineHeight + questionSpacing; // Atualiza y com espaçamento consistente
+        });
+
+        doc.save("activity.pdf");
+    };
+}
+
+    function goBack() {
+        window.history.back();
+    }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hannah's Grammar Exercises</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #ffffff;
+            background-image: url('../../../imagens/fundo.png');
+            background-repeat: repeat;
+            background-size: auto;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            /* Não usamos fundo branco nem sombra, conforme instruções */
+            padding: 20px;
+            border-radius: 8px;
+            position: relative;
+        }
+        /* Botão "Back" preto, relevo, texto branco */
+        .back-button {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background-color: black;
+            color: white;
+            border: 2px solid #333;
+            padding: 10px 15px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-size: 1rem;
+            cursor: pointer;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+        }
+        .back-button:hover {
+            background-color: #444;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            font-size: 2rem;
+            margin-top: 70px;
+        }
+
+        .exercise-title {
+            font-weight: bold;
+            font-size: 1.4rem;
+            margin-top: 30px;
+            margin-bottom: 10px;
+        }
+
+        /* "Exercise 1:" etc. em negrito */
+        .exercise-description {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .exercise-line {
+            margin: 10px 0;
+            font-size: 1rem;
+        }
+
+        .answer-input {
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+
+        /* Botão Check Answers preto, relevo, texto branco */
+        #check-all-btn {
+            background-color: black;
+            color: white;
+            border: 2px solid #333;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+            margin-top: 20px;
+        }
+        #check-all-btn:hover {
+            background-color: #444;
+        }
+
+        /* Resposta certa ou errada */
+        .correct {
+            color: blue; /* certo: azul */
+        }
+        .incorrect {
+            color: red;  /* errado: vermelho */
+        }
+
+        /* Mostra a resposta certa ao lado (fora do input) */
+        .correct-answer-span {
+            display: none; 
+            font-weight: bold;
+            margin-left: 10px;
+            color: blue;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none; 
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 300px;
+            text-align: center;
+        }
+        .close-modal-btn {
+            margin-top: 10px;
+            background-color: black;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .close-modal-btn:hover {
+            background-color: #444;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <a href="javascript:goBack()" class="back-button">Back</a>
+    <h1>Hannah's Grammar Exercises</h1>
+
+    <div id="exercises"></div>
+
+    <!-- Botão único para checar TODAS as respostas -->
+    <button id="check-all-btn" onclick="checkAllAnswers()">Check Answers</button>
+</div>
+
+<!-- Modal de conclusão -->
+<div class="modal-overlay" id="completion-modal-overlay">
+    <div class="modal-content" id="completion-modal-content">
+        <p>Congratulations! You have completed the activity.</p>
+        <button class="close-modal-btn" onclick="closeModal()">OK</button>
+    </div>
+</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<script>
+    // Configuração do Firebase
+    const firebaseConfig = {
+        apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+        authDomain: "hannahenglishcourse.firebaseapp.com",
+        projectId: "hannahenglishcourse",
+        storageBucket: "hannahenglishcourse.appspot.com",
+        messagingSenderId: "449818788486",
+        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+        measurementId: "G-07VVJG9LRS",
+        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+    };
+    firebase.initializeApp(firebaseConfig);
+
+    // Variáveis de controle
+    let checkCount = 0;        // Conta quantas vezes o aluno clicou em "Check Answers".
+    let allInputs = [];        // Guardaremos referência a todos os campos (objeto com input, answer e span)
+    let userData = {};         // Informações do usuário logado (para ver se é aluno e se está atrelado a professor)
+
+    // Extrair parâmetros da URL
+    function getParamsFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        return {
+            level: params.get('level'),
+            unit: params.get('unit'),
+            fase: params.get('fase'),
+        };
+    }
+
+    // Carregar dados do usuário
+    async function loadUserData(userId, callback) {
+        try {
+            const snapshot = await firebase.database().ref('usuarios/' + userId).once('value');
+            userData = snapshot.val() || {};
+            callback();
+        } catch (error) {
+            console.error("Error loading user data:", error);
+            alert("Error loading user data.");
+        }
+    }
+
+    // Garantir que o usuário esteja autenticado
+    function ensureUserIsAuthenticated(callback) {
+        firebase.auth().onAuthStateChanged(function (user) {
+            if (user) {
+                // Carrega dados do usuário
+                loadUserData(user.uid, () => {
+                    callback(user.uid);
+                });
+            } else {
+                console.error("User is not authenticated.");
+                alert("You need to be logged in to proceed.");
+            }
+        });
+    }
+
+    // Atualizar para a próxima fase, unidade ou nível
+    async function updateNextPhase(userId) {
+        const { level, unit, fase } = getParamsFromURL();
+        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+        try {
+            if (fase === "last") {
+                // Próxima unidade
+                const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+                await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
+            } else if (fase === "end") {
+                // Próximo nível
+                const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+                await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+            } else {
+                // Fase intermediária
+                const nextFase = parseInt(fase, 10) + 1;
+                await dbRef.update({ 
+                    [`fase${fase}`]: true,
+                    [`fase${nextFase}`]: true 
+                });
+            }
+        } catch (error) {
+            console.error("Error updating the next phase:", error);
+        }
+    }
+
+    // Marcar a fase atual como concluída
+    function markPhaseCompleted() {
+        ensureUserIsAuthenticated((userId) => {
+            updateNextPhase(userId);
+        });
+    }
+
+    // Exibir modal de conclusão
+    function showModal() {
+        const overlay = document.getElementById('completion-modal-overlay');
+        overlay.style.display = 'flex';
+    }
+
+    // Fechar modal de conclusão
+    function closeModal() {
+        const overlay = document.getElementById('completion-modal-overlay');
+        overlay.style.display = 'none';
+    }
+
+    // Validação de navegação no botão "Back"
+    function goBack() {
+        const { level, unit, fase } = getParamsFromURL();
+        ensureUserIsAuthenticated((userId) => {
+            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+            dbRef.get().then((snapshot) => {
+                if (snapshot.exists()) {
+                    const progress = snapshot.val();
+                    const nextFaseKey = `fase${parseInt(fase, 10) + 1}`;
+                    if (progress[nextFaseKey]) {
+                        window.history.back();
+                    } else {
+                        const confirmNavigation = confirm("The next phase is locked. Do you still want to go back?");
+                        if (confirmNavigation) {
+                            window.history.back();
+                        }
+                    }
+                } else {
+                    alert("Progress could not be verified. Please try again later.");
+                }
+            }).catch((error) => {
+                console.error("Error checking progress:", error);
+                alert("An error occurred while verifying progress. Please try again.");
+            });
+        });
+    }
+
+    // Função para tocar o alarme por 4 segundos (só se role=aluno e atrelado_professor)
+    function playAlarm() {
+        const audio = new Audio('alarme.mp3');
+        audio.play();
+        setTimeout(() => {
+            audio.pause();
+            audio.currentTime = 0;
+        }, 4000);
+    }
+
+    // Função principal para checar todas as respostas
+    function checkAllAnswers() {
+        checkCount++;
+        let allCorrect = true; // Verifica se todas estão corretas
+        const wrongInputs = [];
+
+        // 1) Verificar cada input
+        allInputs.forEach(item => {
+            const userAnswer = item.input.value.trim().toLowerCase();
+            const correctAnswer = item.correctAnswer.trim().toLowerCase();
+
+            if (userAnswer === correctAnswer) {
+                // Certo
+                item.input.classList.remove('incorrect');
+                item.input.classList.add('correct');
+                // Não mostra a span de resposta certa agora, pois não há erro
+                item.correctAnswerSpan.style.display = 'none';
+            } else {
+                // Errado
+                item.input.classList.remove('correct');
+                item.input.classList.add('incorrect');
+                allCorrect = false;
+                wrongInputs.push(item.input);
+            }
+        });
+
+        // 2) Se houver erros, verificar se usuário é "aluno" e atrelado a professor, então toca o alarme
+        if (!allCorrect) {
+            if (
+                userData.role === 'aluno' &&
+                userData.atrelado_professor &&
+                userData.atrelado_professor.trim() !== ''
+            ) {
+                playAlarm();
+            }
+            // Scroll para o primeiro erro
+            if (wrongInputs.length > 0) {
+                wrongInputs[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        // 3) Lógica de repetição/tentativas
+        if (checkCount === 3) {
+            // Na terceira vez: mostrar as respostas corretas nos que ainda estiverem errados
+            allInputs.forEach(item => {
+                const userAnswer = item.input.value.trim().toLowerCase();
+                const correctAnswer = item.correctAnswer.trim().toLowerCase();
+                if (userAnswer !== correctAnswer) {
+                    // Exibir a resposta correta fora do input
+                    item.correctAnswerSpan.textContent = `Right answer: ${item.correctAnswer}`;
+                    item.correctAnswerSpan.style.display = 'inline';
+                }
+            });
+
+            // Se ainda houver erros, não mudamos o input do aluno, mas marcamos todos como "correct" visual
+            // se quiser. Pela descrição, vamos manter a cor vermelha no input para ver o erro,
+            // mas agora exibe a "Right answer" do lado. Se preferir, comentar a linha abaixo:
+            //   item.input.classList.remove('incorrect');
+            //   item.input.classList.add('correct');
+            // mas vamos deixar como está para que fique claro qual errou.  
+
+            // Concluir a atividade (se for a regra final).
+            // Mas o enunciado diz: "Na próxima vez que apertar check answers vai marcar as respostas certas em azul e as erradas em vermelho e mostrar as respostas certas ... e depois disso concluir"
+            // Então concluímos aqui
+            markPhaseCompleted();
+            showModal();
+
+        } else {
+            // Se não for a terceira tentativa, mas o usuário já acertou tudo, conclui a atividade
+            if (allCorrect) {
+                markPhaseCompleted();
+                showModal();
+            }
+        }
+    }
+
+    // Carregar conteúdo do arquivo exercicios.txt
+    async function loadContent() {
+        const { level, unit } = getParamsFromURL();
+        if (!level || !unit) {
+            console.error("Parameters 'level' or 'unit' are missing in the URL.");
+            document.getElementById('exercises').textContent = "Content could not be loaded.";
+            return;
+        }
+
+        const basePath = `../../../../${level}/${unit}/DataExerciciosdaGramatica/`;
+        try {
+            const response = await fetch(`${basePath}exercicios.txt`);
+            if (!response.ok) throw new Error(`Error loading file: ${basePath}exercicios.txt`);
+
+            const data = await response.text();
+            const lines = data.split('\n');
+
+            const exercisesDiv = document.getElementById('exercises');
+            let htmlContent = '';
+            allInputs = []; // reset
+
+            lines.forEach((line) => {
+                const trimmedLine = line.trim();
+
+                // 1) Capturar título (#TITLE: ...)
+                if (trimmedLine.startsWith('#TITLE:')) {
+                    const titleText = trimmedLine.replace('#TITLE:', '').trim();
+                    htmlContent += `<h2 class="exercise-title">${titleText}</h2>`;
+                    return;
+                }
+
+                // 2) Se começa com "Exercise X:" -> inserir como subtítulo em negrito
+                if (/^Exercise\s+\d+:/i.test(trimmedLine)) {
+                    htmlContent += `<div class="exercise-description">${trimmedLine}</div>`;
+                    return;
+                }
+
+                // 3) Linhas de múltipla escolha ou explicações (A), (B), ...
+                //    Se não contiver [Answer:], apenas exibe como texto normal
+                if (trimmedLine && !trimmedLine.includes('[Answer:')) {
+                    htmlContent += `<div class="exercise-line">${trimmedLine}</div>`;
+                    return;
+                }
+
+                // 4) Quando encontramos [Answer:], tratamos como pergunta
+                if (trimmedLine.includes('[Answer:')) {
+                    const [questionPart, answerPart] = trimmedLine.split('[Answer:');
+                    const cleanAnswer = answerPart.replace(']', '').trim();
+
+                    // Verificar se existe algo como ___[size:small], [size:medium], [size:large], [size:huge], [size:essay]
+                    let inputSize = '150px'; // default
+                    const sizeMatch = questionPart.match(/\[size:(.*?)\]/);
+
+                    if (sizeMatch) {
+                        const sizeValue = sizeMatch[1].trim();
+                        if (sizeValue === 'small') inputSize = '30px';
+                        if (sizeValue === 'medium') inputSize = '150px'; 
+                        if (sizeValue === 'large') inputSize = '300px'; 
+                        if (sizeValue === 'huge') inputSize = '800px'; 
+                        if (sizeValue === 'essay') inputSize = '3200px'; 
+                    }
+
+                    // Remover [size:..] do texto a ser exibido
+                    let displayQuestion = questionPart.replace(/\[size:.*?\]/, '').trim();
+                    // Substituir o "___" pelo input
+                    displayQuestion = displayQuestion.replace('___', `<input type="text" class="answer-input" style="width:${inputSize};" />`);
+
+                    // Gera HTML com um span oculto para exibir a resposta correta quando precisar
+                    htmlContent += `
+                        <div class="exercise-line">
+                            ${displayQuestion}
+                            <span class="correct-answer-span"></span>
+                        </div>
+                    `;
+                }
+            });
+
+            // Injeta o HTML no container
+            exercisesDiv.innerHTML = htmlContent;
+
+            // Mapear todos os inputs com suas respostas corretas
+            let answerIndex = 0;
+            lines.forEach((line) => {
+                if (line.includes('[Answer:')) {
+                    const [qPart, aPart] = line.split('[Answer:');
+                    const correctAnswer = aPart.replace(']', '').trim();
+
+                    // Localiza o input correspondente no DOM, na ordem que aparecem
+                    const inputElement = exercisesDiv.querySelectorAll('input.answer-input')[answerIndex];
+                    const spanElement = exercisesDiv.querySelectorAll('.correct-answer-span')[answerIndex];
+
+                    if (inputElement && spanElement) {
+                        allInputs.push({
+                            input: inputElement,
+                            correctAnswer: correctAnswer,
+                            correctAnswerSpan: spanElement
+                        });
+                    }
+                    answerIndex++;
+                }
+            });
+
+        } catch (error) {
+            console.error("Error loading exercises:", error);
+            document.getElementById('exercises').textContent = "Exercises could not be loaded.";
+        }
+    }
+
+    // Ao carregar a página, primeiro nos certificamos de que o usuário está autenticado
+    document.addEventListener('DOMContentLoaded', () => {
+        ensureUserIsAuthenticated(() => {
+            // Depois de carregar userData, carregamos o conteúdo do exercício
+            loadContent();
+        });
+    });
+</script>
+</body>
+</html>

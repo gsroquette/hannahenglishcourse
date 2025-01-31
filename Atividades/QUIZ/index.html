@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hannah Quiz</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <style>
+        /* Estilos existentes mantidos */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-image: url('../../../imagens/fundo.png');
+            background-repeat: repeat;
+            background-size: auto;
+            background-color: white;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2.5em;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .gif-container {
+            display: none;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .gif-container img {
+            max-width: 500px;
+        }
+
+        .question-container {
+            display: flex;
+            justify-content: center;
+        }
+
+        .question {
+            margin-bottom: 10px;
+            font-size: 1.2em;
+            padding: 20px;
+            text-align: left;
+            border: none;
+        }
+
+        label {
+            display: block;
+            font-size: 1em;
+            margin-bottom: 10px;
+        }
+
+        .btn-group {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 5px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 1em;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .prev-btn, .next-btn {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .prev-btn:hover, .next-btn:hover {
+            background-color: #45a049;
+        }
+
+        .read-btn {
+            background-color: #FF9800;
+            color: white;
+        }
+
+        .read-btn i {
+            font-size: 1.2em; /* Ajusta o tamanho dos ícones */
+            margin-right: 5px; /* Espaço entre o ícone e o texto */
+            vertical-align: middle; /* Alinha o ícone ao texto */
+           
+}
+
+        .read-btn:hover {
+            background-color: #FB8C00;
+        }
+
+        .pdf-btn {
+            background-color: #03A9F4;
+            color: white;
+        }
+
+        .pdf-btn:hover {
+            background-color: #0288D1;
+        }
+
+        .feedback {
+            display: none;
+            margin-top: 20px;
+        }
+
+        audio {
+            display: none;
+        }
+
+        /* Modal de conclusão */
+        #completion-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border: 2px solid #333;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            text-align: center;
+        }
+
+        #completion-modal button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #333;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        #completion-modal button:hover {
+            background-color: #555;
+        }
+
+        #overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+    </style>
+</head>
+<body>
+<button id="back-btn" onclick="handleBackButtonClick()" style="padding: 10px 20px; font-size: 1em; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; transition: background-color 0.3s ease;">
+    Back
+</button>
+
+<h1>Hannah Quiz</h1>
+
+<div class="gif-container">
+    <img id="feedback-img" src="" alt="Feedback GIF"/>
+</div>
+
+<div class="question-container">
+    <div id="quiz-container" class="question"></div>
+</div>
+
+<div class="btn-group">
+    <button class="read-btn" id="read-btn" onclick="readQuestion()">
+    <i class="fas fa-file-alt"></i> <i class="fas fa-volume-up"></i> Read
+</button>
+    <button class="prev-btn" id="prev-btn" onclick="stopReading(); showPreviousQuestion()">❮❮ Previous</button>
+    <button class="next-btn" id="next-btn" onclick="stopReading(); showNextQuestion()">Next ❯❯</button>
+</div>
+
+<div id="feedback" class="feedback">
+    <audio id="feedback-audio"></audio>
+</div>
+
+<!-- Modal de conclusão -->
+<div id="overlay"></div>
+<div id="completion-modal">
+    <h2>Phase Completed!</h2>
+    <p>Congratulations! You have completed this phase.</p>
+    <button onclick="closeModal()">Close</button>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<script>
+    // Configuração do Firebase
+    const firebaseConfig = {
+        apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+        authDomain: "hannahenglishcourse.firebaseapp.com",
+        projectId: "hannahenglishcourse",
+        storageBucket: "hannahenglishcourse.appspot.com",
+        messagingSenderId: "449818788486",
+        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+        measurementId: "G-07VVJG9LRS",
+        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+    };
+
+    // Inicializa o Firebase
+    firebase.initializeApp(firebaseConfig);
+
+// Função para exibir o botão PDF se o papel for 'professor' ou 'proprietario'
+function displayPdfButton(role) {
+    if (role === 'professor' || role === 'proprietario') {
+        const pdfButton = document.createElement('button');
+        pdfButton.className = 'pdf-btn';
+        pdfButton.id = 'pdf-btn';
+        pdfButton.textContent = 'Generate PDF';
+        pdfButton.onclick = generatePDF;
+        document.querySelector('.btn-group').appendChild(pdfButton);
+    }
+}
+
+// Obter o papel do usuário e exibir o botão condicionalmente
+firebase.auth().onAuthStateChanged(function(user) {
+    if (user) {
+        // Substitua o caminho abaixo conforme necessário para buscar o papel do usuário
+        firebase.database().ref('usuarios/' + user.uid + '/role').once('value').then((snapshot) => {
+            const role = snapshot.val();
+            displayPdfButton(role);
+        });
+    }
+});
+
+    let currentQuestionIndex = 0;
+    let questions = [];
+    let answeredQuestions = [];
+    let userAnswers = {}; // Objeto para armazenar as respostas do usuário
+    let speechSynthesisUtterance = null;
+async function loadQuestions() {
+    // Obtém os parâmetros level e unit da URL
+    const { level, unit } = getLevelAndUnitFromURL();
+
+    // Adicione os logs para verificar level e unit
+    console.log("Level:", level);
+    console.log("Unit:", unit);
+
+    if (!level || !unit) {
+        console.error("Level or Unit not identified in the URL.");
+        return;
+    }
+
+    // Gera o caminho dinâmico baseado no level e unit
+    const questionsPath = `../../${level}/${unit}/DataQuiz/questions.txt`;
+
+    // Adicione o log para verificar o caminho gerado
+    console.log("Generated Path:", questionsPath);
+
+    try {
+        const response = await fetch(questionsPath);
+        if (!response.ok) throw new Error(`Failed to fetch questions from ${questionsPath}`);
+        
+        const text = await response.text();
+        const lines = text.split('\n');
+        let currentQuestion = null;
+
+        lines.forEach(line => {
+            line = line.trim();
+            if (line.startsWith('Q:')) {
+                if (currentQuestion) {
+                    questions.push(currentQuestion);
+                }
+                currentQuestion = { question: line.substring(2).trim(), answers: [], correct: '' };
+            } else if (/^[A-Z]\./.test(line)) {
+                currentQuestion.answers.push(line);
+            } else if (line.startsWith('Correct:')) {
+                currentQuestion.correct = line.split(':')[1].trim();
+            }
+        });
+
+        if (currentQuestion) {
+            questions.push(currentQuestion);
+        }
+
+        answeredQuestions = new Array(questions.length).fill(false);
+        displayQuestion();
+
+        // Log para verificar as perguntas carregadas
+        console.log("Loaded Questions:", questions);
+    } catch (error) {
+        console.error("Error loading questions:", error);
+    }
+}
+
+   function displayQuestion() {
+    const container = document.getElementById('quiz-container');
+    container.innerHTML = '';
+
+    const q = questions[currentQuestionIndex];
+    const questionDiv = document.createElement('div');
+    questionDiv.classList.add('question');
+
+    const questionText = document.createElement('p');
+    questionText.id = 'question-text';
+    questionText.innerText = `${currentQuestionIndex + 1}. ${q.question}`;
+    questionDiv.appendChild(questionText);
+
+    q.answers.forEach((answer) => {
+        const answerLabel = document.createElement('label');
+        answerLabel.innerHTML = `<input type="radio" name="question${currentQuestionIndex}" value="${answer[0]}" onclick="checkAnswer(this, '${answer[0]}')"> ${answer}`;
+        questionDiv.appendChild(answerLabel);
+    });
+
+    container.appendChild(questionDiv);
+
+    // Restaura a resposta do usuário, se houver
+    if (userAnswers[currentQuestionIndex]) {
+        const savedAnswer = userAnswers[currentQuestionIndex];
+        const radioButtons = document.getElementsByName(`question${currentQuestionIndex}`);
+        radioButtons.forEach((radio) => {
+            if (radio.value === savedAnswer) {
+                radio.checked = true;
+            }
+        });
+    }
+
+    updateNavigationButtons();
+}
+
+    function updateNavigationButtons() {
+        document.getElementById('prev-btn').disabled = currentQuestionIndex === 0;
+        document.getElementById('next-btn').disabled = currentQuestionIndex === questions.length - 1;
+    }
+
+    function showNextQuestion() {
+        hideGIF();
+        console.log("Before Next Question:", currentQuestionIndex);
+        if (currentQuestionIndex < questions.length - 1) {
+            currentQuestionIndex++;
+            displayQuestion();
+        }
+    }
+
+    function showPreviousQuestion() {
+        hideGIF();
+        console.log("Before Previous Question:", currentQuestionIndex);
+        if (currentQuestionIndex > 0) {
+            currentQuestionIndex--;
+            displayQuestion();
+        }
+    }
+
+function toggleButtons(state) {
+    document.getElementById('prev-btn').disabled = !state;
+    document.getElementById('next-btn').disabled = !state;
+    document.getElementById('read-btn').disabled = !state;
+
+    const radios = document.querySelectorAll('input[type="radio"]');
+    radios.forEach(radio => radio.disabled = !state);
+}
+
+   function checkAnswer(radioElement, selectedAnswer) {
+    const q = questions[currentQuestionIndex];
+    const feedbackDiv = document.getElementById('feedback');
+    const feedbackImg = document.getElementById('feedback-img');
+    const feedbackAudio = document.getElementById('feedback-audio');
+    const gifContainer = document.querySelector('.gif-container');
+
+    // Salva a resposta do usuário
+    userAnswers[currentQuestionIndex] = selectedAnswer;
+
+    toggleButtons(false); // Bloqueia os botões
+
+    if (selectedAnswer === q.correct) {
+        feedbackImg.src = 'certo.gif';
+        feedbackAudio.src = 'certo.mp3';
+        feedbackAudio.play();
+        feedbackDiv.style.display = 'block';
+        gifContainer.style.display = 'block';
+        answeredQuestions[currentQuestionIndex] = true;
+
+        setTimeout(() => {
+            hideGIF();
+            toggleButtons(true); // Desbloqueia os botões
+            showNextQuestion();
+            checkCompletion();
+        }, 2000);
+    } else {
+        feedbackImg.src = 'errado.gif';
+        feedbackAudio.src = 'errado.mp3';
+        feedbackAudio.play();
+        feedbackDiv.style.display = 'block';
+        gifContainer.style.display = 'block';
+
+        setTimeout(() => {
+            hideGIF();
+            toggleButtons(true); // Desbloqueia os botões
+            radioElement.checked = false;
+        }, 2000);
+    }
+}
+
+    function hideGIF() {
+        const gifContainer = document.querySelector('.gif-container');
+        gifContainer.style.display = 'none';
+    }
+
+  function toggleSpeech(text, buttonElement, index) {
+    if (!('speechSynthesis' in window)) {
+        alert("Your browser does not support speech synthesis. Please enable it or use a compatible browser.");
+        return;
+    }
+
+    if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+        console.log("Speech synthesis stopped.");
+        buttonElement.src = 'businessman.png';
+    } else {
+        let voices = window.speechSynthesis.getVoices();
+        let usVoice = voices.find(voice => voice.lang === 'en-US');
+
+        if (!usVoice && voices.length === 0) {
+            // Se não houver vozes disponíveis, configure o evento para buscar as vozes posteriormente
+            window.speechSynthesis.onvoiceschanged = () => {
+                voices = window.speechSynthesis.getVoices();
+                usVoice = voices.find(voice => voice.lang === 'en-US');
+
+                if (!usVoice && !alertDisplayed) {
+                    alert("No 'en-US' voice found in your speech synthesizer. Please enable English language in your browser's speech synthesizer. For now, the default voice will be used, which may cause problems.");
+                    alertDisplayed = true;
+                }
+
+                speakText(text, usVoice || voices[0], buttonElement, index);
+            };
+        } else {
+            if (!usVoice && !alertDisplayed) {
+                alert("No 'en-US' voice found. Using default voice instead.");
+                alertDisplayed = true;
+            }
+
+            speakText(text, usVoice || voices[0], buttonElement, index);
+        }
+
+        buttonElement.src = 'pause.png';
+    }
+}
+
+function speakText(text, voice, buttonElement, index) {
+    let utterance = new SpeechSynthesisUtterance(text);
+    utterance.voice = voice;
+    utterance.lang = 'en-US';
+    console.log("Speaking with voice: ", voice.name);
+    window.speechSynthesis.speak(utterance);
+    utterance.onend = () => {
+        buttonElement.src = 'businessman.png';
+        spokenCards.add(index);
+        checkCompletion();
+    };
+}
+
+    function checkCompletion() {
+        if (answeredQuestions.every((answered) => answered)) {
+            showModal();
+            ensureUserIsAuthenticated(updateNextPhase);
+        }
+    }
+
+    function showModal() {
+        document.getElementById('completion-modal').style.display = 'block';
+        document.getElementById('overlay').style.display = 'block';
+    }
+
+    function closeModal() {
+        document.getElementById('completion-modal').style.display = 'none';
+        document.getElementById('overlay').style.display = 'none';
+    }
+
+    function ensureUserIsAuthenticated(callback) {
+        firebase.auth().onAuthStateChanged(function(user) {
+            if (user) {
+                callback(user.uid);
+            } else {
+                console.error("Usuário não autenticado");
+            }
+        });
+    }
+
+    async function updateNextPhase(userId) {
+        const currentPhase = getPhaseFromURL(); 
+        const { level, unit } = getLevelAndUnitFromURL(); 
+        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso`);
+
+        try {
+            if (currentPhase === "end") {
+                // Criar nova Level
+                const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+                await dbRef.child(nextLevel).set({});
+                console.log(`Level ${nextLevel} criada.`);
+
+                // Criar Unit1/fase1 como true dentro da nova Level
+                await dbRef.child(`${nextLevel}/Unit1/fase1`).set(true);
+                console.log(`Unit1/fase1 criada como true dentro de ${nextLevel}.`);
+            } else if (currentPhase === "last") {
+                const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+                // Primeiro, cria a nova Unit
+                await dbRef.child(`${level}/${nextUnit}`).set({});
+                console.log(`Unit ${nextUnit} criada dentro de ${level}.`);
+
+                // Em seguida, adiciona a fase1 como true dentro da nova Unit
+                await dbRef.child(`${level}/${nextUnit}/fase1`).set(true);
+                console.log(`Fase1 marcada como true dentro de ${nextUnit}.`);
+            } else {
+                const nextPhase = parseInt(currentPhase) + 1;
+                await dbRef.child(`${level}/${unit}`).update({ 
+                    [`fase${currentPhase}`]: true, 
+                    [`fase${nextPhase}`]: true 
+                });
+                console.log(`Fase ${currentPhase} marcada como concluída e fase ${nextPhase} liberada.`);
+            }
+        } catch (error) {
+            console.error("Erro ao atualizar o progresso da fase:", error);
+        }
+    }
+
+    function getPhaseFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('fase'); 
+    }
+
+  function getLevelAndUnitFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    const level = params.get('level');
+    const unit = params.get('unit');
+
+    // Adicione os logs para verificar level e unit
+    console.log("Extracted Level from URL:", level);
+    console.log("Extracted Unit from URL:", unit);
+
+    return { level, unit };
+}
+
+async function handleBackButtonClick() {
+    const { level, unit } = getLevelAndUnitFromURL();
+
+    console.log("Checking progress for level:", level, "unit:", unit);
+
+    if (!level || !unit) {
+        alert("Level or Unit not identified in the URL.");
+        return;
+    }
+
+    firebase.auth().onAuthStateChanged(async (user) => {
+        if (user) {
+            const uid = user.uid;
+            const isNextPhaseUnlocked = await checkPhaseProgress(uid, level, unit);
+
+            if (isNextPhaseUnlocked) {
+                window.history.back(); // Permite voltar normalmente
+            } else {
+                // Exibe a mensagem se a próxima fase não estiver desbloqueada
+                const confirmExit = confirm(
+                    "You have not completed this phase. Do you want to go back anyway?"
+                );
+                if (confirmExit) {
+                    window.history.back();
+                }
+            }
+        } else {
+            alert("Please log in to save your progress and continue.");
+        }
+    });
+}
+
+async function checkPhaseProgress(uid, level, unit) {
+    try {
+        // Obtem a fase atual e calcula a próxima
+        const currentPhase = parseInt(getPhaseFromURL());
+        const nextPhase = `fase${currentPhase + 1}`;
+        console.log("Checking progress for next phase:", nextPhase);
+
+        // Referência ao banco de dados para verificar a próxima fase
+        const dbRef = firebase.database().ref(`usuarios/${uid}/progresso/${level}/${unit}/${nextPhase}`);
+        const snapshot = await dbRef.once("value");
+        
+        const isUnlocked = snapshot.val() === true;
+        console.log(`Next phase (${nextPhase}) unlocked:`, isUnlocked);
+
+        return isUnlocked; // Retorna true se a próxima fase estiver desbloqueada
+    } catch (error) {
+        console.error("Error checking phase progress:", error);
+        return false; // Retorna false em caso de erro
+    }
+}
+
+function readQuestion() {
+    console.log("Reading question...");
+    stopReading(); // Cancela qualquer leitura anterior
+    const questionText = document.getElementById('question-text').innerText;
+
+    if (!('speechSynthesis' in window)) {
+        alert("Your browser does not support speech synthesis. Please enable it or use a compatible browser.");
+        return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(questionText);
+    utterance.lang = 'en-US';
+    window.speechSynthesis.speak(utterance);
+}
+
+function stopReading() {
+    console.log("Stopping reading...");
+    if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+    }
+}
+
+    function generatePDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        const logo = new Image();
+        logo.src = 'Logo.png'; 
+
+        doc.addImage(logo, 'PNG', 90, 10, 30, 30); 
+
+        doc.setFontSize(20);
+        doc.text('Hannah Quiz', 105, 50, null, null, 'center');
+
+        doc.setFontSize(12);
+        doc.text('Name: ____________________________________', 20, 70);
+        doc.text('Date: _______________', 150, 70);
+
+        let yPosition = 90;
+
+        questions.forEach((q, index) => {
+            doc.setFontSize(14);
+            let questionText = `${index + 1}. ${q.question}`;
+            let textLines = doc.splitTextToSize(questionText, 180);  
+            let questionHeight = textLines.length * 10; 
+
+            if (yPosition + questionHeight > 280) {
+                doc.addPage();
+                yPosition = 20;
+            }
+
+            doc.text(textLines, 20, yPosition);
+            yPosition += questionHeight;
+
+            q.answers.forEach(answer => {
+                doc.setFontSize(12);
+                let answerText = answer;
+                let answerLines = doc.splitTextToSize(answerText, 180);
+                let answerHeight = answerLines.length * 10;
+
+                if (yPosition + answerHeight > 280) {
+                    doc.addPage();
+                    yPosition = 20;
+                }
+
+                doc.text(answerLines, 30, yPosition);
+                yPosition += answerHeight;
+            });
+
+            yPosition += 10; 
+        });
+
+        doc.save('QuizQuestionsWithLogo.pdf');
+    }
+
+    window.onload = loadQuestions;
+
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</body>
+</html>

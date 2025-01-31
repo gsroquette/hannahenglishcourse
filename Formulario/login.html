@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Email/Phone</title>
+    <link rel="stylesheet" href="CSS/styles.css">
+    <!-- Firebase Libraries -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script>
+        // Firebase configuration
+        var firebaseConfig = {
+            apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+            authDomain: "hannahenglishcourse.firebaseapp.com",
+            projectId: "hannahenglishcourse",
+            storageBucket: "hannahenglishcourse.appspot.com",
+            messagingSenderId: "449818788486",
+            appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+            measurementId: "G-07VVJG9LRS"
+        };
+        firebase.initializeApp(firebaseConfig);
+
+        // Function for email/password login
+        function loginWithEmail(event) {
+            event.preventDefault();
+            var email = document.getElementById('email').value;
+            var password = document.getElementById('password').value;
+            firebase.auth().signInWithEmailAndPassword(email, password)
+                .then((userCredential) => {
+                    var user = userCredential.user;
+                    alert('Email login successful: ' + user.email);
+                    window.location.href = "../index.html";  // Redirects to the index page one level up
+                })
+                .catch((error) => {
+                    alert(error.message);
+                });
+        }
+
+        // Function for phone login
+        function loginWithPhone(event) {
+            event.preventDefault();
+            var phoneNumber = document.getElementById('phone-number').value;
+            var appVerifier = window.recaptchaVerifier;
+            firebase.auth().signInWithPhoneNumber(phoneNumber, appVerifier)
+                .then((confirmationResult) => {
+                    var code = prompt('Enter the verification code you received');
+                    return confirmationResult.confirm(code);
+                })
+                .then((result) => {
+                    var user = result.user;
+                    alert('Phone login successful: ' + user.phoneNumber);
+                    window.location.href = "../index.html";  // Redirects to the index page one level up
+                })
+                .catch((error) => {
+                    alert(error.message);
+                });
+        }
+
+        // Initialize reCAPTCHA for phone login
+        window.onload = function () {
+            window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
+                'size': 'normal',
+                'callback': (response) => {
+                    console.log('reCAPTCHA verified');
+                }
+            });
+            recaptchaVerifier.render();
+        };
+
+        // Function to switch between Email/Password and Phone login forms
+        function showForm(formType) {
+            if (formType === 'email') {
+                document.getElementById('email-login-form').style.display = 'block';
+                document.getElementById('phone-login-form').style.display = 'none';
+            } else if (formType === 'phone') {
+                document.getElementById('email-login-form').style.display = 'none';
+                document.getElementById('phone-login-form').style.display = 'block';
+            }
+        }
+
+        // Function for password recovery
+        function resetPassword() {
+            var email = document.getElementById('email').value;
+            if (email) {
+                firebase.auth().sendPasswordResetEmail(email)
+                    .then(() => {
+                        alert('Password recovery email sent to: ' + email);
+                    })
+                    .catch((error) => {
+                        alert(error.message);
+                    });
+            } else {
+                alert('Please enter your email in the field above to receive the recovery link.');
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 20px;
+        }
+
+        h2, h3 {
+            color: #333;
+        }
+
+        form {
+            margin: 20px auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            width: 300px;
+            text-align: left;
+        }
+
+        label, input {
+            display: block;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #218838;
+        }
+
+        #signup-link, #reset-password-link {
+            margin-top: 15px;
+        }
+
+        a {
+            color: #007bff;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <h2>Select Login Method</h2>
+    <button onclick="showForm('email')">Login with Email and Password</button>
+    <button onclick="showForm('phone')">Login with Phone</button>
+
+    <!-- Email and Password Login Form -->
+    <div id="email-login-form" style="display:none;">
+        <h3>Login with Email</h3>
+        <form onsubmit="loginWithEmail(event)">
+            <label for="email">Email:</label>
+            <input type="email" id="email" required><br>
+            <label for="password">Password:</label>
+            <input type="password" id="password" required><br>
+            <button type="submit">Login</button>
+        </form>
+        <p id="reset-password-link">
+            Forgot your password? <a href="#" onclick="resetPassword()">Recover here</a>
+        </p>
+        <p id="signup-link">
+            Don't have an account? <a href="signup.html">Sign up here</a>
+        </p>
+    </div>
+
+    <!-- Phone Login Form -->
+    <div id="phone-login-form" style="display:none;">
+        <h3>Login with Phone</h3>
+        <form onsubmit="loginWithPhone(event)">
+            <label for="phone-number">Phone Number:</label>
+            <input type="text" id="phone-number" placeholder="+11234567890" required><br>
+            <div id="recaptcha-container"></div>
+            <button type="submit">Send Verification Code</button>
+        </form>
+    </div>
+</body>
+</html>

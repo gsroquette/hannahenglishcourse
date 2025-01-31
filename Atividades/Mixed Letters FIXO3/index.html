@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hannah Mixed Letters</title>
+    <style>
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-image: url('../../../imagens/fundo.png');
+            background-repeat: repeat;
+            background-size: auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #ff4500;
+            font-size: 3rem;
+            margin-bottom: 20px;
+        }
+
+        .activity-container {
+            margin-top: 20px;
+            width: 100%;
+        }
+
+        .activity {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            padding: 20px;
+            background-color: #ffdab9;
+            border-radius: 15px;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+            overflow: hidden;
+            font-family: 'Times New Roman', Times, serif;
+        }
+
+        .activity img {
+            max-width: 150px;
+            max-height: 150px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+        }
+
+        .mixed-letters {
+            font-size: 36px;
+            font-weight: bold;
+            color: #ff4500;
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 15px;
+        }
+
+        .letter-input {
+            width: 40px;
+            font-size: 36px;
+            text-align: center;
+            border-bottom: 2px solid black;
+            margin-right: 5px;
+        }
+
+        .correct {
+            border-color: blue;
+        }
+
+        .incorrect {
+            border-color: red;
+        }
+
+        .word-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: 'Times New Roman', Times, serif;
+        }
+
+        .check-answer-btn {
+            background-color: #32CD32;
+            color: white;
+            margin-top: 10px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+
+        .check-answer-btn:hover {
+            background-color: #28a428;
+        }
+
+        /* Estilos do modal de conclusão */
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            z-index: 1000;
+        }
+        #completion-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            display: none;
+            z-index: 1001;
+        }
+        #completion-modal h2 {
+            margin-top: 0;
+            font-size: 2rem;
+            color: #32CD32;
+        }
+        #completion-modal p {
+            font-size: 1.2rem;
+            margin: 10px 0;
+        }
+        #completion-modal button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 1rem;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #32CD32;
+            color: white;
+            transition: background-color 0.3s ease;
+        }
+        #completion-modal button:hover {
+            background-color: #28a428;
+        }
+
+        @media (max-width: 600px) {
+            .letter-input {
+                width: 30px;
+                font-size: 28px;
+                margin-right: 3px;
+            }
+
+            .mixed-letters {
+                font-size: 28px;
+            }
+        }
+    </style>
+</head>
+<body>
+<button id="backButton" style="padding: 15px 25px; background-color: black; color: white; border: none; border-radius: 10px; font-size: 1.5rem; cursor: pointer; transition: background-color 0.3s ease;">
+    Back
+</button>
+<button id="pdfButton" onclick="generatePDF()" style="display: none; padding: 15px 25px; background-color: #32CD32; color: white; border: none; border-radius: 10px; font-size: 1.5rem; cursor: pointer; transition: background-color 0.3s ease; margin-top: 10px;">
+    Generate PDF
+</button>
+
+<h1>Hannah Mixed Letters</h1>
+
+<div id="activity-container" class="activity-container"></div>
+
+<!-- Modal de conclusão -->
+<div id="overlay"></div>
+<div id="completion-modal">
+    <h2>Phase Completed!</h2>
+    <p>Congratulations! You have completed this phase.</p>
+    <button onclick="closeModal()">Close</button>
+</div>
+
+<!-- Scripts -->
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+        authDomain: "hannahenglishcourse.firebaseapp.com",
+        projectId: "hannahenglishcourse",
+        storageBucket: "hannahenglishcourse.appspot.com",
+        messagingSenderId: "449818788486",
+        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+        measurementId: "G-07VVJG9LRS",
+        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+    };
+    firebase.initializeApp(firebaseConfig);
+
+    let activities = [];
+    let completedWords = 0;
+    let alertDisplayed = false;
+    let selectedVoice = null;
+
+    document.getElementById('backButton').addEventListener('click', async function () {
+        console.log("Botão 'Back' pressionado.");
+
+        const { level, unit } = getLevelAndUnitFromURL();
+        const currentPhase = parseInt(getPhaseFromURL());
+        const nextPhase = currentPhase + 1;
+
+        const user = firebase.auth().currentUser;
+        if (!user) {
+            console.error("User not authenticated.");
+            alert("You must be logged in to perform this action.");
+            return;
+        }
+
+        const userId = user.uid;
+        const progressRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/fase${nextPhase}`);
+
+        try {
+            const snapshot = await progressRef.once('value');
+            const isUnlocked = snapshot.val();
+            console.log("The next phase is locked:", isUnlocked);
+
+            if (isUnlocked) {
+                history.back();
+            } else {
+                console.warn("The next phase is locked.");
+                const confirmMessage = "The next phase is still locked. Are you sure you want to leave this page before finishing it?";
+                if (confirm(confirmMessage)) {
+                    history.back();
+                }
+            }
+        } catch (error) {
+            console.error("Error checking phase progress:", error);
+            alert("Error checking phase progress.");
+        }
+    });
+
+    firebase.auth().onAuthStateChanged((user) => {
+        if (user) {
+            console.log("User successfully authenticated:", user.uid);
+
+            const userId = user.uid;
+            const userRoleRef = firebase.database().ref(`usuarios/${userId}/role`);
+
+            userRoleRef.once('value').then((snapshot) => {
+                const role = snapshot.val();
+                console.log("Role do usuário recuperado:", role);
+
+                if (role === 'professor' || role === 'proprietário') {
+                    document.getElementById("pdfButton").style.display = "inline-block";
+                    console.log("Botão PDF exibido para o usuário.");
+                } else {
+                    console.log("Usuário não é 'professor' ou 'proprietário'. Botão PDF oculto.");
+                }
+            }).catch((error) => {
+                console.error("Error fetching user role from Firebase:", error);
+            });
+        } else {
+            console.warn("No user authenticated. Please make sure you are logged in.");
+        }
+    });
+
+    function initializeVoices() {
+        const synth = window.speechSynthesis;
+        const voices = synth.getVoices();
+
+        console.log("Available voices:", voices);
+
+        selectedVoice = voices.find(voice => voice.lang === "en-US");
+
+        if (!selectedVoice && !alertDisplayed) {
+            alertDisplayed = true;
+            alert("No 'en-US' voice found. Using the first available voice.");
+            selectedVoice = voices[0];
+        }
+
+        console.log("Selected voice:", selectedVoice ? selectedVoice.name : "Default voice");
+    }
+
+    if (!window.speechSynthesis.onvoiceschanged) {
+        window.speechSynthesis.onvoiceschanged = initializeVoices;
+    }
+
+    function readText(text) {
+        const synth = window.speechSynthesis;
+        synth.cancel();
+
+        if (!selectedVoice) {
+            initializeVoices();
+        }
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.voice = selectedVoice || synth.getVoices()[0];
+        synth.speak(utterance);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initializeVoices();
+        loadActivities();
+    });
+
+    function createActivity(imageUrl, word) {
+        const activityContainer = document.getElementById('activity-container');
+        const activityDiv = document.createElement('div');
+        activityDiv.classList.add('activity');
+        activityDiv.dataset.completed = "false";
+
+        const imgElement = document.createElement('img');
+        imgElement.src = imageUrl;
+
+        imgElement.onerror = function () {
+            imgElement.style.display = 'none';
+        };
+
+        activityDiv.appendChild(imgElement);
+
+        const wordContainer = document.createElement('div');
+        wordContainer.classList.add('word-container');
+
+        const shuffledWord = shuffleWord(word);
+        const mixedLettersElement = document.createElement('div');
+        mixedLettersElement.classList.add('mixed-letters');
+        shuffledWord.split('').forEach(letter => {
+            const letterElement = document.createElement('span');
+            letterElement.innerText = letter;
+            mixedLettersElement.appendChild(letterElement);
+        });
+        wordContainer.appendChild(mixedLettersElement);
+
+        const inputContainer = document.createElement('div');
+        const letterInputs = [];
+
+        shuffledWord.split('').forEach((_, index, array) => {
+            const letterInput = document.createElement('input');
+            letterInput.classList.add('letter-input');
+            letterInput.maxLength = 1;
+
+            letterInput.addEventListener('input', function () {
+                if (letterInput.value.length === 1) {
+                    if (index < array.length - 1) {
+                        letterInputs[index + 1].focus();
+                    } else {
+                        letterInput.blur();
+                    }
+                }
+            });
+
+            inputContainer.appendChild(letterInput);
+            letterInputs.push(letterInput);
+        });
+
+        wordContainer.appendChild(inputContainer);
+
+        const checkAnswerBtn = document.createElement('button');
+        checkAnswerBtn.classList.add('check-answer-btn');
+        checkAnswerBtn.innerText = 'Check Answer';
+
+        checkAnswerBtn.onclick = function () {
+            const userAnswer = Array.from(inputContainer.querySelectorAll('.letter-input'))
+                .map(input => input.value.toUpperCase())
+                .join('');
+
+            const letterInputs = inputContainer.querySelectorAll('.letter-input');
+            if (userAnswer === word.toUpperCase()) {
+                letterInputs.forEach(input => {
+                    input.classList.add('correct');
+                    input.classList.remove('incorrect');
+                });
+
+                readText(word);
+
+                if (activityDiv.dataset.completed === "false") {
+                    completedWords++;
+                    activityDiv.dataset.completed = "true";
+                }
+
+               if (completedWords === activities.length) {
+    console.log("Todas as atividades foram concluídas!");
+    showCompletionModal();
+
+    // Atualiza o progresso no banco de dados
+    firebase.auth().onAuthStateChanged((user) => {
+        if (user) {
+            updateNextPhase(user.uid);
+        } else {
+            console.error("User not authenticated. Progress cannot be updated.");
+        }
+    });
+}
+            } else {
+                letterInputs.forEach(input => {
+                    input.classList.add('incorrect');
+                    input.classList.remove('correct');
+                });
+            }
+        };
+
+        wordContainer.appendChild(checkAnswerBtn);
+        activityDiv.appendChild(wordContainer);
+        activityContainer.appendChild(activityDiv);
+    }
+
+// Função para atualizar o progresso no banco de dados
+  async function updateNextPhase(userId) {
+    console.log("Updating next phase...");
+    const currentPhase = getPhaseFromURL();
+    const { level, unit } = getLevelAndUnitFromURL();
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+    try {
+        if (currentPhase === "last") {
+            const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+            await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
+        } else if (currentPhase === "end") {
+            const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+            await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+        } else {
+            const nextPhase = parseInt(currentPhase) + 1;
+            await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true }); // Correção aqui
+        }
+    } catch (error) {
+        console.error("Erro ao atualizar o progresso da fase:", error);
+    }
+}
+
+    async function loadActivities() {
+        const { level, unit } = getLevelAndUnitFromURL();
+
+        try {
+            const wordsPath = `../../${level}/${unit}/data3/words.txt`;
+            const response = await fetch(wordsPath);
+            if (!response.ok) throw new Error(`Erro ao buscar palavras. Status: ${response.status}`);
+            const text = await response.text();
+
+            const words = text.trim().split('\n');
+            words.forEach((word, index) => {
+                const imageUrl = `../../${level}/${unit}/data3/imagens/imagem${index + 1}.png`;
+                activities.push(word);
+                createActivity(imageUrl, word);
+            });
+        } catch (error) {
+            console.error('Erro ao carregar palavras ou imagens:', error);
+        }
+    }
+
+    function shuffleWord(word) {
+        const shuffled = word.split('').sort(() => 0.5 - Math.random()).join('');
+        return shuffled !== word ? shuffled : shuffleWord(word);
+    }
+
+    function showCompletionModal() {
+        document.getElementById('overlay').style.display = 'block';
+        document.getElementById('completion-modal').style.display = 'block';
+    }
+
+    function closeModal() {
+        document.getElementById('overlay').style.display = 'none';
+        document.getElementById('completion-modal').style.display = 'none';
+    }
+
+    async function generatePDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        const logo = new Image();
+        logo.src = 'Logo.png';
+
+        logo.onload = function () {
+            doc.addImage(logo, 'PNG', 10, 10, 30, 30);
+            doc.setFontSize(12);
+            doc.text("Name: __________________________________________ Date: ____________", 50, 20);
+            doc.setFontSize(16);
+            doc.text("Hannah Mixed Letters", 10, 50);
+
+            let yOffset = 60;
+            document.querySelectorAll('.activity').forEach((activity, index) => {
+                if (yOffset > 270) {
+                    doc.addPage();
+                    yOffset = 20;
+                }
+
+                const imgElement = activity.querySelector('img');
+                if (imgElement) {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = imgElement.width;
+                    canvas.height = imgElement.height;
+                    ctx.drawImage(imgElement, 0, 0, imgElement.width, imgElement.height);
+                    const imgData = canvas.toDataURL('image/png');
+                    doc.addImage(imgData, 'JPEG', 10, yOffset, 30, 30);
+                }
+
+                const wordContainer = activity.querySelector('.word-container');
+                if (wordContainer) {
+                    doc.setFontSize(14);
+                    let xPos = 50;
+
+                    wordContainer.querySelectorAll('.letter-input').forEach(() => {
+                        doc.text("_____", xPos, yOffset + 10);
+                        xPos += 15;
+                    });
+
+                    const mixedLettersElement = wordContainer.querySelector('.mixed-letters');
+                    if (mixedLettersElement) {
+                        const mixedLetters = Array.from(mixedLettersElement.children).map(el => el.innerText).join(' ');
+                        yOffset += 10;
+                        doc.text(`Letters (mixed): ${mixedLetters}`, 50, yOffset + 10);
+                    }
+
+                    yOffset += 40;
+                }
+            });
+
+            doc.save("Hannah_Mixed_Letters.pdf");
+        };
+
+        logo.onerror = function () {
+            doc.setFontSize(12);
+            doc.text("Name: __________________________________________ Date: ____________", 50, 20);
+            doc.setFontSize(16);
+            doc.text("Hannah Mixed Letters", 10, 50);
+            doc.save("Hannah_Mixed_Letters.pdf");
+        };
+    }
+
+    function getPhaseFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('fase');
+    }
+
+    function getLevelAndUnitFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        const level = params.get('level');
+        const unit = params.get('unit');
+        return { level, unit };
+    }
+</script>
+</body>
+</html>

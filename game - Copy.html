@@ -1,0 +1,1259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <!-- Meta Tag de Viewport para Responsividade -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Hannah Games</title>
+
+  <!-- Firebase (v8.x) -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+  <style>
+    /* RESET BÁSICO */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background-image: url('imagens/fundo.png');
+      background-repeat: repeat;
+      background-size: cover;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    header h1 {
+      font-size: 2.5rem;
+      color: #4CAF50;
+      line-height: 1.2;
+      text-shadow: 2px 2px #888;
+    }
+
+    #subtitle a {
+      font-size: 0.9rem;
+      color: #000;
+      text-decoration: none; /* Remove o sublinhado */
+      font-style: italic;
+    }
+
+    #subtitle a:hover {
+      text-decoration: underline; /* Adiciona sublinhado ao passar o mouse */
+    }
+
+    #subtitle strong {
+      font-weight: bold; /* Garante o negrito */
+    }
+
+    #game-title {
+      font-size: 1.8rem;
+      color: #333;
+      font-weight: bold;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    /* SEÇÃO DO ROBÔ */
+    #robot-section {
+      text-align: center;
+      margin-bottom: 20px;
+      position: relative; /* para posicionar o balão */
+    }
+
+    #robot-image {
+      width: 200px;
+      margin: 0 auto;
+    }
+
+    #robot-balloon {
+      position: absolute;
+      top: 220px; /* ajustado */
+      left: 50%;
+      transform: translateX(-50%);
+      max-width: 220px;
+      background: #fff;
+      border: 2px solid #ccc;
+      padding: 10px;
+      border-radius: 8px;
+      box-shadow: 2px 2px 6px rgba(0,0,0,0.2);
+      display: none;
+      z-index: 999;
+      text-align: center;
+      font-size: 1rem;
+    }
+
+    /* ÁREA PRINCIPAL (O JOGO, BOTÕES, ETC) */
+    #main-content {
+      width: 100%;
+      max-width: 600px;
+      margin-bottom: 30px; /* para dar espaço antes do scoreboard */
+      background: rgba(255, 255, 255, 0.8); /* Container transparente */
+      border-radius: 8px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    #top-controls {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    select,
+    button {
+      font-size: 1.2rem;
+      padding: 10px 15px;
+      border-radius: 8px;
+      border: 2px solid #ccc;
+      cursor: pointer;
+      width: 90%;
+      max-width: 300px;
+    }
+
+    #start-game {
+      background-color: #03a9f4;
+      color: #fff;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 1.2rem;
+      box-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+      transition: background-color 0.3s;
+    }
+
+    #start-game:disabled {
+      background-color: #bbb;
+      cursor: not-allowed;
+    }
+
+    #start-game:hover:not(:disabled) {
+      background-color: #0288D1;
+    }
+
+    #rules-button {
+      background-color: #009688;
+      color: #fff;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 1.2rem;
+      box-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+      transition: background-color 0.3s;
+    }
+
+    #rules-button:hover {
+      background-color: #00796B;
+    }
+
+    #player-score-display {
+      font-weight: bold;
+      margin-top: 10px;
+      text-align: center;
+      font-size: 1.2rem;
+      display: none;
+    }
+
+    #active-players-section {
+      margin: 15px 0; /* Espaçamento entre os elementos acima e abaixo */
+      text-align: center;
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: #333; /* Cor do texto */
+    }
+
+    #active-players-count {
+      font-size: 1rem;
+      color: #555; /* Cor mais suave */
+    }
+
+    #input-container {
+      text-align: center; /* Centraliza o conteúdo */
+      margin-top: 15px;   /* Espaço acima do contêiner */
+    }
+
+    #guess-title {
+      font-size: 1.2rem; /* Tamanho do texto */
+      color: #333;       /* Cor do texto */
+      font-weight: bold; /* Negrito */
+      margin-bottom: 4px; /* Espaço entre o texto e o campo de entrada */
+    }
+
+    #hidden-input {
+      width: 90%;          /* Largura do campo de entrada */
+      max-width: 300px;    /* Largura máxima */
+      padding: 10px;       /* Espaçamento interno */
+      font-size: 1rem;     /* Tamanho do texto */
+      border: 2px solid #4CAF50; /* Borda estilizada */
+      border-radius: 8px;  /* Cantos arredondados */
+    }
+
+    /* TABULEIRO */
+    #board {
+      width: 100%;
+      max-width: 600px;
+      min-height: 200px;
+      background: transparent; /* Tornar transparente */
+      padding: 10px;
+      border: none; /* Remover borda */
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .attempt-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+      gap: 5px;
+      width: 100%;
+      justify-content: center;
+    }
+
+    .letter-block {
+      width: 45px;
+      height: 45px;
+      background-color: #cfd8dc;
+      border: 2px solid #999;
+      border-radius: 4px;
+      font-weight: bold;
+      font-size: 1rem;
+      text-transform: uppercase;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #000;
+      cursor: pointer; /* para indicar que é clicável */
+      box-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+      transition: background-color 0.3s, border-color 0.3s;
+    }
+
+    .player-name {
+      font-size: 1rem;
+      margin-left: 10px;
+      font-style: italic;
+      color: #666;
+      min-width: 80px; /* Definir largura mínima para alinhamento */
+      text-align: left;
+    }
+
+    /* CAMPO DE TEXTO VISÍVEL */
+    #hidden-input {
+      width: 90%;
+      max-width: 300px;
+      padding: 15px;
+      margin: 20px 0;
+      font-size: 1.5rem;
+      border: 2px solid #4CAF50;
+      border-radius: 8px;
+      outline: none;
+      text-align: center;
+      font-family: Arial, sans-serif;
+    }
+
+    /* BOTÕES */
+    #try-button,
+    #login-button,
+    #invite-button-main {
+      display: block;
+      margin: 10px 0;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 1.2rem;
+      box-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+      transition: background-color 0.3s;
+    }
+
+    #try-button {
+      background-color: #4caf50;
+      color: #fff;
+    }
+
+    #try-button:hover {
+      background-color: #43a047;
+    }
+
+    #login-button {
+      background-color: #2196F3;
+      color: #fff;
+      display: none; /* Inicialmente oculto */
+    }
+
+    #login-button:hover {
+      background-color: #1976D2;
+    }
+
+    #invite-button-main {
+      background-color: #ff9800;
+      color: #fff;
+    }
+
+    #invite-button-main:hover {
+      background-color: #fb8c00;
+    }
+
+    /* BOTÃO BACK */
+    #back-button {
+      margin-top: 20px;
+      padding: 12px 25px;
+      background-color: #000;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+      font-size: 1.2rem;
+      transition: background-color 0.3s;
+    }
+
+    #back-button:hover {
+      background-color: #333;
+    }
+
+    /* CORES DE FEEDBACK */
+    .green {
+      background-color: #66bb6a;
+      color: #fff;
+      border-color: #43a047;
+    }
+
+    .yellow {
+      background-color: #ffeb3b;
+      color: #000;
+      border-color: #fdd835;
+    }
+
+    .red {
+      background-color: #f44336;
+      color: #fff;
+      border-color: #e53935;
+    }
+
+    /* SCOREBOARD (NO FINAL) */
+    #scoreboard-section {
+      width: 100%;
+      max-width: 600px;
+      background: #f0f0f0; /* Cinza não muito claro */
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    #scoreboard-section h3 {
+      margin-bottom: 20px;
+      text-align: center;
+      font-size: 1.8rem;
+      color: #333;
+    }
+
+    .scoreboard-subtitle {
+      font-size: 1.2rem;
+      color: #4CAF50;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    #score-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      width: 100%;
+    }
+
+    #score-list li {
+      border-bottom: 1px solid #eee;
+      padding: 10px 0;
+      display: flex;
+      justify-content: space-between;
+      font-size: 1.1rem;
+      align-items: center;
+    }
+
+    #score-list li span {
+      font-weight: bold;
+    }
+
+    /* MOSTRADOR DE PONTOS PESSOAIS DO USUÁRIO */
+    /* Removido para eliminar "Your Points" do Top 20 */
+
+    /* CONTADOR DE PARTIDAS VISÍVEL PARA TODOS */
+    #owner-game-counter {
+      margin-top: 10px;
+      text-align: center;
+      display: block;
+      font-size: 1.2rem;
+    }
+
+    /* IMAGEM DE CONVITE */
+    .invite-image {
+      display: block;
+      margin: 20px auto;
+      max-width: 200px;
+      height: auto;
+      cursor: pointer;
+      transition: transform 0.3s;
+    }
+
+    .invite-image:hover {
+      transform: scale(1.05);
+    }
+
+    /* RESPONSIVIDADE - até 768px */
+    @media (max-width: 768px) {
+      header h1 {
+        font-size: 2rem;
+      }
+
+      #robot-image {
+        width: 150px;
+      }
+
+      #robot-balloon {
+        position: static;
+        margin-top: 10px;
+        transform: none;
+        left: 0;
+        max-width: 100%;
+      }
+
+      #main-content {
+        padding: 15px;
+      }
+
+      #top-controls {
+        gap: 8px;
+      }
+
+      select,
+      button {
+        font-size: 1rem;
+        padding: 8px 12px;
+        max-width: 100%;
+      }
+
+      #hidden-input {
+        max-width: 100%;
+        font-size: 1.2rem;
+        padding: 12px;
+      }
+
+      .letter-block {
+        width: 35px;
+        height: 35px;
+        font-size: 0.9rem;
+      }
+
+      .player-name {
+        min-width: 60px; /* Ajuste para telas menores */
+        font-size: 0.9rem;
+      }
+
+      #player-score-display {
+        font-size: 1rem;
+      }
+
+      #try-button,
+      #login-button,
+      #invite-button-main,
+      #back-button {
+        font-size: 1rem;
+        padding: 10px 16px;
+      }
+
+      .invite-image {
+        max-width: 150px;
+      }
+
+      #scoreboard-section h3 {
+        font-size: 1.5rem;
+      }
+
+      #score-list li {
+        font-size: 1rem;
+      }
+
+      /* Atualizado para refletir a nova função */
+      #owner-game-counter {
+        font-size: 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER COM TÍTULO -->
+  <header>
+    <h1>Hannah Games</h1>
+    <p id="subtitle">
+      Brought to you by <a href="https://hannahenglishcourse.vercel.app/" target="_blank"><strong>Hannah English Course</strong></a>
+    </p>
+  </header>
+
+  <!-- SEÇÃO DO ROBÔ -->
+  <div id="robot-section">
+    <img id="robot-image" src="imagens/robo_estatico.png" alt="Robot Samuel">
+    <div id="robot-balloon"></div>
+  </div>
+
+  <!-- ÁREA PRINCIPAL (O JOGO) -->
+  <div id="main-content">
+    <div id="top-controls">
+      <h2 id="game-title">Guess the Word</h2>
+      <label for="difficulty-select">Difficulty:</label>
+      <select id="difficulty-select">
+        <option value="easy">Easy</option>
+        <option value="medium">Medium</option>
+        <option value="hard">Hard</option>
+      </select>
+      <button id="start-game">Start Game</button>
+      <button id="rules-button">Rules</button>
+      <span id="player-score-display"></span>
+    </div>
+
+    <div id="board"></div>
+    
+    <!-- Texto sobre o campo de entrada -->
+    <div id="input-container">
+      <p id="guess-title"><strong>Take a guess!</strong></p>
+      <input 
+        type="text"
+        id="hidden-input"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="none"
+        spellcheck="false"
+        placeholder="Type a word of X letters"
+      >
+    </div>
+    
+    <button id="try-button">Try</button>
+    
+    <!-- Botão de Login -->
+    <button id="login-button">Login</button>
+
+    <!-- Contador de Jogadores Ativos -->
+    <div id="active-players-section">
+      <p id="active-players-count">Active Players: 0</p>
+    </div>
+
+    <!-- Botão Invite Friends -->
+    <button id="invite-button-main">Invite Friends</button>
+  </div>
+
+    <!-- SUBTÍTULO E IMAGEM DE CONVITE -->
+    <div id="invite-section">
+      <div class="scoreboard-subtitle">Do you want to learn English while having fun?</div>
+      <a href="https://hannahenglishcourse.vercel.app/Apresentacao/propaganda.html">
+        <img src="imagens/convite.gif" alt="Invitation" class="invite-image">
+      </a>
+    </div>
+
+    <!-- SCOREBOARD POR ÚLTIMO -->
+    <div id="scoreboard-section">
+      <h3>Top 20</h3>
+      <ol id="score-list"></ol>
+
+      <!-- CONTADOR DE PARTIDAS (VISÍVEL PARA TODOS) -->
+      <div id="owner-game-counter">
+        <p>Total Games: <span id="ownerGamesCount"></span></p>
+      </div>
+    </div>
+
+    <!-- BOTÃO BACK (Último elemento da página) -->
+    <button id="back-button">Back</button>
+
+  <script>
+    /*******************************************************
+     * 1) CONFIGURANDO FIREBASE
+     *******************************************************/
+    const firebaseConfig = {
+      apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+      authDomain: "hannahenglishcourse.firebaseapp.com",
+      databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "hannahenglishcourse",
+      storageBucket: "hannahenglishcourse.appspot.com",
+      messagingSenderId: "449818788486",
+      appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+      measurementId: "G-07VVJG9LRS"
+    };
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+
+    const db = firebase.database();
+    const auth = firebase.auth();
+
+    /*******************************************************
+     * 2) VARIÁVEIS GLOBAIS
+     *******************************************************/
+    let dictionarySet    = new Set();
+    let userName         = "Guest";
+    let userUid          = null;
+    let isGuest          = true;
+    let userRole         = "aluno";
+    let currentWord      = "";
+    let currentStatus    = "idle";
+    let currentDifficulty= "easy";
+    let totalPoints      = 0;
+    let totalGames       = 0; 
+    let attemptsArray    = [];
+    let currentLetters   = [];
+    let activeIndex      = 0; // posição atual para digitação
+
+    const hiddenInput      = document.getElementById("hidden-input");
+    const board            = document.getElementById("board");
+    const robotSection     = document.getElementById("robot-section");
+    const robotBalloon     = document.getElementById("robot-balloon");
+    const backButton       = document.getElementById("back-button");
+    const inviteButtonMain = document.getElementById("invite-button-main");
+    const loginButton      = document.getElementById("login-button");
+
+    /*******************************************************
+ * 3) CARREGAR OS DICIONÁRIOS
+ *******************************************************/
+let oxfordDictionarySet = new Set(); // Para sortear palavras do jogo
+let validationDictionarySet = new Set(); // Para validar palavras digitadas
+
+async function loadDictionaries() {
+  try {
+    // Carregar o Oxford 3000 Word List para sortear palavras
+    const oxfordResponse = await fetch("dictionaries/Oxford 3000 Word List.txt");
+    if (!oxfordResponse.ok) {
+      throw new Error(`Failed to load Oxford 3000 Word List: ${oxfordResponse.statusText}`);
+    }
+    const oxfordText = await oxfordResponse.text();
+    oxfordDictionarySet = new Set(oxfordText.split("\n").map(word => word.trim().toLowerCase()));
+
+    // Carregar o words_alpha.txt para validar palavras digitadas
+    const alphaResponse = await fetch("dictionaries/words_alpha.txt");
+    if (!alphaResponse.ok) {
+      throw new Error(`Failed to load words_alpha.txt: ${alphaResponse.statusText}`);
+    }
+    const alphaText = await alphaResponse.text();
+    validationDictionarySet = new Set(alphaText.split("\n").map(word => word.trim().toLowerCase()));
+
+    console.log("Dicionários carregados com sucesso!");
+  } catch (error) {
+    console.error("Erro ao carregar os dicionários:", error);
+  }
+}
+
+// Chamar a função para carregar os dicionários
+loadDictionaries();
+
+    /*******************************************************
+     * 4) ROBÔ E TTS
+     *******************************************************/
+    const robotImage   = document.getElementById("robot-image");
+    const synth        = window.speechSynthesis;
+
+    function speakText(text, shouldScroll = false) {
+      if (!text) return; 
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang  = "en-US";
+
+      utterance.onstart = () => {
+        robotImage.src = "imagens/robo_fala.gif";
+        robotBalloon.textContent = text;
+        robotBalloon.style.display = "block";
+      };
+      utterance.onend = () => {
+        robotImage.src = "imagens/robo_estatico.png";
+        setTimeout(() => {
+          robotBalloon.style.display = "none";
+          if (shouldScroll) {
+            robotSection.scrollIntoView({ behavior: 'smooth' });
+          }
+        }, 800);   
+      };
+      synth.speak(utterance);
+    }
+
+    const encouragementMessages = [
+      "Nice attempt!",
+      "Keep going!",
+      "You're almost there!",
+      "Don't give up!",
+      "Keep trying!"
+    ];
+
+    /*******************************************************
+     * 5) BOTÃO RULES
+     *******************************************************/
+    document.getElementById("rules-button").addEventListener("click", () => {
+      alert(
+        "Simple Rules of the Game:\n\n" +
+        "1. A random English word is chosen.\n" +
+        "2. Type your guess into the text field below.\n" +
+        "3. Press 'Try' or hit 'Enter' to submit.\n" +
+        "4. Green = correct letter & position.\n" +
+        "5. Yellow = correct letter, wrong position.\n" +
+        "6. Red = letter not in the word.\n\n" +
+        "Good luck!"
+      );
+    });
+
+    /*******************************************************
+     * 6) LOGIN
+     *******************************************************/
+    auth.onAuthStateChanged(async (user) => {
+      let playerRef = null; // Referência do jogador no nó players
+
+      if (user) {
+        // Usuário logado
+        userUid = user.uid;
+        isGuest = false;
+
+        // Recupera os dados do usuário no Firebase
+        const snap = await db.ref("usuarios/" + userUid).once("value");
+        const data = snap.val() || {};
+        userName = data.nome || data.email || "User";
+        userRole = data.role || ""; // Obtém o role do usuário logado (se disponível)
+
+        // Adiciona o jogador logado ao nó global players
+        playerRef = db.ref("HannahGames/guessTheWord/players/" + userUid);
+        playerRef.set({
+          name: userName,
+          joinedAt: Date.now(),
+        });
+      } else {
+        // Usuário convidado (não logado)
+        userUid = null;
+        isGuest = true;
+        userName = "Guest";
+        userRole = ""; // Não atribuir role para convidados
+
+        // Gera um ID único para o convidado
+        const guestId = `guest_${Date.now()}`;
+        playerRef = db.ref("HannahGames/guessTheWord/players/" + guestId);
+        playerRef.set({
+          name: "Guest",
+          joinedAt: Date.now(),
+        });
+      }
+
+      // Remove o jogador do nó players ao desconectar
+      if (playerRef) {
+        playerRef.onDisconnect().remove();
+      }
+
+      // Atualiza a interface e funcionalidades
+      loadScoreboard(); // Atualiza o placar
+      listenGameState(); // Monitora o estado do jogo e jogadores ativos
+      updateGameStats(); // Atualiza "Your Score" e "Total Games"
+      updateLoginButtonVisibility(); // Ajusta a visibilidade do botão de login
+    });
+
+    /*******************************************************
+     * 7) FUNÇÃO UNIFICADA PARA ATUALIZAR SCORE E GAMES
+     *******************************************************/
+    function updateGameStats() {
+      const gamesPlayedRef = db.ref("HannahGames/guessTheWord/gamesPlayed");
+      const scoreDisplay = document.getElementById("player-score-display");
+
+      // Atualizar "Total Games"
+      gamesPlayedRef.on("value", (snapshot) => {
+        const totalGames = snapshot.val() || 0; // Caso ainda não exista, exibir 0
+        document.getElementById("ownerGamesCount").textContent = totalGames;
+      });
+
+      // Atualizar "Your Score" se o usuário estiver logado
+      if (!isGuest && userUid) {
+        db.ref("usuarios/" + userUid).on("value", (snapshot) => {
+          const userData = snapshot.val() || {};
+          const points = userData.points || 0;
+          scoreDisplay.style.display = "block";
+          scoreDisplay.textContent = `Your Score: ${points}`;
+        });
+      } else {
+        // Esconder "Your Score" para convidados
+        scoreDisplay.style.display = "none";
+      }
+    }
+
+    /*******************************************************
+     * 8) SCOREBOARD
+     *******************************************************/
+    function loadScoreboard() {
+      const scoreList = document.getElementById("score-list");
+      db.ref("usuarios").orderByChild("points").limitToLast(20).on("value", (snap) => {
+        const val = snap.val() || {};
+        let arr   = [];
+        Object.keys(val).forEach(uid => {
+          const u = val[uid];
+          const nm= u.nome || u.email || "User";
+          const pts= u.points || 0;
+          arr.push({ name: nm, points: pts });
+        });
+        arr.sort((a,b) => b.points - a.points);
+        scoreList.innerHTML = "";
+        arr.forEach((item, i) => {
+          const li = document.createElement("li");
+          li.innerHTML = `<span>${i+1}.</span> ${item.name} <span>${item.points} pts</span>`;
+          scoreList.appendChild(li);
+        });
+      });
+    }
+
+   /*******************************************************
+   * 9) OUVIR ESTADO DO JOGO
+   *******************************************************/
+  function listenGameState() {
+    db.ref("HannahGames/guessTheWord/currentGame").on("value", (snap) => {
+      const data = snap.val();
+
+      if (!data) {
+        // Jogo inativo: resetar estado local e interface
+        currentStatus = "idle";
+        currentWord = "";
+        attemptsArray = [];
+        currentLetters = [];
+        activeIndex = 0;
+
+        renderAllAttempts();
+        updateUI();
+        hiddenInput.placeholder = "Waiting for a new game...";
+        hiddenInput.maxLength = ""; // Remove o limite do input
+        return;
+      }
+
+      // Atualizar estado local com os dados do jogo
+      currentWord = data.word || "";
+      currentStatus = data.status || "idle";
+      currentDifficulty = data.difficulty || "easy";
+
+      const attemptsObj = data.attempts || {};
+      attemptsArray = Object.keys(attemptsObj).map((key) => attemptsObj[key]);
+
+      // Atualizar o campo de entrada com o comprimento da palavra
+      if (data.length) {
+        hiddenInput.maxLength = data.length; // Define o tamanho máximo do input
+        hiddenInput.placeholder = `Type a word of ${data.length} letters`; // Atualiza o placeholder
+      }
+
+      // Renderizar tentativas e atualizar interface
+      renderAllAttempts();
+      updateUI();
+
+      // Exibir mensagem para convidados, apenas uma vez
+      if (isGuest && !localStorage.getItem("guestMessageShown")) {
+        speakText("You're playing as a guest. Your progress won't be saved.");
+        localStorage.setItem("guestMessageShown", "true");
+      }
+    });
+
+    // Monitora o número de jogadores ativos
+    db.ref("HannahGames/guessTheWord/players").on("value", (snap) => {
+      const players = snap.val() || {};
+      const activePlayersCount = Object.keys(players).length;
+
+      // Atualiza a exibição de jogadores ativos
+      const activePlayersElement = document.getElementById("active-players-count");
+      if (activePlayersElement) {
+        activePlayersElement.textContent = `Active Players: ${activePlayersCount}`;
+      }
+    });
+
+    // Atualiza o contador global de jogos jogados
+    const gamesPlayedRef = db.ref("HannahGames/guessTheWord/gamesPlayed");
+    gamesPlayedRef.on("value", (snapshot) => {
+      const gamesPlayed = snapshot.val() || 0;
+      const ownerGamesCountElement = document.getElementById("ownerGamesCount");
+      if (ownerGamesCountElement) {
+        ownerGamesCountElement.textContent = gamesPlayed;
+      }
+    });
+  }
+
+    /*******************************************************
+   * 10) START GAME
+   *******************************************************/
+  document.getElementById("start-game").addEventListener("click", startGame);
+
+  async function startGame() {
+    // Permitir que o proprietário inicie o jogo mesmo com um jogo ativo
+    if (currentStatus === "in_progress" && userRole !== "proprietario") {
+      speakText("A game is already in progress. Please wait.");
+      return;
+    }
+
+    // Incrementar contador global de partidas
+    const gamesPlayedRef = db.ref("HannahGames/guessTheWord/gamesPlayed");
+    const snapshot = await gamesPlayedRef.once("value");
+    const currentGamesPlayed = snapshot.val() || 0; // Caso não exista, começa do 0
+    const updatedGamesPlayed = currentGamesPlayed + 1;
+    await gamesPlayedRef.set(updatedGamesPlayed); // Atualizar no Firebase
+
+    /*// Mensagem de confirmação para o proprietário
+    if (userUid && userRole === "proprietario") {
+      speakText(`This is game number ${updatedGamesPlayed}.`);
+    }*/
+
+    // Reiniciar o jogo
+    await db.ref("HannahGames/guessTheWord/currentGame").remove(); // Remove dados do jogo atual
+    currentDifficulty = document.getElementById("difficulty-select").value;
+    const chosenWord = await pickWordWithDefinition(currentDifficulty);
+
+    // Garantir que a palavra e o comprimento sejam registrados no banco de dados
+    await db.ref("HannahGames/guessTheWord/currentGame").set({
+      word: chosenWord,
+      length: chosenWord.length, // Adiciona o comprimento da palavra
+      status: "in_progress",
+      difficulty: currentDifficulty,
+      attempts: {}, // Reinicia as tentativas
+      players: {} // Reinicia os jogadores
+    });
+
+    // Mensagem de início
+    speakText(`${userName} started a new game! Difficulty: ${currentDifficulty}. Good luck!`);
+    if (isGuest) {
+      speakText("You're playing as a guest. Your progress won't be saved.");
+    }
+
+    // Atualizar estado local do jogo
+    currentWord = chosenWord;
+    currentStatus = "in_progress";
+    currentLetters = [];
+    activeIndex = 0;
+    attemptsArray = [];
+
+    // Atualizar o campo de entrada com base no comprimento da palavra
+    hiddenInput.maxLength = currentWord.length; // Define o tamanho máximo do input
+    hiddenInput.value = ""; // Limpa o valor atual do input
+    hiddenInput.placeholder = `Type a word of ${currentWord.length} letters`; // Atualiza o placeholder
+
+    // Renderizar tentativas, atualizar a interface e exibir informações do jogo
+    renderAllAttempts();
+    updateUI();
+    updateGameStats(); // Atualizar "Your Score" e "Total Games"
+  }
+
+  /*******************************************************
+ * 11) ESCOLHER PALAVRA
+ *******************************************************/
+async function pickWordWithDefinition(diff) {
+  let minLen = 3, maxLen = 3;
+  if (diff === "medium") { minLen = 4; maxLen = 5; }
+  if (diff === "hard") { minLen = 6; maxLen = 7; }
+
+  // Filtrar palavras do Oxford 3000 Word List com base no tamanho
+  const allWords = [...oxfordDictionarySet].filter(w => w.length >= minLen && w.length <= maxLen);
+  if (allWords.length < 1) return "cat"; // Palavra fallback caso nenhuma seja encontrada
+
+  // Tentar encontrar uma palavra com definição válida
+  for (let i = 0; i < 30; i++) {
+    const cand = allWords[Math.floor(Math.random() * allWords.length)];
+    if (await hasDefinition(cand)) return cand;
+  }
+
+  // Fallback para o caso de não encontrar nenhuma palavra válida com definição
+  return allWords[Math.floor(Math.random() * allWords.length)];
+}
+
+/*******************************************************
+ * 12) VERIFICAR DEFINIÇÃO NA API
+ *******************************************************/
+async function hasDefinition(word) {
+  try {
+    const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+    if (!res.ok) return false;
+    const data = await res.json();
+    return !!(data[0]?.meanings?.[0]?.definitions?.[0]?.definition);
+  } catch {
+    return false;
+  }
+}
+
+    /*******************************************************
+   * 12) RENDERIZAR
+   *******************************************************/
+  function renderAllAttempts() {
+    board.innerHTML = "";
+
+    // Render tentativas passadas
+    attemptsArray.forEach((att) => {
+      const rowDiv = document.createElement("div");
+      rowDiv.classList.add("attempt-row");
+
+      let guessArr = att.guess.split("");
+      guessArr.forEach((letter, i) => {
+        const block = document.createElement("div");
+        block.classList.add("letter-block");
+        block.textContent = letter.toUpperCase();
+        if (att.feedback && att.feedback[i]) {
+          block.classList.add(att.feedback[i]);
+        }
+        rowDiv.appendChild(block);
+      });
+
+      const playerSpan = document.createElement("span");
+      playerSpan.classList.add("player-name");
+      playerSpan.textContent = `- ${att.playerName || "Unknown"}`;
+      rowDiv.appendChild(playerSpan);
+
+      board.appendChild(rowDiv);
+    });
+
+    // Não renderizar a linha ativa, pois agora usamos o campo de texto
+  }
+
+    /*******************************************************
+   * 13) UPDATE UI
+   *******************************************************/
+  function updateUI() {
+    const startBtn = document.getElementById("start-game");
+    const difficultySelect = document.getElementById("difficulty-select");
+    const tryBtn = document.getElementById("try-button");
+
+    if (userRole === "proprietario") {
+      // Sempre habilitar botões para o proprietário
+      startBtn.disabled = false;
+      difficultySelect.disabled = false;
+    } else {
+      // Para usuários comuns e convidados, aplicar restrições
+      if (currentStatus === "in_progress") {
+        startBtn.disabled = true;
+        difficultySelect.disabled = true;
+      } else {
+        startBtn.disabled = false;
+        difficultySelect.disabled = false;
+      }
+    }
+
+    // Botão "Try" só é habilitado durante um jogo ativo
+    tryBtn.disabled = currentStatus !== "in_progress";
+  }
+
+    /*******************************************************
+   * 14) INPUT EVENT (PARA MOBILE E DESKTOP)
+   *******************************************************/
+  hiddenInput.addEventListener("input", (e) => {
+    const val = e.target.value.trim().toLowerCase(); // Captura o valor digitado
+    if (!val || currentStatus !== "in_progress" || !currentWord) return;
+
+    // Limita o valor ao tamanho da palavra atual
+    if (val.length > currentWord.length) {
+      e.target.value = val.slice(0, currentWord.length); 
+    }
+  });
+
+  hiddenInput.addEventListener("keydown", (e) => {
+    if (currentStatus !== "in_progress" || !currentWord) return;
+
+    if (e.key === "Backspace") {
+      // Remove o último caractere do input
+      const val = hiddenInput.value.trim();
+      hiddenInput.value = val.slice(0, -1);
+    }
+
+    if (e.key === "Enter") {
+      e.preventDefault(); // Evita comportamentos padrão
+      submitCurrentRow(); // Envia a tentativa atual
+    }
+  });
+
+    /*******************************************************
+   * 15) BOTÃO TRY
+   *******************************************************/
+  document.getElementById("try-button").addEventListener("click", () => {
+    if (currentStatus !== "in_progress") {
+      speakText("No active game right now.");
+      return;
+    }
+    submitCurrentRow();
+  });
+
+    /*******************************************************
+   * 16) BOTÃO BACK
+   *******************************************************/
+  backButton.addEventListener("click", () => {
+    window.history.back();
+  });
+
+    /*******************************************************
+   * 17) BOTÃO INVITE FRIENDS PRINCIPAL
+   *******************************************************/
+  inviteButtonMain.addEventListener("click", () => {
+    const shareData = {
+      title: "Hannah English Course",
+      text: "Come play this English word game with me!",
+      url: "https://hannahenglishcourse.vercel.app/game.html"
+    };
+    if (navigator.share) {
+      navigator.share(shareData).catch(() => {});
+    } else {
+      const wUrl = "https://wa.me/?text=" + encodeURIComponent(shareData.text + " " + shareData.url);
+      window.open(wUrl, "_blank");
+    }
+  });
+
+    /*******************************************************
+   * 18) BOTÃO LOGIN
+   *******************************************************/
+  loginButton.addEventListener("click", () => {
+    window.location.href = "https://hannahenglishcourse.vercel.app/Formulario/login.html";
+  });
+
+ /*******************************************************
+ * 19) SUBMETER TENTATIVA
+ *******************************************************/
+async function submitCurrentRow() {
+  const guessClean = hiddenInput.value.trim().toLowerCase();
+
+  // Verificar se há uma palavra ativa e se o comprimento está correto
+  if (!currentWord || guessClean.length !== currentWord.length) {
+    speakText(`You must fill exactly ${currentWord.length} letters!`);
+    return;
+  }
+
+  // Validar se a palavra digitada existe no validationDictionarySet
+  if (!validationDictionarySet.has(guessClean)) {
+    speakText("That word is not in our dictionary!");
+    return;
+  }
+
+  // Obter feedback para a palavra digitada
+  const feedback = getFeedback(guessClean, currentWord);
+  const pushRef = db.ref("HannahGames/guessTheWord/currentGame/attempts").push();
+  await pushRef.set({
+    guess: guessClean,
+    feedback,
+    playerName: isGuest ? "Guest" : userName,
+    timestamp: Date.now()
+  });
+
+  // Limpar o campo de texto após a tentativa
+  hiddenInput.value = "";
+  hiddenInput.focus();
+
+  // Verificar se a palavra foi adivinhada corretamente
+  if (feedback.every(c => c === "green")) {
+    const definition = await getDefinition(guessClean);
+    let msg = `Congratulations, ${isGuest ? "Guest" : userName}! You found the word "${guessClean}".`;
+    if (definition) msg += ` Definition: ${definition}`;
+    speakText(msg, true); // Passa true para scrollar
+
+    // Atualizar pontuação apenas para usuários logados
+    if (!isGuest && userUid) {
+      let pts = 10;
+      if (currentDifficulty === "medium") pts = 20;
+      if (currentDifficulty === "hard") pts = 35;
+
+      // Recuperar e atualizar pontos no banco de dados
+      const userRef = db.ref("usuarios/" + userUid);
+      const userSnap = await userRef.once("value");
+      const userData = userSnap.val() || {};
+      const currentPoints = userData.points || 0; // Pontos existentes ou 0
+      const updatedPoints = currentPoints + pts; // Soma os pontos ganhos
+
+      await userRef.update({ points: updatedPoints }); // Atualiza no Firebase
+
+      // Atualizar variável local e interface
+      totalPoints = updatedPoints;
+      updateGameStats(); // Atualiza "Your Score" e outras estatísticas
+    }
+
+    // Atualiza o status do jogo
+    db.ref("HannahGames/guessTheWord/currentGame").update({ status: "ended" });
+  } else {
+    // Mostrar mensagem de incentivo
+    const randomMsg = encouragementMessages[Math.floor(Math.random() * encouragementMessages.length)];
+    speakText(randomMsg);
+  }
+
+  // Re-renderizar tentativas e manter o foco no input
+  renderAllAttempts();
+  hiddenInput.focus(); // Foca automaticamente no input após a tentativa
+}
+
+    /*******************************************************
+   * 20) FEEDBACK (green, yellow, red)
+   *******************************************************/
+  function getFeedback(guess, realWord) {
+    const feedback = Array(guess.length).fill("red");
+    const realArr  = realWord.split("");
+
+    // Green
+    for (let i=0; i<guess.length; i++) {
+      if (guess[i] === realArr[i]) {
+        feedback[i] = "green";
+        realArr[i]  = "*";
+      }
+    }
+    // Yellow
+    for (let i=0; i<guess.length; i++) {
+      if (feedback[i] === "green") continue;
+      const idx = realArr.indexOf(guess[i]);
+      if (idx !== -1) {
+        feedback[i] = "yellow";
+        realArr[idx]= "*";
+      }
+    }
+    return feedback;
+  }
+
+    /*******************************************************
+   * 21) DEFINIÇÃO
+   *******************************************************/
+  async function getDefinition(word) {
+    try {
+      const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+      if (!res.ok) return "";
+      const data = await res.json();
+      return data[0]?.meanings?.[0]?.definitions?.[0]?.definition || "";
+    } catch {
+      return "";
+    }
+  }
+
+    /*******************************************************
+   * 22) FUNÇÃO UNIFICADA PARA ATUALIZAR SCORE E GAMES
+   *******************************************************/
+  // Função já definida acima: updateGameStats()
+
+    /*******************************************************
+   * 23) ATUALIZAR VISIBILIDADE DO BOTÃO DE LOGIN
+   *******************************************************/
+  function updateLoginButtonVisibility() {
+    if (isGuest) {
+      loginButton.style.display = "block";
+    } else {
+      loginButton.style.display = "none";
+    }
+  }
+  </script>
+</body>
+</html>
