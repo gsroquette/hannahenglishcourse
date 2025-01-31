@@ -1,12 +1,10 @@
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
-
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const fs = require('fs');
-const path = require('path');
 const { Configuration, OpenAIApi } = require('openai');
 const admin = require('firebase-admin');
 const fetch = require('node-fetch'); // Para chamar o /api/tts internamente
