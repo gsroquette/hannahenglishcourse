@@ -314,8 +314,8 @@ app.post('/api/tts', async (req, res) => {
             input: { text },
             voice: {
                 languageCode: 'en-US',
-                name: 'en-US-Standard-J', // Define a voz específica
-                ssmlGender: 'MALE' // 'J' é uma voz masculina
+                name: 'en-US-Standard-I', // Define a voz específica
+                ssmlGender: 'MALE' // 'I' é uma voz masculina
             },
             audioConfig: {
                 audioEncoding: 'MP3',
