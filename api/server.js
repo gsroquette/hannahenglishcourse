@@ -200,9 +200,10 @@ app.get('/api/start', async (req, res) => {
         const initialMessage = `Hello ${studentName}! Today's topic is: ${conversationDetails}. I'm ready to help you at your ${studentLevel}, in ${studentUnit}. Shall we begin?`;
 
         // (Re)inicializa o array de conversas
+        // **IMPORTANTE**: garantir que contextMessage fique em primeiro
         conversations[userId] = [
-            { studentName, studentLevel, studentUnit },
             contextMessage,
+            { studentName, studentLevel, studentUnit },
             { role: "assistant", content: initialMessage },
         ];
         console.log(`📝 Contexto inicial (re)inicializado para userId=${userId}`);
@@ -281,7 +282,7 @@ app.post('/api/chat', async (req, res) => {
 
         // Chama a OpenAI com o histórico atualizado
         const completion = await openai.createChatCompletion({
-            model: 'gpt-4o-mini-2024-07-18', // Certifique-se de que este modelo exista na sua conta
+            model: 'gpt-4o-mini-2024-07-18', // Mantém o modelo solicitado
             messages: conversations[userId],
         });
 
