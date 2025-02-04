@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Histórias do Campo Missionário</title>
+  <link rel="stylesheet" href="css/estilo.css" />
+  <script src="js/translations.js"></script>
+</head>
+<body>
+<header>
+  <!-- Menu igual ao da página inicial -->
+  <nav class="menu">
+    <a href="index.html" id="nav-inicio">Início</a>
+    <a href="impacto.html" id="nav-historias-impacto">Histórias</a>
+    <!-- Seletor de idioma -->
+    <a href="#" onclick="setLanguage('pt')" id="lang-pt">PT</a>
+    <a href="#" onclick="setLanguage('en')" id="lang-en" class="inactive">EN</a>
+  </nav>
+</header>
+
+<section class="banner-impacto">
+  <h1 id="impacto-h1">Histórias do Campo Missionário</h1>
+  <button id="btn-compartilhar-pagina" onclick="shareThisPage()">
+    Compartilhe esta página
+  </button>
+</section>
+
+<!-- Filtros (opcional) -->
+<div class="filtros">
+  <button onclick="filtrarHistorias('todas')" id="filtro-todas">Todas</button>
+  <button onclick="filtrarHistorias('criancas')" id="filtro-criancas">Crianças</button>
+  <!-- etc. -->
+</div>
+
+<section class="historias-grid" id="historias-grid">
+  <!-- Cards gerados dinamicamente -->
+</section>
+
+<footer>
+  <p>© 2025 Fundação Hannah. Todos os direitos reservados.</p>
+</footer>
+
+<script>
+/* ========================================
+   1) IDIOMA (exemplo básico)
+======================================== */
+function setLanguage(lang) {
+  changeLanguage(lang);
+  if(lang === 'pt') {
+    document.getElementById('lang-pt').classList.remove('inactive');
+    document.getElementById('lang-en').classList.add('inactive');
+  } else {
+    document.getElementById('lang-pt').classList.add('inactive');
+    document.getElementById('lang-en').classList.remove('inactive');
+  }
+}
+
+const translations = {
+  "impacto-h1": { pt: "Histórias do Campo Missionário", en: "Mission Field Stories" },
+  "btn-compartilhar-pagina": { pt: "Compartilhe esta página", en: "Share this page" },
+  "filtro-todas": { pt: "Todas", en: "All" },
+  "filtro-criancas": { pt: "Crianças", en: "Children" },
+  "nav-inicio": { pt: "Início", en: "Home" },
+  "nav-historias-impacto": { pt: "Histórias", en: "Stories" }
+};
+
+function changeLanguage(lang) {
+  document.documentElement.setAttribute("lang", lang);
+  for (let key in translations) {
+    let el = document.getElementById(key);
+    if (el) {
+      el.innerHTML = translations[key][lang];
+    }
+  }
+}
+
+/* ========================================
+   2) LISTA DE HISTÓRIAS
+   - Agora, APENAS os IDs (ou subpastas)
+======================================== */
+const historiasIDs = [
+  "historia1",
+  // "historia2",
+  // etc.
+];
+
+/* ========================================
+   3) CARREGAR E PARSEAR O TXT (metadados)
+======================================== */
+async function carregarMetadadosHistoria(id) {
+  // Ex: fetch(`impacto/historia1/historia1.txt`)
+  let url = `impacto/${id}/${id}.txt`;
+  const response = await fetch(url);
+  const fullText = await response.text();
+
+  // Extrair linhas
+  let lines = fullText.split("\n");
+
+  // Objeto para armazenar metadados + resumo
+  let info = {
+    id: id,
+    categorias: [],
+    imagemLista: "",
+    tituloPT: "",
+    resumoPT: "",
+    tituloEN: "",
+    resumoEN: ""
+  };
+
+  // Vamos ler linha a linha ATÉ encontrar "# PT" (que marca começo do texto longo)
+  // Tudo que vier depois de "# PT" ou "# EN" é texto longo.
+  for (let line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("# PT")) break; // paramos aqui, metadados acabaram
+
+    if (trimmed.startsWith("ID:")) {
+      info.id = trimmed.replace("ID:", "").trim();
+    } else if (trimmed.startsWith("CATEGORIAS:")) {
+      let cats = trimmed.replace("CATEGORIAS:", "").trim();
+      info.categorias = cats.split(",").map(c => c.trim());
+    } else if (trimmed.startsWith("IMAGEM_LISTA:")) {
+      info.imagemLista = trimmed.replace("IMAGEM_LISTA:", "").trim();
+    } else if (trimmed.startsWith("TITULO_PT:")) {
+      info.tituloPT = trimmed.replace("TITULO_PT:", "").trim();
+    } else if (trimmed.startsWith("RESUMO_PT:")) {
+      info.resumoPT = trimmed.replace("RESUMO_PT:", "").trim();
+    } else if (trimmed.startsWith("TITULO_EN:")) {
+      info.tituloEN = trimmed.replace("TITULO_EN:", "").trim();
+    } else if (trimmed.startsWith("RESUMO_EN:")) {
+      info.resumoEN = trimmed.replace("RESUMO_EN:", "").trim();
+    }
+  }
+  return info;
+}
+
+/* ========================================
+   4) RENDERIZAR CARDS NA LISTA
+======================================== */
+async function renderHistorias() {
+  const grid = document.getElementById("historias-grid");
+  grid.innerHTML = "";
+
+  // Carregamos TODOS os metadados
+  let listaMetadados = [];
+  for (let id of historiasIDs) {
+    let dados = await carregarMetadadosHistoria(id);
+    listaMetadados.push(dados);
+  }
+
+  // Guardamos no window/lista global para filtrar
+  window.metadadosGlobal = listaMetadados;
+  
+  mostrarHistorias(listaMetadados);
+}
+
+function mostrarHistorias(lista) {
+  const grid = document.getElementById("historias-grid");
+  const lang = document.documentElement.getAttribute("lang") || "pt";
+
+  grid.innerHTML = "";
+  lista.forEach(h => {
+    let titulo = (lang === 'pt') ? h.tituloPT : h.tituloEN;
+    let resumo = (lang === 'pt') ? h.resumoPT : h.resumoEN;
+
+    // Cria card
+    let card = document.createElement("div");
+    card.className = "card-historia"; // seu CSS
+    card.innerHTML = `
+      <img src="impacto/${h.id}/${h.imagemLista}" alt="${titulo}" style="width:100%; height:180px; object-fit:cover;">
+      <div class="conteudo">
+        <h3>${titulo}</h3>
+        <p>${resumo}</p>
+        <button onclick="abrirHistoria('${h.id}')">
+          ${(lang === 'pt') ? 'Leia Mais' : 'Read More'}
+        </button>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+/* ========================================
+   5) FILTRAR POR CATEGORIA
+======================================== */
+function filtrarHistorias(cat) {
+  if (cat === "todas") {
+    mostrarHistorias(window.metadadosGlobal);
+  } else {
+    let filtradas = window.metadadosGlobal.filter(h => h.categorias.includes(cat));
+    mostrarHistorias(filtradas);
+  }
+}
+
+/* ========================================
+   6) BOTÃO "LEIA MAIS"
+======================================== */
+function abrirHistoria(historiaId) {
+  window.location.href = `historia.html?id=${historiaId}`;
+}
+
+/* ========================================
+   7) COMPARTILHAR
+======================================== */
+function shareThisPage() {
+  let lang = document.documentElement.getAttribute("lang") || "pt";
+  let shareTextPT = "Essas histórias me impactaram profundamente e eu quis compartilhar com você. Leia e veja como Deus está transformando vidas! 🙌✨";
+  let shareTextEN = "These stories had a profound impact on me, and I wanted to share them with you. Read and see how God is transforming lives! 🙌✨";
+
+  let finalText = (lang === "pt") ? shareTextPT : shareTextEN;
+  let pageUrl = window.location.href;
+
+  if (navigator.share) {
+    navigator.share({
+      title: document.title,
+      text: finalText,
+      url: pageUrl
+    }).catch(console.error);
+  } else {
+    alert(finalText + "\n\n" + pageUrl);
+  }
+}
+
+/* ========================================
+   8) INICIALIZAR
+======================================== */
+window.addEventListener("DOMContentLoaded", async () => {
+  setLanguage("pt"); // se quiser iniciar em PT
+  await renderHistorias();
+});
+</script>
+</body>
+</html>

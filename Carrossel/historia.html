@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>História Completa</title>
+  <link rel="stylesheet" href="css/estilo.css" />
+  <script src="js/translations.js"></script>
+</head>
+<body>
+<header>
+  <nav class="menu">
+    <a href="index.html" id="nav-inicio">Início</a>
+    <a href="impacto.html" id="nav-historias-impacto">Histórias</a>
+    <a href="#" onclick="setLanguage('pt')" id="lang-pt">PT</a>
+    <a href="#" onclick="setLanguage('en')" id="lang-en" class="inactive">EN</a>
+  </nav>
+</header>
+
+<div class="historia-container">
+  <img id="historia-img" src="imagens/placeholder.jpg" alt="Imagem da História" />
+  <h1 class="titulo-historia" id="titulo-historia">Carregando título...</h1>
+  <div class="texto-historia" id="texto-historia">Carregando texto completo...</div>
+
+  <div class="botoes-acao">
+    <button id="btn-compartilhar-historia" onclick="shareThisStory()">
+      Compartilhe esta história
+    </button>
+    <a href="impacto.html" id="btn-voltar-lista">Voltar para Histórias</a>
+  </div>
+</div>
+
+<footer>
+  <p>© 2025 Fundação Hannah. Todos os direitos reservados.</p>
+</footer>
+
+<script>
+function setLanguage(lang) {
+  changeLanguage(lang);
+  if(lang === 'pt') {
+    document.getElementById('lang-pt').classList.remove('inactive');
+    document.getElementById('lang-en').classList.add('inactive');
+  } else {
+    document.getElementById('lang-pt').classList.add('inactive');
+    document.getElementById('lang-en').classList.remove('inactive');
+  }
+}
+
+const translations = {
+  "nav-inicio": { pt: "Início", en: "Home" },
+  "nav-historias-impacto": { pt: "Histórias", en: "Stories" },
+  "btn-compartilhar-historia": { pt: "Compartilhe esta história", en: "Share this story" },
+  "btn-voltar-lista": { pt: "Voltar para Histórias", en: "Back to Stories" }
+};
+
+function changeLanguage(lang) {
+  document.documentElement.setAttribute("lang", lang);
+  for (let key in translations) {
+    let el = document.getElementById(key);
+    if (el) el.innerHTML = translations[key][lang];
+  }
+}
+
+/* ======================================
+   1) PEGAR ?id= da URL
+====================================== */
+function getQueryParam(param) {
+  const urlParams = new URLSearchParams(window.location.search);
+  return urlParams.get(param);
+}
+const historiaId = getQueryParam("id");
+
+/* ======================================
+   2) BUSCAR E PARSEAR .TXT
+====================================== */
+async function carregarHistoria(id) {
+  let url = `impacto/${id}/${id}.txt`;
+  try {
+    const resp = await fetch(url);
+    const text = await resp.text();
+    const lang = document.documentElement.getAttribute("lang") || "pt";
+    
+    // Precisamos pegar o bloco # PT e o bloco # EN
+    // E extrair TÍTULO/TEXTO/IMAGEM
+    let [ptBlock, enBlock] = separarBlocos(text);
+
+    let dataPT = parseBlocoLongo(ptBlock, "PT");
+    let dataEN = parseBlocoLongo(enBlock, "EN");
+
+    // Se quiser, também podemos extrair os metadados se precisar exibir
+    // (Mas aqui estamos focando no texto completo.)
+    
+    if (lang === "pt") {
+      document.getElementById("titulo-historia").innerText = dataPT.titulo || "Sem título (PT)";
+      document.getElementById("texto-historia").innerText = dataPT.texto || "Sem texto (PT)";
+      if (dataPT.imagem) {
+        document.getElementById("historia-img").src = `impacto/${id}/${dataPT.imagem}`;
+      }
+    } else {
+      document.getElementById("titulo-historia").innerText = dataEN.titulo || "No title (EN)";
+      document.getElementById("texto-historia").innerText = dataEN.texto || "No text (EN)";
+      if (dataEN.imagem) {
+        document.getElementById("historia-img").src = `impacto/${id}/${dataEN.imagem}`;
+      }
+    }
+  } catch (err) {
+    document.getElementById("titulo-historia").innerText = "Erro ao carregar história";
+    console.error(err);
+  }
+}
+
+/* ======================================
+   3) SEPARAR BLOCOS # PT e # EN
+====================================== */
+function separarBlocos(conteudo) {
+  // Vamos dividir em "# PT" e "# EN"
+  // Mas note que antes de # PT pode haver metadados
+  // Então, idealmente, a gente acha a substring "# PT" e "# EN"
+  // e separa. Exemplo simples:
+  let indicePt = conteudo.indexOf("# PT");
+  let indiceEn = conteudo.indexOf("# EN");
+
+  if (indicePt === -1) return ["", ""];
+  if (indiceEn === -1) indiceEn = conteudo.length;
+
+  let ptBlock = conteudo.substring(indicePt, indiceEn);
+  let enBlock = conteudo.substring(indiceEn);
+
+  return [ptBlock, enBlock];
+}
+
+/* ======================================
+   4) PARSE DO BLOCO LONGO
+   Ex: # PT
+       TÍTULO: ...
+       TEXTO:
+       ...
+       IMAGEM: ...
+====================================== */
+function parseBlocoLongo(bloco, langTag) {
+  let data = { titulo: "", texto: "", imagem: "" };
+
+  let lines = bloco.split("\n");
+  let isReadingText = false; // se estiver lendo após "TEXTO:" (múltiplas linhas)
+
+  for (let line of lines) {
+    let trimmed = line.trim();
+    if (trimmed.startsWith("# PT") || trimmed.startsWith("# EN")) {
+      continue; // ignora linha do marcador
+    }
+    if (trimmed.startsWith("TÍTULO:") || trimmed.startsWith("TITLE:")) {
+      data.titulo = trimmed.split(":")[1].trim();
+      isReadingText = false;
+    } else if (trimmed.startsWith("TEXTO:") || trimmed.startsWith("TEXT:")) {
+      // pode começar o texto (multi-linha)
+      isReadingText = true;
+      // Se houver algo depois de "TEXTO:" na mesma linha, concatena
+      let partial = trimmed.replace("TEXTO:", "").replace("TEXT:", "").trim();
+      data.texto += partial + "\n";
+    } else if (trimmed.startsWith("IMAGEM:") || trimmed.startsWith("IMAGE:")) {
+      data.imagem = trimmed.split(":")[1].trim();
+      isReadingText = false;
+    } else {
+      // se isReadingText = true, essas linhas pertencem ao texto
+      if (isReadingText) {
+        data.texto += trimmed + "\n";
+      }
+    }
+  }
+
+  return data;
+}
+
+/* ======================================
+   5) COMPARTILHAR HISTÓRIA
+====================================== */
+function shareThisStory() {
+  let lang = document.documentElement.getAttribute("lang") || "pt";
+  let textPT = "Essa história me impactou e eu quis compartilhar com você. Leia como Deus transformou essa vida! 🙌✨";
+  let textEN = "This story touched me deeply, and I wanted to share it with you. Read how God transformed this life! 🙌✨";
+
+  let shareText = (lang === "pt") ? textPT : textEN;
+  let storyUrl = window.location.href;
+
+  if (navigator.share) {
+    navigator.share({
+      title: document.title,
+      text: shareText,
+      url: storyUrl
+    }).catch(console.error);
+  } else {
+    alert(shareText + "\n\n" + storyUrl);
+  }
+}
+
+/* ======================================
+   6) AO CARREGAR
+====================================== */
+window.addEventListener("DOMContentLoaded", () => {
+  setLanguage("pt");
+  if (historiaId) {
+    carregarHistoria(historiaId);
+  }
+});
+</script>
+</body>
+</html>
