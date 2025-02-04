@@ -122,7 +122,7 @@ function loadConversationDetails(level, unit) {
     }
 }
 
-// Valida e limpa o histórico de mensagens para não passar de 20
+// Valida e limpa o histórico de mensagens para não passar de 10
 function validateAndTrimHistory(userId) {
     if (!Array.isArray(conversations[userId])) {
         conversations[userId] = [];
@@ -132,8 +132,8 @@ function validateAndTrimHistory(userId) {
         return message && typeof message.role === 'string' && typeof message.content === 'string';
     });
 
-    if (conversations[userId].length > 20) {
-        conversations[userId] = conversations[userId].slice(-20);
+    if (conversations[userId].length > 10) {
+        conversations[userId] = conversations[userId].slice(-10);
     }
 }
 
@@ -314,7 +314,8 @@ app.post('/api/tts', async (req, res) => {
             input: { text },
             voice: {
                 languageCode: 'en-US',
-                ssmlGender: 'NEUTRAL' 
+                name: 'en-US-Standard-J', // Define a voz específica
+                ssmlGender: 'MALE' // 'J' é uma voz masculina
             },
             audioConfig: {
                 audioEncoding: 'MP3',
