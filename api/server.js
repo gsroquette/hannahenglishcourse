@@ -122,7 +122,7 @@ function loadConversationDetails(level, unit) {
     }
 }
 
-// Valida e limpa o histórico de mensagens para não passar de 10
+// Valida e limpa o histórico de mensagens para não passar de 20
 function validateAndTrimHistory(userId) {
     if (!Array.isArray(conversations[userId])) {
         conversations[userId] = [];
@@ -132,8 +132,8 @@ function validateAndTrimHistory(userId) {
         return message && typeof message.role === 'string' && typeof message.content === 'string';
     });
 
-    if (conversations[userId].length > 10) {
-        conversations[userId] = conversations[userId].slice(-10);
+    if (conversations[userId].length > 20) {
+        conversations[userId] = conversations[userId].slice(-20);
     }
 }
 
