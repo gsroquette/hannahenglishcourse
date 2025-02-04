@@ -230,21 +230,21 @@
                 resetStaticTimer();
                 speakButton.classList.add("listening");
                 speakButton.innerText = "Listening...";
-                console.log("User is speaking...");
+                console.log("[index.html] Reconhecimento de voz iniciado (user está falando).");
             };
 
             recognition.onend = () => {
                 isSpeaking = false;
                 speakButton.classList.remove("listening");
                 speakButton.innerText = "Press to Speak";
-                console.log("User finished speaking.");
+                console.log("[index.html] Reconhecimento de voz finalizado (user parou de falar).");
             };
 
             recognition.onresult = async (event) => {
                 const userSpeech = event.results[0][0].transcript;
                 messageElement.style.visibility = "visible";
                 messageElement.innerText = `You said: "${userSpeech}"`;
-                console.log("User speech:", userSpeech);
+                console.log("[index.html] Texto reconhecido pelo STT:", userSpeech);
 
                 if (!userId) {
                     alert("User ID is missing. Please log in again.");
@@ -252,15 +252,17 @@
                 }
 
                 try {
+                    console.log("[index.html] Enviando mensagem do usuário para /api/chat...");
                     const response = await fetch('/api/chat', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ uid: userId, message: userSpeech, chatHistory }),
                     });
+                    console.log("[index.html] Resposta do /api/chat recebida. Processando...");
                     const data = await response.json();
 
                     if (!data.response) {
-                        console.error("Error: Missing response from AI.");
+                        console.error("[index.html] Erro: 'response' não retornou da IA.");
                         return;
                     }
 
@@ -268,9 +270,10 @@
                     messageElement.innerText = data.response;
 
                     // Chamamos a função para falar usando Google Cloud TTS
+                    console.log("[index.html] Chamando speakUsingGoogleTTS com:", data.response);
                     speakUsingGoogleTTS(data.response);
                 } catch (error) {
-                    console.error("Error communicating with the server:", error);
+                    console.error("[index.html] Erro ao se comunicar com o servidor em /api/chat:", error);
                     messageElement.innerText = "Error communicating with the server.";
                 }
             };
@@ -290,7 +293,7 @@
                     messageElement.innerText = `An error occurred: ${event.error}`;
                 }
                 messageElement.style.visibility = 'visible';
-                console.error("Speech recognition error:", event.error);
+                console.error("[index.html] Erro no reconhecimento de voz:", event.error);
             };
         }
 
@@ -301,6 +304,7 @@
             try {
                 // Captura dinamicamente o valor do seletor de velocidade
                 const playbackSpeed = parseFloat(speedSlider.value) || 1.0;
+                console.log("[index.html] Enviando texto para /api/tts:", text, "com playbackSpeed:", playbackSpeed);
 
                 // Envia texto + playbackSpeed para o endpoint TTS
                 const resp = await fetch('/api/tts', {
@@ -310,18 +314,20 @@
                 });
 
                 if (!resp.ok) {
-                    console.error("Erro ao obter resposta do servidor TTS.");
+                    console.error("[index.html] Resposta não-OK do servidor TTS:", resp.status, resp.statusText);
                     return;
                 }
 
+                console.log("[index.html] Resposta OK do servidor TTS. Convertendo para JSON...");
                 const data = await resp.json();
                 const audioBase64 = data.audioContent;
                 if (!audioBase64) {
-                    console.error("Conteúdo de áudio vazio ou inválido.");
+                    console.error("[index.html] Conteúdo de áudio vazio ou inválido (audioBase64).");
                     return;
                 }
 
                 // Converte base64 em Blob e cria URL para reproduzir
+                console.log("[index.html] Convertendo base64 para Blob e iniciando reprodução de áudio...");
                 const audioBlob = base64ToBlob(audioBase64, 'audio/mp3');
                 const audioUrl = URL.createObjectURL(audioBlob);
 
@@ -333,6 +339,7 @@
                     robotImg.src = ROBOT_GIF;
                     speakButton.innerText = "Samuel is talking";
                     speakButton.disabled = true;
+                    console.log("[index.html] Reprodução de áudio iniciada.");
                 };
 
                 // Evento disparado ao finalizar a reprodução
@@ -341,13 +348,14 @@
                     robotImg.src = ROBOT_STATIC;
                     speakButton.innerText = "Press to Speak";
                     speakButton.disabled = false;
+                    console.log("[index.html] Reprodução de áudio finalizada.");
                 };
 
                 audio.play().catch(err => {
-                    console.error("Erro ao reproduzir áudio:", err);
+                    console.error("[index.html] Erro ao reproduzir áudio:", err);
                 });
             } catch (e) {
-                console.error("Erro TTS:", e);
+                console.error("[index.html] Erro na função speakUsingGoogleTTS:", e);
             }
         }
 
@@ -362,9 +370,9 @@
             return new Blob([byteArray], { type: contentType });
         }
 
-        // ========================================
+        // =======================================
         //   FUNÇÕES DE FALLBACK PARA TEXTO DIGITADO
-        // ========================================
+        // =======================================
         document.addEventListener("DOMContentLoaded", () => {
             const fallbackInput = document.getElementById("fallback-input");
             const userInput = document.getElementById("user-input");
@@ -377,16 +385,18 @@
                         messageElement.style.visibility = "visible";
                         messageElement.innerText = `You said: "${userMessage}"`;
                         userInput.value = "";
-                        console.log("User typed:", userMessage);
+                        console.log("[index.html] Usuário digitou via fallback:", userMessage);
 
                         // Se quiser processar via fallback, faz chamada fetch ao /api/chat:
                         if (userId) {
                             try {
+                                console.log("[index.html] Enviando mensagem do usuário (fallback) para /api/chat...");
                                 const response = await fetch('/api/chat', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ uid: userId, message: userMessage, chatHistory }),
                                 });
+                                console.log("[index.html] Resposta do /api/chat (fallback) recebida. Processando...");
                                 const data = await response.json();
 
                                 if (data.response) {
@@ -395,7 +405,7 @@
                                     speakUsingGoogleTTS(data.response);
                                 }
                             } catch (error) {
-                                console.error("Erro no fallback chat:", error);
+                                console.error("[index.html] Erro no fallback chat:", error);
                                 messageElement.innerText = "Error communicating with the server.";
                             }
                         }
@@ -411,18 +421,20 @@
             firebase.auth().onAuthStateChanged(async (user) => {
                 if (user) {
                     userId = user.uid;
-                    console.log("User authenticated. User ID:", userId);
+                    console.log("[index.html] Usuário autenticado. userId:", userId);
 
                     const urlParams = new URLSearchParams(window.location.search);
                     const level = urlParams.get('level') || 'Level1';
                     const unit = urlParams.get('unit') || 'Unit1';
 
                     try {
+                        console.log("[index.html] Chamando /api/start com UID, level e unit...");
                         const response = await fetch(`/api/start?uid=${userId}&level=${level}&unit=${unit}`);
                         if (!response.ok) throw new Error("Failed to initialize conversation.");
 
+                        console.log("[index.html] Resposta OK de /api/start. Lendo JSON...");
                         const data = await response.json();
-                        console.log("Server Response:", data);
+                        console.log("[index.html] Dados recebidos de /api/start:", data);
 
                         chatHistory = data.chatHistory || [];
                         messageElement.innerText = data.response;
@@ -439,28 +451,30 @@
                                     // Ao primeiro clique, falamos a resposta inicial do robô
                                     messageElement.style.visibility = "visible";
                                     if (data.response) {
+                                        console.log("[index.html] Primeira fala do robô (Press to Start):", data.response);
                                         speakUsingGoogleTTS(data.response);
                                     } else {
-                                        console.error("Erro: Resposta da IA ausente.");
+                                        console.error("[index.html] Erro: Resposta inicial da IA ausente.");
                                         messageElement.innerText = "No response received from the server.";
                                     }
                                     speakButton.innerText = "Press to Speak";
                                 } else {
                                     // Iniciar reconhecimento de voz
                                     if (recognition) {
+                                        console.log("[index.html] Iniciando reconhecimento de voz (click)...");
                                         recognition.start();
                                     }
                                 }
                             });
                         }
                     } catch (error) {
-                        console.error("Error initializing conversation:", error);
+                        console.error("[index.html] Erro ao inicializar conversa:", error);
                         messageElement.innerText = "An unexpected error occurred. Try again later.";
                         speakButton.disabled = true;
                         messageElement.style.visibility = "visible";
                     }
                 } else {
-                    console.warn("User is not logged in. Redirecting to login page...");
+                    console.warn("[index.html] Usuário não está logado. Redirecionando para login...");
                     messageElement.innerText = "Redirecting to login page...";
                     messageElement.style.visibility = "visible";
 
@@ -484,7 +498,7 @@
             if (document.hidden) {
                 // Se houvesse TTS nativo rodando, poderíamos parar
                 // Aqui não é mais necessário parar speechSynthesis, pois não o usamos mais.
-                console.log("Page hidden: if audio is playing, it will continue or be paused by the browser automatically.");
+                console.log("[index.html] Página ficou oculta. Se áudio estiver tocando, o navegador pode pausar automaticamente.");
             }
         });
     </script>
