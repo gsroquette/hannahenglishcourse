@@ -11,7 +11,7 @@ const client = new textToSpeech.TextToSpeechClient({
 async function generateSpeech(text) {
     const request = {
         input: { text: text }, // O que será lido
-        voice: { languageCode: 'en-US', ssmlGender: 'NEUTRAL' }, // Configuração da voz (idioma e gênero)
+        voice: { languageCode: 'en-US', ssmlGender: 'en-US-Standard-D' }, // Configuração da voz (idioma e gênero)
         audioConfig: { audioEncoding: 'MP3' }, // Tipo de áudio que será gerado
     };
 
