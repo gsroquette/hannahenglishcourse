@@ -218,7 +218,6 @@
       border-radius: 0;
       box-shadow: none;        /* sem sombra */
     }
-    /* (1) Centralizar a imagem dentro do container */
     .historia-container img {
       max-width: 100%;
       border-radius: 8px;
@@ -234,13 +233,20 @@
       font-size: 1.8rem;
       text-align: center;
     }
-    /* (2) Subtítulo/versículo bíblico */
+    /* Versículo (texto) e referência */
     .versiculo-historia {
       font-style: italic;
       font-size: 1rem;
       color: #b2916c;
       text-align: center;
-      margin: 10px 0 20px 0;
+      margin: 10px 0 0 0; /* Margem acima e abaixo */
+      white-space: pre-wrap; /* para exibir todo o conteúdo */
+    }
+    .versiculo-referencia {
+      font-weight: bold;
+      color: #b2916c;
+      text-align: center;
+      margin: 5px 0 20px 0;
     }
     /* Texto da história */
     .texto-historia {
@@ -348,7 +354,7 @@
     <ul>
       <li><a href="index.html" id="nav-inicio">Início</a></li>
       <li><a href="impacto.html" id="nav-historias-impacto">Histórias</a></li>
-      <!-- Outros links, se houver -->
+      <!-- Você pode adicionar os outros links se quiser manter idêntico ao original -->
     </ul>
   </nav>
 
@@ -384,10 +390,12 @@
 <!-- CONTEÚDO DA HISTÓRIA -->
 <div class="historia-container">
   <img id="historia-img" src="imagens/placeholder.jpg" alt="Imagem da História" />
+
   <h1 class="titulo-historia" id="titulo-historia">Carregando título...</h1>
 
-  <!-- Subtítulo/versículo bíblico -->
+  <!-- Versículo e referência -->
   <div class="versiculo-historia" id="versiculo-historia"></div>
+  <div class="versiculo-referencia" id="versiculo-numero"></div>
 
   <div class="texto-historia" id="texto-historia">Carregando texto completo...</div>
 
@@ -447,7 +455,7 @@
       let el = document.getElementById(key);
       if (el) el.innerHTML = translations[key][lang];
     }
-    // Depois de mudar o lang, recarregue a história, para exibir PT ou EN
+    // Depois de mudar o lang, recarregue a história
     if(historiaId) {
       carregarHistoria(historiaId);
     }
@@ -464,7 +472,6 @@
   /* FUNÇÃO PARA CARREGAR BLOCO COMPLETO (PT/EN) */
   async function carregarHistoria(id) {
     try {
-      // Agora buscamos "historia.txt" em vez de `${id}.txt`
       const url = `impacto/${id}/historia.txt`;
       const resp = await fetch(url);
       const text = await resp.text();
@@ -481,11 +488,13 @@
         document.getElementById('texto-historia').innerText = dataPT.texto || "Sem texto (PT)";
         document.getElementById('historia-img').src = `impacto/${id}/${dataPT.imagem || 'placeholder.jpg'}`;
         document.getElementById('versiculo-historia').innerText = dataPT.versiculo || "";
+        document.getElementById('versiculo-numero').innerText = dataPT.versiculoNumero || "";
       } else {
         document.getElementById('titulo-historia').innerText = dataEN.titulo || "No Title (EN)";
         document.getElementById('texto-historia').innerText = dataEN.texto || "No text (EN)";
         document.getElementById('historia-img').src = `impacto/${id}/${dataEN.imagem || 'placeholder.jpg'}`;
         document.getElementById('versiculo-historia').innerText = dataEN.versiculo || "";
+        document.getElementById('versiculo-numero').innerText = dataEN.versiculoNumero || "";
       }
     } catch (err) {
       document.getElementById('titulo-historia').innerText = "Erro ao carregar história";
@@ -504,30 +513,53 @@
     return [ptBlock, enBlock];
   }
 
+  // Ajuste de parsing para não cortar o versículo no primeiro ':' e incluir a referência
   function parseBlocoLongo(bloco) {
-    let data = { titulo: "", texto: "", imagem: "", versiculo: "" };
+    let data = { titulo: "", texto: "", imagem: "", versiculo: "", versiculoNumero: "" };
     let lines = bloco.split("\n");
     let isReadingText = false;
 
     for (let line of lines) {
       let trimmed = line.trim();
+
+      // Ignora marcadores de bloco
       if(trimmed.startsWith("# PT") || trimmed.startsWith("# EN")) {
         continue;
       }
+
       if(trimmed.startsWith("TÍTULO:") || trimmed.startsWith("TITLE:")) {
-        data.titulo = trimmed.split(":")[1].trim();
+        // Remove "TÍTULO:" ou "TITLE:" do início e pega o resto
+        data.titulo = trimmed.replace(/^TÍTULO:/i, "").replace(/^TITLE:/i, "").trim();
         isReadingText = false;
+
       } else if(trimmed.startsWith("TEXTO:") || trimmed.startsWith("TEXT:")) {
+        // Inicia leitura de texto (multilinha)
         isReadingText = true;
-        let partial = trimmed.replace("TEXTO:", "").replace("TEXT:", "").trim();
+        // Remove "TEXTO:" ou "TEXT:" e anexa no data.texto
+        let partial = trimmed.replace(/^TEXTO:/i, "").replace(/^TEXT:/i, "").trim();
         data.texto += partial + "\n";
+
       } else if(trimmed.startsWith("IMAGEM:") || trimmed.startsWith("IMAGE:")) {
-        data.imagem = trimmed.split(":")[1].trim();
+        data.imagem = trimmed.replace(/^IMAGEM:/i, "").replace(/^IMAGE:/i, "").trim();
         isReadingText = false;
+
       } else if(trimmed.startsWith("VERSICULO:") || trimmed.startsWith("VERSE:")) {
-        data.versiculo = trimmed.split(":")[1].trim();
+        // Verso inteiro (sem cortar no ':')
+        data.versiculo = trimmed
+          .replace(/^VERSICULO:/i, "")
+          .replace(/^VERSE:/i, "")
+          .trim();
         isReadingText = false;
+
+      } else if(trimmed.startsWith("VERSICULONUMERO:") || trimmed.startsWith("VERSENUMBER:")) {
+        data.versiculoNumero = trimmed
+          .replace(/^VERSICULONUMERO:/i, "")
+          .replace(/^VERSENUMBER:/i, "")
+          .trim();
+        isReadingText = false;
+
       } else {
+        // Linha comum. Se estamos lendo texto, concatena no texto
         if(isReadingText) {
           data.texto += trimmed + "\n";
         }
