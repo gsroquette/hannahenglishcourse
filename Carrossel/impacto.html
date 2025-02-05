@@ -315,6 +315,45 @@
       color: var(--secundaria);
     }
 
+    /* SPINNER DE CARREGAMENTO */
+    #loading-spinner {
+      display: none;
+      text-align: center;
+      margin: 20px;
+    }
+    /* Aqui apenas um spinner simples: */
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #ccc;
+      border-top-color: var(--primaria);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto;
+    }
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* BOTÃO VER MAIS */
+    #btn-ver-mais {
+      display: none;
+      background-color: var(--primaria);
+      color: #fff;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      margin: 20px auto;
+      display: block;
+    }
+    #btn-ver-mais:hover {
+      background-color: var(--secundaria);
+    }
+
     /* RESPONSIVIDADE */
     @media (max-width: 768px) {
       html {
@@ -420,7 +459,8 @@
 
     <!-- Filtros -->
     <div class="filtros-historias">
-      <button id="filtro-todas">Todas</button>
+      <!-- Observação: mudamos o texto para "Mais Recentes" -->
+      <button id="filtro-todas">Mais Recentes</button>
       <button id="filtro-criancas">Crianças</button>
       <button id="filtro-familias">Famílias</button>
       <button id="filtro-missionarios">Missionários</button>
@@ -429,10 +469,19 @@
       <button id="filtro-educacao">Educação</button>
     </div>
 
+    <!-- Spinner de Carregamento -->
+    <div id="loading-spinner">
+      <div class="spinner"></div>
+      <p>Carregando...</p>
+    </div>
+
     <!-- Grade de Histórias -->
     <div class="historias-grid" id="historias-grid">
       <!-- Cartões gerados dinamicamente via JS -->
     </div>
+
+    <!-- Botão Ver Mais -->
+    <button id="btn-ver-mais">Ver mais</button>
   </section>
 
   <!-- RODAPÉ (mesmo estilo) -->
@@ -487,9 +536,10 @@
         pt: "Compartilhe esta página",
         en: "Share this page"
       },
+      // Filtro "todas" agora se chama "Mais Recentes"
       "filtro-todas": {
-        pt: "Todas",
-        en: "All"
+        pt: "Mais Recentes",
+        en: "Most Recent"
       },
       "filtro-criancas": {
         pt: "Crianças",
@@ -526,44 +576,54 @@
         }
       }
       // Re-renderizar as histórias com o novo idioma:
-      mostrarHistorias(metadadosGlobal);
+      mostrarHistorias(filtroAtual, false); 
     }
 
-    /* VAMOS DETECTAR TODAS AS PASTAS historiaX */
-    let metadadosGlobal = [];
+    // -------------- LÓGICA PRINCIPAL -------------- //
 
-    // Ajuste aqui o número máximo de pastas que você pode ter
-    // (se você puder ter 100 histórias, coloque maxPastas=100, etc.)
+    // Variáveis globais
+    let metadadosGlobal = [];   // todas as histórias encontradas
+    let storiesPerPage = 5;     // número de cards por página
+    let currentPage = 1;        // página atual
+    let filteredStories = [];   // histórias filtradas
+    let filtroAtual = 'todas';  // guarda categoria atual (para re-render se mudar idioma)
+
+    // Para detectar pasta: historia1, historia2...
     const maxPastas = 50;
 
-    // Função que "varre" as pastas historia1, historia2, ... historia50
-    // e tenta carregar o historia.txt de cada uma. Se existir, pega os metadados.
+    // 1) Carrega TODAS as pastas
     async function carregarTodasHistorias() {
       const encontradas = [];
       for (let i = 1; i <= maxPastas; i++) {
         const pasta = `historia${i}`;
+        // Tenta buscar o arquivo
         const url = `impacto/${pasta}/historia.txt`;
         try {
           const resp = await fetch(url);
-          // Se der 404, resp.ok será false
           if (!resp.ok) {
-            continue; // não achou essa pasta, pula
+            continue; // pasta não existe ou 404
           }
           const fullText = await resp.text();
-          // faz parse dos metadados (linha por linha)
-          const info = parseMetadados(fullText, pasta);
+          const info = parseMetadados(fullText);
+          // Armazena também o 'numero da pasta' para ordenação
+          info.folderNumber = i;
+
+          // IMPORTANTE: no card, usaremos a PASTA 'historiaX',
+          // então guardamos info.folderPath = pasta
+          info.folderPath = pasta;
+
           encontradas.push(info);
         } catch (e) {
-          // em caso de erro, apenas ignora
+          // se erro, ignora
         }
       }
       return encontradas;
     }
 
-    // mesma lógica de parse do .txt que você já tinha
-    function parseMetadados(fullText, historiaId) {
+    // 2) Extrai metadados do .txt
+    function parseMetadados(fullText) {
       let info = {
-        id: historiaId,
+        id: "",
         categorias: [],
         imagemLista: "",
         tituloPT: "",
@@ -571,12 +631,11 @@
         tituloEN: "",
         resumoEN: ""
       };
-
       const lines = fullText.split("\n");
       for (let line of lines) {
         const trimmed = line.trim();
-        // Quando chega em "# PT", paramos o parse de metadados, pois
-        // dali em diante vem texto longo. Mas se preferir, pode continuar
+        // Se chegou em "# PT", paramos. 
+        // (Ou se preferir, você pode continuar lendo, mas normalmente # PT marca o início do texto longo.)
         if (trimmed.startsWith("# PT")) break;
 
         if (trimmed.startsWith("ID:")) {
@@ -599,47 +658,95 @@
       return info;
     }
 
-    // exibe os cards
-    function mostrarHistorias(lista) {
+    // 3) Mostra as histórias, mas paginando (5 por vez)
+    function mostrarHistorias(cat, resetPage = true) {
+      // cat = categoria a filtrar
+      filtroAtual = cat; // salva globalmente
+
+      // se resetPage, então volta para a primeira página
+      if (resetPage) {
+        currentPage = 1;
+      }
+
+      // Filtra
+      let lista;
+      if (cat === 'todas') {
+        // "Mais Recentes" => todas, mas ordem decrescente do folderNumber
+        lista = [...metadadosGlobal].sort((a, b) => b.folderNumber - a.folderNumber);
+      } else {
+        // Filtra pela categoria e depois ordena
+        lista = metadadosGlobal.filter(h => h.categorias.includes(cat));
+        // Por padrão, vamos manter a mesma lógica de exibir do mais recente pro mais antigo
+        lista.sort((a, b) => b.folderNumber - a.folderNumber);
+      }
+
+      filteredStories = lista;
+      renderPage(); // exibe a página atual
+    }
+
+    // 4) Renderiza a página (parte da paginação)
+    function renderPage() {
       const grid = document.getElementById("historias-grid");
       grid.innerHTML = "";
+
+      // Pega o subset de historias de filteredStories
+      const startIndex = (currentPage - 1) * storiesPerPage;
+      const endIndex = currentPage * storiesPerPage;
+      const subset = filteredStories.slice(startIndex, endIndex);
+
+      // Idioma
       const lang = document.documentElement.getAttribute("lang") || "pt";
 
-      lista.forEach(h => {
+      // Gera os cards
+      subset.forEach(h => {
         const titulo = (lang === 'pt') ? h.tituloPT : h.tituloEN;
         const resumo = (lang === 'pt') ? h.resumoPT : h.resumoEN;
+
         const card = document.createElement("div");
         card.className = "card-historia";
+        // Em vez de h.id, usamos h.folderPath para garantir a pasta correta
         card.innerHTML =
-          `<img src="impacto/${h.id}/${h.imagemLista}" alt="${titulo}">
+          `<img src="impacto/${h.folderPath}/${h.imagemLista}" alt="${titulo}">
            <div class="conteudo">
              <h3>${titulo}</h3>
              <p>${resumo}</p>
-             <button onclick="abrirHistoria('${h.id}')">
+             <button onclick="abrirHistoria('${h.folderPath}')">
                ${ (lang === 'pt') ? 'Leia Mais' : 'Read More' }
              </button>
            </div>`;
         grid.appendChild(card);
       });
-    }
 
-    // abre historia.html?id=xxx&lang=xxx
-    function abrirHistoria(historiaId) {
-      const lang = document.documentElement.getAttribute("lang");
-      window.location.href = `historia.html?id=${historiaId}&lang=${lang}`;
-    }
-
-    // filtra por categoria
-    function filtrarHistorias(cat) {
-      if (cat === 'todas') {
-        mostrarHistorias(metadadosGlobal);
+      // Verifica se tem mais páginas
+      const btnVerMais = document.getElementById("btn-ver-mais");
+      if (endIndex < filteredStories.length) {
+        // ainda tem mais pra mostrar
+        btnVerMais.style.display = "block";
       } else {
-        const filtradas = metadadosGlobal.filter(h => h.categorias.includes(cat));
-        mostrarHistorias(filtradas);
+        // não tem mais
+        btnVerMais.style.display = "none";
       }
     }
 
-    // compartilhar a página
+    // 5) Ao clicar no "Ver mais"
+    function verMais() {
+      currentPage++;
+      renderPage();
+    }
+
+    // Abre historia.html
+    function abrirHistoria(historiaPasta) {
+      const lang = document.documentElement.getAttribute("lang");
+      // Ex: historia2 => "?id=historia2&lang=pt"
+      window.location.href = `historia.html?id=${historiaPasta}&lang=${lang}`;
+    }
+
+    // Função para filtrar
+    function filtrarHistorias(cat) {
+      mostrarHistorias(cat);
+    }
+
+    // 6) Compartilhar a página
     function shareThisPage() {
       const lang = document.documentElement.getAttribute("lang") || "pt";
       const shareTextPT = "Essas histórias me impactaram profundamente e eu quis compartilhar com você. Leia e veja como Deus está transformando vidas! 🙌✨";
@@ -659,19 +766,25 @@
       }
     }
 
-    // Ao carregar a página
+    // 7) Ao carregar a página
     document.addEventListener("DOMContentLoaded", async () => {
+      // Inicialmente, mostra o spinner
+      document.getElementById("loading-spinner").style.display = "block";
+
       // Inicia com PT
       document.documentElement.setAttribute("lang","pt");
       document.getElementById('lang-pt').classList.remove('inactive');
       document.getElementById('lang-en').classList.add('inactive');
-      // Aplica traduções
       changeLanguage('pt');
 
-      // Carrega todas as historias
+      // Carrega as histórias
       metadadosGlobal = await carregarTodasHistorias();
-      // Exibe inicialmente todas
-      mostrarHistorias(metadadosGlobal);
+
+      // Oculta o spinner após carregar
+      document.getElementById("loading-spinner").style.display = "none";
+
+      // Exibe "Mais Recentes" (todas) por padrão
+      mostrarHistorias('todas');
 
       // Eventos de filtro
       document.getElementById('filtro-todas').addEventListener('click', () => filtrarHistorias('todas'));
@@ -684,6 +797,9 @@
 
       // Botão compartilhar
       document.getElementById('btn-compartilhar-pagina').addEventListener('click', shareThisPage);
+
+      // Botão ver mais
+      document.getElementById('btn-ver-mais').addEventListener('click', verMais);
     });
   </script>
 </body>
