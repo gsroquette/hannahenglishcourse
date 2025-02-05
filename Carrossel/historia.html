@@ -192,7 +192,8 @@
       padding: 20px;
       margin: 0 auto;
     }
-    #hero .hero-text h1 {
+    /* (1) Ajuste para o novo título dinâmico */
+    #hero-title {
       font-family: 'Montserrat', sans-serif;
       font-weight: 700;
       margin-bottom: 15px;
@@ -210,37 +211,54 @@
     }
 
     /* CONTEÚDO DA HISTÓRIA */
+    /* (2) Spinner de carregamento */
+    #spinner {
+      display: none; /* invisível por padrão; será exibido em JS */
+      margin: 80px auto;
+      border: 8px solid #f3f3f3;
+      border-top: 8px solid var(--primaria);
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Container inicialmente oculto para exibir somente após carregamento */
     .historia-container {
       max-width: 800px;
       margin: 30px auto;
       padding: 20px;
-      background: transparent; /* total transparência */
+      background: transparent; 
       border-radius: 0;
-      box-shadow: none;        /* sem sombra */
+      box-shadow: none;
+      display: none; /* oculto até tudo carregar */
     }
     .historia-container img {
       max-width: 100%;
       border-radius: 8px;
       margin: 20px auto;
-      display: block; /* garante centralização */
+      display: block;
     }
     /* Título principal do texto */
     .titulo-historia {
       font-family: 'Montserrat', sans-serif;
       font-weight: 700;
-      color: #b2916c; /* mesma cor do texto */
+      color: #b2916c;
       margin-bottom: 20px;
       font-size: 1.8rem;
       text-align: center;
     }
-    /* Versículo (texto) e referência */
     .versiculo-historia {
       font-style: italic;
       font-size: 1rem;
       color: #b2916c;
       text-align: center;
-      margin: 10px 0 0 0; /* Margem acima e abaixo */
-      white-space: pre-wrap; /* para exibir todo o conteúdo */
+      margin: 10px 0 0 0;
+      white-space: pre-wrap;
     }
     .versiculo-referencia {
       font-weight: bold;
@@ -248,7 +266,6 @@
       text-align: center;
       margin: 5px 0 20px 0;
     }
-    /* Texto da história */
     .texto-historia {
       margin-bottom: 20px;
       line-height: 1.6;
@@ -258,7 +275,7 @@
       word-wrap: break-word;
       hyphens: auto;
       white-space: normal;
-      text-indent: 2em; /* afastamento da margem na primeira linha */
+      text-indent: 2em;
     }
     .botoes-acao {
       display: flex;
@@ -382,13 +399,17 @@
 <!-- HERO -->
 <section id="hero">
   <div class="hero-text">
-    <h1>História Completa</h1>
+    <!-- (1) Substituir "História Completa" por algo dinâmico -->
+    <h1 id="hero-title">Histórias do Campo Missionário</h1>
     <p id="hero-subtitle">Acompanhe todos os detalhes desta história inspiradora.</p>
   </div>
 </section>
 
+<!-- SPINNER (aparece enquanto carrega) -->
+<div id="spinner"></div>
+
 <!-- CONTEÚDO DA HISTÓRIA -->
-<div class="historia-container">
+<div class="historia-container" id="historia-container">
   <img id="historia-img" src="imagens/placeholder.jpg" alt="Imagem da História" />
 
   <h1 class="titulo-historia" id="titulo-historia">Carregando título...</h1>
@@ -446,6 +467,11 @@
     "hero-subtitle": {
       pt: "Acompanhe todos os detalhes desta história inspiradora.",
       en: "Explore the full details of this inspiring story."
+    },
+    // (1) Título do hero dinâmico em duas línguas
+    "hero-title": {
+      pt: "Histórias do Campo Missionário",
+      en: "Mission Field Stories"
     }
   };
 
@@ -471,6 +497,10 @@
 
   /* FUNÇÃO PARA CARREGAR BLOCO COMPLETO (PT/EN) */
   async function carregarHistoria(id) {
+    // Exibe o spinner e esconde container
+    document.getElementById("spinner").style.display = "block";
+    document.getElementById("historia-container").style.display = "none";
+
     try {
       const url = `impacto/${id}/historia.txt`;
       const resp = await fetch(url);
@@ -483,23 +513,37 @@
       const dataPT = parseBlocoLongo(ptBlock);
       const dataEN = parseBlocoLongo(enBlock);
 
+      const img = document.getElementById('historia-img');
+
       if(lang === 'pt') {
         document.getElementById('titulo-historia').innerText = dataPT.titulo || "Sem Título (PT)";
         document.getElementById('texto-historia').innerText = dataPT.texto || "Sem texto (PT)";
-        document.getElementById('historia-img').src = `impacto/${id}/${dataPT.imagem || 'placeholder.jpg'}`;
+        img.src = `impacto/${id}/${dataPT.imagem || 'placeholder.jpg'}`;
         document.getElementById('versiculo-historia').innerText = dataPT.versiculo || "";
         document.getElementById('versiculo-numero').innerText = dataPT.versiculoNumero || "";
       } else {
         document.getElementById('titulo-historia').innerText = dataEN.titulo || "No Title (EN)";
         document.getElementById('texto-historia').innerText = dataEN.texto || "No text (EN)";
-        document.getElementById('historia-img').src = `impacto/${id}/${dataEN.imagem || 'placeholder.jpg'}`;
+        img.src = `impacto/${id}/${dataEN.imagem || 'placeholder.jpg'}`;
         document.getElementById('versiculo-historia').innerText = dataEN.versiculo || "";
         document.getElementById('versiculo-numero').innerText = dataEN.versiculoNumero || "";
       }
+
+      // Quando a imagem carrega (ou falha), ocultar spinner e mostrar container
+      img.onload = hideSpinnerShowContent;
+      img.onerror = hideSpinnerShowContent;
+
     } catch (err) {
       document.getElementById('titulo-historia').innerText = "Erro ao carregar história";
       console.error(err);
+      // Caso haja erro, oculta spinner e mostra container mesmo assim
+      hideSpinnerShowContent();
     }
+  }
+
+  function hideSpinnerShowContent() {
+    document.getElementById("spinner").style.display = "none";
+    document.getElementById("historia-container").style.display = "block";
   }
 
   function separarBlocos(conteudo) {
@@ -513,7 +557,6 @@
     return [ptBlock, enBlock];
   }
 
-  // Ajuste de parsing para não cortar o versículo no primeiro ':' e incluir a referência
   function parseBlocoLongo(bloco) {
     let data = { titulo: "", texto: "", imagem: "", versiculo: "", versiculoNumero: "" };
     let lines = bloco.split("\n");
@@ -521,45 +564,32 @@
 
     for (let line of lines) {
       let trimmed = line.trim();
-
-      // Ignora marcadores de bloco
       if(trimmed.startsWith("# PT") || trimmed.startsWith("# EN")) {
         continue;
       }
-
       if(trimmed.startsWith("TÍTULO:") || trimmed.startsWith("TITLE:")) {
-        // Remove "TÍTULO:" ou "TITLE:" do início e pega o resto
         data.titulo = trimmed.replace(/^TÍTULO:/i, "").replace(/^TITLE:/i, "").trim();
         isReadingText = false;
-
       } else if(trimmed.startsWith("TEXTO:") || trimmed.startsWith("TEXT:")) {
-        // Inicia leitura de texto (multilinha)
         isReadingText = true;
-        // Remove "TEXTO:" ou "TEXT:" e anexa no data.texto
         let partial = trimmed.replace(/^TEXTO:/i, "").replace(/^TEXT:/i, "").trim();
         data.texto += partial + "\n";
-
       } else if(trimmed.startsWith("IMAGEM:") || trimmed.startsWith("IMAGE:")) {
         data.imagem = trimmed.replace(/^IMAGEM:/i, "").replace(/^IMAGE:/i, "").trim();
         isReadingText = false;
-
       } else if(trimmed.startsWith("VERSICULO:") || trimmed.startsWith("VERSE:")) {
-        // Verso inteiro (sem cortar no ':')
         data.versiculo = trimmed
           .replace(/^VERSICULO:/i, "")
           .replace(/^VERSE:/i, "")
           .trim();
         isReadingText = false;
-
       } else if(trimmed.startsWith("VERSICULONUMERO:") || trimmed.startsWith("VERSENUMBER:")) {
         data.versiculoNumero = trimmed
           .replace(/^VERSICULONUMERO:/i, "")
           .replace(/^VERSENUMBER:/i, "")
           .trim();
         isReadingText = false;
-
       } else {
-        // Linha comum. Se estamos lendo texto, concatena no texto
         if(isReadingText) {
           data.texto += trimmed + "\n";
         }
