@@ -529,19 +529,41 @@
       mostrarHistorias(metadadosGlobal);
     }
 
-    /* ARRAY DE HISTÓRIAS (IDs) */
-    const historiasIDs = ["historia1"];
+    /* VAMOS DETECTAR TODAS AS PASTAS historiaX */
     let metadadosGlobal = [];
 
-    /* FETCH DO .TXT E PARSE DOS METADADOS */
-    async function carregarMetadadosHistoria(id) {
-      // AJUSTE: agora buscamos "historia.txt" em vez de `${id}.txt`
-      const url = `impacto/${id}/historia.txt`;
-      const response = await fetch(url);
-      const fullText = await response.text();
+    // Ajuste aqui o número máximo de pastas que você pode ter
+    // (se você puder ter 100 histórias, coloque maxPastas=100, etc.)
+    const maxPastas = 50;
 
+    // Função que "varre" as pastas historia1, historia2, ... historia50
+    // e tenta carregar o historia.txt de cada uma. Se existir, pega os metadados.
+    async function carregarTodasHistorias() {
+      const encontradas = [];
+      for (let i = 1; i <= maxPastas; i++) {
+        const pasta = `historia${i}`;
+        const url = `impacto/${pasta}/historia.txt`;
+        try {
+          const resp = await fetch(url);
+          // Se der 404, resp.ok será false
+          if (!resp.ok) {
+            continue; // não achou essa pasta, pula
+          }
+          const fullText = await resp.text();
+          // faz parse dos metadados (linha por linha)
+          const info = parseMetadados(fullText, pasta);
+          encontradas.push(info);
+        } catch (e) {
+          // em caso de erro, apenas ignora
+        }
+      }
+      return encontradas;
+    }
+
+    // mesma lógica de parse do .txt que você já tinha
+    function parseMetadados(fullText, historiaId) {
       let info = {
-        id: id,
+        id: historiaId,
         categorias: [],
         imagemLista: "",
         tituloPT: "",
@@ -553,15 +575,14 @@
       const lines = fullText.split("\n");
       for (let line of lines) {
         const trimmed = line.trim();
-        // Quando chega em "# PT", paramos o parse de metadados
+        // Quando chega em "# PT", paramos o parse de metadados, pois
+        // dali em diante vem texto longo. Mas se preferir, pode continuar
         if (trimmed.startsWith("# PT")) break;
 
         if (trimmed.startsWith("ID:")) {
           info.id = trimmed.replace("ID:", "").trim();
         } else if (trimmed.startsWith("CATEGORIAS:")) {
           let cats = trimmed.replace("CATEGORIAS:", "").trim();
-          // Se você quiser forçar tudo em minúsculo, pode usar:
-          // cats = cats.toLowerCase();
           info.categorias = cats.split(",").map(c => c.trim());
         } else if (trimmed.startsWith("IMAGEM_LISTA:")) {
           info.imagemLista = trimmed.replace("IMAGEM_LISTA:", "").trim();
@@ -578,20 +599,7 @@
       return info;
     }
 
-    /* RENDERIZAR HISTÓRIAS NO GRID */
-    async function renderHistorias() {
-      const grid = document.getElementById("historias-grid");
-      grid.innerHTML = "";
-      metadadosGlobal = [];
-
-      for (let id of historiasIDs) {
-        let dados = await carregarMetadadosHistoria(id);
-        metadadosGlobal.push(dados);
-      }
-      mostrarHistorias(metadadosGlobal);
-    }
-
-    /* MOSTRAR HISTÓRIAS (CARDS) */
+    // exibe os cards
     function mostrarHistorias(lista) {
       const grid = document.getElementById("historias-grid");
       grid.innerHTML = "";
@@ -602,38 +610,36 @@
         const resumo = (lang === 'pt') ? h.resumoPT : h.resumoEN;
         const card = document.createElement("div");
         card.className = "card-historia";
-        card.innerHTML = 
+        card.innerHTML =
           `<img src="impacto/${h.id}/${h.imagemLista}" alt="${titulo}">
-          <div class="conteudo">
-            <h3>${titulo}</h3>
-            <p>${resumo}</p>
-            <button onclick="abrirHistoria('${h.id}')">
-              ${ (lang === 'pt') ? 'Leia Mais' : 'Read More' }
-            </button>
-          </div>`;
+           <div class="conteudo">
+             <h3>${titulo}</h3>
+             <p>${resumo}</p>
+             <button onclick="abrirHistoria('${h.id}')">
+               ${ (lang === 'pt') ? 'Leia Mais' : 'Read More' }
+             </button>
+           </div>`;
         grid.appendChild(card);
       });
     }
 
-    /* ABRIR PÁGINA historia.html?id=xxx E PASSAR O IDIOMA */
+    // abre historia.html?id=xxx&lang=xxx
     function abrirHistoria(historiaId) {
       const lang = document.documentElement.getAttribute("lang");
       window.location.href = `historia.html?id=${historiaId}&lang=${lang}`;
     }
 
-    /* FILTRAR POR CATEGORIA */
+    // filtra por categoria
     function filtrarHistorias(cat) {
       if (cat === 'todas') {
         mostrarHistorias(metadadosGlobal);
       } else {
-        // Aqui precisa bater EXATAMENTE com o que está no .txt
-        // Exemplo: se no .txt estiver "criancas", "familias"...
         const filtradas = metadadosGlobal.filter(h => h.categorias.includes(cat));
         mostrarHistorias(filtradas);
       }
     }
 
-    /* COMPARTILHAR A PÁGINA */
+    // compartilhar a página
     function shareThisPage() {
       const lang = document.documentElement.getAttribute("lang") || "pt";
       const shareTextPT = "Essas histórias me impactaram profundamente e eu quis compartilhar com você. Leia e veja como Deus está transformando vidas! 🙌✨";
@@ -653,7 +659,7 @@
       }
     }
 
-    /* AO CARREGAR */
+    // Ao carregar a página
     document.addEventListener("DOMContentLoaded", async () => {
       // Inicia com PT
       document.documentElement.setAttribute("lang","pt");
@@ -662,8 +668,10 @@
       // Aplica traduções
       changeLanguage('pt');
 
-      // Renderiza histórias
-      await renderHistorias();
+      // Carrega todas as historias
+      metadadosGlobal = await carregarTodasHistorias();
+      // Exibe inicialmente todas
+      mostrarHistorias(metadadosGlobal);
 
       // Eventos de filtro
       document.getElementById('filtro-todas').addEventListener('click', () => filtrarHistorias('todas'));
