@@ -16,9 +16,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentUnit = urlPathParts[2]; // Ex: "Unit1"
 
 const activities = [
-    { id: 21, name: "Grammar2", path: `/Atividades/Grammar/index.html?level=${currentLevel}&unit=${currentUnit}&fase=21`, img: "../../imagens/botoes/grammar_button.png", unlocked: false },
-    { id: 22, name: "DataExerciciosdaGramatica2", path: `/Atividades/DataExerciciosdaGramatica2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=22`, img: "../../imagens/botoes/exercises_button.png", unlocked: false },
-    { id: 23, name: "GrammarDialogo", path: `/Atividades/Grammar/index.html?level=${currentLevel}&unit=${currentUnit}&fase=23`, img: "../../imagens/botoes/conversation_button.png", unlocked: false },
+    { id: 21, name: "Grammar2", path: `/Atividades/Grammar2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=21`, img: "../../imagens/botoes/grammar_button.png", unlocked: false },
+    { id: 22, name: "ExerciciosdaGramatica2", path: `/Atividades/ExerciciosdaGramatica2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=22`, img: "../../imagens/botoes/exercises_button.png", unlocked: false },
+    { id: 23, name: "GrammarDialogo", path: `/Atividades/GrammarDialogo/index.html?level=${currentLevel}&unit=${currentUnit}&fase=23`, img: "../../imagens/botoes/conversation_button.png", unlocked: false },
     { id: 24, name: "QUIZ2", path: `/Atividades/QUIZ2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=24`, img: "../../imagens/botoes/quiz_button.png", unlocked: false },
     { id: 25, name: "Diálogo", path: `/Atividades/Dialogo/index.html?level=${currentLevel}&unit=${currentUnit}&fase=25`, img: "../../imagens/botoes/dialogo_button.png", unlocked: false },
     { id: 26, name: "Speak", path: `/Atividades/Speak/index.html?level=${currentLevel}&unit=${currentUnit}&fase=26`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
