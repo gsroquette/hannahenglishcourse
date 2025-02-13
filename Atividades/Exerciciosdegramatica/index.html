@@ -201,16 +201,13 @@
                 margin-top: 10px;
                 margin-right: 0;
             }
-
-            /* Garantir que os elementos de texto quebrem corretamente */
             .exercise-line {
-                font-size: 1rem; /* Manter tamanho da fonte */
+                font-size: 1rem; 
                 word-break: break-word;
                 white-space: normal;
             }
-
             .free-text-span {
-                width: 100px; /* Ajuste para telas pequenas */
+                width: 100px; 
             }
         }
     </style>
@@ -260,10 +257,10 @@
     firebase.initializeApp(firebaseConfig);
 
     // Variáveis de controle
-    let checkCount = 0;        // Conta quantas vezes o aluno clicou em "Check Answers".
-    let allInputs = [];        // Guardaremos referência a todos os campos de texto e outras perguntas (objeto com input, answer e span)
-    let userData = {};         // Informações do usuário logado (para ver se é aluno e se está atrelado a professor)
-    let linesFromFile = [];    // Guardamos as linhas do arquivo exercicios.txt para gerar o PDF sem respostas
+    let checkCount = 0;        
+    let allInputs = [];        
+    let userData = {};         
+    let linesFromFile = [];    
 
     // Extrair parâmetros da URL
     function getParamsFromURL() {
@@ -291,7 +288,6 @@
     function ensureUserIsAuthenticated(callback) {
         firebase.auth().onAuthStateChanged(function (user) {
             if (user) {
-                // Carrega dados do usuário
                 loadUserData(user.uid, () => {
                     callback(user.uid);
                 });
@@ -309,15 +305,12 @@
 
         try {
             if (fase === "last") {
-                // Próxima unidade
                 const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
                 await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
             } else if (fase === "end") {
-                // Próximo nível
                 const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
                 await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
             } else {
-                // Fase intermediária
                 const nextFase = parseInt(fase, 10) + 1;
                 await dbRef.update({ 
                     [`fase${fase}`]: true,
@@ -348,7 +341,7 @@
         overlay.style.display = 'none';
     }
 
-    // Validação de navegação no botão "Back"
+    // Botão "Back"
     function goBack() {
         const { level, unit, fase } = getParamsFromURL();
         ensureUserIsAuthenticated((userId) => {
@@ -375,7 +368,7 @@
         });
     }
 
-    // Função para tocar o alarme por 4 segundos (só se role=aluno e atrelado_professor)
+    // Tocar alarme (se aluno e atrelado a professor)
     function playAlarm() {
         const audio = new Audio('alarme.mp3');
         audio.play();
@@ -385,26 +378,23 @@
         }, 4000);
     }
 
-    // Função principal para checar todas as respostas
+    // Checar todas as respostas
     function checkAllAnswers() {
         checkCount++;
-        let allCorrect = true; // Verifica se todas estão corretas
+        let allCorrect = true; 
         const wrongInputs = [];
 
-        // 1) Verificar cada item em allInputs
+        // Verificar cada item em allInputs
         allInputs.forEach(item => {
             if (item.type === 'textInput') {
-                // Campo de texto convencional
                 const userAnswer = item.input.value.trim().toLowerCase();
                 const correctAnswer = item.correctAnswer.trim().toLowerCase();
 
                 if (userAnswer === correctAnswer) {
-                    // Certo
                     item.input.classList.remove('incorrect');
                     item.input.classList.add('correct');
                     item.correctAnswerSpan.style.display = 'none';
                 } else {
-                    // Errado
                     item.input.classList.remove('correct');
                     item.input.classList.add('incorrect');
                     allCorrect = false;
@@ -412,15 +402,14 @@
                 }
             }
             else if (item.type === 'multipleChoice') {
-                // Múltipla escolha
                 const radios = item.container.querySelectorAll('input[type="radio"]');
                 let userAnswerMC = null;
                 radios.forEach(radio => {
                     if (radio.checked) {
-                        userAnswerMC = radio.value.trim();
+                        userAnswerMC = radio.value.trim().toLowerCase();
                     }
                 });
-                if (!userAnswerMC || userAnswerMC.toLowerCase() !== item.correctAnswer.toLowerCase()) {
+                if (!userAnswerMC || userAnswerMC !== item.correctAnswer.toLowerCase()) {
                     allCorrect = false;
                     wrongInputs.push(item.container);
                     item.container.style.color = 'red';
@@ -429,15 +418,14 @@
                 }
             }
             else if (item.type === 'trueFalse') {
-                // Verdadeiro/Falso
                 const radios = item.container.querySelectorAll('input[type="radio"]');
                 let userAnswerVF = null;
                 radios.forEach(radio => {
                     if (radio.checked) {
-                        userAnswerVF = radio.value.trim();
+                        userAnswerVF = radio.value.trim().toLowerCase();
                     }
                 });
-                if (!userAnswerVF || userAnswerVF.toLowerCase() !== item.correctAnswer.toLowerCase()) {
+                if (!userAnswerVF || userAnswerVF !== item.correctAnswer.toLowerCase()) {
                     allCorrect = false;
                     wrongInputs.push(item.container);
                     item.container.style.color = 'red';
@@ -446,7 +434,6 @@
                 }
             }
             else if (item.type === 'matching') {
-                // Associação de colunas
                 let mismatchFound = false;
                 item.pairs.forEach(pairObj => {
                     const userVal = pairObj.input.value.trim().toLowerCase();
@@ -466,7 +453,6 @@
                 }
             }
             else if (item.type === 'ordering') {
-                // Ordenação de sequência
                 item.orderInputs.forEach((inputObj) => {
                     const userPos = parseInt(inputObj.input.value.trim(), 10);
                     if (isNaN(userPos) || userPos !== inputObj.correctPosition) {
@@ -482,7 +468,7 @@
             }
         });
 
-        // 2) Se houver erros, verificar se usuário é "aluno" e atrelado a professor, então tocar alarme
+        // Se houver erros, verificar alarme
         if (!allCorrect) {
             if (
                 userData.role === 'aluno' &&
@@ -491,16 +477,13 @@
             ) {
                 playAlarm();
             }
-            // Scroll para o primeiro erro
             if (wrongInputs.length > 0 && wrongInputs[0].scrollIntoView) {
                 wrongInputs[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         }
 
-        // 3) Lógica de repetição/tentativas
+        // 3) Terceira tentativa => mostrar respostas
         if (checkCount === 3) {
-            // Na terceira vez: mostrar as respostas corretas nos que ainda estiverem errados para TODOS os tipos:
-
             allInputs.forEach(item => {
                 if (item.type === 'textInput') {
                     const userAnswer = item.input.value.trim().toLowerCase();
@@ -511,7 +494,6 @@
                     }
                 }
                 else if (item.type === 'multipleChoice') {
-                    // Show correct answer if userAnswer != correctAnswer
                     const radios = item.container.querySelectorAll('input[type="radio"]');
                     let userAnswerMC = null;
                     radios.forEach(radio => {
@@ -519,11 +501,12 @@
                             userAnswerMC = radio.value.trim().toLowerCase();
                         }
                     });
+                    // If still wrong, insert a line with the correct answer
                     if (!userAnswerMC || userAnswerMC !== item.correctAnswer.toLowerCase()) {
-                        if (item.correctAnswerSpan) {
-                            item.correctAnswerSpan.textContent = `Right answer: ${item.correctAnswer}`;
-                            item.correctAnswerSpan.style.display = 'inline';
-                        }
+                        item.container.insertAdjacentHTML(
+                            'beforeend',
+                            `<div class="exercise-line" style="color:blue; font-weight:bold;">Right answer: ${item.correctAnswer}</div>`
+                        );
                     }
                 }
                 else if (item.type === 'trueFalse') {
@@ -535,10 +518,10 @@
                         }
                     });
                     if (!userAnswerVF || userAnswerVF !== item.correctAnswer.toLowerCase()) {
-                        if (item.correctAnswerSpan) {
-                            item.correctAnswerSpan.textContent = `Right answer: ${item.correctAnswer}`;
-                            item.correctAnswerSpan.style.display = 'inline';
-                        }
+                        item.container.insertAdjacentHTML(
+                            'beforeend',
+                            `<div class="exercise-line" style="color:blue; font-weight:bold;">Right answer: ${item.correctAnswer}</div>`
+                        );
                     }
                 }
                 else if (item.type === 'matching') {
@@ -565,12 +548,10 @@
                     });
                 }
             });
-
-            // Concluir a atividade
             markPhaseCompleted();
             showModal();
         } else {
-            // Se não for a terceira tentativa, mas o usuário já acertou tudo, conclui a atividade
+            // Se não for a terceira tentativa, mas tudo certo, conclui
             if (allCorrect) {
                 markPhaseCompleted();
                 showModal();
@@ -578,7 +559,7 @@
         }
     }
 
-    // Carregar conteúdo do arquivo exercicios.txt
+    // Carregar exercicios.txt
     async function loadContent() {
         const { level, unit } = getParamsFromURL();
         if (!level || !unit) {
@@ -593,18 +574,17 @@
             if (!response.ok) throw new Error(`Error loading file: ${basePath}exercicios.txt`);
 
             const data = await response.text();
-            linesFromFile = data.split('\n'); // Guardamos para o PDF também
+            linesFromFile = data.split('\n'); 
 
             const exercisesDiv = document.getElementById('exercises');
             let htmlContent = '';
-            allInputs = []; // reset
+            allInputs = []; 
 
-            // Variáveis auxiliares para parsing de blocos (tabela, múltipla escolha, etc.)
             let i = 0;
             while (i < linesFromFile.length) {
                 let line = linesFromFile[i].trim();
 
-                // 1) Título
+                // #TITLE
                 if (line.startsWith('#TITLE:')) {
                     const titleText = line.replace('#TITLE:', '').trim();
                     htmlContent += `<h2 class="exercise-title">${titleText}</h2>`;
@@ -612,14 +592,14 @@
                     continue;
                 }
 
-                // 2) Se começa com "Exercise X:"
+                // "Exercise X:"
                 if (/^Exercise\s+\d+:/i.test(line)) {
                     htmlContent += `<div class="exercise-description">${line}</div>`;
                     i++;
                     continue;
                 }
 
-                // 3) Imagem (#IMG: nome_arquivo.png)
+                // #IMG
                 if (line.startsWith('#IMG:')) {
                     const imageName = line.replace('#IMG:', '').trim();
                     htmlContent += `<div class="exercise-line"><img src="${basePath}${imageName}" style="max-width:100%; height:auto;" alt="Image"></div>`;
@@ -627,7 +607,7 @@
                     continue;
                 }
 
-                // 4) Tabela (#TABLE ... #ENDTABLE)
+                // #TABLE
                 if (line.startsWith('#TABLE')) {
                     let tableRows = [];
                     i++;
@@ -645,7 +625,7 @@
                         htmlContent += `</tr>`;
                     });
                     htmlContent += `</table>`;
-                    i++;
+                    i++; // skip #ENDTABLE
                     continue;
                 }
 
@@ -663,12 +643,11 @@
                     });
                     boxHTML += `</div>`;
                     htmlContent += boxHTML;
-
-                    i++;
+                    i++; // skip #ENDBOX
                     continue;
                 }
 
-                // 5) Múltipla escolha (#MULTIPLE_CHOICE ... #END_MULTIPLE_CHOICE)
+                // #MULTIPLE_CHOICE
                 if (line.startsWith('#MULTIPLE_CHOICE:')) {
                     let questionText = line.replace('#MULTIPLE_CHOICE:', '').trim();
                     let mcHTML = `<div class="exercise-line"><strong>${questionText}</strong></div>`;
@@ -679,7 +658,6 @@
 
                     while (i < linesFromFile.length && !linesFromFile[i].trim().startsWith('#END_MULTIPLE_CHOICE')) {
                         const optLine = linesFromFile[i].trim();
-
                         if (optLine.startsWith('#CORRECT:')) {
                             correctAnswerMC = optLine.replace('#CORRECT:', '').trim();
                         } else {
@@ -687,6 +665,7 @@
                         }
                         i++;
                     }
+
                     let uniqueGroupName = `mcq_${blockStartIndex}`;
                     let containerId = `mcq_container_${blockStartIndex}`;
                     mcHTML += `<div class="choice-container" id="${containerId}">`;
@@ -703,22 +682,19 @@
                     }
                     mcHTML += `</div>`;
 
-                    // Add a span for the correct answer if needed
-                    mcHTML += `<div class="exercise-line"><span class="correct-answer-span"></span></div>`;
+                    // (Removed the extra .correct-answer-span block here)
 
                     htmlContent += mcHTML;
                     allInputs.push({
                         type: 'multipleChoice',
                         correctAnswer: correctAnswerMC || '',
-                        container: null,
-                        correctAnswerSpan: null
+                        container: null 
                     });
-
-                    i++;
+                    i++; // skip #END_MULTIPLE_CHOICE
                     continue;
                 }
 
-                // 6) Verdadeiro ou Falso (#TRUE_FALSE ... #END_TRUE_FALSE)
+                // #TRUE_FALSE
                 if (line.startsWith('#TRUE_FALSE:')) {
                     let statementText = line.replace('#TRUE_FALSE:', '').trim();
                     let vfHTML = `<div class="exercise-line"><strong>${statementText}</strong></div>`;
@@ -733,6 +709,7 @@
                         }
                         i++;
                     }
+
                     let uniqueGroupName = `vf_${blockStartIndex}`;
                     let containerId = `vf_container_${blockStartIndex}`;
                     vfHTML += `
@@ -745,20 +722,18 @@
                             </label>
                         </div>
                     `;
-                    vfHTML += `<div class="exercise-line"><span class="correct-answer-span"></span></div>`;
+                    // (Removed the extra .correct-answer-span block)
 
                     htmlContent += vfHTML;
                     allInputs.push({
                         type: 'trueFalse',
                         correctAnswer: correctAnswerVF || 'V',
-                        container: null,
-                        correctAnswerSpan: null
+                        container: null 
                     });
-
                     continue;
                 }
 
-                // 7) Associação de colunas (#MATCHING ... #END_MATCHING)
+                // #MATCHING
                 if (line.startsWith('#MATCHING:')) {
                     let matchingHTML = `<div class="exercise-line"><strong>Associação de colunas</strong></div>`;
                     let pairs = [];
@@ -774,10 +749,11 @@
                         }
                         i++;
                     }
+
                     let blockIndex = i; 
                     let containerId = `matching_container_${blockIndex}`;
                     matchingHTML += `<div id="${containerId}" class="choice-container">`;
-                    pairs.forEach((p, idx) => {
+                    pairs.forEach((p) => {
                         matchingHTML += `
                             <div class="exercise-line">
                                 <strong>${p.left}</strong> = 
@@ -805,7 +781,7 @@
                     continue;
                 }
 
-                // 8) Ordenação de sequência (#ORDERING ... #END_ORDERING)
+                // #ORDERING
                 if (line.startsWith('#ORDERING:')) {
                     let orderItems = [];
                     let correctOrder = [];
@@ -822,10 +798,11 @@
                         }
                         i++;
                     }
+
                     let blockIndex = i;
                     let containerId = `ordering_container_${blockIndex}`;
                     orderHTML += `<div id="${containerId}" class="choice-container">`;
-                    orderItems.forEach((it, idx) => {
+                    orderItems.forEach((it) => {
                         orderHTML += `
                             <div class="exercise-line">
                                 <strong>${it}</strong>
@@ -839,10 +816,10 @@
                     htmlContent += orderHTML;
 
                     let orderMap = [];
-                    for (let idx = 0; idx < orderItems.length; idx++) {
+                    for (let idx2 = 0; idx2 < orderItems.length; idx2++) {
                         orderMap.push({
-                            text: orderItems[idx],
-                            correctPosition: correctOrder[idx] || (idx + 1),
+                            text: orderItems[idx2],
+                            correctPosition: correctOrder[idx2] || (idx2 + 1),
                             input: null,
                             correctAnswerSpan: null
                         });
@@ -852,18 +829,17 @@
                         container: null,
                         orderInputs: orderMap
                     });
-
                     continue;
                 }
 
-                // 9) Se não contiver [Answer:] nem [FreeText], apenas exibe como texto normal
+                // Se não contiver [Answer:] nem [FreeText]
                 if (line && !line.includes('[Answer:') && !line.includes('[FreeText]')) {
                     htmlContent += `<div class="exercise-line">${line}</div>`;
                     i++;
                     continue;
                 }
 
-                // 10) Linhas que contêm ambos [Answer:] e [FreeText]
+                // Linhas que contêm ambos [Answer:] e [FreeText]
                 if (line.includes('[Answer:') && line.includes('[FreeText]')) {
                     let [questionPart, answerPartWithFreeText] = line.split('[Answer:');
                     const cleanAnswer = answerPartWithFreeText.split(']')[0].trim();
@@ -900,7 +876,6 @@
                             <span class="free-text-span"></span>
                         </div>
                     `;
-
                     allInputs.push({
                         type: 'textInput',
                         input: null,
@@ -911,7 +886,7 @@
                     continue;
                 }
 
-                // 11) Linhas de texto livre (não corrigidas)
+                // [FreeText] sem [Answer:]
                 if (line.includes('[FreeText]') && !line.includes('[Answer:')) {
                     let displayText = line.replace('[FreeText]', '').trim();
                     htmlContent += `
@@ -924,7 +899,7 @@
                     continue;
                 }
 
-                // 12) Quando encontramos [Answer:]
+                // [Answer:] sem [FreeText]
                 if (line.includes('[Answer:') && !line.includes('[FreeText]')) {
                     let [questionPart, answerPart] = line.split('[Answer:');
                     const cleanAnswer = answerPart.replace(']', '').trim();
@@ -966,46 +941,35 @@
                     continue;
                 }
 
-                // Caso não se encaixe em nada, apenas prossegue
                 i++;
             }
 
-            // Injeta o HTML no container
             exercisesDiv.innerHTML = htmlContent;
 
-            // Agora, precisamos mapear os elementos criados no DOM e associar com allInputs
-
-            // 1) Mapear textInput
+            // Mapear textInputs
             let textCount = 0;
+            const inputElements = exercisesDiv.querySelectorAll('.answer-input');
+            const spansAll = exercisesDiv.querySelectorAll('.correct-answer-span');
+
             for (let k = 0; k < allInputs.length; k++) {
                 if (allInputs[k].type === 'textInput') {
-                    const inputElements = exercisesDiv.querySelectorAll('.answer-input');
-                    const spans = exercisesDiv.querySelectorAll('.correct-answer-span');
                     allInputs[k].input = inputElements[textCount];
-                    allInputs[k].correctAnswerSpan = spans[textCount];
+                    allInputs[k].correctAnswerSpan = spansAll[textCount];
                     textCount++;
                 }
             }
 
-            // 2) Coletar todos os .choice-container e as spans de corrected answers
+            // Mapear multipleChoice / trueFalse / matching / ordering
             let containerIndex = 0;
             let allChoiceContainers = exercisesDiv.querySelectorAll('.choice-container');
-            let extraSpans = exercisesDiv.querySelectorAll('.exercise-line .correct-answer-span');
-            let extraSpanIndex = textCount; 
 
             for (let k = 0; k < allInputs.length; k++) {
                 if (['multipleChoice', 'trueFalse', 'matching', 'ordering'].includes(allInputs[k].type)) {
                     allInputs[k].container = allChoiceContainers[containerIndex];
-                    
-                    // multipleChoice / trueFalse have 1 "correctAnswerSpan" each
-                    if (allInputs[k].type === 'multipleChoice' || allInputs[k].type === 'trueFalse') {
-                        allInputs[k].correctAnswerSpan = extraSpans[extraSpanIndex];
-                        extraSpanIndex++;
-                    }
                     containerIndex++;
 
-                    // matching => each pair has an input + correctAnswerSpan
                     if (allInputs[k].type === 'matching') {
+                        // each pair => input + span
                         const lineDivs = allInputs[k].container.querySelectorAll('.exercise-line');
                         for (let m = 0; m < allInputs[k].pairs.length; m++) {
                             let pairObj = allInputs[k].pairs[m];
@@ -1015,9 +979,7 @@
                             pairObj.correctAnswerSpan = spanEl;
                         }
                     }
-
-                    // ordering => each item has an input + correctAnswerSpan
-                    if (allInputs[k].type === 'ordering') {
+                    else if (allInputs[k].type === 'ordering') {
                         const lineDivs = allInputs[k].container.querySelectorAll('.exercise-line');
                         for (let o = 0; o < allInputs[k].orderInputs.length; o++) {
                             let orderObj = allInputs[k].orderInputs[o];
@@ -1029,14 +991,13 @@
                     }
                 }
             }
-
         } catch (error) {
             console.error("Error loading exercises:", error);
             document.getElementById('exercises').textContent = "Exercises could not be loaded.";
         }
     }
 
-    // Função para gerar PDF (sem respostas)
+    // Gera PDF (sem respostas)
     function generatePDF() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({
@@ -1051,7 +1012,7 @@
         let marginTop = 60;
         let currentY = marginTop;
 
-        // 1) Tentar adicionar a logo
+        // Tentar adicionar logo
         try {
             const img = new Image();
             img.src = 'logo.png';
@@ -1072,7 +1033,6 @@
         }
 
         function addPDFContent() {
-            // Campos "Name" e "Date"
             doc.setFontSize(12);
             doc.text("Name: ________________________________________________", marginLeft, currentY);
             currentY += 20;
@@ -1119,7 +1079,7 @@
                     continue;
                 }
 
-                // "Exercise X:"
+                // Exercise X:
                 if (/^Exercise\s+\d+:/i.test(line)) {
                     doc.setFont(undefined, 'bold');
                     drawWrappedText([line], 0, false);
@@ -1130,7 +1090,8 @@
 
                 // #IMG
                 if (line.startsWith('#IMG:')) {
-                    drawWrappedText(["[Image: " + line.replace('#IMG:', '').trim() + "]"], 0, true);
+                    let imgLine = line.replace('#IMG:', '').trim();
+                    drawWrappedText(["[Image: " + imgLine + "]"], 0, true);
                     continue;
                 }
 
@@ -1218,13 +1179,13 @@
                     continue;
                 }
 
-                // If the line doesn't have [Answer:], print as normal
+                // Normal text if no [Answer:]
                 if (line && !line.includes('[Answer:')) {
                     drawWrappedText([line], 0, false);
                     continue;
                 }
 
-                // If it has [Answer:], replace "___" with blank
+                // If it has [Answer:], just replace the blank with underscores
                 if (line.includes('[Answer:')) {
                     let [qPart] = line.split('[Answer:');
                     qPart = qPart.replace(/\[size:.*?\]/, '').trim();
@@ -1238,13 +1199,9 @@
         }
     }
 
-    // Ao carregar a página, primeiro nos certificamos de que o usuário está autenticado
     document.addEventListener('DOMContentLoaded', () => {
         ensureUserIsAuthenticated(() => {
-            // Depois de carregar userData, carregamos o conteúdo do exercício
             loadContent();
-
-            // Após carregar o conteúdo, verificar o papel do usuário para exibir o botão "Generate PDF"
             const generatePdfBtn = document.getElementById('generate-pdf-btn');
             if (userData.role === 'professor' || userData.role === 'proprietario') {
                 generatePdfBtn.style.display = 'inline-block';
