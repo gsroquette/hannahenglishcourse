@@ -1,4 +1,4 @@
-<!DOCTYPE html>  
+<!DOCTYPE html>   
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -154,6 +154,24 @@
             background-color: #444;
         }
 
+        /* Tabelas geradas via #TABLE */
+        table {
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        table, th, td {
+            border: 1px solid #000;
+        }
+        th, td {
+            padding: 8px;
+        }
+
+        /* Múltipla escolha, V/F, etc. */
+        .choice-container {
+            margin-left: 20px;
+            margin-bottom: 10px;
+        }
+
         /* Ajustes de responsividade para telas pequenas */
         @media (max-width: 600px) {
             .container {
@@ -234,7 +252,7 @@
 
     // Variáveis de controle
     let checkCount = 0;        // Conta quantas vezes o aluno clicou em "Check Answers".
-    let allInputs = [];        // Guardaremos referência a todos os campos (objeto com input, answer e span)
+    let allInputs = [];        // Guardaremos referência a todos os campos de texto e outras perguntas (objeto com input, answer e span)
     let userData = {};         // Informações do usuário logado (para ver se é aluno e se está atrelado a professor)
     let linesFromFile = [];    // Guardamos as linhas do arquivo exercicios.txt para gerar o PDF sem respostas
 
@@ -364,22 +382,99 @@
         let allCorrect = true; // Verifica se todas estão corretas
         const wrongInputs = [];
 
-        // 1) Verificar cada input
+        // 1) Verificar cada item em allInputs
         allInputs.forEach(item => {
-            const userAnswer = item.input.value.trim().toLowerCase();
-            const correctAnswer = item.correctAnswer.trim().toLowerCase();
+            if (item.type === 'textInput') {
+                // Campo de texto convencional
+                const userAnswer = item.input.value.trim().toLowerCase();
+                const correctAnswer = item.correctAnswer.trim().toLowerCase();
 
-            if (userAnswer === correctAnswer) {
-                // Certo
-                item.input.classList.remove('incorrect');
-                item.input.classList.add('correct');
-                item.correctAnswerSpan.style.display = 'none';
-            } else {
-                // Errado
-                item.input.classList.remove('correct');
-                item.input.classList.add('incorrect');
-                allCorrect = false;
-                wrongInputs.push(item.input);
+                if (userAnswer === correctAnswer) {
+                    // Certo
+                    item.input.classList.remove('incorrect');
+                    item.input.classList.add('correct');
+                    item.correctAnswerSpan.style.display = 'none';
+                } else {
+                    // Errado
+                    item.input.classList.remove('correct');
+                    item.input.classList.add('incorrect');
+                    allCorrect = false;
+                    wrongInputs.push(item.input);
+                }
+            }
+            else if (item.type === 'multipleChoice') {
+                // Múltipla escolha
+                const radios = item.container.querySelectorAll('input[type="radio"]');
+                let userAnswerMC = null;
+                radios.forEach(radio => {
+                    if (radio.checked) {
+                        userAnswerMC = radio.value.trim();
+                    }
+                });
+                if (!userAnswerMC || userAnswerMC.toLowerCase() !== item.correctAnswer.toLowerCase()) {
+                    allCorrect = false;
+                    wrongInputs.push(item.container);
+                    // Marcar visualmente
+                    item.container.style.color = 'red';
+                } else {
+                    item.container.style.color = 'blue';
+                }
+            }
+            else if (item.type === 'trueFalse') {
+                // Verdadeiro/Falso
+                const radios = item.container.querySelectorAll('input[type="radio"]');
+                let userAnswerVF = null;
+                radios.forEach(radio => {
+                    if (radio.checked) {
+                        userAnswerVF = radio.value.trim();
+                    }
+                });
+                if (!userAnswerVF || userAnswerVF.toLowerCase() !== item.correctAnswer.toLowerCase()) {
+                    allCorrect = false;
+                    wrongInputs.push(item.container);
+                    item.container.style.color = 'red';
+                } else {
+                    item.container.style.color = 'blue';
+                }
+            }
+            else if (item.type === 'matching') {
+                // Associação de colunas
+                // Para simplificar, cada par tem um input (chave=>resposta). Precisaríamos checar cada um.
+                let mismatchFound = false;
+                item.pairs.forEach(pairObj => {
+                    const userVal = pairObj.input.value.trim().toLowerCase();
+                    const correctVal = pairObj.correct.trim().toLowerCase();
+                    if (userVal !== correctVal) {
+                        mismatchFound = true;
+                        wrongInputs.push(pairObj.input);
+                        pairObj.input.classList.remove('correct');
+                        pairObj.input.classList.add('incorrect');
+                    } else {
+                        pairObj.input.classList.remove('incorrect');
+                        pairObj.input.classList.add('correct');
+                    }
+                });
+                if (mismatchFound) {
+                    allCorrect = false;
+                }
+            }
+            else if (item.type === 'ordering') {
+                // Ordenação de sequência
+                // Supondo que cada item tem um input onde o usuário digita a posição correta
+                let userOrder = [];
+                item.orderInputs.forEach((inputObj, idx) => {
+                    const userPos = parseInt(inputObj.input.value.trim(), 10);
+                    if (isNaN(userPos) || userPos !== inputObj.correctPosition) {
+                        allCorrect = false;
+                        wrongInputs.push(inputObj.input);
+                        inputObj.input.classList.remove('correct');
+                        inputObj.input.classList.add('incorrect');
+                    } else {
+                        inputObj.input.classList.remove('incorrect');
+                        inputObj.input.classList.add('correct');
+                    }
+                    userOrder.push(userPos);
+                });
             }
         });
 
@@ -393,20 +488,22 @@
                 playAlarm();
             }
             // Scroll para o primeiro erro
-            if (wrongInputs.length > 0) {
+            if (wrongInputs.length > 0 && wrongInputs[0].scrollIntoView) {
                 wrongInputs[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         }
 
         // 3) Lógica de repetição/tentativas
         if (checkCount === 3) {
-            // Na terceira vez: mostrar as respostas corretas nos que ainda estiverem errados
+            // Na terceira vez: mostrar as respostas corretas nos que ainda estiverem errados (para campos de texto)
             allInputs.forEach(item => {
-                const userAnswer = item.input.value.trim().toLowerCase();
-                const correctAnswer = item.correctAnswer.trim().toLowerCase();
-                if (userAnswer !== correctAnswer) {
-                    item.correctAnswerSpan.textContent = `Right answer: ${item.correctAnswer}`;
-                    item.correctAnswerSpan.style.display = 'inline';
+                if (item.type === 'textInput') {
+                    const userAnswer = item.input.value.trim().toLowerCase();
+                    const correctAnswer = item.correctAnswer.trim().toLowerCase();
+                    if (userAnswer !== correctAnswer) {
+                        item.correctAnswerSpan.textContent = `Right answer: ${item.correctAnswer}`;
+                        item.correctAnswerSpan.style.display = 'inline';
+                    }
                 }
             });
             // Concluir a atividade
@@ -443,181 +540,490 @@
             let htmlContent = '';
             allInputs = []; // reset
 
-            linesFromFile.forEach((line) => {
-                let trimmedLine = line.trim();
+            // Variáveis auxiliares para parsing de blocos (tabela, múltipla escolha, etc.)
+            let i = 0;
+            while (i < linesFromFile.length) {
+                let line = linesFromFile[i].trim();
 
-                // 1) Capturar título (#TITLE: ...)
-                if (trimmedLine.startsWith('#TITLE:')) {
-                    const titleText = trimmedLine.replace('#TITLE:', '').trim();
+                // 1) Título
+                if (line.startsWith('#TITLE:')) {
+                    const titleText = line.replace('#TITLE:', '').trim();
                     htmlContent += `<h2 class="exercise-title">${titleText}</h2>`;
-                    return;
+                    i++;
+                    continue;
                 }
 
                 // 2) Se começa com "Exercise X:" -> inserir como subtítulo em negrito
-                if (/^Exercise\s+\d+:/i.test(trimmedLine)) {
-                    htmlContent += `<div class="exercise-description">${trimmedLine}</div>`;
-                    return;
+                if (/^Exercise\s+\d+:/i.test(line)) {
+                    htmlContent += `<div class="exercise-description">${line}</div>`;
+                    i++;
+                    continue;
                 }
 
-                // 3) Linhas de múltipla escolha ou explicações (A), (B), ...
-                //    Se não contiver [Answer:] nem [FreeText], apenas exibe como texto normal
-                if (trimmedLine && !trimmedLine.includes('[Answer:') && !trimmedLine.includes('[FreeText]')) {
-                    htmlContent += `<div class="exercise-line">${trimmedLine}</div>`;
-                    return;
+                // 3) Imagem (#IMG: nome_arquivo.png)
+                if (line.startsWith('#IMG:')) {
+                    const imageName = line.replace('#IMG:', '').trim();
+                    htmlContent += `<div class="exercise-line"><img src="${basePath}${imageName}" style="max-width:100%; height:auto;" alt="Image"></div>`;
+                    i++;
+                    continue;
                 }
 
-                // 4) Linhas que contêm ambos [Answer:] e [FreeText]
-                if (trimmedLine.includes('[Answer:') && trimmedLine.includes('[FreeText]')) {
-                    // Extrair partes
-                    let [questionPart, answerPartWithFreeText] = trimmedLine.split('[Answer:');
+                // 4) Tabela (#TABLE ... #ENDTABLE)
+                if (line.startsWith('#TABLE')) {
+                    let tableRows = [];
+                    i++;
+                    while (i < linesFromFile.length && !linesFromFile[i].trim().startsWith('#ENDTABLE')) {
+                        tableRows.push(linesFromFile[i].trim());
+                        i++;
+                    }
+                    // Montar HTML da tabela
+                    htmlContent += `<table>`;
+                    tableRows.forEach(row => {
+                        const cells = row.split('|').map(c => c.trim());
+                        htmlContent += `<tr>`;
+                        cells.forEach(cell => {
+                            htmlContent += `<td>${cell}</td>`;
+                        });
+                        htmlContent += `</tr>`;
+                    });
+                    htmlContent += `</table>`;
+
+                    // pular a linha #ENDTABLE
+                    i++;
+                    continue;
+                }
+
+                // 5) Múltipla escolha (#MULTIPLE_CHOICE ... #END_MULTIPLE_CHOICE)
+                if (line.startsWith('#MULTIPLE_CHOICE:')) {
+                    // Linha contém a pergunta?
+                    let questionText = line.replace('#MULTIPLE_CHOICE:', '').trim();
+                    let mcHTML = `<div class="exercise-line"><strong>${questionText}</strong></div>`;
+                    let options = [];
+                    let correctAnswerMC = null;
+                    let blockStartIndex = i;
+                    i++;
+
+                    // Ler até #END_MULTIPLE_CHOICE
+                    while (i < linesFromFile.length && !linesFromFile[i].trim().startsWith('#END_MULTIPLE_CHOICE')) {
+                        const optLine = linesFromFile[i].trim();
+
+                        // Se linha começa com "#CORRECT:", significa resposta correta
+                        if (optLine.startsWith('#CORRECT:')) {
+                            correctAnswerMC = optLine.replace('#CORRECT:', '').trim();
+                        } 
+                        else {
+                            // Presumindo que seja uma opção
+                            options.push(optLine);
+                        }
+                        i++;
+                    }
+                    // Agora temos a pergunta em questionText, as opções em options e a resposta correta em correctAnswerMC
+                    // Gerar o HTML de múltipla escolha
+                    let uniqueGroupName = `mcq_${blockStartIndex}`; // ID único para o grupo
+                    let containerId = `mcq_container_${blockStartIndex}`;
+                    mcHTML += `<div class="choice-container" id="${containerId}">`;
+                    for (let idx = 0; idx < options.length; idx++) {
+                        let optLabel = options[idx];
+                        // Exibir como radio
+                        mcHTML += `
+                            <div>
+                                <label>
+                                    <input type="radio" name="${uniqueGroupName}" value="${optLabel}">
+                                    ${optLabel}
+                                </label>
+                            </div>
+                        `;
+                    }
+                    mcHTML += `</div>`;
+
+                    htmlContent += mcHTML;
+
+                    // Adicionar ao allInputs
+                    allInputs.push({
+                        type: 'multipleChoice',
+                        correctAnswer: correctAnswerMC || '',
+                        container: null // definiremos depois
+                    });
+
+                    // pular #END_MULTIPLE_CHOICE
+                    i++;
+                    // continue
+                    continue;
+                }
+
+                // 6) Verdadeiro ou Falso (#TRUE_FALSE ... #END_TRUE_FALSE)
+                if (line.startsWith('#TRUE_FALSE:')) {
+                    let statementText = line.replace('#TRUE_FALSE:', '').trim();
+                    let vfHTML = `<div class="exercise-line"><strong>${statementText}</strong></div>`;
+                    let correctAnswerVF = null;
+                    let blockStartIndex = i;
+                    i++;
+
+                    while (i < linesFromFile.length && !linesFromFile[i].trim().startsWith('#END_TRUE_FALSE')) {
+                        const vfLine = linesFromFile[i].trim();
+                        // Se linha começa com "#CORRECT:" => guardamos a resposta (V ou F)
+                        if (vfLine.startsWith('#CORRECT:')) {
+                            correctAnswerVF = vfLine.replace('#CORRECT:', '').trim();
+                        }
+                        i++;
+                    }
+
+                    // Montar HTML
+                    let uniqueGroupName = `vf_${blockStartIndex}`;
+                    let containerId = `vf_container_${blockStartIndex}`;
+                    vfHTML += `
+                        <div class="choice-container" id="${containerId}">
+                            <label>
+                                <input type="radio" name="${uniqueGroupName}" value="V">Verdadeiro
+                            </label>
+                            <label>
+                                <input type="radio" name="${uniqueGroupName}" value="F" style="margin-left:20px;">Falso
+                            </label>
+                        </div>
+                    `;
+                    htmlContent += vfHTML;
+
+                    allInputs.push({
+                        type: 'trueFalse',
+                        correctAnswer: correctAnswerVF || 'V',
+                        container: null
+                    });
+
+                    // pular #END_TRUE_FALSE
+                    i++;
+                    continue;
+                }
+
+                // 7) Associação de colunas (#MATCHING ... #END_MATCHING)
+                if (line.startsWith('#MATCHING:')) {
+                    // Exemplo de sintaxe esperada:
+                    // #MATCHING:
+                    // Maçã = Apple
+                    // Casa = House
+                    // #END_MATCHING
+                    let matchingHTML = `<div class="exercise-line"><strong>Associação de colunas</strong></div>`;
+                    let pairs = [];
+                    i++;
+
+                    while (i < linesFromFile.length && !linesFromFile[i].trim().startsWith('#END_MATCHING')) {
+                        const matchLine = linesFromFile[i].trim();
+                        if (matchLine.includes('=')) {
+                            let [left, right] = matchLine.split('=');
+                            let leftText = (left || '').trim();
+                            let rightText = (right || '').trim();
+                            // Guardar pares
+                            pairs.push({ left: leftText, right: rightText });
+                        }
+                        i++;
+                    }
+
+                    // Montar HTML
+                    let blockIndex = i; 
+                    let containerId = `matching_container_${blockIndex}`;
+                    matchingHTML += `<div id="${containerId}" class="choice-container">`;
+                    // Exibimos cada par com input para resposta?
+                    // Ex: "Maçã => ___ (digite Apple)" 
+                    // (Você pode adaptar para dropdown, etc., mas aqui deixamos como texto)
+                    pairs.forEach((p, idx) => {
+                        matchingHTML += `
+                            <div class="exercise-line">
+                                <strong>${p.left}</strong> = 
+                                <input type="text" class="answer-input" style="width:150px;" />
+                            </div>
+                        `;
+                    });
+                    matchingHTML += `</div>`;
+
+                    htmlContent += matchingHTML;
+
+                    // Precisamos guardar as referências para check
+                    allInputs.push({
+                        type: 'matching',
+                        container: null,
+                        pairs: pairs.map(p => {
+                            return {
+                                left: p.left,
+                                correct: p.right,
+                                input: null // definiremos depois
+                            };
+                        })
+                    });
+
+                    // pular #END_MATCHING
+                    i++;
+                    continue;
+                }
+
+                // 8) Ordenação de sequência (#ORDERING ... #END_ORDERING)
+                if (line.startsWith('#ORDERING:')) {
+                    // Sintaxe exemplo:
+                    // #ORDERING:
+                    // Primeiro passo
+                    // Segundo passo
+                    // Terceiro passo
+                    // #CORRECT_ORDER: 1,2,3
+                    // #END_ORDERING
+                    let orderItems = [];
+                    let correctOrder = [];
+                    let orderHTML = `<div class="exercise-line"><strong>Ordenação de sequência</strong></div>`;
+                    i++;
+
+                    while (i < linesFromFile.length && !linesFromFile[i].trim().startsWith('#END_ORDERING')) {
+                        const orderLine = linesFromFile[i].trim();
+                        if (orderLine.startsWith('#CORRECT_ORDER:')) {
+                            // Pegamos a sequência correta, ex: "1,2,3"
+                            let seq = orderLine.replace('#CORRECT_ORDER:', '').trim();
+                            correctOrder = seq.split(',').map(s => parseInt(s.trim(), 10));
+                        }
+                        else {
+                            // Cada linha é um item
+                            orderItems.push(orderLine);
+                        }
+                        i++;
+                    }
+
+                    // Montar o HTML
+                    let blockIndex = i;
+                    let containerId = `ordering_container_${blockIndex}`;
+                    orderHTML += `<div id="${containerId}" class="choice-container">`;
+                    // Ex: exibir cada item + input para o usuário digitar a posição
+                    orderItems.forEach((it, idx) => {
+                        orderHTML += `
+                            <div class="exercise-line">
+                                <strong>${it}</strong>
+                                <input type="text" class="answer-input" style="width:50px; margin-left:10px;" placeholder="Pos"/>
+                            </div>
+                        `;
+                    });
+                    orderHTML += `</div>`;
+
+                    htmlContent += orderHTML;
+
+                    // Guardar no allInputs
+                    // correctOrder indica a posição de cada item
+                    // Ex: se correctOrder = [1,2,3], item[0] é 1, item[1] é 2, item[2] é 3
+                    let orderMap = [];
+                    for (let idx = 0; idx < orderItems.length; idx++) {
+                        orderMap.push({
+                            text: orderItems[idx],
+                            correctPosition: correctOrder[idx] || (idx + 1),
+                            input: null
+                        });
+                    }
+
+                    allInputs.push({
+                        type: 'ordering',
+                        container: null,
+                        orderInputs: orderMap
+                    });
+
+                    // pular #END_ORDERING
+                    i++;
+                    continue;
+                }
+
+                // 9) Se não contiver [Answer:] nem [FreeText], apenas exibe como texto normal
+                if (line && !line.includes('[Answer:') && !line.includes('[FreeText]')) {
+                    htmlContent += `<div class="exercise-line">${line}</div>`;
+                    i++;
+                    continue;
+                }
+
+                // 10) Linhas que contêm ambos [Answer:] e [FreeText]
+                if (line.includes('[Answer:') && line.includes('[FreeText]')) {
+                    let [questionPart, answerPartWithFreeText] = line.split('[Answer:');
                     const cleanAnswer = answerPartWithFreeText.split(']')[0].trim();
 
-                    // Verificar [size:small], [size:medium], [size:large], [size:huge], [size:essay]
-                    let inputSize = '150px'; // default
+                    // Verificar [size:...]
+                    let inputSize = '150px';
                     let useTextarea = false;
                     const sizeMatch = questionPart.match(/\[size:(.*?)\]/);
-
                     if (sizeMatch) {
                         const sizeValue = sizeMatch[1].trim();
                         if (sizeValue === 'small') inputSize = '30px';
-                        if (sizeValue === 'medium') inputSize = '150px'; 
-                        if (sizeValue === 'large') inputSize = '300px'; 
-                        if (sizeValue === 'huge') inputSize = '800px'; 
+                        if (sizeValue === 'medium') inputSize = '150px';
+                        if (sizeValue === 'large') inputSize = '300px';
+                        if (sizeValue === 'huge') inputSize = '800px';
                         if (sizeValue === 'essay') {
                             useTextarea = true;
-                            // Largura 100% + rows
                         }
                     }
-
-                    // Remover [size:..] do texto a ser exibido
                     let displayQuestion = questionPart.replace(/\[size:.*?\]/, '').trim();
 
                     if (!useTextarea) {
-                        // Substituir o "___" por input
                         displayQuestion = displayQuestion.replace('___', `<input type="text" class="answer-input" style="width:${inputSize};" />`);
                     } else {
-                        // Substituir o "___" por textarea
                         displayQuestion = displayQuestion.replace('___', `<textarea rows="4" class="answer-input" style="width:100%;"></textarea>`);
                     }
 
-                    // Adicionar o campo de resposta
                     htmlContent += `
                         <div class="exercise-line">
                             ${displayQuestion}
                             <span class="correct-answer-span"></span>
                         </div>
                     `;
-
-                    // Adicionar a linha de texto livre inline
+                    // E uma linha extra livre
                     htmlContent += `
                         <div class="exercise-line">
                             <span class="free-text-span"></span>
                         </div>
                     `;
-                    return;
+
+                    // Adicionamos ao allInputs
+                    allInputs.push({
+                        type: 'textInput',
+                        input: null,
+                        correctAnswer: cleanAnswer,
+                        correctAnswerSpan: null
+                    });
+                    i++;
+                    continue;
                 }
 
-                // 5) Linhas de texto livre (não corrigidas)
-                if (trimmedLine.includes('[FreeText]') && !trimmedLine.includes('[Answer:')) {
-                    // Remover a marcação [FreeText] do texto a ser exibido
-                    let displayText = trimmedLine.replace('[FreeText]', '').trim();
-
-                    // Renderizar o texto seguido de uma linha para digitação livre
+                // 11) Linhas de texto livre (não corrigidas)
+                if (line.includes('[FreeText]') && !line.includes('[Answer:')) {
+                    let displayText = line.replace('[FreeText]', '').trim();
                     htmlContent += `
                         <div class="exercise-line">
                             ${displayText}
                             <span class="free-text-span"></span>
                         </div>
                     `;
-                    return;
+                    i++;
+                    continue;
                 }
 
-                // 6) Quando encontramos [Answer:], tratamos como pergunta
-                if (trimmedLine.includes('[Answer:') && !trimmedLine.includes('[FreeText]')) {
-                    let [questionPart, answerPart] = trimmedLine.split('[Answer:');
+                // 12) Quando encontramos [Answer:]
+                if (line.includes('[Answer:') && !line.includes('[FreeText]')) {
+                    let [questionPart, answerPart] = line.split('[Answer:');
                     const cleanAnswer = answerPart.replace(']', '').trim();
 
-                    // Verificar [size:small], [size:medium], [size:large], [size:huge], [size:essay]
-                    let inputSize = '150px'; // default
+                    let inputSize = '150px';
                     let useTextarea = false;
                     const sizeMatch = questionPart.match(/\[size:(.*?)\]/);
-
                     if (sizeMatch) {
                         const sizeValue = sizeMatch[1].trim();
                         if (sizeValue === 'small') inputSize = '30px';
-                        if (sizeValue === 'medium') inputSize = '150px'; 
-                        if (sizeValue === 'large') inputSize = '300px'; 
-                        if (sizeValue === 'huge') inputSize = '800px'; 
+                        if (sizeValue === 'medium') inputSize = '150px';
+                        if (sizeValue === 'large') inputSize = '300px';
+                        if (sizeValue === 'huge') inputSize = '800px';
                         if (sizeValue === 'essay') {
                             useTextarea = true;
-                            // Largura 100% + rows
                         }
                     }
-
-                    // Remover [size:..] do texto a ser exibido
                     let displayQuestion = questionPart.replace(/\[size:.*?\]/, '').trim();
 
                     if (!useTextarea) {
-                        // Substituir o "___" por input
                         displayQuestion = displayQuestion.replace('___', `<input type="text" class="answer-input" style="width:${inputSize};" />`);
                     } else {
-                        // Substituir o "___" por textarea
                         displayQuestion = displayQuestion.replace('___', `<textarea rows="4" class="answer-input" style="width:100%;"></textarea>`);
                     }
 
-                    // Gera HTML com um span oculto para exibir a resposta correta quando precisar
                     htmlContent += `
                         <div class="exercise-line">
                             ${displayQuestion}
                             <span class="correct-answer-span"></span>
                         </div>
                     `;
+                    // Adicionar ao allInputs
+                    allInputs.push({
+                        type: 'textInput',
+                        input: null,
+                        correctAnswer: cleanAnswer,
+                        correctAnswerSpan: null
+                    });
+                    i++;
+                    continue;
                 }
-            });
+
+                // Caso não se encaixe em nada, apenas prossegue
+                i++;
+            }
 
             // Injeta o HTML no container
             exercisesDiv.innerHTML = htmlContent;
 
-            // Mapear todos os inputs/areas com suas respostas corretas
-            let answerIndex = 0;
-            linesFromFile.forEach((line) => {
-                if (line.includes('[Answer:') && !line.includes('[FreeText]')) {
-                    let [qPart, aPart] = line.split('[Answer:');
-                    const correctAnswer = aPart.replace(']', '').trim();
+            // Agora, precisamos mapear os elementos criados no DOM e associar com allInputs
 
-                    // Localiza o input correspondente no DOM, na ordem que aparecem
-                    const inputElement = exercisesDiv.querySelectorAll('.answer-input')[answerIndex];
-                    const spanElement = exercisesDiv.querySelectorAll('.correct-answer-span')[answerIndex];
+            // 1) Mapear todos os inputs/areas de texto para type='textInput'
+            let textInputIndex = 0;
+            linesFromFile.forEach(line => {
+                if (line.includes('[Answer:') && !line.includes('#MULTIPLE_CHOICE:') && !line.includes('#TRUE_FALSE:') && !line.includes('#MATCHING:') && !line.includes('#ORDERING:')) {
+                    // Conta quantos "textInput" a gente já adicionou
+                    // O total de .answer-input na página
+                    // Precisamos usar textInputIndex para mapear na ordem
+                    const inputElement = exercisesDiv.querySelectorAll('.answer-input')[textInputIndex];
+                    const spanElement = exercisesDiv.querySelectorAll('.correct-answer-span')[textInputIndex];
+                    textInputIndex++;
 
-                    if (inputElement && spanElement) {
-                        allInputs.push({
-                            input: inputElement,
-                            correctAnswer: correctAnswer,
-                            correctAnswerSpan: spanElement
-                        });
-                    }
-                    answerIndex++;
-                }
-
-                // Para linhas que contêm ambos [Answer:] e [FreeText], o input é seguido pela linha livre
-                if (line.includes('[Answer:') && line.includes('[FreeText]')) {
-                    let [qPart, aPartWithFreeText] = line.split('[Answer:');
-                    const correctAnswer = aPartWithFreeText.split(']')[0].trim();
-
-                    // Localiza o input correspondente no DOM, na ordem que aparecem
-                    const inputElement = exercisesDiv.querySelectorAll('.answer-input')[answerIndex];
-                    const spanElement = exercisesDiv.querySelectorAll('.correct-answer-span')[answerIndex];
-
-                    if (inputElement && spanElement) {
-                        allInputs.push({
-                            input: inputElement,
-                            correctAnswer: correctAnswer,
-                            correctAnswerSpan: spanElement
-                        });
-                    }
-                    answerIndex++;
+                    // Esse "line" pode ter [FreeText] também, mas já tratamos no push.
                 }
             });
+
+            // Mas a maneira mais fácil é iterar em allInputs e achar .type === 'textInput'
+            let allTextInputsOnPage = exercisesDiv.querySelectorAll('.answer-input');
+            let textCount = 0;
+            for (let k = 0; k < allInputs.length; k++) {
+                if (allInputs[k].type === 'textInput') {
+                    allInputs[k].input = allTextInputsOnPage[textCount];
+                    allInputs[k].correctAnswerSpan = exercisesDiv.querySelectorAll('.correct-answer-span')[textCount];
+                    textCount++;
+                }
+            }
+
+            // 2) Múltipla escolha
+            // Vamos criar uma contagem de quantos blocos multipleChoice temos
+            let mcCount = 0;
+            for (let k = 0; k < allInputs.length; k++) {
+                if (allInputs[k].type === 'multipleChoice') {
+                    // container: document.getElementById(`mcq_container_X`) - mas não sabemos X exato
+                    // faremos de forma incremental, buscando o .choice-container na ordem
+                    let containerElems = exercisesDiv.querySelectorAll('.choice-container');
+                    // Pegamos containerElems[mcCount], associamos
+                    allInputs[k].container = containerElems[mcCount];
+                    mcCount++;
+                }
+            }
+
+            // 3) Verdadeiro/Falso
+            for (let k = 0; k < allInputs.length; k++) {
+                if (allInputs[k].type === 'trueFalse') {
+                    // A sequência continua: as containers de choice-container. O multipleChoice e trueFalse compartilham a classe
+                    let containerElems = exercisesDiv.querySelectorAll('.choice-container');
+                    // mcCount já está no final do multipleChoice, então esse será containerElems[mcCount], e assim por diante
+                    allInputs[k].container = containerElems[mcCount];
+                    mcCount++;
+                }
+            }
+
+            // 4) Associação (matching)
+            let matchCount = 0;
+            for (let k = 0; k < allInputs.length; k++) {
+                if (allInputs[k].type === 'matching') {
+                    let containerElems = exercisesDiv.querySelectorAll('.choice-container');
+                    allInputs[k].container = containerElems[mcCount];
+                    // dentro dessa container, temos N inputs (um para cada par)
+                    const inputsInContainer = allInputs[k].container.querySelectorAll('.answer-input');
+                    for (let p = 0; p < allInputs[k].pairs.length; p++) {
+                        allInputs[k].pairs[p].input = inputsInContainer[p];
+                    }
+                    mcCount++;
+                    matchCount++;
+                }
+            }
+
+            // 5) Ordenação (ordering)
+            for (let k = 0; k < allInputs.length; k++) {
+                if (allInputs[k].type === 'ordering') {
+                    let containerElems = exercisesDiv.querySelectorAll('.choice-container');
+                    allInputs[k].container = containerElems[mcCount];
+                    const inputsInContainer = allInputs[k].container.querySelectorAll('.answer-input');
+                    for (let o = 0; o < allInputs[k].orderInputs.length; o++) {
+                        allInputs[k].orderInputs[o].input = inputsInContainer[o];
+                    }
+                    mcCount++;
+                }
+            }
 
         } catch (error) {
             console.error("Error loading exercises:", error);
@@ -641,12 +1047,7 @@
         let currentY = marginTop;
 
         // 1) Adicionar a logo (logo.png deve estar na mesma pasta)
-        // Tente ajustar as dimensões da imagem conforme necessário
-        // Se a imagem não for encontrada ou der erro no console, adapte o caminho.
         try {
-            // Cria uma imagem base64 para evitar problemas de carregamento
-            // Alternativamente, se estiver hospedado em algum lugar acessível, use a URL completa
-            // Aqui assumimos que "logo.png" está acessível
             const img = new Image();
             img.src = 'logo.png';
             img.onload = function() {
@@ -654,8 +1055,6 @@
                 const imgHeight = 40;
                 doc.addImage(img, "PNG", marginLeft, currentY, imgWidth, imgHeight);
                 currentY += imgHeight + 20;
-
-                // Continuar a geração após a imagem carregar
                 addPDFContent();
             };
             img.onerror = function() {
@@ -667,21 +1066,16 @@
             addPDFContent();
         }
 
-        // Função para adicionar o restante do conteúdo no PDF
         function addPDFContent() {
-            // 2) Campos para "Name" e "Date"
+            // Campos "Name" e "Date"
             doc.setFontSize(12);
             doc.text("Name: ________________________________________________", marginLeft, currentY);
             currentY += 20;
             doc.text("Date: ____________", marginLeft, currentY);
             currentY += 40;
 
-            // 3) Lê as linhas salvas em linesFromFile e imprime sem mostrar as respostas
-            //    Respeitando as quebras e adicionando linhas para o aluno responder.
-
-            // Função auxiliar para desenhar texto com quebra de linha e controle de página
             function drawWrappedText(textLines, indent = 0, extraSpaceAfter = false) {
-                const lineHeight = 14; // px
+                const lineHeight = 14;
                 const maxWidth = pageWidth - marginLeft * 2 - indent;
                 doc.setFontSize(12);
 
@@ -696,22 +1090,20 @@
                         currentY += lineHeight;
                     });
                 });
-
                 if (extraSpaceAfter) {
-                    currentY += lineHeight; // Adiciona uma linha extra
+                    currentY += lineHeight;
                 }
             }
 
-            let lastTitle = ""; // Guardar último título (para não repetir)
-
-            linesFromFile.forEach((rawLine) => {
+            let lastTitle = "";
+            for (let idx = 0; idx < linesFromFile.length; idx++) {
+                let rawLine = linesFromFile[idx];
                 let line = rawLine.trim();
 
-                // Se for título
+                // #TITLE
                 if (line.startsWith('#TITLE:')) {
                     let theTitle = line.replace('#TITLE:', '').trim();
                     lastTitle = theTitle;
-                    // Exibir como título (fonte maior)
                     doc.setFontSize(14);
                     if (currentY + 20 > pageHeight - 40) {
                         doc.addPage();
@@ -719,48 +1111,110 @@
                     }
                     doc.text(theTitle, marginLeft, currentY);
                     currentY += 25;
-                    return;
+                    continue;
                 }
 
-                // Se for "Exercise X:"
+                // "Exercise X:"
                 if (/^Exercise\s+\d+:/i.test(line)) {
-                    // Subtítulo em negrito
-                    doc.setFontSize(12);
                     doc.setFont(undefined, 'bold');
-                    drawWrappedText([line], 0, false); // Não adicionar espaço após o título
+                    drawWrappedText([line], 0, false);
                     doc.setFont(undefined, 'normal');
-                    currentY += 10; // Adicionar espaço entre o título e o conteúdo
-
-                    return;
+                    currentY += 10;
+                    continue;
                 }
 
-                // Se a linha não tiver [Answer:], imprime normal
+                // #IMG => omitimos a imagem no PDF (ou poderíamos tentar inserir, mas deixaremos sem)
+                if (line.startsWith('#IMG:')) {
+                    // Podemos colocar um placeholder ou simplesmente ignorar
+                    drawWrappedText(["[Image: " + line.replace('#IMG:', '').trim() + "]"], 0, true);
+                    continue;
+                }
+
+                // #TABLE => convertemos em texto
+                if (line.startsWith('#TABLE')) {
+                    // Lemos até #ENDTABLE
+                    idx++;
+                    let tableRows = [];
+                    while (idx < linesFromFile.length && !linesFromFile[idx].trim().startsWith('#ENDTABLE')) {
+                        tableRows.push(linesFromFile[idx].trim());
+                        idx++;
+                    }
+                    drawWrappedText(["[TABLE START]"], 0, false);
+                    tableRows.forEach(r => {
+                        drawWrappedText([r], 0, false);
+                    });
+                    drawWrappedText(["[TABLE END]"], 0, true);
+                    continue;
+                }
+
+                // #MULTIPLE_CHOICE ...
+                if (line.startsWith('#MULTIPLE_CHOICE:')) {
+                    let questionText = line.replace('#MULTIPLE_CHOICE:', '').trim();
+                    drawWrappedText(["[Multiple Choice] " + questionText], 0, true);
+                    idx++;
+                    while (idx < linesFromFile.length && !linesFromFile[idx].trim().startsWith('#END_MULTIPLE_CHOICE')) {
+                        let optLine = linesFromFile[idx].trim();
+                        drawWrappedText(["   " + optLine], 0, false);
+                        idx++;
+                    }
+                    drawWrappedText(["[End Multiple Choice]"], 0, true);
+                    continue;
+                }
+
+                // #TRUE_FALSE ...
+                if (line.startsWith('#TRUE_FALSE:')) {
+                    let statementText = line.replace('#TRUE_FALSE:', '').trim();
+                    drawWrappedText(["[True/False] " + statementText], 0, true);
+                    idx++;
+                    while (idx < linesFromFile.length && !linesFromFile[idx].trim().startsWith('#END_TRUE_FALSE')) {
+                        idx++;
+                    }
+                    drawWrappedText(["[End True/False]"], 0, true);
+                    continue;
+                }
+
+                // #MATCHING ...
+                if (line.startsWith('#MATCHING:')) {
+                    drawWrappedText(["[Matching Columns]"], 0, true);
+                    idx++;
+                    while (idx < linesFromFile.length && !linesFromFile[idx].trim().startsWith('#END_MATCHING')) {
+                        let matchLine = linesFromFile[idx].trim();
+                        drawWrappedText(["   " + matchLine], 0, false);
+                        idx++;
+                    }
+                    drawWrappedText(["[End Matching]"], 0, true);
+                    continue;
+                }
+
+                // #ORDERING ...
+                if (line.startsWith('#ORDERING:')) {
+                    drawWrappedText(["[Ordering Sequence]"], 0, true);
+                    idx++;
+                    while (idx < linesFromFile.length && !linesFromFile[idx].trim().startsWith('#END_ORDERING')) {
+                        let orderLine = linesFromFile[idx].trim();
+                        drawWrappedText(["   " + orderLine], 0, false);
+                        idx++;
+                    }
+                    drawWrappedText(["[End Ordering]"], 0, true);
+                    continue;
+                }
+
+                // Se a linha não tiver [Answer:], imprimimos normal
                 if (line && !line.includes('[Answer:')) {
                     drawWrappedText([line], 0, false);
-                    return;
+                    continue;
                 }
 
-                // Se tiver [Answer:], trocamos o input pela linha em branco
+                // Se tiver [Answer:], substituímos a lacuna
                 if (line.includes('[Answer:')) {
                     let [qPart] = line.split('[Answer:');
-                    
-                    // Remove [size:...] se existir
                     qPart = qPart.replace(/\[size:.*?\]/, '').trim();
-                    // Substituir "___" por linhas
-                    // Se quiser mais espaço, podemos colocar mais underlines
-                    const questionText = qPart.replace('___', '____________________');
-                    
-                    drawWrappedText([questionText], 0, false);
-                    currentY += 5; // Pequeno espaço após a linha
+                    let questionText = qPart.replace('___', '_______________');
+                    drawWrappedText([questionText], 0, true);
+                    continue;
                 }
+            }
 
-                // Adicionar uma linha em branco após o exercício
-                if (/^Exercise\s+\d+:/i.test(line) === false && line === '') {
-                    drawWrappedText([''], 0, true);
-                }
-            });
-
-            // Por fim, gerar o PDF para download
             doc.save(`${lastTitle || 'activity'}.pdf`);
         }
     }
