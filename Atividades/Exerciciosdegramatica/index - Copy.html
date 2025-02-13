@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html>  
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -65,29 +65,28 @@
         .exercise-line {
             margin: 10px 0;
             font-size: 1rem;
+            word-break: break-word; /* Permitir quebra de palavra */
+            white-space: normal; /* Quebra de linha normal */
         }
 
+        /* Inputs para respostas corrigidas */
         .answer-input {
             padding: 5px;
-            border: 1px solid #ccc;
+            border: 1px solid #000; /* Bordas pretas */
             border-radius: 5px;
             font-size: 1rem;
+            max-width: 150px; /* Ajuste conforme necessário */
+            box-sizing: border-box; /* Garantir que padding conte no total */
         }
 
-        /* Botão Check Answers preto, relevo, texto branco */
-        #check-all-btn {
-            background-color: black;
-            color: white;
-            border: 2px solid #333;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 1rem;
-            box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
-            margin-top: 20px;
-        }
-        #check-all-btn:hover {
-            background-color: #444;
+        /* Linhas de texto livre */
+        .free-text-span {
+            border-bottom: 1px solid #000; /* Linha contínua */
+            display: inline-block;
+            width: 200px; /* Ajuste conforme necessário */
+            margin-left: 10px;
+            vertical-align: bottom;
+            min-height: 20px; /* Espaço para digitação */
         }
 
         /* Resposta certa ou errada */
@@ -104,6 +103,23 @@
             font-weight: bold;
             margin-left: 10px;
             color: blue;
+        }
+
+        /* Botões */
+        #check-all-btn, #generate-pdf-btn {
+            background-color: black;
+            color: white;
+            border: 2px solid #333;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+            margin-top: 20px;
+            margin-right: 10px;
+        }
+        #check-all-btn:hover, #generate-pdf-btn:hover {
+            background-color: #444;
         }
 
         .modal-overlay {
@@ -137,6 +153,39 @@
         .close-modal-btn:hover {
             background-color: #444;
         }
+
+        /* Ajustes de responsividade para telas pequenas */
+        @media (max-width: 600px) {
+            .container {
+                padding: 10px;
+            }
+            h1 {
+                font-size: 1.5rem;
+            }
+            .exercise-title {
+                font-size: 1.2rem;
+            }
+            .back-button {
+                font-size: 0.9rem;
+                padding: 8px 12px;
+            }
+            #check-all-btn, #generate-pdf-btn {
+                width: 100%;
+                margin-top: 10px;
+                margin-right: 0;
+            }
+
+            /* Garantir que os elementos de texto quebrem corretamente */
+            .exercise-line {
+                font-size: 1rem; /* Manter tamanho da fonte */
+                word-break: break-word;
+                white-space: normal;
+            }
+
+            .free-text-span {
+                width: 100px; /* Ajuste para telas pequenas */
+            }
+        }
     </style>
 </head>
 <body>
@@ -149,6 +198,8 @@
 
     <!-- Botão único para checar TODAS as respostas -->
     <button id="check-all-btn" onclick="checkAllAnswers()">Check Answers</button>
+    <!-- Botão para gerar PDF, inicialmente oculto -->
+    <button id="generate-pdf-btn" onclick="generatePDF()" style="display: none;">Generate PDF</button>
 </div>
 
 <!-- Modal de conclusão -->
@@ -163,6 +214,9 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<!-- jsPDF (UMD) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <script>
     // Configuração do Firebase
@@ -182,6 +236,7 @@
     let checkCount = 0;        // Conta quantas vezes o aluno clicou em "Check Answers".
     let allInputs = [];        // Guardaremos referência a todos os campos (objeto com input, answer e span)
     let userData = {};         // Informações do usuário logado (para ver se é aluno e se está atrelado a professor)
+    let linesFromFile = [];    // Guardamos as linhas do arquivo exercicios.txt para gerar o PDF sem respostas
 
     // Extrair parâmetros da URL
     function getParamsFromURL() {
@@ -318,7 +373,6 @@
                 // Certo
                 item.input.classList.remove('incorrect');
                 item.input.classList.add('correct');
-                // Não mostra a span de resposta certa agora, pois não há erro
                 item.correctAnswerSpan.style.display = 'none';
             } else {
                 // Errado
@@ -329,7 +383,7 @@
             }
         });
 
-        // 2) Se houver erros, verificar se usuário é "aluno" e atrelado a professor, então toca o alarme
+        // 2) Se houver erros, verificar se usuário é "aluno" e atrelado a professor, então tocar alarme
         if (!allCorrect) {
             if (
                 userData.role === 'aluno' &&
@@ -351,22 +405,11 @@
                 const userAnswer = item.input.value.trim().toLowerCase();
                 const correctAnswer = item.correctAnswer.trim().toLowerCase();
                 if (userAnswer !== correctAnswer) {
-                    // Exibir a resposta correta fora do input
                     item.correctAnswerSpan.textContent = `Right answer: ${item.correctAnswer}`;
                     item.correctAnswerSpan.style.display = 'inline';
                 }
             });
-
-            // Se ainda houver erros, não mudamos o input do aluno, mas marcamos todos como "correct" visual
-            // se quiser. Pela descrição, vamos manter a cor vermelha no input para ver o erro,
-            // mas agora exibe a "Right answer" do lado. Se preferir, comentar a linha abaixo:
-            //   item.input.classList.remove('incorrect');
-            //   item.input.classList.add('correct');
-            // mas vamos deixar como está para que fique claro qual errou.  
-
-            // Concluir a atividade (se for a regra final).
-            // Mas o enunciado diz: "Na próxima vez que apertar check answers vai marcar as respostas certas em azul e as erradas em vermelho e mostrar as respostas certas ... e depois disso concluir"
-            // Então concluímos aqui
+            // Concluir a atividade
             markPhaseCompleted();
             showModal();
 
@@ -394,14 +437,14 @@
             if (!response.ok) throw new Error(`Error loading file: ${basePath}exercicios.txt`);
 
             const data = await response.text();
-            const lines = data.split('\n');
+            linesFromFile = data.split('\n'); // Guardamos para o PDF também
 
             const exercisesDiv = document.getElementById('exercises');
             let htmlContent = '';
             allInputs = []; // reset
 
-            lines.forEach((line) => {
-                const trimmedLine = line.trim();
+            linesFromFile.forEach((line) => {
+                let trimmedLine = line.trim();
 
                 // 1) Capturar título (#TITLE: ...)
                 if (trimmedLine.startsWith('#TITLE:')) {
@@ -417,19 +460,21 @@
                 }
 
                 // 3) Linhas de múltipla escolha ou explicações (A), (B), ...
-                //    Se não contiver [Answer:], apenas exibe como texto normal
-                if (trimmedLine && !trimmedLine.includes('[Answer:')) {
+                //    Se não contiver [Answer:] nem [FreeText], apenas exibe como texto normal
+                if (trimmedLine && !trimmedLine.includes('[Answer:') && !trimmedLine.includes('[FreeText]')) {
                     htmlContent += `<div class="exercise-line">${trimmedLine}</div>`;
                     return;
                 }
 
-                // 4) Quando encontramos [Answer:], tratamos como pergunta
-                if (trimmedLine.includes('[Answer:')) {
-                    const [questionPart, answerPart] = trimmedLine.split('[Answer:');
-                    const cleanAnswer = answerPart.replace(']', '').trim();
+                // 4) Linhas que contêm ambos [Answer:] e [FreeText]
+                if (trimmedLine.includes('[Answer:') && trimmedLine.includes('[FreeText]')) {
+                    // Extrair partes
+                    let [questionPart, answerPartWithFreeText] = trimmedLine.split('[Answer:');
+                    const cleanAnswer = answerPartWithFreeText.split(']')[0].trim();
 
-                    // Verificar se existe algo como ___[size:small], [size:medium], [size:large], [size:huge], [size:essay]
+                    // Verificar [size:small], [size:medium], [size:large], [size:huge], [size:essay]
                     let inputSize = '150px'; // default
+                    let useTextarea = false;
                     const sizeMatch = questionPart.match(/\[size:(.*?)\]/);
 
                     if (sizeMatch) {
@@ -438,13 +483,87 @@
                         if (sizeValue === 'medium') inputSize = '150px'; 
                         if (sizeValue === 'large') inputSize = '300px'; 
                         if (sizeValue === 'huge') inputSize = '800px'; 
-                        if (sizeValue === 'essay') inputSize = '3200px'; 
+                        if (sizeValue === 'essay') {
+                            useTextarea = true;
+                            // Largura 100% + rows
+                        }
                     }
 
                     // Remover [size:..] do texto a ser exibido
                     let displayQuestion = questionPart.replace(/\[size:.*?\]/, '').trim();
-                    // Substituir o "___" pelo input
-                    displayQuestion = displayQuestion.replace('___', `<input type="text" class="answer-input" style="width:${inputSize};" />`);
+
+                    if (!useTextarea) {
+                        // Substituir o "___" por input
+                        displayQuestion = displayQuestion.replace('___', `<input type="text" class="answer-input" style="width:${inputSize};" />`);
+                    } else {
+                        // Substituir o "___" por textarea
+                        displayQuestion = displayQuestion.replace('___', `<textarea rows="4" class="answer-input" style="width:100%;"></textarea>`);
+                    }
+
+                    // Adicionar o campo de resposta
+                    htmlContent += `
+                        <div class="exercise-line">
+                            ${displayQuestion}
+                            <span class="correct-answer-span"></span>
+                        </div>
+                    `;
+
+                    // Adicionar a linha de texto livre inline
+                    htmlContent += `
+                        <div class="exercise-line">
+                            <span class="free-text-span"></span>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // 5) Linhas de texto livre (não corrigidas)
+                if (trimmedLine.includes('[FreeText]') && !trimmedLine.includes('[Answer:')) {
+                    // Remover a marcação [FreeText] do texto a ser exibido
+                    let displayText = trimmedLine.replace('[FreeText]', '').trim();
+
+                    // Renderizar o texto seguido de uma linha para digitação livre
+                    htmlContent += `
+                        <div class="exercise-line">
+                            ${displayText}
+                            <span class="free-text-span"></span>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // 6) Quando encontramos [Answer:], tratamos como pergunta
+                if (trimmedLine.includes('[Answer:') && !trimmedLine.includes('[FreeText]')) {
+                    let [questionPart, answerPart] = trimmedLine.split('[Answer:');
+                    const cleanAnswer = answerPart.replace(']', '').trim();
+
+                    // Verificar [size:small], [size:medium], [size:large], [size:huge], [size:essay]
+                    let inputSize = '150px'; // default
+                    let useTextarea = false;
+                    const sizeMatch = questionPart.match(/\[size:(.*?)\]/);
+
+                    if (sizeMatch) {
+                        const sizeValue = sizeMatch[1].trim();
+                        if (sizeValue === 'small') inputSize = '30px';
+                        if (sizeValue === 'medium') inputSize = '150px'; 
+                        if (sizeValue === 'large') inputSize = '300px'; 
+                        if (sizeValue === 'huge') inputSize = '800px'; 
+                        if (sizeValue === 'essay') {
+                            useTextarea = true;
+                            // Largura 100% + rows
+                        }
+                    }
+
+                    // Remover [size:..] do texto a ser exibido
+                    let displayQuestion = questionPart.replace(/\[size:.*?\]/, '').trim();
+
+                    if (!useTextarea) {
+                        // Substituir o "___" por input
+                        displayQuestion = displayQuestion.replace('___', `<input type="text" class="answer-input" style="width:${inputSize};" />`);
+                    } else {
+                        // Substituir o "___" por textarea
+                        displayQuestion = displayQuestion.replace('___', `<textarea rows="4" class="answer-input" style="width:100%;"></textarea>`);
+                    }
 
                     // Gera HTML com um span oculto para exibir a resposta correta quando precisar
                     htmlContent += `
@@ -459,15 +578,34 @@
             // Injeta o HTML no container
             exercisesDiv.innerHTML = htmlContent;
 
-            // Mapear todos os inputs com suas respostas corretas
+            // Mapear todos os inputs/areas com suas respostas corretas
             let answerIndex = 0;
-            lines.forEach((line) => {
-                if (line.includes('[Answer:')) {
-                    const [qPart, aPart] = line.split('[Answer:');
+            linesFromFile.forEach((line) => {
+                if (line.includes('[Answer:') && !line.includes('[FreeText]')) {
+                    let [qPart, aPart] = line.split('[Answer:');
                     const correctAnswer = aPart.replace(']', '').trim();
 
                     // Localiza o input correspondente no DOM, na ordem que aparecem
-                    const inputElement = exercisesDiv.querySelectorAll('input.answer-input')[answerIndex];
+                    const inputElement = exercisesDiv.querySelectorAll('.answer-input')[answerIndex];
+                    const spanElement = exercisesDiv.querySelectorAll('.correct-answer-span')[answerIndex];
+
+                    if (inputElement && spanElement) {
+                        allInputs.push({
+                            input: inputElement,
+                            correctAnswer: correctAnswer,
+                            correctAnswerSpan: spanElement
+                        });
+                    }
+                    answerIndex++;
+                }
+
+                // Para linhas que contêm ambos [Answer:] e [FreeText], o input é seguido pela linha livre
+                if (line.includes('[Answer:') && line.includes('[FreeText]')) {
+                    let [qPart, aPartWithFreeText] = line.split('[Answer:');
+                    const correctAnswer = aPartWithFreeText.split(']')[0].trim();
+
+                    // Localiza o input correspondente no DOM, na ordem que aparecem
+                    const inputElement = exercisesDiv.querySelectorAll('.answer-input')[answerIndex];
                     const spanElement = exercisesDiv.querySelectorAll('.correct-answer-span')[answerIndex];
 
                     if (inputElement && spanElement) {
@@ -487,11 +625,159 @@
         }
     }
 
+    // Função para gerar PDF (sem respostas), com layout personalizado
+    function generatePDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({
+            unit: "pt",
+            format: "a4",
+            hotfixes: ["px_scaling"]
+        });
+
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        let marginLeft = 40;
+        let marginTop = 60;
+        let currentY = marginTop;
+
+        // 1) Adicionar a logo (logo.png deve estar na mesma pasta)
+        // Tente ajustar as dimensões da imagem conforme necessário
+        // Se a imagem não for encontrada ou der erro no console, adapte o caminho.
+        try {
+            // Cria uma imagem base64 para evitar problemas de carregamento
+            // Alternativamente, se estiver hospedado em algum lugar acessível, use a URL completa
+            // Aqui assumimos que "logo.png" está acessível
+            const img = new Image();
+            img.src = 'logo.png';
+            img.onload = function() {
+                const imgWidth = 80;
+                const imgHeight = 40;
+                doc.addImage(img, "PNG", marginLeft, currentY, imgWidth, imgHeight);
+                currentY += imgHeight + 20;
+
+                // Continuar a geração após a imagem carregar
+                addPDFContent();
+            };
+            img.onerror = function() {
+                console.error("Logo image not found. Skipping logo in PDF.");
+                addPDFContent();
+            };
+        } catch (error) {
+            console.error("Error loading logo image:", error);
+            addPDFContent();
+        }
+
+        // Função para adicionar o restante do conteúdo no PDF
+        function addPDFContent() {
+            // 2) Campos para "Name" e "Date"
+            doc.setFontSize(12);
+            doc.text("Name: ________________________________________________", marginLeft, currentY);
+            currentY += 20;
+            doc.text("Date: ____________", marginLeft, currentY);
+            currentY += 40;
+
+            // 3) Lê as linhas salvas em linesFromFile e imprime sem mostrar as respostas
+            //    Respeitando as quebras e adicionando linhas para o aluno responder.
+
+            // Função auxiliar para desenhar texto com quebra de linha e controle de página
+            function drawWrappedText(textLines, indent = 0, extraSpaceAfter = false) {
+                const lineHeight = 14; // px
+                const maxWidth = pageWidth - marginLeft * 2 - indent;
+                doc.setFontSize(12);
+
+                textLines.forEach((textLine) => {
+                    const wrapped = doc.splitTextToSize(textLine, maxWidth);
+                    wrapped.forEach((part) => {
+                        if (currentY + lineHeight > pageHeight - 40) {
+                            doc.addPage();
+                            currentY = marginTop;
+                        }
+                        doc.text(part, marginLeft + indent, currentY);
+                        currentY += lineHeight;
+                    });
+                });
+
+                if (extraSpaceAfter) {
+                    currentY += lineHeight; // Adiciona uma linha extra
+                }
+            }
+
+            let lastTitle = ""; // Guardar último título (para não repetir)
+
+            linesFromFile.forEach((rawLine) => {
+                let line = rawLine.trim();
+
+                // Se for título
+                if (line.startsWith('#TITLE:')) {
+                    let theTitle = line.replace('#TITLE:', '').trim();
+                    lastTitle = theTitle;
+                    // Exibir como título (fonte maior)
+                    doc.setFontSize(14);
+                    if (currentY + 20 > pageHeight - 40) {
+                        doc.addPage();
+                        currentY = marginTop;
+                    }
+                    doc.text(theTitle, marginLeft, currentY);
+                    currentY += 25;
+                    return;
+                }
+
+                // Se for "Exercise X:"
+                if (/^Exercise\s+\d+:/i.test(line)) {
+                    // Subtítulo em negrito
+                    doc.setFontSize(12);
+                    doc.setFont(undefined, 'bold');
+                    drawWrappedText([line], 0, false); // Não adicionar espaço após o título
+                    doc.setFont(undefined, 'normal');
+                    currentY += 10; // Adicionar espaço entre o título e o conteúdo
+
+                    return;
+                }
+
+                // Se a linha não tiver [Answer:], imprime normal
+                if (line && !line.includes('[Answer:')) {
+                    drawWrappedText([line], 0, false);
+                    return;
+                }
+
+                // Se tiver [Answer:], trocamos o input pela linha em branco
+                if (line.includes('[Answer:')) {
+                    let [qPart] = line.split('[Answer:');
+                    
+                    // Remove [size:...] se existir
+                    qPart = qPart.replace(/\[size:.*?\]/, '').trim();
+                    // Substituir "___" por linhas
+                    // Se quiser mais espaço, podemos colocar mais underlines
+                    const questionText = qPart.replace('___', '____________________');
+                    
+                    drawWrappedText([questionText], 0, false);
+                    currentY += 5; // Pequeno espaço após a linha
+                }
+
+                // Adicionar uma linha em branco após o exercício
+                if (/^Exercise\s+\d+:/i.test(line) === false && line === '') {
+                    drawWrappedText([''], 0, true);
+                }
+            });
+
+            // Por fim, gerar o PDF para download
+            doc.save(`${lastTitle || 'activity'}.pdf`);
+        }
+    }
+
     // Ao carregar a página, primeiro nos certificamos de que o usuário está autenticado
     document.addEventListener('DOMContentLoaded', () => {
         ensureUserIsAuthenticated(() => {
             // Depois de carregar userData, carregamos o conteúdo do exercício
             loadContent();
+
+            // Após carregar o conteúdo, verificar o papel do usuário para exibir o botão "Generate PDF"
+            const generatePdfBtn = document.getElementById('generate-pdf-btn');
+            if (userData.role === 'professor' || userData.role === 'proprietario') {
+                generatePdfBtn.style.display = 'inline-block';
+            } else {
+                generatePdfBtn.style.display = 'none';
+            }
         });
     });
 </script>
