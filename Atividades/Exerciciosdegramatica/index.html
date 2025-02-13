@@ -18,7 +18,6 @@
         .container {
             max-width: 800px;
             margin: auto;
-            /* Não usamos fundo branco nem sombra, conforme instruções */
             padding: 20px;
             border-radius: 8px;
             position: relative;
@@ -56,7 +55,6 @@
             margin-bottom: 10px;
         }
 
-        /* "Exercise 1:" etc. em negrito */
         .exercise-description {
             font-weight: bold;
             margin-bottom: 10px;
@@ -69,7 +67,6 @@
             white-space: normal; 
         }
 
-        /* Inputs para respostas corrigidas */
         .answer-input {
             padding: 5px;
             border: 1px solid #000; 
@@ -79,7 +76,6 @@
             box-sizing: border-box; 
         }
 
-        /* Linhas de texto livre */
         .free-text-span {
             border-bottom: 1px solid #000; 
             display: inline-block;
@@ -89,7 +85,6 @@
             min-height: 20px; 
         }
 
-        /* Resposta certa ou errada */
         .correct {
             color: blue; 
         }
@@ -97,7 +92,6 @@
             color: red;  
         }
 
-        /* Mostra a resposta certa ao lado (fora do input) */
         .correct-answer-span {
             display: none; 
             font-weight: bold;
@@ -105,7 +99,6 @@
             color: blue;
         }
 
-        /* Botões */
         #check-all-btn, #generate-pdf-btn {
             background-color: black;
             color: white;
@@ -154,7 +147,6 @@
             background-color: #444;
         }
 
-        /* Tabelas geradas via #TABLE */
         table {
             border-collapse: collapse;
             margin: 10px 0;
@@ -166,13 +158,11 @@
             padding: 8px;
         }
 
-        /* Múltipla escolha, V/F, etc. */
         .choice-container {
             margin-left: 20px;
             margin-bottom: 10px;
         }
 
-        /* Tabela ou box harmoniosa (#BOX) */
         .info-box {
             border: 1px solid #333;
             background-color: #f0f8ff;
@@ -181,7 +171,6 @@
             margin: 10px 0;
         }
 
-        /* Ajustes de responsividade para telas pequenas */
         @media (max-width: 600px) {
             .container {
                 padding: 10px;
@@ -220,13 +209,10 @@
 
     <div id="exercises"></div>
 
-    <!-- Botão único para checar TODAS as respostas -->
     <button id="check-all-btn" onclick="checkAllAnswers()">Check Answers</button>
-    <!-- Botão para gerar PDF, inicialmente oculto -->
     <button id="generate-pdf-btn" onclick="generatePDF()" style="display: none;">Generate PDF</button>
 </div>
 
-<!-- Modal de conclusão -->
 <div class="modal-overlay" id="completion-modal-overlay">
     <div class="modal-content" id="completion-modal-content">
         <p>Congratulations! You have completed the activity.</p>
@@ -243,7 +229,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <script>
-    // Configuração do Firebase
+    //====================================================
+    //  1) Firebase Configuration
+    //====================================================
     const firebaseConfig = {
         apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
         authDomain: "hannahenglishcourse.firebaseapp.com",
@@ -256,31 +244,17 @@
     };
     firebase.initializeApp(firebaseConfig);
 
-    let checkCount = 0;        
-    let allInputs = [];        
-    let userData = {};         
-    let linesFromFile = [];    
+    //====================================================
+    //  2) Global Variables
+    //====================================================
+    let checkCount = 0;        // how many times the user pressed "Check Answers"
+    let allInputs = [];        // array of question objects
+    let userData = {};         // user info from Firebase
+    let linesFromFile = [];    // store lines from exercicios.txt for PDF
 
-    function getParamsFromURL() {
-        const params = new URLSearchParams(window.location.search);
-        return {
-            level: params.get('level'),
-            unit: params.get('unit'),
-            fase: params.get('fase'),
-        };
-    }
-
-    async function loadUserData(userId, callback) {
-        try {
-            const snapshot = await firebase.database().ref('usuarios/' + userId).once('value');
-            userData = snapshot.val() || {};
-            callback();
-        } catch (error) {
-            console.error("Error loading user data:", error);
-            alert("Error loading user data.");
-        }
-    }
-
+    //====================================================
+    //  3) User Authentication & Data
+    //====================================================
     function ensureUserIsAuthenticated(callback) {
         firebase.auth().onAuthStateChanged(function (user) {
             if (user) {
@@ -294,6 +268,29 @@
         });
     }
 
+    async function loadUserData(userId, callback) {
+        try {
+            const snapshot = await firebase.database().ref('usuarios/' + userId).once('value');
+            userData = snapshot.val() || {};
+            callback();
+        } catch (error) {
+            console.error("Error loading user data:", error);
+            alert("Error loading user data.");
+        }
+    }
+
+    function getParamsFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        return {
+            level: params.get('level'),
+            unit: params.get('unit'),
+            fase: params.get('fase')
+        };
+    }
+
+    //====================================================
+    //  4) Phase Navigation
+    //====================================================
     async function updateNextPhase(userId) {
         const { level, unit, fase } = getParamsFromURL();
         const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
@@ -323,16 +320,6 @@
         });
     }
 
-    function showModal() {
-        const overlay = document.getElementById('completion-modal-overlay');
-        overlay.style.display = 'flex';
-    }
-
-    function closeModal() {
-        const overlay = document.getElementById('completion-modal-overlay');
-        overlay.style.display = 'none';
-    }
-
     function goBack() {
         const { level, unit, fase } = getParamsFromURL();
         ensureUserIsAuthenticated((userId) => {
@@ -359,6 +346,9 @@
         });
     }
 
+    //====================================================
+    //  5) Check Answers & Alarm
+    //====================================================
     function playAlarm() {
         const audio = new Audio('alarme.mp3');
         audio.play();
@@ -370,15 +360,15 @@
 
     function checkAllAnswers() {
         checkCount++;
-        let allCorrect = true; 
-        const wrongInputs = [];
+        let allCorrect = true;
+        let wrongInputs = [];
 
-        // Evaluate each input object
+        // For each question item
         allInputs.forEach(item => {
             if (item.type === 'textInput') {
+                // typed input
                 const userAnswer = item.input.value.trim().toLowerCase();
                 const correctAnswer = item.correctAnswer.trim().toLowerCase();
-
                 if (userAnswer === correctAnswer) {
                     item.input.classList.remove('incorrect');
                     item.input.classList.add('correct');
@@ -391,15 +381,15 @@
                 }
             }
             else if (item.type === 'multipleChoice') {
+                // we store correctAnswer as a single letter (e.g. "B")
                 const radios = item.container.querySelectorAll('input[type="radio"]');
-                let userAnswerMC = null;
+                let userChoice = null;
                 radios.forEach(radio => {
                     if (radio.checked) {
-                        userAnswerMC = radio.value.trim().toUpperCase();
+                        userChoice = radio.value.trim().toUpperCase();
                     }
                 });
-                // item.correctAnswer is a single letter in uppercase
-                if (!userAnswerMC || userAnswerMC !== item.correctAnswer.toUpperCase()) {
+                if (!userChoice || userChoice !== item.correctAnswer.toUpperCase()) {
                     allCorrect = false;
                     wrongInputs.push(item.container);
                     item.container.style.color = 'red';
@@ -409,13 +399,13 @@
             }
             else if (item.type === 'trueFalse') {
                 const radios = item.container.querySelectorAll('input[type="radio"]');
-                let userAnswerVF = null;
+                let userChoice = null;
                 radios.forEach(radio => {
                     if (radio.checked) {
-                        userAnswerVF = radio.value.trim().toUpperCase();
+                        userChoice = radio.value.trim().toUpperCase();
                     }
                 });
-                if (!userAnswerVF || userAnswerVF !== item.correctAnswer.toUpperCase()) {
+                if (!userChoice || userChoice !== item.correctAnswer.toUpperCase()) {
                     allCorrect = false;
                     wrongInputs.push(item.container);
                     item.container.style.color = 'red';
@@ -443,22 +433,22 @@
                 }
             }
             else if (item.type === 'ordering') {
-                item.orderInputs.forEach((inputObj) => {
-                    const userPos = parseInt(inputObj.input.value.trim(), 10);
-                    if (isNaN(userPos) || userPos !== inputObj.correctPosition) {
+                item.orderInputs.forEach(oItem => {
+                    const userPos = parseInt(oItem.input.value.trim(), 10);
+                    if (isNaN(userPos) || userPos !== oItem.correctPosition) {
                         allCorrect = false;
-                        wrongInputs.push(inputObj.input);
-                        inputObj.input.classList.remove('correct');
-                        inputObj.input.classList.add('incorrect');
+                        wrongInputs.push(oItem.input);
+                        oItem.input.classList.remove('correct');
+                        oItem.input.classList.add('incorrect');
                     } else {
-                        inputObj.input.classList.remove('incorrect');
-                        inputObj.input.classList.add('correct');
+                        oItem.input.classList.remove('incorrect');
+                        oItem.input.classList.add('correct');
                     }
                 });
             }
         });
 
-        // If there are mistakes, maybe play alarm
+        // If mistakes => maybe alarm
         if (!allCorrect) {
             if (userData.role === 'aluno' &&
                 userData.atrelado_professor &&
@@ -471,7 +461,7 @@
             }
         }
 
-        // On 3rd attempt => show correct answers
+        // On 3rd attempt => show correct answers if still wrong
         if (checkCount === 3) {
             allInputs.forEach(item => {
                 if (item.type === 'textInput') {
@@ -523,18 +513,20 @@
                     });
                 }
                 else if (item.type === 'ordering') {
-                    item.orderInputs.forEach(inputObj => {
-                        const userPos = parseInt(inputObj.input.value.trim(), 10);
-                        if (userPos !== inputObj.correctPosition) {
-                            inputObj.correctAnswerSpan.textContent = `Right position: ${inputObj.correctPosition}`;
-                            inputObj.correctAnswerSpan.style.display = 'inline';
+                    item.orderInputs.forEach(oItem => {
+                        const userPos = parseInt(oItem.input.value.trim(), 10);
+                        if (userPos !== oItem.correctPosition) {
+                            oItem.correctAnswerSpan.textContent = `Right position: ${oItem.correctPosition}`;
+                            oItem.correctAnswerSpan.style.display = 'inline';
                         }
                     });
                 }
             });
+
             markPhaseCompleted();
             showModal();
         } else {
+            // if not 3rd attempt, but all are correct => completed
             if (allCorrect) {
                 markPhaseCompleted();
                 showModal();
@@ -542,28 +534,29 @@
         }
     }
 
-    // Parse lines fromFile into HTML
+    function showModal() {
+        document.getElementById('completion-modal-overlay').style.display = 'flex';
+    }
+    function closeModal() {
+        document.getElementById('completion-modal-overlay').style.display = 'none';
+    }
+
+    //====================================================
+    //  6) Parsing exercicios.txt -> HTML
+    //====================================================
     function parseFileLines(lines) {
-        // We'll build HTML in a variable
         let htmlContent = '';
-        allInputs = []; // reset global
+        allInputs = [];
 
         let i = 0;
-        function nextLine() {
-            i++;
-        }
-
-        // A helper function to see if a line is like "#END_..."
-        function isEndBlock(line, blockName) {
-            return line.toUpperCase().startsWith('#END_' + blockName.toUpperCase());
-        }
+        // convenience function to move to next line
+        function nextLine() { i++; }
 
         while (i < lines.length) {
             let rawLine = lines[i];
             let line = rawLine.trim();
 
             if (!line) {
-                // skip empty lines
                 nextLine();
                 continue;
             }
@@ -576,7 +569,7 @@
                 continue;
             }
 
-            // "Exercise X:"
+            // Exercise X:
             if (/^Exercise\s+\d+:/i.test(line)) {
                 htmlContent += `<div class="exercise-description">${line}</div>`;
                 nextLine();
@@ -586,7 +579,6 @@
             // #IMG:
             if (line.toUpperCase().startsWith('#IMG:')) {
                 let imageName = line.substring(5).trim();
-                // The base path logic is in loadContent
                 htmlContent += `<div class="exercise-line"><img src="" data-filename="${imageName}" style="max-width:100%; height:auto;" alt="Image"></div>`;
                 nextLine();
                 continue;
@@ -597,15 +589,14 @@
                 let tableLines = [];
                 nextLine();
                 while (i < lines.length) {
-                    let check = lines[i].trim();
-                    if (check && check.toUpperCase().startsWith('#ENDTABLE')) {
-                        nextLine(); 
-                        break; 
+                    let check = lines[i].trim().toUpperCase();
+                    if (check.startsWith('#ENDTABLE')) {
+                        nextLine();
+                        break;
                     }
                     tableLines.push(lines[i].trim());
                     nextLine();
                 }
-                // Build table HTML
                 htmlContent += `<table>`;
                 tableLines.forEach(row => {
                     if (!row) return;
@@ -625,8 +616,8 @@
                 let boxLines = [];
                 nextLine();
                 while (i < lines.length) {
-                    let check = lines[i].trim();
-                    if (check.toUpperCase().startsWith('#ENDBOX')) {
+                    let check = lines[i].trim().toUpperCase();
+                    if (check.startsWith('#ENDBOX')) {
                         nextLine();
                         break;
                     }
@@ -647,7 +638,7 @@
                 let questionText = line.substring(17).trim();
                 let mcHTML = `<div class="exercise-line"><strong>${questionText}</strong></div>`;
                 let options = [];
-                let correctAnswer = null;
+                let correctLetter = null;
                 let blockIndex = i;
                 nextLine();
 
@@ -658,8 +649,7 @@
                         break;
                     }
                     if (check.toUpperCase().startsWith('#CORRECT:')) {
-                        correctAnswer = check.substring(9).trim(); 
-                        // e.g. "B"
+                        correctLetter = check.substring(9).trim(); 
                         nextLine();
                     } else {
                         options.push(lines[i]);
@@ -667,29 +657,23 @@
                     }
                 }
 
-                // Build MC HTML
                 let uniqueGroupName = `mcq_${blockIndex}`;
                 let containerId = `mcq_container_${blockIndex}`;
                 mcHTML += `<div class="choice-container" id="${containerId}">`;
-                // Each option => parse the letter if it starts with "A)" or "B)" etc.
                 options.forEach(optLine => {
-                    let trimmedOpt = optLine.trim();
-                    let radioValue = trimmedOpt; 
-                    // If it starts with "A)" "B)" "C)" we just capture the letter
-                    // e.g. "B) She goes to school" => letter "B"
-                    let letterMatch = trimmedOpt.match(/^([A-Z])\)\s*/i);
+                    let trimOpt = optLine.trim();
+                    // if line starts like "A) something"
+                    let letterMatch = trimOpt.match(/^([A-Z])\)\s*/i);
+                    let radioValue = trimOpt;
                     if (letterMatch) {
-                        radioValue = letterMatch[1].toUpperCase(); 
-                    } else {
-                        // fallback in case user wrote something else
-                        // but let's keep the entire line as is
-                        radioValue = trimmedOpt;
+                        // just the letter "A" or "B", etc
+                        radioValue = letterMatch[1].toUpperCase();
                     }
                     mcHTML += `
                       <div>
                         <label>
                             <input type="radio" name="${uniqueGroupName}" value="${radioValue}">
-                            ${trimmedOpt}
+                            ${trimOpt}
                         </label>
                       </div>
                     `;
@@ -699,8 +683,8 @@
 
                 allInputs.push({
                     type: 'multipleChoice',
-                    correctAnswer: (correctAnswer||'').trim(),
-                    container: null 
+                    correctAnswer: (correctLetter||'').toUpperCase(),
+                    container: null
                 });
                 continue;
             }
@@ -708,26 +692,27 @@
             // #TRUE_FALSE: ... #END_TRUE_FALSE
             if (line.toUpperCase().startsWith('#TRUE_FALSE:')) {
                 let statementText = line.substring(11).trim();
-                let correctAnswer = 'V'; 
+                let correctValue = 'V';
                 let blockIndex = i;
                 nextLine();
 
                 while (i < lines.length) {
-                    let check = lines[i].trim();
-                    if (check.toUpperCase().startsWith('#END_TRUE_FALSE')) {
+                    let check = lines[i].trim().toUpperCase();
+                    if (check.startsWith('#END_TRUE_FALSE')) {
                         nextLine();
                         break;
                     }
-                    if (check.toUpperCase().startsWith('#CORRECT:')) {
-                        correctAnswer = check.substring(9).trim();
+                    if (check.startsWith('#CORRECT:')) {
+                        // e.g. "#CORRECT: F"
+                        correctValue = lines[i].substring(9).trim();
                         nextLine();
                     } else {
                         nextLine();
                     }
                 }
 
-                let uniqueGroupName = `vf_${blockIndex}`;
-                let containerId = `vf_container_${blockIndex}`;
+                let uniqueGroupName = `tf_${blockIndex}`;
+                let containerId = `tf_container_${blockIndex}`;
                 let vfHTML = `
                   <div class="exercise-line"><strong>${statementText}</strong></div>
                   <div class="choice-container" id="${containerId}">
@@ -743,7 +728,7 @@
 
                 allInputs.push({
                     type: 'trueFalse',
-                    correctAnswer: correctAnswer,
+                    correctAnswer: (correctValue||'V'),
                     container: null
                 });
                 continue;
@@ -751,32 +736,32 @@
 
             // #MATCHING: ... #END_MATCHING
             if (line.toUpperCase().startsWith('#MATCHING:')) {
-                let matchingTitle = `<div class="exercise-line"><strong>Associação de colunas</strong></div>`;
+                let matchTitle = `<div class="exercise-line"><strong>Associação de colunas</strong></div>`;
                 let pairs = [];
                 let blockIndex = i;
                 nextLine();
 
                 while (i < lines.length) {
-                    let check = lines[i].trim();
-                    if (check.toUpperCase().startsWith('#END_MATCHING')) {
+                    let check = lines[i].trim().toUpperCase();
+                    if (check.startsWith('#END_MATCHING')) {
                         nextLine();
                         break;
                     }
-                    if (!check) {
+                    if (!lines[i].trim()) {
                         nextLine();
                         continue;
                     }
                     // parse "Left = Right"
-                    if (check.includes('=')) {
-                        let [left, right] = check.split('=');
-                        let leftTxt = (left || '').trim();
-                        let rightTxt = (right || '').trim();
+                    if (lines[i].includes('=')) {
+                        let [left, right] = lines[i].split('=');
+                        let leftTxt = (left||'').trim();
+                        let rightTxt = (right||'').trim();
                         pairs.push({ left: leftTxt, right: rightTxt });
                     }
                     nextLine();
                 }
                 let containerId = `matching_container_${blockIndex}`;
-                let matchHTML = matchingTitle + `<div id="${containerId}" class="choice-container">`;
+                let matchHTML = matchTitle + `<div id="${containerId}" class="choice-container">`;
                 pairs.forEach(p => {
                     matchHTML += `
                       <div class="exercise-line">
@@ -792,10 +777,10 @@
                 allInputs.push({
                     type: 'matching',
                     container: null,
-                    pairs: pairs.map(p => {
+                    pairs: pairs.map(pp => {
                         return {
-                            left: p.left,
-                            correct: p.right,
+                            left: pp.left,
+                            correct: pp.right,
                             input: null,
                             correctAnswerSpan: null
                         };
@@ -819,7 +804,7 @@
                         break;
                     }
                     if (check.toUpperCase().startsWith('#CORRECT_ORDER:')) {
-                        let seq = check.substring(14).trim(); 
+                        let seq = check.substring(14).trim();
                         correctPositions = seq.split(',').map(s => parseInt(s.trim(),10));
                         nextLine();
                     } else {
@@ -831,7 +816,7 @@
                 }
                 let containerId = `ordering_container_${blockIndex}`;
                 let orderHTML = orderTitle + `<div id="${containerId}" class="choice-container">`;
-                items.forEach((txt) => {
+                items.forEach(txt => {
                     orderHTML += `
                       <div class="exercise-line">
                         <strong>${txt}</strong>
@@ -843,9 +828,9 @@
                 orderHTML += `</div>`;
                 htmlContent += orderHTML;
 
-                let orderMaps = [];
-                for (let x=0; x<items.length; x++){
-                    orderMaps.push({
+                let mapped = [];
+                for (let x = 0; x < items.length; x++) {
+                    mapped.push({
                         text: items[x],
                         correctPosition: correctPositions[x] || (x+1),
                         input: null,
@@ -855,48 +840,43 @@
                 allInputs.push({
                     type: 'ordering',
                     container: null,
-                    orderInputs: orderMaps
+                    orderInputs: mapped
                 });
                 continue;
             }
 
-            // If line has no #... block indicator, check for fill-in patterns
-            // 1) If it has [Answer:] and [FreeText]
+            // If no recognized marker, see if it has [Answer:] / [FreeText]
             if (line.includes('[Answer:') && line.includes('[FreeText]')) {
                 let [partQ, partA] = line.split('[Answer:');
                 let correctSeg = partA.split(']')[0].trim(); 
-                // leftover might be "[FreeText]" 
                 let inputSize = '150px';
                 let useTextarea = false;
-                const sizeRegex = /\[size:(.*?)\]/;
+
+                let sizeRegex = /\[size:(.*?)\]/;
                 let sizeMatch = partQ.match(sizeRegex);
                 if (sizeMatch) {
-                    const sizeValue = sizeMatch[1].trim();
+                    const sizeValue = sizeMatch[1].trim().toLowerCase();
                     if (sizeValue === 'small') inputSize = '30px';
                     if (sizeValue === 'medium') inputSize = '150px';
                     if (sizeValue === 'large') inputSize = '300px';
                     if (sizeValue === 'huge') inputSize = '800px';
-                    if (sizeValue === 'essay') {
-                        useTextarea = true;
-                    }
+                    if (sizeValue === 'essay') useTextarea = true;
                 }
-                let displayQ = partQ.replace(/\[size:.*?\]/, '').trim();
-                // Replace "___" with input
+                let dispQ = partQ.replace(/\[size:.*?\]/, '').trim();
                 if (!useTextarea) {
-                    displayQ = displayQ.replace('___', `<input type="text" class="answer-input" style="width:${inputSize};" />`);
+                    dispQ = dispQ.replace('___', `<input type="text" class="answer-input" style="width:${inputSize};" />`);
                 } else {
-                    displayQ = displayQ.replace('___', `<textarea rows="4" class="answer-input" style="width:100%;"></textarea>`);
+                    dispQ = dispQ.replace('___', `<textarea rows="4" class="answer-input" style="width:100%;"></textarea>`);
                 }
-                let tempHTML = `
-                    <div class="exercise-line">
-                        ${displayQ}
-                        <span class="correct-answer-span"></span>
-                    </div>
-                    <div class="exercise-line">
-                        <span class="free-text-span"></span>
-                    </div>
+                htmlContent += `
+                  <div class="exercise-line">
+                      ${dispQ}
+                      <span class="correct-answer-span"></span>
+                  </div>
+                  <div class="exercise-line">
+                      <span class="free-text-span"></span>
+                  </div>
                 `;
-                htmlContent += tempHTML;
                 allInputs.push({
                     type: 'textInput',
                     input: null,
@@ -907,66 +887,67 @@
                 continue;
             }
 
-            // 2) If it has [FreeText] only
             if (line.includes('[FreeText]') && !line.includes('[Answer:')) {
-                let displayT = line.replace('[FreeText]', '').trim();
+                let disp = line.replace('[FreeText]', '').trim();
                 htmlContent += `
-                    <div class="exercise-line">
-                        ${displayT}
-                        <span class="free-text-span"></span>
-                    </div>
+                  <div class="exercise-line">
+                    ${disp}
+                    <span class="free-text-span"></span>
+                  </div>
                 `;
                 nextLine();
                 continue;
             }
 
-            // 3) If it has [Answer:] but no [FreeText]
             if (line.includes('[Answer:') && !line.includes('[FreeText]')) {
-                let [partQ, partA] = line.split('[Answer:');
-                let correctSeg = partA.replace(']', '').trim();
+                let [qPart, aPart] = line.split('[Answer:');
+                let cleanAnswer = aPart.replace(']', '').trim();
                 let inputSize = '150px';
                 let useTextarea = false;
-                const sizeRegex = /\[size:.*?\]/;
-                let match = partQ.match(sizeRegex);
-                if (match) {
-                    const sizeValue = match[0].replace('[size:', '').replace(']', '').trim();
-                    if (sizeValue === 'small') inputSize = '30px';
-                    if (sizeValue === 'medium') inputSize = '150px';
-                    if (sizeValue === 'large') inputSize = '300px';
-                    if (sizeValue === 'huge') inputSize = '800px';
-                    if (sizeValue === 'essay') {
-                        useTextarea = true;
-                    }
+
+                let sizeRegex = /\[size:.*?\]/;
+                let sizeM = qPart.match(sizeRegex);
+                if (sizeM) {
+                    let val = sizeM[0].replace('[size:', '').replace(']', '').trim().toLowerCase();
+                    if (val === 'small') inputSize = '30px';
+                    if (val === 'medium') inputSize = '150px';
+                    if (val === 'large') inputSize = '300px';
+                    if (val === 'huge') inputSize = '800px';
+                    if (val === 'essay') useTextarea = true;
                 }
-                let displayQ = partQ.replace(/\[size:.*?\]/, '').trim();
+                let dispQ = qPart.replace(/\[size:.*?\]/, '').trim();
                 if (!useTextarea) {
-                    displayQ = displayQ.replace('___', `<input type="text" class="answer-input" style="width:${inputSize};" />`);
+                    dispQ = dispQ.replace('___', `<input type="text" class="answer-input" style="width:${inputSize};" />`);
                 } else {
-                    displayQ = displayQ.replace('___', `<textarea rows="4" class="answer-input" style="width:100%;"></textarea>`);
+                    dispQ = dispQ.replace('___', `<textarea rows="4" class="answer-input" style="width:100%;"></textarea>`);
                 }
                 htmlContent += `
-                    <div class="exercise-line">
-                        ${displayQ}
-                        <span class="correct-answer-span"></span>
-                    </div>
+                  <div class="exercise-line">
+                    ${dispQ}
+                    <span class="correct-answer-span"></span>
+                  </div>
                 `;
                 allInputs.push({
                     type: 'textInput',
                     input: null,
-                    correctAnswer: correctSeg,
+                    correctAnswer: cleanAnswer,
                     correctAnswerSpan: null
                 });
                 nextLine();
                 continue;
             }
 
-            // If it's normal line text
+            // if none of the above => plain text line
             htmlContent += `<div class="exercise-line">${line}</div>`;
             nextLine();
         }
+
         return htmlContent;
     }
 
+    //====================================================
+    //  7) Load the content from exercicios.txt
+    //====================================================
     async function loadContent() {
         const { level, unit } = getParamsFromURL();
         if (!level || !unit) {
@@ -982,69 +963,74 @@
 
             const data = await response.text();
             linesFromFile = data.split('\n');
+            const exercisesDiv = document.getElementById('exercises');
 
+            // parse lines => html
             let html = parseFileLines(linesFromFile);
-            document.getElementById('exercises').innerHTML = html;
+            exercisesDiv.innerHTML = html;
 
-            // Insert images (because we used data-filename above)
-            let imgDivs = document.querySelectorAll('img[data-filename]');
-            imgDivs.forEach(img => {
+            // Insert images (the code above sets data-filename on <img>)
+            let imgTags = exercisesDiv.querySelectorAll('img[data-filename]');
+            imgTags.forEach(img => {
                 let fname = img.getAttribute('data-filename');
                 img.src = basePath + fname;
             });
 
-            // Now map the DOM elements to the allInputs items
-            // 1) textInput
+            // Map DOM elements to allInputs
             let textCount = 0;
-            let answerInputs = document.querySelectorAll('.answer-input');
-            let spansAll = document.querySelectorAll('.correct-answer-span');
+            let answerEls = exercisesDiv.querySelectorAll('.answer-input');
+            let spanEls = exercisesDiv.querySelectorAll('.correct-answer-span');
 
+            // textInput
             for (let k = 0; k < allInputs.length; k++) {
-                let item = allInputs[k];
-                if (item.type === 'textInput') {
-                    item.input = answerInputs[textCount];
-                    item.correctAnswerSpan = spansAll[textCount];
+                if (allInputs[k].type === 'textInput') {
+                    allInputs[k].input = answerEls[textCount];
+                    allInputs[k].correctAnswerSpan = spanEls[textCount];
                     textCount++;
                 }
             }
 
-            // 2) multipleChoice, trueFalse, matching, ordering
+            // multipleChoice / trueFalse / matching / ordering
             let containerIndex = 0;
-            let choiceContainers = document.querySelectorAll('.choice-container');
+            let allChoiceContainers = exercisesDiv.querySelectorAll('.choice-container');
+
             for (let k = 0; k < allInputs.length; k++) {
                 let item = allInputs[k];
                 if (['multipleChoice', 'trueFalse', 'matching', 'ordering'].includes(item.type)) {
-                    item.container = choiceContainers[containerIndex];
+                    item.container = allChoiceContainers[containerIndex];
                     containerIndex++;
 
                     if (item.type === 'matching') {
-                        // each pair => input + span
                         let lineDivs = item.container.querySelectorAll('.exercise-line');
-                        item.pairs.forEach((pObj, idx) => {
-                            let inp = lineDivs[idx].querySelector('input.answer-input');
-                            let spanEl = lineDivs[idx].querySelector('.correct-answer-span');
-                            pObj.input = inp;
-                            pObj.correctAnswerSpan = spanEl;
-                        });
+                        for (let m = 0; m < item.pairs.length; m++) {
+                            let pairObj = item.pairs[m];
+                            let inp = lineDivs[m].querySelector('input.answer-input');
+                            let spn = lineDivs[m].querySelector('.correct-answer-span');
+                            pairObj.input = inp;
+                            pairObj.correctAnswerSpan = spn;
+                        }
                     }
                     else if (item.type === 'ordering') {
                         let lineDivs = item.container.querySelectorAll('.exercise-line');
-                        item.orderInputs.forEach((oObj, idx) => {
-                            let inp = lineDivs[idx].querySelector('input.answer-input');
-                            let spanEl = lineDivs[idx].querySelector('.correct-answer-span');
+                        for (let x = 0; x < item.orderInputs.length; x++) {
+                            let oObj = item.orderInputs[x];
+                            let inp = lineDivs[x].querySelector('input.answer-input');
+                            let spn = lineDivs[x].querySelector('.correct-answer-span');
                             oObj.input = inp;
-                            oObj.correctAnswerSpan = spanEl;
-                        });
+                            oObj.correctAnswerSpan = spn;
+                        }
                     }
                 }
             }
-
         } catch (error) {
             console.error("Error loading exercises:", error);
             document.getElementById('exercises').textContent = "Exercises could not be loaded.";
         }
     }
 
+    //====================================================
+    //  8) PDF Generation (no answers)
+    //====================================================
     function generatePDF() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({
@@ -1059,6 +1045,183 @@
         let marginTop = 60;
         let currentY = marginTop;
 
+        function addPDFContent() {
+            doc.setFontSize(12);
+            doc.text("Name: ________________________________________________", marginLeft, currentY);
+            currentY += 20;
+            doc.text("Date: ____________", marginLeft, currentY);
+            currentY += 40;
+
+            function drawWrappedText(textArr, indent = 0, extraSpaceAfter = false) {
+                const lineHeight = 14;
+                const maxWidth = pageWidth - marginLeft * 2 - indent;
+                doc.setFontSize(12);
+
+                textArr.forEach((line) => {
+                    const wrapped = doc.splitTextToSize(line, maxWidth);
+                    wrapped.forEach((part) => {
+                        if (currentY + lineHeight > pageHeight - 40) {
+                            doc.addPage();
+                            currentY = marginTop;
+                        }
+                        doc.text(part, marginLeft + indent, currentY);
+                        currentY += lineHeight;
+                    });
+                });
+                if (extraSpaceAfter) currentY += lineHeight;
+            }
+
+            let lastTitle = "";
+            for (let idx = 0; idx < linesFromFile.length; idx++) {
+                let rawLine = linesFromFile[idx];
+                let line = rawLine.trim();
+                if (!line) continue;
+
+                if (line.toUpperCase().startsWith('#TITLE:')) {
+                    let theTitle = line.substring(7).trim();
+                    lastTitle = theTitle;
+                    doc.setFontSize(14);
+                    if (currentY + 20 > pageHeight - 40) {
+                        doc.addPage();
+                        currentY = marginTop;
+                    }
+                    doc.text(theTitle, marginLeft, currentY);
+                    currentY += 25;
+                    continue;
+                }
+
+                if (/^Exercise\s+\d+:/i.test(line)) {
+                    doc.setFont(undefined, 'bold');
+                    drawWrappedText([line], 0, false);
+                    doc.setFont(undefined, 'normal');
+                    currentY += 10;
+                    continue;
+                }
+
+                if (line.toUpperCase().startsWith('#IMG:')) {
+                    let imgLine = line.substring(5).trim();
+                    drawWrappedText(["[Image: " + imgLine + "]"], 0, true);
+                    continue;
+                }
+
+                if (line.toUpperCase().startsWith('#TABLE')) {
+                    idx++;
+                    let tableRows = [];
+                    while (idx < linesFromFile.length) {
+                        let chk = linesFromFile[idx].trim().toUpperCase();
+                        if (chk.startsWith('#ENDTABLE')) {
+                            break;
+                        }
+                        tableRows.push(linesFromFile[idx].trim());
+                        idx++;
+                    }
+                    drawWrappedText(["[TABLE START]"], 0, false);
+                    tableRows.forEach(rr => {
+                        drawWrappedText([rr], 10, false);
+                    });
+                    drawWrappedText(["[TABLE END]"], 0, true);
+                    continue;
+                }
+
+                if (line.toUpperCase().startsWith('#BOX')) {
+                    idx++;
+                    let boxLines = [];
+                    while (idx < linesFromFile.length) {
+                        let chk = linesFromFile[idx].trim().toUpperCase();
+                        if (chk.startsWith('#ENDBOX')) {
+                            break;
+                        }
+                        boxLines.push(linesFromFile[idx].trim());
+                        idx++;
+                    }
+                    drawWrappedText(["[BOX START]"], 0, true);
+                    boxLines.forEach(bc => drawWrappedText([bc], 10, false));
+                    drawWrappedText(["[BOX END]"], 0, true);
+                    continue;
+                }
+
+                if (line.toUpperCase().startsWith('#MULTIPLE_CHOICE:')) {
+                    let quest = line.substring(17).trim();
+                    drawWrappedText(["[Multiple Choice] " + quest], 0, true);
+                    idx++;
+                    while (idx < linesFromFile.length) {
+                        let cLine = linesFromFile[idx].trim();
+                        if (cLine.toUpperCase().startsWith('#END_MULTIPLE_CHOICE')) {
+                            break;
+                        }
+                        if (!cLine.toUpperCase().startsWith('#CORRECT:')) {
+                            drawWrappedText(["   " + cLine], 0, false);
+                        }
+                        idx++;
+                    }
+                    drawWrappedText(["[End Multiple Choice]"], 0, true);
+                    continue;
+                }
+
+                if (line.toUpperCase().startsWith('#TRUE_FALSE:')) {
+                    let stmt = line.substring(11).trim();
+                    drawWrappedText(["[True/False] " + stmt], 0, true);
+                    idx++;
+                    while (idx < linesFromFile.length) {
+                        let cLine = linesFromFile[idx].trim();
+                        if (cLine.toUpperCase().startsWith('#END_TRUE_FALSE')) {
+                            break;
+                        }
+                        idx++;
+                    }
+                    drawWrappedText(["[End True/False]"], 0, true);
+                    continue;
+                }
+
+                if (line.toUpperCase().startsWith('#MATCHING:')) {
+                    drawWrappedText(["[Matching Columns]"], 0, true);
+                    idx++;
+                    while (idx < linesFromFile.length) {
+                        let cLine = linesFromFile[idx].trim();
+                        if (cLine.toUpperCase().startsWith('#END_MATCHING')) {
+                            break;
+                        }
+                        drawWrappedText(["   " + cLine], 0, false);
+                        idx++;
+                    }
+                    drawWrappedText(["[End Matching]"], 0, true);
+                    continue;
+                }
+
+                if (line.toUpperCase().startsWith('#ORDERING:')) {
+                    drawWrappedText(["[Ordering Sequence]"], 0, true);
+                    idx++;
+                    while (idx < linesFromFile.length) {
+                        let cLine = linesFromFile[idx].trim();
+                        if (cLine.toUpperCase().startsWith('#END_ORDERING')) {
+                            break;
+                        }
+                        drawWrappedText(["   " + cLine], 0, false);
+                        idx++;
+                    }
+                    drawWrappedText(["[End Ordering]"], 0, true);
+                    continue;
+                }
+
+                // fill-in lines
+                if (!line.includes('[Answer:')) {
+                    drawWrappedText([line], 0, false);
+                    continue;
+                }
+
+                // replace the blank for fill-ins
+                if (line.includes('[Answer:')) {
+                    let tmp = line.replace(/\[size:.*?\]/, '');
+                    let replaced = tmp.replace('___', '____________');
+                    drawWrappedText([replaced], 0, true);
+                    continue;
+                }
+            }
+
+            doc.save(`${lastTitle || 'activity'}.pdf`);
+        }
+
+        // try adding a logo
         try {
             const img = new Image();
             img.src = 'logo.png';
@@ -1077,201 +1240,16 @@
             console.error("Error loading logo image:", error);
             addPDFContent();
         }
-
-        function addPDFContent() {
-            doc.setFontSize(12);
-            doc.text("Name: ________________________________________________", marginLeft, currentY);
-            currentY += 20;
-            doc.text("Date: ____________", marginLeft, currentY);
-            currentY += 40;
-
-            function drawWrappedText(textLines, indent = 0, extraSpaceAfter = false) {
-                const lineHeight = 14;
-                const maxWidth = pageWidth - marginLeft * 2 - indent;
-                doc.setFontSize(12);
-
-                textLines.forEach((textLine) => {
-                    const wrapped = doc.splitTextToSize(textLine, maxWidth);
-                    wrapped.forEach((part) => {
-                        if (currentY + lineHeight > pageHeight - 40) {
-                            doc.addPage();
-                            currentY = marginTop;
-                        }
-                        doc.text(part, marginLeft + indent, currentY);
-                        currentY += lineHeight;
-                    });
-                });
-                if (extraSpaceAfter) {
-                    currentY += lineHeight;
-                }
-            }
-
-            let lastTitle = "";
-            for (let idx = 0; idx < linesFromFile.length; idx++) {
-                let lineRaw = linesFromFile[idx];
-                let line = lineRaw.trim();
-                if (!line) continue;
-
-                // #TITLE:
-                if (line.toUpperCase().startsWith('#TITLE:')) {
-                    let theTitle = line.substring(7).trim();
-                    lastTitle = theTitle;
-                    doc.setFontSize(14);
-                    if (currentY + 20 > pageHeight - 40) {
-                        doc.addPage();
-                        currentY = marginTop;
-                    }
-                    doc.text(theTitle, marginLeft, currentY);
-                    currentY += 25;
-                    continue;
-                }
-
-                // Exercise X:
-                if (/^Exercise\s+\d+:/i.test(line)) {
-                    doc.setFont(undefined, 'bold');
-                    drawWrappedText([line], 0, false);
-                    doc.setFont(undefined, 'normal');
-                    currentY += 10;
-                    continue;
-                }
-
-                // #IMG
-                if (line.toUpperCase().startsWith('#IMG:')) {
-                    let imgLine = line.substring(5).trim();
-                    drawWrappedText(["[Image: " + imgLine + "]"], 0, true);
-                    continue;
-                }
-
-                // #TABLE ... #ENDTABLE
-                if (line.toUpperCase().startsWith('#TABLE')) {
-                    idx++;
-                    let tableRows = [];
-                    while (idx < linesFromFile.length) {
-                        let chk = linesFromFile[idx].trim();
-                        if (chk.toUpperCase().startsWith('#ENDTABLE')) {
-                            break;
-                        }
-                        tableRows.push(chk);
-                        idx++;
-                    }
-                    drawWrappedText(["[TABLE START]"], 0, false);
-                    tableRows.forEach(r => drawWrappedText([r], 10, false));
-                    drawWrappedText(["[TABLE END]"], 0, true);
-                    continue;
-                }
-
-                // #BOX
-                if (line.toUpperCase().startsWith('#BOX')) {
-                    idx++;
-                    let boxContent = [];
-                    while (idx < linesFromFile.length) {
-                        let chk = linesFromFile[idx].trim();
-                        if (chk.toUpperCase().startsWith('#ENDBOX')) {
-                            break;
-                        }
-                        boxContent.push(chk);
-                        idx++;
-                    }
-                    drawWrappedText(["[BOX START]"], 0, true);
-                    boxContent.forEach(bc => {
-                        drawWrappedText([bc], 10, false);
-                    });
-                    drawWrappedText(["[BOX END]"], 0, true);
-                    continue;
-                }
-
-                // #MULTIPLE_CHOICE:
-                if (line.toUpperCase().startsWith('#MULTIPLE_CHOICE:')) {
-                    let questionText = line.substring(17).trim();
-                    drawWrappedText(["[Multiple Choice] " + questionText], 0, true);
-                    idx++;
-                    while (idx < linesFromFile.length) {
-                        let check = linesFromFile[idx].trim();
-                        if (check.toUpperCase().startsWith('#END_MULTIPLE_CHOICE')) {
-                            break;
-                        }
-                        if (!check.toUpperCase().startsWith('#CORRECT:')) {
-                            drawWrappedText(["   " + check], 0, false);
-                        }
-                        idx++;
-                    }
-                    drawWrappedText(["[End Multiple Choice]"], 0, true);
-                    continue;
-                }
-
-                // #TRUE_FALSE:
-                if (line.toUpperCase().startsWith('#TRUE_FALSE:')) {
-                    let statementText = line.substring(11).trim();
-                    drawWrappedText(["[True/False] " + statementText], 0, true);
-                    idx++;
-                    while (idx < linesFromFile.length) {
-                        let check = linesFromFile[idx].trim();
-                        if (check.toUpperCase().startsWith('#END_TRUE_FALSE')) {
-                            break;
-                        }
-                        idx++;
-                    }
-                    drawWrappedText(["[End True/False]"], 0, true);
-                    continue;
-                }
-
-                // #MATCHING:
-                if (line.toUpperCase().startsWith('#MATCHING:')) {
-                    drawWrappedText(["[Matching Columns]"], 0, true);
-                    idx++;
-                    while (idx < linesFromFile.length) {
-                        let check = linesFromFile[idx].trim();
-                        if (check.toUpperCase().startsWith('#END_MATCHING')) {
-                            break;
-                        }
-                        drawWrappedText(["   " + check], 0, false);
-                        idx++;
-                    }
-                    drawWrappedText(["[End Matching]"], 0, true);
-                    continue;
-                }
-
-                // #ORDERING:
-                if (line.toUpperCase().startsWith('#ORDERING:')) {
-                    drawWrappedText(["[Ordering Sequence]"], 0, true);
-                    idx++;
-                    while (idx < linesFromFile.length) {
-                        let check = linesFromFile[idx].trim();
-                        if (check.toUpperCase().startsWith('#END_ORDERING')) {
-                            break;
-                        }
-                        drawWrappedText(["   " + check], 0, false);
-                        idx++;
-                    }
-                    drawWrappedText(["[End Ordering]"], 0, true);
-                    continue;
-                }
-
-                // If line doesn't have [Answer:], just print it
-                if (!line.includes('[Answer:')) {
-                    drawWrappedText([line], 0, false);
-                    continue;
-                }
-
-                // If line does have [Answer:], replace the blank with underscores
-                if (line.includes('[Answer:')) {
-                    // remove [size:??] if any
-                    let tmp = line.replace(/\[size:.*?\]/, '');
-                    let replaced = tmp.replace('___', '___________');
-                    drawWrappedText([replaced], 0, true);
-                    continue;
-                }
-            }
-
-            doc.save(`${lastTitle || 'activity'}.pdf`);
-        }
     }
 
+    //====================================================
+    //  9) On Page Load
+    //====================================================
     document.addEventListener('DOMContentLoaded', () => {
         ensureUserIsAuthenticated(() => {
             loadContent();
+
             const generatePdfBtn = document.getElementById('generate-pdf-btn');
-            // Show PDF button only if user is professor or owner
             if (userData.role === 'professor' || userData.role === 'proprietario') {
                 generatePdfBtn.style.display = 'inline-block';
             } else {
