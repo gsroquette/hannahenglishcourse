@@ -34,7 +34,6 @@
             transition: background-color 0.3s ease, box-shadow 0.3s ease;
             box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
         }
-
         .check-btn:hover {
             background-color: #f0f0f0;
             box-shadow: 3px 3px 7px rgba(0, 0, 0, 0.2);
@@ -54,11 +53,27 @@
         .back-button:hover {
             background-color: #0056b3;
         }
+        /* Ajuste do tamanho e estilo do título carregado do texto.txt */
+        .page-title {
+            font-size: 2rem;
+            font-weight: bold;
+            text-align: center;
+            color: #2c3e50;
+            margin-top: 20px;
+        }
+        /* Estilo para subtítulo (##) */
+        .subtitle {
+            font-size: 1.3rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            text-align: left; /* Agora alinhado à esquerda */
+            margin: 10px 0;
+        }
         h1 {
             text-align: center;
             color: #333;
             font-size: 2rem;
-            margin-top: 70px;
+            margin-top: 70px; /* Mantido para não afetar outras partes, mas pode ajustar se quiser */
         }
         h2 {
             background-color: #28a745;
@@ -207,11 +222,14 @@
 
 <div class="container">
     <a href="javascript:history.back()" class="back-button">Back</a>
-    <h1 id="title">Loading title...</h1>
     
+    <!-- Imagem agora aparece antes do título -->
     <div class="image-container">
         <img id="main-image" src="image.png" alt="Example Image">
     </div>
+
+    <!-- Título do texto.txt será injetado aqui com a classe .page-title -->
+    <h1 id="title">Loading title...</h1>
 
     <div class="button-container">
         <!-- Botões dos professores serão carregados aqui -->
@@ -248,10 +266,12 @@
     let totalAnswers = 0;
     let clickedAnswers = 0;
     let isTextFileLoaded = false; // Variável para rastrear se já foi carregado
-    
+
     // ======================================================
     // ESTA É A FUNÇÃO QUE LÊ O ARQUIVO "texto.txt"
-    // E MOSTRA SEU CONTEÚDO NA PÁGINA.
+    // E MOSTRA SEU CONTEÚDO NA PÁGINA, INCLUINDO TÍTULO,
+    // SEÇÕES, TABELAS, NEGRITO/ITÁLICO E CAMPOS DE RESPOSTA.
+    // TAMBÉM RECONHECE "##" COMO SUBTÍTULO EM CAIXA ALTA.
     // ======================================================
     function loadTextFile() {
         if (isTextFileLoaded) {
@@ -284,13 +304,21 @@
                 let isHeaderRow = true;
 
                 lines.forEach(line => {
-                    // Remove quebras de linha extras (trim) caso queira evitar espaços
                     const trimmedLine = line.trim();
 
+                    // Verifica se é a linha de título principal (Title: ...)
                     if (trimmedLine.startsWith('Title: ')) {
-                        // Define o título na página
-                        document.getElementById('title').innerText = trimmedLine.replace('Title: ', '');
-                    } 
+                        const pageTitle = trimmedLine.replace('Title: ', '');
+                        // Define o título no h1 e adiciona a classe de estilo
+                        document.getElementById('title').innerText = pageTitle;
+                        document.getElementById('title').classList.add('page-title');
+                    }
+                    // Subtítulo reconhecido com "## "
+                    else if (trimmedLine.startsWith('## ')) {
+                        const subtitleText = trimmedLine.replace('## ', '').toUpperCase();
+                        htmlContent += `<h3 class="subtitle">${subtitleText}</h3>`;
+                    }
+                    // Seções definidas com "# "
                     else if (trimmedLine.startsWith('# ')) {
                         // Fecha uma seção anterior, se houver
                         if (currentSection) {
@@ -299,37 +327,28 @@
                         currentSection = trimmedLine.replace('# ', '');
                         htmlContent += `<div class="section"><h2>${currentSection}</h2>`;
                     }
-                    // ===========================================================
-                    // DETECTANDO INÍCIO DE TABELA
-                    // ===========================================================
+                    // Detectando início de tabela (tablestart)
                     else if (trimmedLine.toLowerCase() === 'tablestart') {
                         inTable = true;
-                        isHeaderRow = true; 
+                        isHeaderRow = true;
                         htmlContent += '<table class="grammar-table">';
-                    } 
-                    // ===========================================================
-                    // DETECTANDO FIM DE TABELA
-                    // ===========================================================
+                    }
+                    // Detectando fim de tabela (tableend)
                     else if (trimmedLine.toLowerCase() === 'tableend') {
                         inTable = false;
                         htmlContent += '</tbody></table>';
                     }
-                    // ===========================================================
-                    // SE ESTAMOS DENTRO DE UMA TABELA, TRATA COMO LINHA DA TABELA
-                    // ===========================================================
+                    // Se estamos dentro de uma tabela, processa como linha de tabela
                     else if (inTable) {
                         const columns = trimmedLine.split('|');
                         if (isHeaderRow) {
-                            // Primeira linha após "TableStart" vira o cabeçalho
                             htmlContent += '<thead><tr>' + columns.map(col => `<th>${col.trim()}</th>`).join('') + '</tr></thead><tbody>';
                             isHeaderRow = false;
                         } else {
                             htmlContent += '<tr>' + columns.map(col => `<td>${col.trim()}</td>`).join('') + '</tr>';
                         }
                     }
-                    // ===========================================================
-                    // LINHAS COM [Answer: ...] => CRIA CAMPO E BOTÃO "CHECK"
-                    // ===========================================================
+                    // Linhas com [Answer: ...] => cria campo de texto, botão "Check" e conta no totalAnswers
                     else if (trimmedLine.includes('[Answer:')) {
                         const [question, answer] = trimmedLine.split('[Answer:');
                         const cleanedAnswer = answer.replace(']', '').trim();
@@ -345,12 +364,15 @@
                             </p>`;
                         totalAnswers++;
                         console.log(`Incrementando totalAnswers: ${totalAnswers}`);
-                    } 
-                    // ===========================================================
-                    // QUALQUER OUTRA LINHA SIMPLES
-                    // ===========================================================
+                    }
+                    // Qualquer outra linha simples => pode ter **negrito**, *itálico* ou ***ambos***
                     else {
-                        htmlContent += `<p>${trimmedLine}</p>`;
+                        let formattedLine = trimmedLine
+                            .replace(/\*\*\*(.*?)\*\*\*/g, '<b><i>$1</i></b>') // Negrito + Itálico
+                            .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')         // Negrito
+                            .replace(/\*(.*?)\*/g, '<i>$1</i>');            // Itálico
+
+                        htmlContent += `<p>${formattedLine}</p>`;
                     }
                 });
 
@@ -592,7 +614,6 @@
         });
     }
 
-    // Função para obter o usuário autenticado
     function getAuthenticatedUser() {
         return new Promise((resolve, reject) => {
             firebase.auth().onAuthStateChanged((user) => {
