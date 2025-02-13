@@ -1,4 +1,4 @@
-<!DOCTYPE html>    
+<!DOCTYPE html>   
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -264,7 +264,8 @@
     let checkCount = 0;       
     let userData = {};        
     let linesFromFile = [];   
-    // Array de objetos de pergunta
+    // Este array conterá objetos de pergunta (questionObjects)
+    // Ex: { qtype: 'multipleChoice', questionHTML: '...', correctAnswer: 'B', containerDOM: ..., ... }
     let questionObjects = [];
 
     //====================================================
@@ -381,6 +382,7 @@
         let allCorrect = true;
         let wrongItems = [];
 
+        // Percorremos cada objeto de questão
         questionObjects.forEach(qObj => {
             if (qObj.qtype === 'textInput') {
                 const userAnswer = qObj.userInputDOM.value.trim().toLowerCase();
@@ -449,7 +451,6 @@
                 let anyWrong = false;
                 qObj.sequenceItems.forEach(seq => {
                     const userNum = parseInt(seq.inputDOM.value.trim(), 10);
-                    // Compare com a posição correta
                     if (isNaN(userNum) || userNum !== seq.correctPos) {
                         anyWrong = true;
                         wrongItems.push(seq.inputDOM);
@@ -464,7 +465,7 @@
             }
         });
 
-        // Se existem erros e o usuário é aluno atrelado a professor => alarme
+        // Se existem erros e o usuário é aluno atrelado a professor => toco o alarme
         if (!allCorrect) {
             if (userData.role === 'aluno' && userData.atrelado_professor && userData.atrelado_professor.trim() !== '') {
                 playAlarm();
@@ -474,7 +475,7 @@
             }
         }
 
-        // Se chegou na terceira tentativa => mostrar respostas corretas
+        // Terceira tentativa => mostrar respostas corretas
         if (checkCount === 3) {
             questionObjects.forEach(qObj => {
                 if (qObj.qtype === 'textInput') {
@@ -646,6 +647,7 @@
             // #MULTIPLE_CHOICE
             if (line.toUpperCase().startsWith('#MULTIPLE_CHOICE:')) {
                 let questionText = line.substring(17).trim();
+                // Em vez de usar 'i' como índice do container, usamos o índice do array questionObjects
                 let questionIndex = questionObjects.length;
                 let options = [];
                 let corrLetter = null;
@@ -670,9 +672,9 @@
 
                 questionObjects.push({
                     qtype: 'multipleChoice',
-                    index: questionIndex,
+                    index: questionIndex,           // guardando o índice
                     questionText,
-                    correctAnswer: (corrLetter || '').toUpperCase(),
+                    correctAnswer: (corrLetter||'').toUpperCase(),
                     options, 
                     containerDOM: null
                 });
@@ -776,7 +778,6 @@
                 htmlAccum += `<div class="exercise-line"><strong>Ordenação de sequência</strong></div>`;
                 htmlAccum += `<div class="choice-container" id="${containerID}"></div>`;
 
-                // Armazena no questionObjects
                 questionObjects.push({
                     qtype: 'ordering',
                     index: questionIndex,
@@ -863,7 +864,7 @@
                 continue;
             }
 
-            // Se não bate em nada especial, tratamos como texto simples
+            // Se nenhuma marca especial => texto simples
             htmlAccum += `<div class="exercise-line">${line}</div>`;
             nextLine();
         }
@@ -872,12 +873,14 @@
     }
 
     //====================================================
-    //  (8) Renderizar as questões
+    //  (8) Depois de gerar o HTML bruto, "renderizamos"
+    //      os objetos de questão
     //====================================================
     function renderQuestions(container) {
-        // MultipleChoice, TrueFalse, Matching, Ordering
+        // 1) Para multipleChoice, trueFalse, matching, ordering
         questionObjects.forEach((qObj) => {
             if (qObj.qtype === 'multipleChoice') {
+                // Buscamos pelo ID baseado no índice guardado
                 let cID = `multichoice_container_${qObj.index}`;
                 let containerDOM = container.querySelector(`#${cID}`);
                 if (containerDOM) {
@@ -951,7 +954,7 @@
             }
         });
 
-        // textInput
+        // 2) Para textInput
         let textLines = container.querySelectorAll('[data-qtype]');
         textLines.forEach(tLine => {
             let qIdx = parseInt(tLine.getAttribute('data-question-idx'),10);
@@ -964,7 +967,7 @@
             }
         });
 
-        // Associando inputs em matching e ordering
+        // 3) Para matching & ordering, ligamos os inputs a cada par/posição
         questionObjects.forEach((qObj) => {
             if (qObj.qtype === 'matching') {
                 let cDOM = qObj.containerDOM;
@@ -980,12 +983,10 @@
                 qObj.sequenceItems = [];
                 let cDOM = qObj.containerDOM;
                 let lineDivs = cDOM ? cDOM.querySelectorAll('.exercise-line') : [];
-                // Removido o fallback (x+1)
-                for (let x = 0; x < qObj.items.length; x++) {
+                for (let x=0; x<qObj.items.length; x++){
                     qObj.sequenceItems.push({
                         textValue: qObj.items[x],
-                        // Agora, cada item só usa o array de correctOrder. Se faltar, poderá dar undefined.
-                        correctPos: qObj.correctOrder[x], 
+                        correctPos: qObj.correctOrder[x] || (x+1),
                         inputDOM: lineDivs[x].querySelector('.answer-input'),
                         correctSpanDOM: lineDivs[x].querySelector('.correct-answer-span')
                     });
@@ -1200,6 +1201,7 @@
             doc.save(`${lastTitle||'activity'}.pdf`);
         }
 
+        // Tentativa de adicionar logo
         try {
             const img = new Image();
             img.src = 'logo.png';
