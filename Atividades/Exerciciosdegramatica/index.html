@@ -264,6 +264,7 @@
     let checkCount = 0;       
     let userData = {};        
     let linesFromFile = [];   
+    // Array para todos os tipos de questão
     let questionObjects = [];
 
     //====================================================
@@ -380,7 +381,10 @@
         let allCorrect = true;
         let wrongItems = [];
 
+        // Loop principal das questões
         questionObjects.forEach(qObj => {
+
+            //-------------- TEXT INPUT --------------
             if (qObj.qtype === 'textInput') {
                 const userAnswer = qObj.userInputDOM.value.trim().toLowerCase();
                 const correct = qObj.correctAnswer.trim().toLowerCase();
@@ -395,6 +399,8 @@
                     qObj.userInputDOM.classList.add('incorrect');
                 }
             }
+
+            //-------------- MULTIPLE CHOICE --------------
             else if (qObj.qtype === 'multipleChoice') {
                 const radios = qObj.containerDOM.querySelectorAll('input[type="radio"]');
                 let userChoice = null;
@@ -411,6 +417,8 @@
                     qObj.containerDOM.style.color = 'blue';
                 }
             }
+
+            //-------------- TRUE/FALSE --------------
             else if (qObj.qtype === 'trueFalse') {
                 const radios = qObj.containerDOM.querySelectorAll('input[type="radio"]');
                 let userChoice = null;
@@ -427,6 +435,8 @@
                     qObj.containerDOM.style.color = 'blue';
                 }
             }
+
+            //-------------- MATCHING --------------
             else if (qObj.qtype === 'matching') {
                 let mismatch = false;
                 qObj.pairs.forEach(pair => {
@@ -444,24 +454,31 @@
                 });
                 if (mismatch) allCorrect = false;
             }
+
+            //-------------- ORDERING (REESCRITO DO ZERO) --------------
             else if (qObj.qtype === 'ordering') {
+                let containerDOM = qObj.containerDOM;
+                let inputs = containerDOM.querySelectorAll('input.answer-input');
                 let anyWrong = false;
-                qObj.sequenceItems.forEach(seq => {
-                    const userNum = parseInt(seq.inputDOM.value.trim(), 10);
-                    if (isNaN(userNum) || userNum !== seq.correctPos) {
+                for (let i=0; i<qObj.items.length; i++) {
+                    // Posição correta do i-ésimo item
+                    const correctPos = qObj.correctPositions[i];
+                    const userVal = parseInt(inputs[i].value.trim(), 10);
+                    if (isNaN(userVal) || userVal !== correctPos) {
                         anyWrong = true;
-                        wrongItems.push(seq.inputDOM);
-                        seq.inputDOM.classList.remove('correct');
-                        seq.inputDOM.classList.add('incorrect');
+                        wrongItems.push(inputs[i]);
+                        inputs[i].classList.remove('correct');
+                        inputs[i].classList.add('incorrect');
                     } else {
-                        seq.inputDOM.classList.remove('incorrect');
-                        seq.inputDOM.classList.add('correct');
+                        inputs[i].classList.remove('incorrect');
+                        inputs[i].classList.add('correct');
                     }
-                });
+                }
                 if (anyWrong) allCorrect = false;
             }
         });
 
+        // Se existem erros e o usuário é aluno atrelado a professor => toco o alarme
         if (!allCorrect) {
             if (userData.role === 'aluno' && userData.atrelado_professor && userData.atrelado_professor.trim() !== '') {
                 playAlarm();
@@ -471,6 +488,7 @@
             }
         }
 
+        //-------------- TERCEIRA TENTATIVA => MOSTRAR RESPOSTAS --------------
         if (checkCount === 3) {
             questionObjects.forEach(qObj => {
                 if (qObj.qtype === 'textInput') {
@@ -522,18 +540,26 @@
                     });
                 }
                 else if (qObj.qtype === 'ordering') {
-                    qObj.sequenceItems.forEach(seq => {
-                        const userNum = parseInt(seq.inputDOM.value.trim(), 10);
-                        if (userNum !== seq.correctPos) {
-                            seq.correctSpanDOM.textContent = `Right position: ${seq.correctPos}`;
-                            seq.correctSpanDOM.style.display = 'inline';
+                    // Mostra "Right position: X" para cada item errado
+                    let containerDOM = qObj.containerDOM;
+                    let inputs = containerDOM.querySelectorAll('input.answer-input');
+                    for (let i=0; i<qObj.items.length; i++) {
+                        const correctPos = qObj.correctPositions[i];
+                        const userVal = parseInt(inputs[i].value.trim(), 10);
+                        if (userVal !== correctPos) {
+                            const span = inputs[i].parentNode.querySelector('.correct-answer-span');
+                            if (span) {
+                                span.textContent = `Right position: ${correctPos}`;
+                                span.style.display = 'inline';
+                            }
                         }
-                    });
+                    }
                 }
             });
             markPhaseCompleted();
             showModal();
         } else {
+            // Se não é terceira tentativa e está tudo certo => concluído
             if (allCorrect) {
                 markPhaseCompleted();
                 showModal();
@@ -566,6 +592,7 @@
                 continue;
             }
 
+            //-------------- #TITLE --------------
             if (line.toUpperCase().startsWith('#TITLE:')) {
                 let titleText = line.substring(7).trim();
                 htmlAccum += `<h2 class="exercise-title">${titleText}</h2>`;
@@ -573,12 +600,14 @@
                 continue;
             }
 
+            //-------------- Exercise X: --------------
             if (/^Exercise\s+\d+:/i.test(line)) {
                 htmlAccum += `<div class="exercise-description">${line}</div>`;
                 nextLine();
                 continue;
             }
 
+            //-------------- #IMG --------------
             if (line.toUpperCase().startsWith('#IMG:')) {
                 let file = line.substring(5).trim();
                 htmlAccum += `<div class="exercise-line"><img data-imgfile="${file}" style="max-width:100%; height:auto;" alt="Image"></div>`;
@@ -586,6 +615,7 @@
                 continue;
             }
 
+            //-------------- #TABLE --------------
             if (line.toUpperCase().startsWith('#TABLE')) {
                 let tableLines = [];
                 nextLine();
@@ -612,6 +642,7 @@
                 continue;
             }
 
+            //-------------- #BOX --------------
             if (line.toUpperCase().startsWith('#BOX')) {
                 let boxLines = [];
                 nextLine();
@@ -633,7 +664,7 @@
                 continue;
             }
 
-            // #MULTIPLE_CHOICE
+            //-------------- #MULTIPLE_CHOICE --------------
             if (line.toUpperCase().startsWith('#MULTIPLE_CHOICE:')) {
                 let questionText = line.substring(17).trim();
                 let questionIndex = questionObjects.length;
@@ -669,7 +700,7 @@
                 continue;
             }
 
-            // #TRUE_FALSE
+            //-------------- #TRUE_FALSE --------------
             if (line.toUpperCase().startsWith('#TRUE_FALSE:')) {
                 let statement = line.substring(11).trim();
                 let questionIndex = questionObjects.length;
@@ -704,7 +735,7 @@
                 continue;
             }
 
-            // #MATCHING
+            //-------------- #MATCHING --------------
             if (line.toUpperCase().startsWith('#MATCHING:')) {
                 let questionIndex = questionObjects.length;
                 let pairs = [];
@@ -741,12 +772,13 @@
                 continue;
             }
 
-            // #ORDERING
+            //-------------- #ORDERING (RECRIADO DO ZERO) --------------
             if (line.toUpperCase().startsWith('#ORDERING:')) {
                 let questionIndex = questionObjects.length;
                 let items = [];
-                let correctOrder = [];
+                let correctPositions = [];
                 nextLine();
+
                 while (i < lines.length) {
                     let check = lines[i].trim();
                     if (check.toUpperCase().startsWith('#END_ORDERING')) {
@@ -755,28 +787,31 @@
                     }
                     if (check.toUpperCase().startsWith('#CORRECT_ORDER:')) {
                         let seq = check.substring(14).trim();
-                        correctOrder = seq.split(',').map(x=>parseInt(x.trim(),10));
+                        correctPositions = seq.split(',').map(x => parseInt(x,10));
                         nextLine();
                     } else {
+                        // Cada linha é 1 item
                         if (check) items.push(check);
                         nextLine();
                     }
                 }
+
                 let containerID = `ordering_container_${questionIndex}`;
                 htmlAccum += `<div class="exercise-line"><strong>Ordenação de sequência</strong></div>`;
                 htmlAccum += `<div class="choice-container" id="${containerID}"></div>`;
 
+                // Armazena
                 questionObjects.push({
                     qtype: 'ordering',
                     index: questionIndex,
                     items,
-                    correctOrder,
+                    correctPositions,
                     containerDOM: null
                 });
                 continue;
             }
 
-            // [Answer:] / [FreeText]
+            //-------------- [Answer: ] e [FreeText] --------------
             if (line.includes('[Answer:') && line.includes('[FreeText]')) {
                 let [qPart, aPart] = line.split('[Answer:');
                 let correctVal = aPart.split(']')[0].trim();
@@ -812,12 +847,14 @@
                 nextLine();
                 continue;
             }
+
             if (line.includes('[FreeText]') && !line.includes('[Answer:')) {
                 let stripped = line.replace('[FreeText]','').trim();
                 htmlAccum += `<div class="exercise-line">${stripped}<span class="free-text-span"></span></div>`;
                 nextLine();
                 continue;
             }
+
             if (line.includes('[Answer:') && !line.includes('[FreeText]')) {
                 let [qPart, aPart] = line.split('[Answer:');
                 let correctVal = aPart.replace(']','').trim();
@@ -852,6 +889,7 @@
                 continue;
             }
 
+            //-------------- Se não caiu em nada, é texto simples --------------
             htmlAccum += `<div class="exercise-line">${line}</div>`;
             nextLine();
         }
@@ -860,10 +898,13 @@
     }
 
     //====================================================
-    //  (8) Render Questions
+    //  (8) Render Questions (com a nova lógica #ORDERING)
     //====================================================
     function renderQuestions(container) {
+        // Renderizamos cada tipo
         questionObjects.forEach((qObj) => {
+
+            // ---------- multipleChoice ----------
             if (qObj.qtype === 'multipleChoice') {
                 let cID = `multichoice_container_${qObj.index}`;
                 let containerDOM = container.querySelector(`#${cID}`);
@@ -887,6 +928,8 @@
                 }
                 qObj.containerDOM = containerDOM;
             }
+
+            // ---------- trueFalse ----------
             else if (qObj.qtype === 'trueFalse') {
                 let cID = `truefalse_container_${qObj.index}`;
                 let containerDOM = container.querySelector(`#${cID}`);
@@ -902,6 +945,8 @@
                 }
                 qObj.containerDOM = containerDOM;
             }
+
+            // ---------- matching ----------
             else if (qObj.qtype === 'matching') {
                 let cID = `matching_container_${qObj.index}`;
                 let containerDOM = container.querySelector(`#${cID}`);
@@ -919,6 +964,8 @@
                 }
                 qObj.containerDOM = containerDOM;
             }
+
+            // ---------- ordering (NOVO) ----------
             else if (qObj.qtype === 'ordering') {
                 let cID = `ordering_container_${qObj.index}`;
                 let containerDOM = container.querySelector(`#${cID}`);
@@ -938,6 +985,7 @@
             }
         });
 
+        // ---------- textInput ----------
         let textLines = container.querySelectorAll('[data-qtype]');
         textLines.forEach(tLine => {
             let qIdx = parseInt(tLine.getAttribute('data-question-idx'),10);
@@ -950,7 +998,7 @@
             }
         });
 
-        // Matching & Ordering
+        // ---------- associando inputs em matching e ordering ----------
         questionObjects.forEach((qObj) => {
             if (qObj.qtype === 'matching') {
                 let cDOM = qObj.containerDOM;
@@ -963,17 +1011,9 @@
                 });
             }
             else if (qObj.qtype === 'ordering') {
-                qObj.sequenceItems = [];
-                let cDOM = qObj.containerDOM;
-                let lineDivs = cDOM ? cDOM.querySelectorAll('.exercise-line') : [];
-                for (let x = 0; x < qObj.items.length; x++) {
-                    qObj.sequenceItems.push({
-                        textValue: qObj.items[x],
-                        correctPos: qObj.correctOrder[x],
-                        inputDOM: lineDivs[x].querySelector('.answer-input'),
-                        correctSpanDOM: lineDivs[x].querySelector('.correct-answer-span')
-                    });
-                }
+                // não mais "sequenceItems" — apenas armazenamos containerDOM
+                // já temos qObj.items e qObj.correctPositions
+                // inputs recuperados em checkAllAnswers()
             }
         });
     }
@@ -1001,8 +1041,10 @@
             let rawHTML = parseFileLines(linesFromFile);
             container.innerHTML = rawHTML;
 
+            // Renderiza as questões
             renderQuestions(container);
 
+            // Insere imagens
             let allImgTags = container.querySelectorAll('img[data-imgfile]');
             allImgTags.forEach(imgTag => {
                 let fname = imgTag.getAttribute('data-imgfile');
