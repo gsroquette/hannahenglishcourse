@@ -1,4 +1,4 @@
-<!DOCTYPE html>  
+<!DOCTYPE html>    
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -65,39 +65,39 @@
         .exercise-line {
             margin: 10px 0;
             font-size: 1rem;
-            word-break: break-word; /* Permitir quebra de palavra */
-            white-space: normal; /* Quebra de linha normal */
+            word-break: break-word; 
+            white-space: normal; 
         }
 
         /* Inputs para respostas corrigidas */
         .answer-input {
             padding: 5px;
-            border: 1px solid #000; /* Bordas pretas */
+            border: 1px solid #000; 
             border-radius: 5px;
             font-size: 1rem;
-            max-width: 150px; /* Ajuste conforme necessário */
-            box-sizing: border-box; /* Garantir que padding conte no total */
+            max-width: 150px; 
+            box-sizing: border-box; 
         }
 
-        /* Linhas de texto livre */
+        /* Linhas de texto livre (não corrigidas) */
         .free-text-span {
-            border-bottom: 1px solid #000; /* Linha contínua */
+            border-bottom: 1px solid #000; 
             display: inline-block;
-            width: 200px; /* Ajuste conforme necessário */
+            width: 200px; 
             margin-left: 10px;
             vertical-align: bottom;
-            min-height: 20px; /* Espaço para digitação */
+            min-height: 20px; 
         }
 
         /* Resposta certa ou errada */
         .correct {
-            color: blue; /* certo: azul */
+            color: blue; 
         }
         .incorrect {
-            color: red;  /* errado: vermelho */
+            color: red;  
         }
 
-        /* Mostra a resposta certa ao lado (fora do input) */
+        /* Mostra a resposta certa ao lado */
         .correct-answer-span {
             display: none; 
             font-weight: bold;
@@ -154,6 +154,33 @@
             background-color: #444;
         }
 
+        /* Tabelas geradas via #TABLE */
+        table {
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        table, th, td {
+            border: 1px solid #000;
+        }
+        th, td {
+            padding: 8px;
+        }
+
+        /* Múltipla escolha, V/F, etc. */
+        .choice-container {
+            margin-left: 20px;
+            margin-bottom: 10px;
+        }
+
+        /* Tabela ou box harmoniosa (#BOX) */
+        .info-box {
+            border: 1px solid #333;
+            background-color: #f0f8ff;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+
         /* Ajustes de responsividade para telas pequenas */
         @media (max-width: 600px) {
             .container {
@@ -174,16 +201,13 @@
                 margin-top: 10px;
                 margin-right: 0;
             }
-
-            /* Garantir que os elementos de texto quebrem corretamente */
             .exercise-line {
-                font-size: 1rem; /* Manter tamanho da fonte */
+                font-size: 1rem; 
                 word-break: break-word;
                 white-space: normal;
             }
-
             .free-text-span {
-                width: 100px; /* Ajuste para telas pequenas */
+                width: 100px; 
             }
         }
     </style>
@@ -219,7 +243,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <script>
-    // Configuração do Firebase
+    //====================================================
+    //  (1) Firebase Configuration
+    //====================================================
     const firebaseConfig = {
         apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
         authDomain: "hannahenglishcourse.firebaseapp.com",
@@ -232,23 +258,31 @@
     };
     firebase.initializeApp(firebaseConfig);
 
-    // Variáveis de controle
-    let checkCount = 0;        // Conta quantas vezes o aluno clicou em "Check Answers".
-    let allInputs = [];        // Guardaremos referência a todos os campos (objeto com input, answer e span)
-    let userData = {};         // Informações do usuário logado (para ver se é aluno e se está atrelado a professor)
-    let linesFromFile = [];    // Guardamos as linhas do arquivo exercicios.txt para gerar o PDF sem respostas
+    //====================================================
+    //  (2) Global Variables
+    //====================================================
+    let checkCount = 0;       
+    let userData = {};        
+    let linesFromFile = [];   
+    // Array para todos os tipos de questão
+    let questionObjects = [];
 
-    // Extrair parâmetros da URL
-    function getParamsFromURL() {
-        const params = new URLSearchParams(window.location.search);
-        return {
-            level: params.get('level'),
-            unit: params.get('unit'),
-            fase: params.get('fase'),
-        };
+    //====================================================
+    //  (3) Auth & Data
+    //====================================================
+    function ensureUserIsAuthenticated(callback) {
+        firebase.auth().onAuthStateChanged(function (user) {
+            if (user) {
+                loadUserData(user.uid, () => {
+                    callback(user.uid);
+                });
+            } else {
+                console.error("User is not authenticated.");
+                alert("You need to be logged in to proceed.");
+            }
+        });
     }
 
-    // Carregar dados do usuário
     async function loadUserData(userId, callback) {
         try {
             const snapshot = await firebase.database().ref('usuarios/' + userId).once('value');
@@ -260,37 +294,30 @@
         }
     }
 
-    // Garantir que o usuário esteja autenticado
-    function ensureUserIsAuthenticated(callback) {
-        firebase.auth().onAuthStateChanged(function (user) {
-            if (user) {
-                // Carrega dados do usuário
-                loadUserData(user.uid, () => {
-                    callback(user.uid);
-                });
-            } else {
-                console.error("User is not authenticated.");
-                alert("You need to be logged in to proceed.");
-            }
-        });
+    //====================================================
+    //  (4) Phase Navigation
+    //====================================================
+    function getParamsFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        return {
+            level: params.get('level'),
+            unit: params.get('unit'),
+            fase: params.get('fase'),
+        };
     }
 
-    // Atualizar para a próxima fase, unidade ou nível
     async function updateNextPhase(userId) {
         const { level, unit, fase } = getParamsFromURL();
         const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
 
         try {
             if (fase === "last") {
-                // Próxima unidade
                 const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
                 await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
             } else if (fase === "end") {
-                // Próximo nível
                 const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
                 await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
             } else {
-                // Fase intermediária
                 const nextFase = parseInt(fase, 10) + 1;
                 await dbRef.update({ 
                     [`fase${fase}`]: true,
@@ -302,26 +329,12 @@
         }
     }
 
-    // Marcar a fase atual como concluída
     function markPhaseCompleted() {
         ensureUserIsAuthenticated((userId) => {
             updateNextPhase(userId);
         });
     }
 
-    // Exibir modal de conclusão
-    function showModal() {
-        const overlay = document.getElementById('completion-modal-overlay');
-        overlay.style.display = 'flex';
-    }
-
-    // Fechar modal de conclusão
-    function closeModal() {
-        const overlay = document.getElementById('completion-modal-overlay');
-        overlay.style.display = 'none';
-    }
-
-    // Validação de navegação no botão "Back"
     function goBack() {
         const { level, unit, fase } = getParamsFromURL();
         ensureUserIsAuthenticated((userId) => {
@@ -348,7 +361,9 @@
         });
     }
 
-    // Função para tocar o alarme por 4 segundos (só se role=aluno e atrelado_professor)
+    //====================================================
+    //  (5) Alarm
+    //====================================================
     function playAlarm() {
         const audio = new Audio('alarme.mp3');
         audio.play();
@@ -358,63 +373,211 @@
         }, 4000);
     }
 
-    // Função principal para checar todas as respostas
+    //====================================================
+    //  (6) Check Answers
+    //====================================================
     function checkAllAnswers() {
         checkCount++;
-        let allCorrect = true; // Verifica se todas estão corretas
-        const wrongInputs = [];
+        let allCorrect = true;
+        let wrongItems = [];
 
-        // 1) Verificar cada input
-        allInputs.forEach(item => {
-            const userAnswer = item.input.value.trim().toLowerCase();
-            const correctAnswer = item.correctAnswer.trim().toLowerCase();
+        // Loop principal das questões
+        questionObjects.forEach(qObj => {
 
-            if (userAnswer === correctAnswer) {
-                // Certo
-                item.input.classList.remove('incorrect');
-                item.input.classList.add('correct');
-                item.correctAnswerSpan.style.display = 'none';
-            } else {
-                // Errado
-                item.input.classList.remove('correct');
-                item.input.classList.add('incorrect');
-                allCorrect = false;
-                wrongInputs.push(item.input);
+            //-------------- TEXT INPUT --------------
+            if (qObj.qtype === 'textInput') {
+                const userAnswer = qObj.userInputDOM.value.trim().toLowerCase();
+                const correct = qObj.correctAnswer.trim().toLowerCase();
+                if (userAnswer === correct) {
+                    qObj.userInputDOM.classList.remove('incorrect');
+                    qObj.userInputDOM.classList.add('correct');
+                    qObj.correctSpanDOM.style.display = 'none';
+                } else {
+                    allCorrect = false;
+                    wrongItems.push(qObj.userInputDOM);
+                    qObj.userInputDOM.classList.remove('correct');
+                    qObj.userInputDOM.classList.add('incorrect');
+                }
             }
+
+            //-------------- MULTIPLE CHOICE --------------
+            else if (qObj.qtype === 'multipleChoice') {
+                const radios = qObj.containerDOM.querySelectorAll('input[type="radio"]');
+                let userChoice = null;
+                radios.forEach(r => {
+                    if (r.checked) {
+                        userChoice = r.value.trim().toUpperCase();
+                    }
+                });
+                if (!userChoice || userChoice !== qObj.correctAnswer.toUpperCase()) {
+                    allCorrect = false;
+                    wrongItems.push(qObj.containerDOM);
+                    qObj.containerDOM.style.color = 'red';
+                } else {
+                    qObj.containerDOM.style.color = 'blue';
+                }
+            }
+
+            //-------------- TRUE/FALSE --------------
+            else if (qObj.qtype === 'trueFalse') {
+                const radios = qObj.containerDOM.querySelectorAll('input[type="radio"]');
+                let userChoice = null;
+                radios.forEach(r => {
+                    if (r.checked) {
+                        userChoice = r.value.trim().toUpperCase();
+                    }
+                });
+                if (!userChoice || userChoice !== qObj.correctAnswer.toUpperCase()) {
+                    allCorrect = false;
+                    wrongItems.push(qObj.containerDOM);
+                    qObj.containerDOM.style.color = 'red';
+                } else {
+                    qObj.containerDOM.style.color = 'blue';
+                }
+            }
+
+            //-------------- MATCHING --------------
+            else if (qObj.qtype === 'matching') {
+                let mismatch = false;
+                qObj.pairs.forEach(pair => {
+                    const typed = pair.inputDOM.value.trim().toLowerCase();
+                    const corr = pair.correctValue.trim().toLowerCase();
+                    if (typed !== corr) {
+                        mismatch = true;
+                        wrongItems.push(pair.inputDOM);
+                        pair.inputDOM.classList.remove('correct');
+                        pair.inputDOM.classList.add('incorrect');
+                    } else {
+                        pair.inputDOM.classList.remove('incorrect');
+                        pair.inputDOM.classList.add('correct');
+                    }
+                });
+                if (mismatch) allCorrect = false;
+            }
+
+            //-------------- ORDERING --------------
+            else if (qObj.qtype === 'ordering') {
+    let containerDOM = qObj.containerDOM;
+    let inputs = containerDOM.querySelectorAll('input.answer-input');
+    let anyWrong = false;
+
+    console.log(`Checking ordering question ${qObj.index}. Expected order:`, qObj.correctPositions);
+
+    for (let i = 0; i < qObj.items.length; i++) {
+        const correctPos = qObj.correctPositions[i]; 
+        let userVal = parseInt(inputs[i].value.trim(), 10);
+
+        console.log(`User input for "${qObj.items[i]}":`, userVal, `(Correct: ${correctPos})`);
+
+        if (isNaN(userVal) || userVal !== correctPos) {
+            anyWrong = true;
+            inputs[i].classList.remove('correct');
+            inputs[i].classList.add('incorrect');
+
+            let correctSpan = inputs[i].parentNode.querySelector('.correct-answer-span');
+
+            // Só mostra a resposta certa após a terceira tentativa
+            if (checkCount >= 3 && correctSpan) {
+                correctSpan.textContent = `Right position: ${correctPos}`;
+                correctSpan.style.display = 'inline';
+            }
+        } else {
+            inputs[i].classList.remove('incorrect');
+            inputs[i].classList.add('correct');
+
+            let correctSpan = inputs[i].parentNode.querySelector('.correct-answer-span');
+            if (correctSpan) {
+                correctSpan.style.display = 'none';
+            }
+        }
+    }
+
+    if (anyWrong) allCorrect = false;
+}
         });
 
-        // 2) Se houver erros, verificar se usuário é "aluno" e atrelado a professor, então tocar alarme
+        // Se existem erros e o usuário é aluno atrelado a professor => toco o alarme
         if (!allCorrect) {
-            if (
-                userData.role === 'aluno' &&
-                userData.atrelado_professor &&
-                userData.atrelado_professor.trim() !== ''
-            ) {
+            if (userData.role === 'aluno' && userData.atrelado_professor && userData.atrelado_professor.trim() !== '') {
                 playAlarm();
             }
-            // Scroll para o primeiro erro
-            if (wrongInputs.length > 0) {
-                wrongInputs[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (wrongItems.length > 0 && wrongItems[0].scrollIntoView) {
+                wrongItems[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         }
 
-        // 3) Lógica de repetição/tentativas
+        //-------------- TERCEIRA TENTATIVA => MOSTRAR RESPOSTAS --------------
         if (checkCount === 3) {
-            // Na terceira vez: mostrar as respostas corretas nos que ainda estiverem errados
-            allInputs.forEach(item => {
-                const userAnswer = item.input.value.trim().toLowerCase();
-                const correctAnswer = item.correctAnswer.trim().toLowerCase();
-                if (userAnswer !== correctAnswer) {
-                    item.correctAnswerSpan.textContent = `Right answer: ${item.correctAnswer}`;
-                    item.correctAnswerSpan.style.display = 'inline';
+            questionObjects.forEach(qObj => {
+                if (qObj.qtype === 'textInput') {
+                    const typed = qObj.userInputDOM.value.trim().toLowerCase();
+                    const correct = qObj.correctAnswer.trim().toLowerCase();
+                    if (typed !== correct) {
+                        qObj.correctSpanDOM.textContent = `Right answer: ${qObj.correctAnswer}`;
+                        qObj.correctSpanDOM.style.display = 'inline';
+                    }
+                }
+                else if (qObj.qtype === 'multipleChoice') {
+                    const radios = qObj.containerDOM.querySelectorAll('input[type="radio"]');
+                    let userChoice = null;
+                    radios.forEach(r => {
+                        if (r.checked) {
+                            userChoice = r.value.trim().toUpperCase();
+                        }
+                    });
+                    if (!userChoice || userChoice !== qObj.correctAnswer.toUpperCase()) {
+                        qObj.containerDOM.insertAdjacentHTML(
+                            'beforeend',
+                            `<div class="exercise-line" style="color:blue; font-weight:bold;">Right answer: ${qObj.correctAnswer}</div>`
+                        );
+                    }
+                }
+                else if (qObj.qtype === 'trueFalse') {
+                    const radios = qObj.containerDOM.querySelectorAll('input[type="radio"]');
+                    let userChoice = null;
+                    radios.forEach(r => {
+                        if (r.checked) {
+                            userChoice = r.value.trim().toUpperCase();
+                        }
+                    });
+                    if (!userChoice || userChoice !== qObj.correctAnswer.toUpperCase()) {
+                        qObj.containerDOM.insertAdjacentHTML(
+                            'beforeend',
+                            `<div class="exercise-line" style="color:blue; font-weight:bold;">Right answer: ${qObj.correctAnswer}</div>`
+                        );
+                    }
+                }
+                else if (qObj.qtype === 'matching') {
+                    qObj.pairs.forEach(pair => {
+                        const typed = pair.inputDOM.value.trim().toLowerCase();
+                        const corr = pair.correctValue.trim().toLowerCase();
+                        if (typed !== corr) {
+                            pair.correctSpanDOM.textContent = `Right answer: ${pair.correctValue}`;
+                            pair.correctSpanDOM.style.display = 'inline';
+                        }
+                    });
+                }
+                else if (qObj.qtype === 'ordering') {
+                    // Somente na 3ª tentativa mostramos "Right position"
+                    let containerDOM = qObj.containerDOM;
+                    let inputs = containerDOM.querySelectorAll('input.answer-input');
+                    for (let i = 0; i < qObj.items.length; i++) {
+                        const correctPos = qObj.correctPositions[i];
+                        const userVal = parseInt(inputs[i].value.trim(), 10);
+                        if (userVal !== correctPos) {
+                            const span = inputs[i].parentNode.querySelector('.correct-answer-span');
+                            if (span) {
+                                span.textContent = `Right position: ${correctPos}`;
+                                span.style.display = 'inline';
+                            }
+                        }
+                    }
                 }
             });
-            // Concluir a atividade
             markPhaseCompleted();
             showModal();
-
         } else {
-            // Se não for a terceira tentativa, mas o usuário já acertou tudo, conclui a atividade
+            // Se não é terceira tentativa e está tudo certo => concluído
             if (allCorrect) {
                 markPhaseCompleted();
                 showModal();
@@ -422,7 +585,478 @@
         }
     }
 
-    // Carregar conteúdo do arquivo exercicios.txt
+    function showModal() {
+        const overlay = document.getElementById('completion-modal-overlay');
+        overlay.style.display = 'flex';
+    }
+    function closeModal() {
+        const overlay = document.getElementById('completion-modal-overlay');
+        overlay.style.display = 'none';
+    }
+
+    //====================================================
+    //  (7) Parsing the lines into questionObjects
+    //====================================================
+    function parseFileLines(lines) {
+        let htmlAccum = '';  
+        let i = 0;
+        function nextLine() { i++; }
+
+        while (i < lines.length) {
+            let raw = lines[i];
+            let line = raw.trim();
+            if (!line) {
+                nextLine();
+                continue;
+            }
+
+            //-------------- #TITLE --------------
+            if (line.toUpperCase().startsWith('#TITLE:')) {
+                let titleText = line.substring(7).trim();
+                htmlAccum += `<h2 class="exercise-title">${titleText}</h2>`;
+                nextLine();
+                continue;
+            }
+
+            //-------------- Exercise X: --------------
+            if (/^Exercise\s+\d+:/i.test(line)) {
+                htmlAccum += `<div class="exercise-description">${line}</div>`;
+                nextLine();
+                continue;
+            }
+
+            //-------------- #IMG --------------
+            if (line.toUpperCase().startsWith('#IMG:')) {
+                let file = line.substring(5).trim();
+                htmlAccum += `<div class="exercise-line"><img data-imgfile="${file}" style="max-width:100%; height:auto;" alt="Image"></div>`;
+                nextLine();
+                continue;
+            }
+
+            //-------------- #TABLE --------------
+            if (line.toUpperCase().startsWith('#TABLE')) {
+                let tableLines = [];
+                nextLine();
+                while (i < lines.length) {
+                    let check = lines[i].trim().toUpperCase();
+                    if (check.startsWith('#ENDTABLE')) {
+                        nextLine();
+                        break;
+                    }
+                    tableLines.push(lines[i]);
+                    nextLine();
+                }
+                htmlAccum += `<table>`;
+                tableLines.forEach(row => {
+                    if (!row) return;
+                    let cells = row.split('|').map(x=>x.trim());
+                    htmlAccum += `<tr>`;
+                    cells.forEach(td => {
+                        htmlAccum += `<td>${td}</td>`;
+                    });
+                    htmlAccum += `</tr>`;
+                });
+                htmlAccum += `</table>`;
+                continue;
+            }
+
+            //-------------- #BOX --------------
+            if (line.toUpperCase().startsWith('#BOX')) {
+                let boxLines = [];
+                nextLine();
+                while (i < lines.length) {
+                    let c = lines[i].trim().toUpperCase();
+                    if (c.startsWith('#ENDBOX')) {
+                        nextLine();
+                        break;
+                    }
+                    boxLines.push(lines[i]);
+                    nextLine();
+                }
+                let boxHTML = `<div class="info-box">`;
+                boxLines.forEach(bl => {
+                    boxHTML += bl + "<br>";
+                });
+                boxHTML += `</div>`;
+                htmlAccum += boxHTML;
+                continue;
+            }
+
+            //-------------- #MULTIPLE_CHOICE --------------
+            if (line.toUpperCase().startsWith('#MULTIPLE_CHOICE:')) {
+                let questionText = line.substring(17).trim();
+                let questionIndex = questionObjects.length;
+                let options = [];
+                let corrLetter = null;
+                nextLine();
+                while (i < lines.length) {
+                    let check = lines[i].trim();
+                    if (check.toUpperCase().startsWith('#END_MULTIPLE_CHOICE')) {
+                        nextLine();
+                        break;
+                    }
+                    if (check.toUpperCase().startsWith('#CORRECT:')) {
+                        corrLetter = check.substring(9).trim();
+                        nextLine();
+                    } else {
+                        options.push(lines[i]);
+                        nextLine();
+                    }
+                }
+                let containerID = `multichoice_container_${questionIndex}`;
+                htmlAccum += `<div class="exercise-line"><strong>${questionText}</strong></div>`;
+                htmlAccum += `<div class="choice-container" id="${containerID}"></div>`;
+
+                questionObjects.push({
+                    qtype: 'multipleChoice',
+                    index: questionIndex,
+                    questionText,
+                    correctAnswer: (corrLetter||'').toUpperCase(),
+                    options, 
+                    containerDOM: null
+                });
+                continue;
+            }
+
+            //-------------- #TRUE_FALSE --------------
+            if (line.toUpperCase().startsWith('#TRUE_FALSE:')) {
+                let statement = line.substring(11).trim();
+                let questionIndex = questionObjects.length;
+                let correctVal = 'V';
+                nextLine();
+                while (i < lines.length) {
+                    let check = lines[i].trim().toUpperCase();
+                    if (check.startsWith('#END_TRUE_FALSE')) {
+                        nextLine();
+                        break;
+                    }
+                    if (check.startsWith('#CORRECT:')) {
+                        correctVal = lines[i].substring(9).trim();
+                        nextLine();
+                    } else {
+                        nextLine();
+                    }
+                }
+                let containerID = `truefalse_container_${questionIndex}`;
+                htmlAccum += `<div class="exercise-line"><strong>${statement}</strong></div>`;
+                htmlAccum += `
+                  <div class="choice-container" id="${containerID}">
+                  </div>
+                `;
+                questionObjects.push({
+                    qtype: 'trueFalse',
+                    index: questionIndex,
+                    statement,
+                    correctAnswer: correctVal,
+                    containerDOM: null
+                });
+                continue;
+            }
+
+            //-------------- #MATCHING --------------
+            if (line.toUpperCase().startsWith('#MATCHING:')) {
+                let questionIndex = questionObjects.length;
+                let pairs = [];
+                nextLine();
+                while (i < lines.length) {
+                    let check = lines[i].trim().toUpperCase();
+                    if (check.startsWith('#END_MATCHING')) {
+                        nextLine();
+                        break;
+                    }
+                    if (!lines[i].trim()) {
+                        nextLine();
+                        continue;
+                    }
+                    if (lines[i].includes('=')) {
+                        let [left, right] = lines[i].split('=');
+                        pairs.push({
+                            leftValue: (left||'').trim(),
+                            correctValue: (right||'').trim()
+                        });
+                    }
+                    nextLine();
+                }
+                let containerID = `matching_container_${questionIndex}`;
+                htmlAccum += `<div class="exercise-line"><strong>Associação de colunas</strong></div>`;
+                htmlAccum += `<div class="choice-container" id="${containerID}"></div>`;
+
+                questionObjects.push({
+                    qtype: 'matching',
+                    index: questionIndex,
+                    pairs, 
+                    containerDOM: null
+                });
+                continue;
+            }
+
+          //-------------- #ORDERING --------------
+if (line.toUpperCase().startsWith('#ORDERING:')) {
+    let questionIndex = questionObjects.length;
+    let items = [];
+    let correctPositions = [];
+    nextLine();
+
+    while (i < lines.length) {
+        let check = lines[i].trim();
+        if (check.toUpperCase().startsWith('#END_ORDERING')) {
+            nextLine();
+            break;
+        }
+        if (check.toUpperCase().startsWith('#CORRECT_ORDER:')) {
+            let seq = check.substring(14).trim();
+
+            // Convertendo corretamente os valores e removendo caracteres inválidos
+            correctPositions = seq.split(',').map(x => {
+                let cleaned = x.replace(/[^\d]/g, '').trim(); // Remove caracteres não numéricos
+                let num = parseInt(cleaned, 10);
+                
+                if (isNaN(num) || num <= 0) { 
+                    console.error(`⚠️ Erro ao converter posição em questão de ordenação: '${x.trim()}' não é um número válido.`);
+                    return -1; // Substitui valores inválidos para debug
+                }
+                return num;
+            });
+
+            console.log(`✔️ Posições lidas para questão de ordenação ${questionIndex}:`, correctPositions);
+            nextLine();
+        } else {
+            // Cada linha é um item da questão de ordenação
+            if (check) items.push(check);
+            nextLine();
+        }
+    }
+
+    // Verificação de integridade: número de itens e posições devem ser iguais
+    if (correctPositions.includes(-1) || correctPositions.length !== items.length) {
+        console.error(`⚠️ Erro na questão de ordenação ${questionIndex}: Número incorreto de posições.`);
+        console.error(`Itens encontrados: ${items.length}, Posições lidas: ${correctPositions.length}`);
+    }
+
+    let containerID = `ordering_container_${questionIndex}`;
+    htmlAccum += `<div class="exercise-line"><strong>Ordenação de sequência</strong></div>`;
+    htmlAccum += `<div class="choice-container" id="${containerID}"></div>`;
+
+    // Armazena a questão
+    questionObjects.push({
+        qtype: 'ordering',
+        index: questionIndex,
+        items,
+        correctPositions,
+        containerDOM: null
+    });
+
+    continue;
+}
+
+            //-------------- [Answer: ] e [FreeText] --------------
+            if (line.includes('[Answer:') && line.includes('[FreeText]')) {
+                let [qPart, aPart] = line.split('[Answer:');
+                let correctVal = aPart.split(']')[0].trim();
+                let inputSize = '150px';
+                let useTextarea = false;
+
+                let sizeMatch = qPart.match(/\[size:(.*?)\]/);
+                if (sizeMatch) {
+                    let sizeVal = sizeMatch[1].trim().toLowerCase();
+                    if (sizeVal === 'small') inputSize = '30px';
+                    if (sizeVal === 'medium') inputSize = '150px';
+                    if (sizeVal === 'large') inputSize = '300px';
+                    if (sizeVal === 'huge') inputSize = '800px';
+                    if (sizeVal === 'essay') useTextarea = true;
+                }
+                let cleanedQ = qPart.replace(/\[size:.*?\]/,'').trim();
+                let placeholderIndex = questionObjects.length;
+                htmlAccum += `<div class="exercise-line" data-question-idx="${placeholderIndex}" data-qtype="textInputWithFreeText">`;
+                if (!useTextarea) {
+                    cleanedQ = cleanedQ.replace('___', `<input type="text" class="answer-input" style="width:${inputSize};" />`);
+                } else {
+                    cleanedQ = cleanedQ.replace('___', `<textarea rows="4" class="answer-input" style="width:100%;"></textarea>`);
+                }
+                htmlAccum += `${cleanedQ}<span class="correct-answer-span"></span></div>`;
+                htmlAccum += `<div class="exercise-line"><span class="free-text-span"></span></div>`;
+
+                questionObjects.push({
+                    qtype: 'textInput',
+                    correctAnswer: correctVal,
+                    userInputDOM: null,
+                    correctSpanDOM: null
+                });
+                nextLine();
+                continue;
+            }
+
+            if (line.includes('[FreeText]') && !line.includes('[Answer:')) {
+                let stripped = line.replace('[FreeText]','').trim();
+                htmlAccum += `<div class="exercise-line">${stripped}<span class="free-text-span"></span></div>`;
+                nextLine();
+                continue;
+            }
+
+            if (line.includes('[Answer:') && !line.includes('[FreeText]')) {
+                let [qPart, aPart] = line.split('[Answer:');
+                let correctVal = aPart.replace(']','').trim();
+                let inputSize = '150px';
+                let useTextarea = false;
+                let sizeM = qPart.match(/\[size:(.*?)\]/);
+                if (sizeM) {
+                    let sVal = sizeM[1].trim().toLowerCase();
+                    if (sVal === 'small') inputSize = '30px';
+                    if (sVal === 'medium') inputSize = '150px';
+                    if (sVal === 'large') inputSize = '300px';
+                    if (sVal === 'huge') inputSize = '800px';
+                    if (sVal === 'essay') useTextarea = true;
+                }
+                let cQ = qPart.replace(/\[size:.*?\]/,'').trim();
+                let placeIndex = questionObjects.length;
+                htmlAccum += `<div class="exercise-line" data-question-idx="${placeIndex}" data-qtype="textInputOnly">`;
+                if (!useTextarea) {
+                    cQ = cQ.replace('___', `<input type="text" class="answer-input" style="width:${inputSize};" />`);
+                } else {
+                    cQ = cQ.replace('___', `<textarea rows="4" class="answer-input" style="width:100%;"></textarea>`);
+                }
+                htmlAccum += `${cQ}<span class="correct-answer-span"></span></div>`;
+
+                questionObjects.push({
+                    qtype: 'textInput',
+                    correctAnswer: correctVal,
+                    userInputDOM: null,
+                    correctSpanDOM: null
+                });
+                nextLine();
+                continue;
+            }
+
+            //-------------- Se não caiu em nada, é texto simples --------------
+            htmlAccum += `<div class="exercise-line">${line}</div>`;
+            nextLine();
+        }
+
+        return htmlAccum;
+    }
+
+    //====================================================
+    //  (8) Render Questions (com a nova lógica #ORDERING)
+    //====================================================
+    function renderQuestions(container) {
+        // Renderizamos cada tipo
+        questionObjects.forEach((qObj) => {
+
+            // ---------- multipleChoice ----------
+            if (qObj.qtype === 'multipleChoice') {
+                let cID = `multichoice_container_${qObj.index}`;
+                let containerDOM = container.querySelector(`#${cID}`);
+                if (containerDOM) {
+                    qObj.options.forEach(optLine => {
+                        let trimmedOpt = optLine.trim();
+                        let letterMatch = trimmedOpt.match(/^([A-Z])\)\s*/i);
+                        let rValue = trimmedOpt;
+                        if (letterMatch) {
+                            rValue = letterMatch[1].toUpperCase();
+                        }
+                        let divOption = document.createElement('div');
+                        divOption.innerHTML = `
+                          <label>
+                            <input type="radio" name="mcq_group_${qObj.index}" value="${rValue}">
+                            ${trimmedOpt}
+                          </label>
+                        `;
+                        containerDOM.appendChild(divOption);
+                    });
+                }
+                qObj.containerDOM = containerDOM;
+            }
+
+            // ---------- trueFalse ----------
+            else if (qObj.qtype === 'trueFalse') {
+                let cID = `truefalse_container_${qObj.index}`;
+                let containerDOM = container.querySelector(`#${cID}`);
+                if (containerDOM) {
+                    containerDOM.innerHTML = `
+                      <label>
+                        <input type="radio" name="tf_group_${qObj.index}" value="V">True
+                      </label>
+                      <label style="margin-left:20px;">
+                        <input type="radio" name="tf_group_${qObj.index}" value="F">False
+                      </label>
+                    `;
+                }
+                qObj.containerDOM = containerDOM;
+            }
+
+            // ---------- matching ----------
+            else if (qObj.qtype === 'matching') {
+                let cID = `matching_container_${qObj.index}`;
+                let containerDOM = container.querySelector(`#${cID}`);
+                if (containerDOM) {
+                    qObj.pairs.forEach((p) => {
+                        let lineDiv = document.createElement('div');
+                        lineDiv.classList.add('exercise-line');
+                        lineDiv.innerHTML = `
+                          <strong>${p.leftValue}</strong> =
+                          <input type="text" class="answer-input" style="width:150px;" />
+                          <span class="correct-answer-span"></span>
+                        `;
+                        containerDOM.appendChild(lineDiv);
+                    });
+                }
+                qObj.containerDOM = containerDOM;
+            }
+
+            // ---------- ordering ----------
+            else if (qObj.qtype === 'ordering') {
+                let cID = `ordering_container_${qObj.index}`;
+                let containerDOM = container.querySelector(`#${cID}`);
+                if (containerDOM) {
+                    qObj.items.forEach((txt) => {
+                        let divLine = document.createElement('div');
+                        divLine.classList.add('exercise-line');
+                        divLine.innerHTML = `
+                          <strong>${txt}</strong>
+                          <input type="text" class="answer-input" style="width:50px; margin-left:10px;" placeholder="Pos"/>
+                          <span class="correct-answer-span"></span>
+                        `;
+                        containerDOM.appendChild(divLine);
+                    });
+                }
+                qObj.containerDOM = containerDOM;
+            }
+        });
+
+        // ---------- textInput ----------
+        let textLines = container.querySelectorAll('[data-qtype]');
+        textLines.forEach(tLine => {
+            let qIdx = parseInt(tLine.getAttribute('data-question-idx'),10);
+            let questObj = questionObjects[qIdx];
+            let inputEl = tLine.querySelector('.answer-input');
+            let spanEl = tLine.querySelector('.correct-answer-span');
+            if (questObj && questObj.qtype === 'textInput') {
+                questObj.userInputDOM = inputEl;
+                questObj.correctSpanDOM = spanEl;
+            }
+        });
+
+        // ---------- associando inputs em matching e ordering ----------
+        questionObjects.forEach((qObj) => {
+            if (qObj.qtype === 'matching') {
+                let cDOM = qObj.containerDOM;
+                let lineDivs = cDOM ? cDOM.querySelectorAll('.exercise-line') : [];
+                qObj.pairs.forEach((pair, pIdx) => {
+                    let input = lineDivs[pIdx].querySelector('.answer-input');
+                    let cSpan = lineDivs[pIdx].querySelector('.correct-answer-span');
+                    pair.inputDOM = input;
+                    pair.correctSpanDOM = cSpan;
+                });
+            }
+            else if (qObj.qtype === 'ordering') {
+                // Inputs serão checados em checkAllAnswers()
+            }
+        });
+    }
+
+    //====================================================
+    //  (9) Load the file & Build
+    //====================================================
     async function loadContent() {
         const { level, unit } = getParamsFromURL();
         if (!level || !unit) {
@@ -437,186 +1071,20 @@
             if (!response.ok) throw new Error(`Error loading file: ${basePath}exercicios.txt`);
 
             const data = await response.text();
-            linesFromFile = data.split('\n'); // Guardamos para o PDF também
+            linesFromFile = data.split('\n');
 
-            const exercisesDiv = document.getElementById('exercises');
-            let htmlContent = '';
-            allInputs = []; // reset
+            let container = document.getElementById('exercises');
+            let rawHTML = parseFileLines(linesFromFile);
+            container.innerHTML = rawHTML;
 
-            linesFromFile.forEach((line) => {
-                let trimmedLine = line.trim();
+            // Renderiza as questões
+            renderQuestions(container);
 
-                // 1) Capturar título (#TITLE: ...)
-                if (trimmedLine.startsWith('#TITLE:')) {
-                    const titleText = trimmedLine.replace('#TITLE:', '').trim();
-                    htmlContent += `<h2 class="exercise-title">${titleText}</h2>`;
-                    return;
-                }
-
-                // 2) Se começa com "Exercise X:" -> inserir como subtítulo em negrito
-                if (/^Exercise\s+\d+:/i.test(trimmedLine)) {
-                    htmlContent += `<div class="exercise-description">${trimmedLine}</div>`;
-                    return;
-                }
-
-                // 3) Linhas de múltipla escolha ou explicações (A), (B), ...
-                //    Se não contiver [Answer:] nem [FreeText], apenas exibe como texto normal
-                if (trimmedLine && !trimmedLine.includes('[Answer:') && !trimmedLine.includes('[FreeText]')) {
-                    htmlContent += `<div class="exercise-line">${trimmedLine}</div>`;
-                    return;
-                }
-
-                // 4) Linhas que contêm ambos [Answer:] e [FreeText]
-                if (trimmedLine.includes('[Answer:') && trimmedLine.includes('[FreeText]')) {
-                    // Extrair partes
-                    let [questionPart, answerPartWithFreeText] = trimmedLine.split('[Answer:');
-                    const cleanAnswer = answerPartWithFreeText.split(']')[0].trim();
-
-                    // Verificar [size:small], [size:medium], [size:large], [size:huge], [size:essay]
-                    let inputSize = '150px'; // default
-                    let useTextarea = false;
-                    const sizeMatch = questionPart.match(/\[size:(.*?)\]/);
-
-                    if (sizeMatch) {
-                        const sizeValue = sizeMatch[1].trim();
-                        if (sizeValue === 'small') inputSize = '30px';
-                        if (sizeValue === 'medium') inputSize = '150px'; 
-                        if (sizeValue === 'large') inputSize = '300px'; 
-                        if (sizeValue === 'huge') inputSize = '800px'; 
-                        if (sizeValue === 'essay') {
-                            useTextarea = true;
-                            // Largura 100% + rows
-                        }
-                    }
-
-                    // Remover [size:..] do texto a ser exibido
-                    let displayQuestion = questionPart.replace(/\[size:.*?\]/, '').trim();
-
-                    if (!useTextarea) {
-                        // Substituir o "___" por input
-                        displayQuestion = displayQuestion.replace('___', `<input type="text" class="answer-input" style="width:${inputSize};" />`);
-                    } else {
-                        // Substituir o "___" por textarea
-                        displayQuestion = displayQuestion.replace('___', `<textarea rows="4" class="answer-input" style="width:100%;"></textarea>`);
-                    }
-
-                    // Adicionar o campo de resposta
-                    htmlContent += `
-                        <div class="exercise-line">
-                            ${displayQuestion}
-                            <span class="correct-answer-span"></span>
-                        </div>
-                    `;
-
-                    // Adicionar a linha de texto livre inline
-                    htmlContent += `
-                        <div class="exercise-line">
-                            <span class="free-text-span"></span>
-                        </div>
-                    `;
-                    return;
-                }
-
-                // 5) Linhas de texto livre (não corrigidas)
-                if (trimmedLine.includes('[FreeText]') && !trimmedLine.includes('[Answer:')) {
-                    // Remover a marcação [FreeText] do texto a ser exibido
-                    let displayText = trimmedLine.replace('[FreeText]', '').trim();
-
-                    // Renderizar o texto seguido de uma linha para digitação livre
-                    htmlContent += `
-                        <div class="exercise-line">
-                            ${displayText}
-                            <span class="free-text-span"></span>
-                        </div>
-                    `;
-                    return;
-                }
-
-                // 6) Quando encontramos [Answer:], tratamos como pergunta
-                if (trimmedLine.includes('[Answer:') && !trimmedLine.includes('[FreeText]')) {
-                    let [questionPart, answerPart] = trimmedLine.split('[Answer:');
-                    const cleanAnswer = answerPart.replace(']', '').trim();
-
-                    // Verificar [size:small], [size:medium], [size:large], [size:huge], [size:essay]
-                    let inputSize = '150px'; // default
-                    let useTextarea = false;
-                    const sizeMatch = questionPart.match(/\[size:(.*?)\]/);
-
-                    if (sizeMatch) {
-                        const sizeValue = sizeMatch[1].trim();
-                        if (sizeValue === 'small') inputSize = '30px';
-                        if (sizeValue === 'medium') inputSize = '150px'; 
-                        if (sizeValue === 'large') inputSize = '300px'; 
-                        if (sizeValue === 'huge') inputSize = '800px'; 
-                        if (sizeValue === 'essay') {
-                            useTextarea = true;
-                            // Largura 100% + rows
-                        }
-                    }
-
-                    // Remover [size:..] do texto a ser exibido
-                    let displayQuestion = questionPart.replace(/\[size:.*?\]/, '').trim();
-
-                    if (!useTextarea) {
-                        // Substituir o "___" por input
-                        displayQuestion = displayQuestion.replace('___', `<input type="text" class="answer-input" style="width:${inputSize};" />`);
-                    } else {
-                        // Substituir o "___" por textarea
-                        displayQuestion = displayQuestion.replace('___', `<textarea rows="4" class="answer-input" style="width:100%;"></textarea>`);
-                    }
-
-                    // Gera HTML com um span oculto para exibir a resposta correta quando precisar
-                    htmlContent += `
-                        <div class="exercise-line">
-                            ${displayQuestion}
-                            <span class="correct-answer-span"></span>
-                        </div>
-                    `;
-                }
-            });
-
-            // Injeta o HTML no container
-            exercisesDiv.innerHTML = htmlContent;
-
-            // Mapear todos os inputs/areas com suas respostas corretas
-            let answerIndex = 0;
-            linesFromFile.forEach((line) => {
-                if (line.includes('[Answer:') && !line.includes('[FreeText]')) {
-                    let [qPart, aPart] = line.split('[Answer:');
-                    const correctAnswer = aPart.replace(']', '').trim();
-
-                    // Localiza o input correspondente no DOM, na ordem que aparecem
-                    const inputElement = exercisesDiv.querySelectorAll('.answer-input')[answerIndex];
-                    const spanElement = exercisesDiv.querySelectorAll('.correct-answer-span')[answerIndex];
-
-                    if (inputElement && spanElement) {
-                        allInputs.push({
-                            input: inputElement,
-                            correctAnswer: correctAnswer,
-                            correctAnswerSpan: spanElement
-                        });
-                    }
-                    answerIndex++;
-                }
-
-                // Para linhas que contêm ambos [Answer:] e [FreeText], o input é seguido pela linha livre
-                if (line.includes('[Answer:') && line.includes('[FreeText]')) {
-                    let [qPart, aPartWithFreeText] = line.split('[Answer:');
-                    const correctAnswer = aPartWithFreeText.split(']')[0].trim();
-
-                    // Localiza o input correspondente no DOM, na ordem que aparecem
-                    const inputElement = exercisesDiv.querySelectorAll('.answer-input')[answerIndex];
-                    const spanElement = exercisesDiv.querySelectorAll('.correct-answer-span')[answerIndex];
-
-                    if (inputElement && spanElement) {
-                        allInputs.push({
-                            input: inputElement,
-                            correctAnswer: correctAnswer,
-                            correctAnswerSpan: spanElement
-                        });
-                    }
-                    answerIndex++;
-                }
+            // Insere imagens
+            let allImgTags = container.querySelectorAll('img[data-imgfile]');
+            allImgTags.forEach(imgTag => {
+                let fname = imgTag.getAttribute('data-imgfile');
+                imgTag.src = basePath + fname;
             });
 
         } catch (error) {
@@ -625,7 +1093,9 @@
         }
     }
 
-    // Função para gerar PDF (sem respostas), com layout personalizado
+    //====================================================
+    //  (10) PDF Generation (no answers)
+    //====================================================
     function generatePDF() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({
@@ -640,138 +1110,181 @@
         let marginTop = 60;
         let currentY = marginTop;
 
-        // 1) Adicionar a logo (logo.png deve estar na mesma pasta)
-        // Tente ajustar as dimensões da imagem conforme necessário
-        // Se a imagem não for encontrada ou der erro no console, adapte o caminho.
-        try {
-            // Cria uma imagem base64 para evitar problemas de carregamento
-            // Alternativamente, se estiver hospedado em algum lugar acessível, use a URL completa
-            // Aqui assumimos que "logo.png" está acessível
-            const img = new Image();
-            img.src = 'logo.png';
-            img.onload = function() {
-                const imgWidth = 80;
-                const imgHeight = 40;
-                doc.addImage(img, "PNG", marginLeft, currentY, imgWidth, imgHeight);
-                currentY += imgHeight + 20;
-
-                // Continuar a geração após a imagem carregar
-                addPDFContent();
-            };
-            img.onerror = function() {
-                console.error("Logo image not found. Skipping logo in PDF.");
-                addPDFContent();
-            };
-        } catch (error) {
-            console.error("Error loading logo image:", error);
-            addPDFContent();
-        }
-
-        // Função para adicionar o restante do conteúdo no PDF
         function addPDFContent() {
-            // 2) Campos para "Name" e "Date"
             doc.setFontSize(12);
             doc.text("Name: ________________________________________________", marginLeft, currentY);
             currentY += 20;
             doc.text("Date: ____________", marginLeft, currentY);
             currentY += 40;
 
-            // 3) Lê as linhas salvas em linesFromFile e imprime sem mostrar as respostas
-            //    Respeitando as quebras e adicionando linhas para o aluno responder.
-
-            // Função auxiliar para desenhar texto com quebra de linha e controle de página
-            function drawWrappedText(textLines, indent = 0, extraSpaceAfter = false) {
-                const lineHeight = 14; // px
-                const maxWidth = pageWidth - marginLeft * 2 - indent;
+            function drawWrappedText(textArr, indent=0, extraSpaceAfter=false) {
+                const lineHeight = 14;
+                const maxWidth = pageWidth - marginLeft*2 - indent;
                 doc.setFontSize(12);
 
-                textLines.forEach((textLine) => {
-                    const wrapped = doc.splitTextToSize(textLine, maxWidth);
-                    wrapped.forEach((part) => {
+                textArr.forEach(line => {
+                    let splitted = doc.splitTextToSize(line, maxWidth);
+                    splitted.forEach(sub => {
                         if (currentY + lineHeight > pageHeight - 40) {
                             doc.addPage();
                             currentY = marginTop;
                         }
-                        doc.text(part, marginLeft + indent, currentY);
+                        doc.text(sub, marginLeft+indent, currentY);
                         currentY += lineHeight;
                     });
                 });
-
-                if (extraSpaceAfter) {
-                    currentY += lineHeight; // Adiciona uma linha extra
-                }
+                if (extraSpaceAfter) currentY += lineHeight;
             }
 
-            let lastTitle = ""; // Guardar último título (para não repetir)
+            let lastTitle = "";
+            for (let idx=0; idx<linesFromFile.length; idx++){
+                let raw = linesFromFile[idx];
+                let line = raw.trim();
+                if (!line) continue;
 
-            linesFromFile.forEach((rawLine) => {
-                let line = rawLine.trim();
-
-                // Se for título
-                if (line.startsWith('#TITLE:')) {
-                    let theTitle = line.replace('#TITLE:', '').trim();
+                if (line.toUpperCase().startsWith('#TITLE:')){
+                    let theTitle = line.substring(7).trim();
                     lastTitle = theTitle;
-                    // Exibir como título (fonte maior)
                     doc.setFontSize(14);
-                    if (currentY + 20 > pageHeight - 40) {
+                    if (currentY+20 > pageHeight-40){
                         doc.addPage();
                         currentY = marginTop;
                     }
                     doc.text(theTitle, marginLeft, currentY);
                     currentY += 25;
-                    return;
+                    continue;
                 }
-
-                // Se for "Exercise X:"
-                if (/^Exercise\s+\d+:/i.test(line)) {
-                    // Subtítulo em negrito
-                    doc.setFontSize(12);
-                    doc.setFont(undefined, 'bold');
-                    drawWrappedText([line], 0, false); // Não adicionar espaço após o título
-                    doc.setFont(undefined, 'normal');
-                    currentY += 10; // Adicionar espaço entre o título e o conteúdo
-
-                    return;
+                if (/^Exercise\s+\d+:/i.test(line)){
+                    doc.setFont(undefined,'bold');
+                    drawWrappedText([line],0,false);
+                    doc.setFont(undefined,'normal');
+                    currentY += 10;
+                    continue;
                 }
-
-                // Se a linha não tiver [Answer:], imprime normal
-                if (line && !line.includes('[Answer:')) {
-                    drawWrappedText([line], 0, false);
-                    return;
+                if (line.toUpperCase().startsWith('#IMG:')){
+                    let f = line.substring(5).trim();
+                    drawWrappedText(["[Image: "+f+"]"],0,true);
+                    continue;
                 }
-
-                // Se tiver [Answer:], trocamos o input pela linha em branco
-                if (line.includes('[Answer:')) {
-                    let [qPart] = line.split('[Answer:');
-                    
-                    // Remove [size:...] se existir
-                    qPart = qPart.replace(/\[size:.*?\]/, '').trim();
-                    // Substituir "___" por linhas
-                    // Se quiser mais espaço, podemos colocar mais underlines
-                    const questionText = qPart.replace('___', '____________________');
-                    
-                    drawWrappedText([questionText], 0, false);
-                    currentY += 5; // Pequeno espaço após a linha
+                if (line.toUpperCase().startsWith('#TABLE')){
+                    idx++;
+                    let tableLines = [];
+                    while (idx<linesFromFile.length){
+                        let chk = linesFromFile[idx].trim().toUpperCase();
+                        if (chk.startsWith('#ENDTABLE')) break;
+                        tableLines.push(linesFromFile[idx].trim());
+                        idx++;
+                    }
+                    drawWrappedText(["[TABLE START]"],0,false);
+                    tableLines.forEach(tl=>drawWrappedText([tl],10,false));
+                    drawWrappedText(["[TABLE END]"],0,true);
+                    continue;
                 }
-
-                // Adicionar uma linha em branco após o exercício
-                if (/^Exercise\s+\d+:/i.test(line) === false && line === '') {
-                    drawWrappedText([''], 0, true);
+                if (line.toUpperCase().startsWith('#BOX')){
+                    idx++;
+                    let boxLs = [];
+                    while (idx<linesFromFile.length){
+                        let cc = linesFromFile[idx].trim().toUpperCase();
+                        if (cc.startsWith('#ENDBOX')) break;
+                        boxLs.push(linesFromFile[idx]);
+                        idx++;
+                    }
+                    drawWrappedText(["[BOX START]"],0,true);
+                    boxLs.forEach(b=>drawWrappedText([b],10,false));
+                    drawWrappedText(["[BOX END]"],0,true);
+                    continue;
                 }
-            });
+                if (line.toUpperCase().startsWith('#MULTIPLE_CHOICE:')){
+                    let q = line.substring(17).trim();
+                    drawWrappedText(["[Multiple Choice] "+q],0,true);
+                    idx++;
+                    while (idx<linesFromFile.length){
+                        let c = linesFromFile[idx].trim();
+                        if (c.toUpperCase().startsWith('#END_MULTIPLE_CHOICE')) break;
+                        if (!c.toUpperCase().startsWith('#CORRECT:')) {
+                            drawWrappedText(["   "+c],0,false);
+                        }
+                        idx++;
+                    }
+                    drawWrappedText(["[End Multiple Choice]"],0,true);
+                    continue;
+                }
+                if (line.toUpperCase().startsWith('#TRUE_FALSE:')){
+                    let st = line.substring(11).trim();
+                    drawWrappedText(["[True/False] "+st],0,true);
+                    idx++;
+                    while (idx<linesFromFile.length){
+                        let c=linesFromFile[idx].trim();
+                        if (c.toUpperCase().startsWith('#END_TRUE_FALSE')) break;
+                        idx++;
+                    }
+                    drawWrappedText(["[End True/False]"],0,true);
+                    continue;
+                }
+                if (line.toUpperCase().startsWith('#MATCHING:')){
+                    drawWrappedText(["[Matching Columns]"],0,true);
+                    idx++;
+                    while (idx<linesFromFile.length){
+                        let c=linesFromFile[idx].trim();
+                        if (c.toUpperCase().startsWith('#END_MATCHING')) break;
+                        drawWrappedText(["   "+c],0,false);
+                        idx++;
+                    }
+                    drawWrappedText(["[End Matching]"],0,true);
+                    continue;
+                }
+                if (line.toUpperCase().startsWith('#ORDERING:')){
+                    drawWrappedText(["[Ordering Sequence]"],0,true);
+                    idx++;
+                    while (idx<linesFromFile.length){
+                        let c=linesFromFile[idx].trim();
+                        if (c.toUpperCase().startsWith('#END_ORDERING')) break;
+                        drawWrappedText(["   "+c],0,false);
+                        idx++;
+                    }
+                    drawWrappedText(["[End Ordering]"],0,true);
+                    continue;
+                }
+                // fill-ins
+                if (!line.includes('[Answer:')){
+                    drawWrappedText([line],0,false);
+                    continue;
+                }
+                if (line.includes('[Answer:')){
+                    let replaced = line.replace(/\[size:.*?\]/,'');
+                    replaced = replaced.replace('___','__________');
+                    drawWrappedText([replaced],0,true);
+                    continue;
+                }
+            }
+            doc.save(`${lastTitle||'activity'}.pdf`);
+        }
 
-            // Por fim, gerar o PDF para download
-            doc.save(`${lastTitle || 'activity'}.pdf`);
+        try {
+            const img = new Image();
+            img.src = 'logo.png';
+            img.onload = function() {
+                const imgWidth = 80, imgHeight = 40;
+                doc.addImage(img, "PNG", marginLeft, currentY, imgWidth, imgHeight);
+                currentY += imgHeight + 20;
+                addPDFContent();
+            };
+            img.onerror = function(){
+                console.error("Logo not found, skipping");
+                addPDFContent();
+            };
+        } catch(e){
+            console.error("Error loading logo", e);
+            addPDFContent();
         }
     }
 
-    // Ao carregar a página, primeiro nos certificamos de que o usuário está autenticado
+    //====================================================
+    //  (11) On DOMContentLoaded
+    //====================================================
     document.addEventListener('DOMContentLoaded', () => {
         ensureUserIsAuthenticated(() => {
-            // Depois de carregar userData, carregamos o conteúdo do exercício
             loadContent();
-
-            // Após carregar o conteúdo, verificar o papel do usuário para exibir o botão "Generate PDF"
             const generatePdfBtn = document.getElementById('generate-pdf-btn');
             if (userData.role === 'professor' || userData.role === 'proprietario') {
                 generatePdfBtn.style.display = 'inline-block';
