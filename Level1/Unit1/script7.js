@@ -16,13 +16,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentUnit = urlPathParts[2]; // Ex: "Unit1"
 
   const activities = [
-    { id: 32, name: "TestQuizLidoABC", path: `/Atividades/TestQuizLidoABC/index.html?level=${currentLevel}&unit=${currentUnit}&fase=32`, img: "../../imagens/test.png", unlocked: false },
-    { id: 33, name: "TestQuizLeVeAB", path: `/Atividades/TestQuizLeVeAB/index.html?level=${currentLevel}&unit=${currentUnit}&fase=33`, img: "../../imagens/test.png", unlocked: false },
-    { id: 34, name: "TestQuizVeEscutaC", path: `/Atividades/TestQuizVeEscutaC/index.html?level=${currentLevel}&unit=${currentUnit}&fase=34`, img: "../../imagens/test.png", unlocked: false },
-    { id: 35, name: "TestQuizEscutaC2", path: `/Atividades/TestQuizEscutaC2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=35`, img: "../../imagens/test.png", unlocked: false },
-    { id: 36, name: "TestwordB2C", path: `/Atividades/TestwordB2C/index.html?level=${currentLevel}&unit=${currentUnit}&fase=36`, img: "../../imagens/test.png", unlocked: false },
-    { id: 37, name: "Testword2B2C", path: `/Atividades/Testword2B2C/index.html?level=${currentLevel}&unit=${currentUnit}&fase=37`, img: "../../imagens/test.png", unlocked: false },
-    { id: 38, name: "Testword3B2C", path: `/Atividades/Testword3B2C/index.html?level=${currentLevel}&unit=${currentUnit}&fase=38`, img: "../../imagens/test.png", unlocked: false },
+    { id: 34, name: "TestQuizLidoABC", path: `/Atividades/TestQuizLidoABC/index.html?level=${currentLevel}&unit=${currentUnit}&fase=34`, img: "../../imagens/test.png", unlocked: false },
+    { id: 35, name: "TestQuizLeVeAB", path: `/Atividades/TestQuizLeVeAB/index.html?level=${currentLevel}&unit=${currentUnit}&fase=35`, img: "../../imagens/test.png", unlocked: false },
+    { id: 36, name: "TestQuizVeEscutaC", path: `/Atividades/TestQuizVeEscutaC/index.html?level=${currentLevel}&unit=${currentUnit}&fase=36`, img: "../../imagens/test.png", unlocked: false },
+    { id: 37, name: "TestQuizEscutaC2", path: `/Atividades/TestQuizEscutaC2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=37`, img: "../../imagens/test.png", unlocked: false },
+    { id: 38, name: "TestwordB2C", path: `/Atividades/TestwordB2C/index.html?level=${currentLevel}&unit=${currentUnit}&fase=38`, img: "../../imagens/test.png", unlocked: false },
+    { id: 39, name: "Testword2B2C", path: `/Atividades/Testword2B2C/index.html?level=${currentLevel}&unit=${currentUnit}&fase=39`, img: "../../imagens/test.png", unlocked: false },
+    { id: 40, name: "Testword3B2C", path: `/Atividades/Testword3B2C/index.html?level=${currentLevel}&unit=${currentUnit}&fase=40`, img: "../../imagens/test.png", unlocked: false },
 ];
 
     // Fechar o dropdown ao clicar fora dele
