@@ -19,6 +19,8 @@ document.addEventListener('DOMContentLoaded', function() {
     { id: 12, name: "Grammar", path: `/Atividades/Grammar/index.html?level=${currentLevel}&unit=${currentUnit}&fase=12`, img: "../../imagens/botoes/grammar_button.png", unlocked: false },
     { id: 13, name: "Exerciciosdegramatica", path: `/Atividades/Exerciciosdegramatica/index.html?level=${currentLevel}&unit=${currentUnit}&fase=13`, img: "../../imagens/botoes/exercises_button.png", unlocked: false },
     { id: 14, name: "Fill in the Blanks", path: `/Atividades/Fill%20in%20the%20Blanks/index.html?level=${currentLevel}&unit=${currentUnit}&fase=14`, img: "../../imagens/botoes/fillintheblanks_button.png", unlocked: false },
+    { id: 15, name: "Grammar2", path: `/Atividades/Grammar2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=15`, img: "../../imagens/botoes/grammar_button.png", unlocked: false },
+    { id: 16, name: "Exerciciosdegramatica2", path: `/Atividades/Exerciciosdegramatica2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=16`, img: "../../imagens/botoes/exercises_button.png", unlocked: false },
 ];
 
     // Fechar o dropdown ao clicar fora dele

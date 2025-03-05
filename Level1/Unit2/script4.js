@@ -16,12 +16,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentUnit = urlPathParts[2]; // Ex: "Unit1"
 
    const activities = [
-    { id: 15, name: "Missing Word", path: `/Atividades/Missing Word/index.html?level=${currentLevel}&unit=${currentUnit}&fase=15`, img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
-    { id: 16, name: "Missing Word2", path: `/Atividades/Missing Word2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=16`, img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
-    { id: 17, name: "Missing Word3", path: `/Atividades/Missing Word3/index.html?level=${currentLevel}&unit=${currentUnit}&fase=17`, img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
-    { id: 18, name: "Mixed Letters FIXO", path: `/Atividades/Mixed Letters FIXO/index.html?level=${currentLevel}&unit=${currentUnit}&fase=18`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
-    { id: 19, name: "Mixed Letters FIXO2", path: `/Atividades/Mixed Letters FIXO2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=19`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
-    { id: 20, name: "Mixed Letters FIXO3", path: `/Atividades/Mixed Letters FIXO3/index.html?level=${currentLevel}&unit=${currentUnit}&fase=20`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
+    { id: 17, name: "Missing Word", path: `/Atividades/Missing Word/index.html?level=${currentLevel}&unit=${currentUnit}&fase=17`, img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
+    { id: 18, name: "Missing Word2", path: `/Atividades/Missing Word2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=18`, img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
+    { id: 19, name: "Missing Word3", path: `/Atividades/Missing Word3/index.html?level=${currentLevel}&unit=${currentUnit}&fase=19`, img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
+    { id: 20, name: "Mixed Letters FIXO", path: `/Atividades/Mixed Letters FIXO/index.html?level=${currentLevel}&unit=${currentUnit}&fase=20`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
+    { id: 21, name: "Mixed Letters FIXO2", path: `/Atividades/Mixed Letters FIXO2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=21`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
+    { id: 22, name: "Mixed Letters FIXO3", path: `/Atividades/Mixed Letters FIXO3/index.html?level=${currentLevel}&unit=${currentUnit}&fase=22`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
 ];
 
     // Fechar o dropdown ao clicar fora dele
