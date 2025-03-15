@@ -10,12 +10,21 @@ document.addEventListener('DOMContentLoaded', function() {
     let player;
     let lastUnlockedIndex = -1;
 
-    const activities = [
-          { id: 23, name: "MatchingGame", path: "../Unit1/MatchingGame/index.html?fase=23", img: "../../imagens/botoes/matching_game_button.png", unlocked: false },
-          { id: 24, name: "LifeLessons", path: "../Unit1/LifeLessons/index.html?fase=24", img: "../../imagens/botoes/life_lessons_button.png", unlocked: false },
-    ];
+    // Extraindo Level e Unit da URL atual
+    const urlPathParts = window.location.pathname.split('/');
+    const currentLevel = urlPathParts[1]; // Ex: "Level1"
+    const currentUnit = urlPathParts[2]; // Ex: "Unit1"
 
-     // Fechar o dropdown ao clicar fora dele
+   const activities = [
+    { id: 1023, name: "WordSearch3", path: `/Atividades/WordSearch3/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1023`, img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
+    { id: 1024, name: "Mixed Letters FIXO3", path: `/Atividades/Mixed Letters FIXO3/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1024`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
+    { id: 1025, name: "Missing Word3", path: `/Atividades/Missing Word3/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1025`, img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
+    { id: 1026, name: "Hannah Video", path: `/Atividades/HannahVideo/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1026`, img: "../../imagens/botoes/video_button.png", unlocked: false },
+    { id: 1027, name: "MatchingGame", path: `/Atividades/MatchingGame/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1027`, img: "../../imagens/botoes/matching_game_button.png", unlocked: false },
+    { id: 1028, name: "LifeLessons", path: `/Atividades/LifeLessons/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1028`, img: "../../imagens/botoes/life_lessons_button.png", unlocked: false },
+];
+
+    // Fechar o dropdown ao clicar fora dele
     document.addEventListener("click", function(event) {
         if (!userDropdown.contains(event.target) && !loginContainer.contains(event.target)) {
             userDropdown.style.display = 'none';
@@ -47,15 +56,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 userDropdown.innerHTML = `
                     ${dashboardLink}
                     <a href="/index.html" class="dropdown-item">SELECT A NEW LEVEL</a>
-                    <a href="/${getLevelPath()}/index.html" class="dropdown-item">SELECT A NEW UNIT</a>
-                    <a href="/${getLevelPath()}/${getUnitPath()}/index.html" class="dropdown-item">SELECT A NEW ACTIVITY</a>
+                    <a href="/${currentLevel}/index.html" class="dropdown-item">SELECT A NEW UNIT</a>
+                    <a href="/${currentLevel}/${currentUnit}/index.html" class="dropdown-item">SELECT A NEW ACTIVITY</a>
                 `;
                 
-             // Evento de clique no loginContainer para abrir/fechar o dropdown
-                const loginContainer = document.getElementById("loginContainer");
-
+                // Evento de clique no loginContainer para abrir/fechar o dropdown
                 loginContainer.addEventListener("click", function(event) {
-                    // Somente alterna o dropdown se o alvo não for um link
                     if (event.target.tagName !== 'A') {
                         userDropdown.style.display = userDropdown.style.display === 'flex' ? 'none' : 'flex';
                     }
@@ -70,24 +76,14 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Atualiza o texto com o nível e a unidade atual
-    const urlPathParts = window.location.pathname.split('/');
     levelUnitInfo.innerHTML = `
-          ${urlPathParts[1]}<br>
-          ${urlPathParts[2]}
+          ${currentLevel}<br>
+          ${currentUnit}
     `;
-
-    // Funções auxiliares para os links do dropdown
-    function getLevelPath() {
-        return urlPathParts[1]; // Obtém o nível atual
-    }
-
-    function getUnitPath() {
-        return urlPathParts[2]; // Obtém a unidade atual
-    }
 
     // Função para carregar o progresso do usuário
     function loadUserProgress(userId, userAvatar, userRole) {
-        const progressPath = `/usuarios/${userId}/progresso/${getLevelPath()}/${getUnitPath()}`;
+        const progressPath = `/usuarios/${userId}/progresso/${currentLevel}/${currentUnit}`;
 
         if (userRole === 'proprietario' || userRole === 'professor') {
             activities.forEach(activity => activity.unlocked = true);
@@ -112,7 +108,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Funções para desenhar o mapa, linhas e posicionar o avatar
+    // Função para inicializar o mapa
     function initializeMap(userAvatar) {
         window.scrollTo(0, 0);
         activities.forEach((activity, index) => {

@@ -10,17 +10,18 @@ document.addEventListener('DOMContentLoaded', function() {
     let player;
     let lastUnlockedIndex = -1;
 
-    const activities = [
-        { id: 25, name: "Test", path: "../Unit1/Test/index.html?fase=25", img: "../../imagens/test.png", unlocked: false },
-        { id: 26, name: "Test1", path: "../Unit1/Testlistening/index.html?fase=26", img: "../../imagens/test.png", unlocked: false },   
-        { id: 27, name: "Test2", path: "../Unit1/Testword/index.html?fase=27", img: "../../imagens/test.png", unlocked: false },  
-        { id: 28, name: "Test3", path: "../Unit1/Testword1/index.html?fase=28", img: "../../imagens/test.png", unlocked: false },             
-        { id: 29, name: "Test4", path: "../Unit1/Testword2/index.html?fase=29", img: "../../imagens/test.png", unlocked: false },   
-        { id: 30, name: "Test5", path: "../Unit1/Testimagem/index.html?fase=30", img: "../../imagens/test.png", unlocked: false },     
-        { id: 31, name: "Test6", path: "../Unit1/Testlisteningimagem/index.html?fase=last", img: "../../imagens/test.png", unlocked: false },                 
-    ];
+    // Extraindo Level e Unit da URL atual
+    const urlPathParts = window.location.pathname.split('/');
+    const currentLevel = urlPathParts[1]; // Ex: "Level1"
+    const currentUnit = urlPathParts[2]; // Ex: "Unit1"
 
-     // Fechar o dropdown ao clicar fora dele
+    const activities = [       
+        { id: 1029, name: "TestQuizLeVeAB", path: `/Atividades/TestQuizLeVeAB/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1029`, img: "../../imagens/test.png", unlocked: false },        
+        { id: 1030, name: "TestwordB2C", path: `/Atividades/TestwordB2C/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1030`, img: "../../imagens/test.png", unlocked: false }, 
+        { id: 1031, name: "Testword2B2C", path: `/Atividades/Testword2B2C/index.html?level=${currentLevel}&unit=${currentUnit}&fase=last`, img: "../../imagens/test.png", unlocked: false },        
+];
+
+    // Fechar o dropdown ao clicar fora dele
     document.addEventListener("click", function(event) {
         if (!userDropdown.contains(event.target) && !loginContainer.contains(event.target)) {
             userDropdown.style.display = 'none';
@@ -52,15 +53,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 userDropdown.innerHTML = `
                     ${dashboardLink}
                     <a href="/index.html" class="dropdown-item">SELECT A NEW LEVEL</a>
-                    <a href="/${getLevelPath()}/index.html" class="dropdown-item">SELECT A NEW UNIT</a>
-                    <a href="/${getLevelPath()}/${getUnitPath()}/index.html" class="dropdown-item">SELECT A NEW ACTIVITY</a>
+                    <a href="/${currentLevel}/index.html" class="dropdown-item">SELECT A NEW UNIT</a>
+                    <a href="/${currentLevel}/${currentUnit}/index.html" class="dropdown-item">SELECT A NEW ACTIVITY</a>
                 `;
                 
-             // Evento de clique no loginContainer para abrir/fechar o dropdown
-                const loginContainer = document.getElementById("loginContainer");
-
+                // Evento de clique no loginContainer para abrir/fechar o dropdown
                 loginContainer.addEventListener("click", function(event) {
-                    // Somente alterna o dropdown se o alvo não for um link
                     if (event.target.tagName !== 'A') {
                         userDropdown.style.display = userDropdown.style.display === 'flex' ? 'none' : 'flex';
                     }
@@ -75,24 +73,14 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Atualiza o texto com o nível e a unidade atual
-    const urlPathParts = window.location.pathname.split('/');
     levelUnitInfo.innerHTML = `
-          ${urlPathParts[1]}<br>
-          ${urlPathParts[2]}
+          ${currentLevel}<br>
+          ${currentUnit}
     `;
-
-    // Funções auxiliares para os links do dropdown
-    function getLevelPath() {
-        return urlPathParts[1]; // Obtém o nível atual
-    }
-
-    function getUnitPath() {
-        return urlPathParts[2]; // Obtém a unidade atual
-    }
 
     // Função para carregar o progresso do usuário
     function loadUserProgress(userId, userAvatar, userRole) {
-        const progressPath = `/usuarios/${userId}/progresso/${getLevelPath()}/${getUnitPath()}`;
+        const progressPath = `/usuarios/${userId}/progresso/${currentLevel}/${currentUnit}`;
 
         if (userRole === 'proprietario' || userRole === 'professor') {
             activities.forEach(activity => activity.unlocked = true);
@@ -117,7 +105,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Funções para desenhar o mapa, linhas e posicionar o avatar
+    // Função para inicializar o mapa
     function initializeMap(userAvatar) {
         window.scrollTo(0, 0);
         activities.forEach((activity, index) => {
