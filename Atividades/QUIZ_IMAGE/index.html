@@ -157,7 +157,7 @@
 
 <h1>Hannah Quiz</h1>
 
-<!-- gif-container permanece no HTML para manter a estrutura original -->
+<!-- gif-container permanece no HTML -->
 <div class="gif-container">
     <img id="feedback-img" src="" alt="Feedback GIF"/>
 </div>
@@ -206,6 +206,9 @@
     // Inicializa o Firebase
     firebase.initializeApp(firebaseConfig);
 
+    // Referência global para o .gif-container
+    const gifContainerElement = document.querySelector('.gif-container');
+
     // Função para exibir o botão PDF se o papel for 'professor' ou 'proprietario'
     function displayPdfButton(role) {
         if (role === 'professor' || role === 'proprietario') {
@@ -221,7 +224,6 @@
     // Obter o papel do usuário e exibir o botão condicionalmente
     firebase.auth().onAuthStateChanged(function(user) {
         if (user) {
-            // Substitua o caminho abaixo conforme necessário para buscar o papel do usuário
             firebase.database().ref('usuarios/' + user.uid + '/role').once('value').then((snapshot) => {
                 const role = snapshot.val();
                 displayPdfButton(role);
@@ -236,7 +238,6 @@
 
     // Carrega as perguntas ao iniciar
     async function loadQuestions() {
-        // Obtém os parâmetros level e unit da URL
         const { level, unit } = getLevelAndUnitFromURL();
         console.log("Level:", level, "Unit:", unit);
 
@@ -245,7 +246,6 @@
             return;
         }
 
-        // Gera o caminho dinâmico baseado no level e unit
         const questionsPath = `../../${level}/${unit}/DataQuiz/questions.txt`;
         console.log("Generated Path:", questionsPath);
 
@@ -260,13 +260,11 @@
             lines.forEach(line => {
                 line = line.trim();
                 if (line.startsWith('Q:')) {
-                    // Se já existia uma questão sendo montada, finaliza ela antes de começar a próxima
                     if (currentQuestion) {
                         questions.push(currentQuestion);
                     }
                     currentQuestion = { question: line.substring(2).trim(), answers: [], correct: '' };
                 } else if (/^[A-Z]\./.test(line)) {
-                    // Linhas do tipo A., B. etc.
                     if (currentQuestion) {
                         currentQuestion.answers.push(line);
                     }
@@ -277,20 +275,18 @@
                 }
             });
 
-            // Finaliza a última questão se ela existir
+            // Finaliza a última questão se existir
             if (currentQuestion) {
                 questions.push(currentQuestion);
             }
 
-            // Se não encontrou nenhuma pergunta, emite um log de alerta
             if (questions.length === 0) {
                 console.warn("No questions found in the file.");
             }
 
-            // Cria um array de boolean para marcar se cada questão foi respondida corretamente
             answeredQuestions = new Array(questions.length).fill(false);
 
-            // Associa um imagePath a cada questão: imagem1.png, imagem2.png ...
+            // Define caminho para imagens (imagem1.png, imagem2.png, etc.)
             for (let i = 0; i < questions.length; i++) {
                 questions[i].imagePath = `../../${level}/${unit}/DataQuiz/imagens/imagem${i + 1}.png`;
             }
@@ -304,7 +300,6 @@
     }
 
     function displayQuestion() {
-        // Se o índice estiver fora dos limites, não faz nada
         if (currentQuestionIndex < 0 || currentQuestionIndex >= questions.length) {
             console.error("Invalid currentQuestionIndex:", currentQuestionIndex);
             return;
@@ -321,27 +316,28 @@
 
         console.log("Displaying question index:", currentQuestionIndex, q);
 
-        // 1. IMAGEM
+        // 1) Imagem
         const questionImage = document.createElement('img');
         questionImage.src = q.imagePath;
         questionImage.alt = `Imagem da pergunta ${currentQuestionIndex + 1}`;
         container.appendChild(questionImage);
 
-        // 2. GIF CONTAINER (recolocado logo após a imagem; inicia oculto por precaução)
-        const gifContainerElement = document.querySelector('.gif-container');
-        gifContainerElement.style.display = 'none'; // Garante que inicie escondido
+        // 2) Move o gif-container para cá (e o oculta inicialmente)
+        if (gifContainerElement.parentNode) {
+            gifContainerElement.parentNode.removeChild(gifContainerElement);
+        }
+        gifContainerElement.style.display = 'none';
         container.appendChild(gifContainerElement);
 
-        // 3. TEXTO DA PERGUNTA
+        // 3) Texto da pergunta
         const questionText = document.createElement('p');
         questionText.id = 'question-text';
         questionText.innerText = `${currentQuestionIndex + 1}. ${q.question}`;
         container.appendChild(questionText);
 
-        // 4. OPÇÕES DE RESPOSTA
+        // 4) Opções de resposta
         q.answers.forEach((answer) => {
             const answerLabel = document.createElement('label');
-            // Ex: value = "A" se for "A. ..." -> answer[0]
             answerLabel.innerHTML = `<input type="radio" name="question${currentQuestionIndex}" value="${answer[0]}" onclick="checkAnswer(this, '${answer[0]}')"> ${answer}`;
             container.appendChild(answerLabel);
         });
@@ -361,9 +357,7 @@
     }
 
     function updateNavigationButtons() {
-        // Desabilita "Previous" caso estejamos na primeira pergunta
         document.getElementById('prev-btn').disabled = (currentQuestionIndex === 0);
-        // Desabilita "Next" caso estejamos na última pergunta
         document.getElementById('next-btn').disabled = (currentQuestionIndex === questions.length - 1);
     }
 
@@ -404,15 +398,13 @@
         const feedbackDiv = document.getElementById('feedback');
         const feedbackImg = document.getElementById('feedback-img');
         const feedbackAudio = document.getElementById('feedback-audio');
-        const gifContainer = document.querySelector('.gif-container');
 
-        // Salva a resposta do usuário
+        // Salva a resposta
         userAnswers[currentQuestionIndex] = selectedAnswer;
 
-        // Bloqueia os botões temporariamente
+        // Bloqueia botões
         toggleButtons(false);
 
-        // Verifica resposta
         if (selectedAnswer === q.correct) {
             feedbackImg.src = 'certo.gif';
             feedbackAudio.src = 'certo.mp3';
@@ -424,30 +416,32 @@
 
         feedbackAudio.play();
         feedbackDiv.style.display = 'block';
-        gifContainer.style.display = 'block';
+        gifContainerElement.style.display = 'block'; // exibe o GIF
 
         setTimeout(() => {
             hideGIF();
             toggleButtons(true);
 
-            // Se estiver certa, avança para a próxima e verifica se concluiu
+            // Se estiver correta, avança
             if (selectedAnswer === q.correct) {
                 showNextQuestion();
                 checkCompletion();
             } else {
-                // Se estiver errada, desmarca a opção
+                // Caso errada, desmarca a opção
                 radioElement.checked = false;
             }
         }, 2000);
     }
 
     function hideGIF() {
-        const gifContainer = document.querySelector('.gif-container');
-        gifContainer.style.display = 'none';
+        // Se, por algum motivo, não existir gifContainerElement, não faz nada
+        if (gifContainerElement) {
+            gifContainerElement.style.display = 'none';
+        }
     }
 
     function checkCompletion() {
-        // Se todas as questões estiverem respondidas corretamente
+        // Se todas as questões estiverem corretas
         if (answeredQuestions.every((answered) => answered)) {
             showModal();
             ensureUserIsAuthenticated(updateNextPhase);
@@ -481,21 +475,17 @@
 
         try {
             if (currentPhase === "end") {
-                // Criar nova Level
                 const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
                 await dbRef.child(nextLevel).set({});
                 console.log(`Level ${nextLevel} criada.`);
 
-                // Criar Unit1/fase1 como true dentro da nova Level
                 await dbRef.child(`${nextLevel}/Unit1/fase1`).set(true);
                 console.log(`Unit1/fase1 criada como true dentro de ${nextLevel}.`);
             } else if (currentPhase === "last") {
                 const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-                // Primeiro, cria a nova Unit
                 await dbRef.child(`${level}/${nextUnit}`).set({});
                 console.log(`Unit ${nextUnit} criada dentro de ${level}.`);
 
-                // Em seguida, adiciona a fase1 como true dentro da nova Unit
                 await dbRef.child(`${level}/${nextUnit}/fase1`).set(true);
                 console.log(`Fase1 marcada como true dentro de ${nextUnit}.`);
             } else {
@@ -538,7 +528,7 @@
                 const isNextPhaseUnlocked = await checkPhaseProgress(uid, level, unit);
 
                 if (isNextPhaseUnlocked) {
-                    window.history.back(); // Permite voltar normalmente
+                    window.history.back();
                 } else {
                     const confirmExit = confirm(
                         "You have not completed this phase. Do you want to go back anyway?"
@@ -649,7 +639,7 @@
         doc.save('QuizQuestionsWithLogo.pdf');
     }
 
-    // Ao carregar a página, carrega as perguntas
+    // Ao carregar a página, inicia o carregamento das perguntas
     window.onload = loadQuestions;
 </script>
 
