@@ -614,20 +614,26 @@
         while (i < lines.length) {
             let raw = lines[i];
             let line = raw.trim();
+
+            // (MODIFICAÇÃO) Log opcional para debug
+            // console.log("TXT =>", line);
+
             if (!line) {
                 nextLine();
                 continue;
             }
 
-            //-------------- #TITLE --------------
-            if (line.toUpperCase().startsWith('#TITLE:')) {
-                let titleText = line.substring(7).trim();
+            //============== TÍTULO ==============
+            // (MODIFICAÇÃO) Aceita "#TITLE:" ou "TITLE:"
+            let lineUpper = line.toUpperCase();
+            if (lineUpper.startsWith('#TITLE:') || lineUpper.startsWith('TITLE:')) {
+                let titleText = line.substring(line.indexOf(':') + 1).trim();
                 htmlAccum += `<h2 class="exercise-title">${titleText}</h2>`;
                 nextLine();
                 continue;
             }
 
-            //-------------- Exercise X: --------------
+            //============== EXERCISE X: ==============
             if (/^Exercise\s+\d+:/i.test(line)) {
                 currentExerciseIndex++;
                 exercisesMapping[currentExerciseIndex] = { questions: [] };
@@ -637,21 +643,28 @@
                 continue;
             }
 
-            //-------------- #IMG --------------
-            if (line.toUpperCase().startsWith('#IMG:')) {
-                let file = line.substring(5).trim();
-                htmlAccum += `<div class="exercise-line"><img data-imgfile="${file}" style="max-width:100%; height:auto;" alt="Image" crossorigin="anonymous"></div>`;
-                nextLine();
-                continue;
+            //============== #IMG: (pode estar em qualquer parte da linha) ==============
+            // (MODIFICAÇÃO) Agora usa includes('#IMG:'), e extrai via regex
+            if (lineUpper.includes('#IMG:')) {
+                // Acha o que vem depois de "#IMG:"
+                let match = line.match(/#IMG:\s*(.+)/i);
+                if (match) {
+                    let file = match[1].trim();
+                    htmlAccum += `<div class="exercise-line"><img data-imgfile="${file}" style="max-width:100%; height:auto;" alt="Image" crossorigin="anonymous"></div>`;
+                    nextLine();
+                    continue;
+                }
             }
 
-            //-------------- #TABLE --------------
-            if (line.toUpperCase().startsWith('#TABLE')) {
+            //============== TABLE  ==============
+            // (MODIFICAÇÃO) Para compatibilidade: procura #TABLE ou TableStart
+            if (lineUpper.startsWith('#TABLE') || lineUpper.startsWith('TABLESTART')) {
                 let tableLines = [];
                 nextLine();
                 while (i < lines.length) {
                     let check = lines[i].trim().toUpperCase();
-                    if (check.startsWith('#ENDTABLE')) {
+                    // (MODIFICAÇÃO) Aceita #ENDTABLE ou TableEnd
+                    if (check.startsWith('#ENDTABLE') || check.startsWith('TABLEEND')) {
                         nextLine();
                         break;
                     }
@@ -672,8 +685,8 @@
                 continue;
             }
 
-            //-------------- #BOX --------------
-            if (line.toUpperCase().startsWith('#BOX')) {
+            //============== #BOX  ==============
+            if (lineUpper.startsWith('#BOX')) {
                 let boxLines = [];
                 nextLine();
                 while (i < lines.length) {
@@ -694,21 +707,21 @@
                 continue;
             }
 
-            //-------------- #MULTIPLE_CHOICE --------------
-            if (line.toUpperCase().startsWith('#MULTIPLE_CHOICE:')) {
+            //============== #MULTIPLE_CHOICE  ==============
+            if (lineUpper.startsWith('#MULTIPLE_CHOICE:')) {
                 let questionText = line.substring(17).trim();
                 let questionIndex = questionObjects.length;
                 let options = [];
                 let corrLetter = null;
                 nextLine();
                 while (i < lines.length) {
-                    let check = lines[i].trim();
-                    if (check.toUpperCase().startsWith('#END_MULTIPLE_CHOICE')) {
+                    let check = lines[i].trim().toUpperCase();
+                    if (check.startsWith('#END_MULTIPLE_CHOICE')) {
                         nextLine();
                         break;
                     }
-                    if (check.toUpperCase().startsWith('#CORRECT:')) {
-                        corrLetter = check.substring(9).trim();
+                    if (check.startsWith('#CORRECT:')) {
+                        corrLetter = lines[i].substring(9).trim();
                         nextLine();
                     } else {
                         options.push(lines[i]);
@@ -734,8 +747,8 @@
                 continue;
             }
 
-            //-------------- #TRUE_FALSE --------------
-            if (line.toUpperCase().startsWith('#TRUE_FALSE:')) {
+            //============== #TRUE_FALSE  ==============
+            if (lineUpper.startsWith('#TRUE_FALSE:')) {
                 let statement = line.substring(11).trim();
                 let questionIndex = questionObjects.length;
                 let correctVal = 'V';
@@ -773,8 +786,8 @@
                 continue;
             }
 
-            //-------------- #MATCHING --------------
-            if (line.toUpperCase().startsWith('#MATCHING:')) {
+            //============== #MATCHING  ==============
+            if (lineUpper.startsWith('#MATCHING:')) {
                 let questionIndex = questionObjects.length;
                 let pairs = [];
                 nextLine();
@@ -814,8 +827,8 @@
                 continue;
             }
 
-            //-------------- #ORDERING --------------
-            if (line.toUpperCase().startsWith('#ORDERING:')) {
+            //============== #ORDERING  ==============
+            if (lineUpper.startsWith('#ORDERING:')) {
                 let questionIndex = questionObjects.length;
                 let items = [];
                 let correctPositions = [];
@@ -823,11 +836,12 @@
 
                 while (i < lines.length) {
                     let check = lines[i].trim();
-                    if (check.toUpperCase().startsWith('#END_ORDERING')) {
+                    let checkU = check.toUpperCase();
+                    if (checkU.startsWith('#END_ORDERING')) {
                         nextLine();
                         break;
                     }
-                    if (check.toUpperCase().startsWith('#CORRECT_ORDER:')) {
+                    if (checkU.startsWith('#CORRECT_ORDER:')) {
                         let seq = check.substring(14).trim();
                         correctPositions = seq.split(',').map(x => {
                             let cleaned = x.replace(/[^\d]/g, '').trim(); 
@@ -863,7 +877,7 @@
                 continue;
             }
 
-            //-------------- [Answer: ] e [FreeText] --------------
+            //============== [Answer: ] e [FreeText]  ==============
             if (line.includes('[Answer:') && line.includes('[FreeText]')) {
                 let [qPart, aPart] = line.split('[Answer:');
                 let correctVal = aPart.split(']')[0].trim();
@@ -882,7 +896,6 @@
                 let cleanedQ = qPart.replace(/\[size:.*?\]/,'').trim();
                 let placeholderIndex = questionObjects.length;
 
-                // Monta a parte do input de resposta corrigida
                 htmlAccum += `<div class="exercise-line" data-question-idx="${placeholderIndex}" data-qtype="textInputWithFreeText">`;
                 if (!useTextarea) {
                     cleanedQ = cleanedQ.replace('___', `<input type="text" class="answer-input" style="width:${inputSize};" />`);
@@ -891,7 +904,7 @@
                 }
                 htmlAccum += `${cleanedQ}<span class="correct-answer-span"></span></div>`;
 
-                // Monta a parte do texto livre
+                // Texto livre
                 htmlAccum += `<div class="exercise-line"><span class="free-text-span"><input type="text" class="free-text-input" /></span></div>`;
 
                 questionObjects.push({
@@ -953,7 +966,7 @@
                 continue;
             }
 
-            //-------------- Se não caiu em nada, é texto simples --------------
+            // Se não caiu em nenhum caso especial, é texto comum
             htmlAccum += `<div class="exercise-line">${line}</div>`;
             nextLine();
         }
@@ -968,7 +981,7 @@
         // Renderizamos cada tipo
         questionObjects.forEach((qObj) => {
 
-            // ---------- multipleChoice ----------
+            // multipleChoice
             if (qObj.qtype === 'multipleChoice') {
                 let cID = `multichoice_container_${qObj.index}`;
                 let containerDOM = container.querySelector(`#${cID}`);
@@ -993,7 +1006,7 @@
                 qObj.containerDOM = containerDOM;
             }
 
-            // ---------- trueFalse ----------
+            // trueFalse
             else if (qObj.qtype === 'trueFalse') {
                 let cID = `truefalse_container_${qObj.index}`;
                 let containerDOM = container.querySelector(`#${cID}`);
@@ -1010,7 +1023,7 @@
                 qObj.containerDOM = containerDOM;
             }
 
-            // ---------- matching ----------
+            // matching
             else if (qObj.qtype === 'matching') {
                 let cID = `matching_container_${qObj.index}`;
                 let containerDOM = container.querySelector(`#${cID}`);
@@ -1029,7 +1042,7 @@
                 qObj.containerDOM = containerDOM;
             }
 
-            // ---------- ordering ----------
+            // ordering
             else if (qObj.qtype === 'ordering') {
                 let cID = `ordering_container_${qObj.index}`;
                 let containerDOM = container.querySelector(`#${cID}`);
@@ -1049,7 +1062,7 @@
             }
         });
 
-        // ---------- textInput ----------
+        // textInput
         let textLines = container.querySelectorAll('[data-qtype]');
         textLines.forEach(tLine => {
             let qIdx = parseInt(tLine.getAttribute('data-question-idx'),10);
@@ -1062,7 +1075,7 @@
             }
         });
 
-        // ---------- associando inputs em matching ----------
+        // associando inputs em matching
         questionObjects.forEach((qObj) => {
             if (qObj.qtype === 'matching') {
                 let cDOM = qObj.containerDOM;
