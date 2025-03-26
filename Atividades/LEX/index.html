@@ -104,6 +104,14 @@
         button {
             margin: 10px;
         }
+
+        /* Loader (opcional) */
+        #loader-message {
+            font-size: 14px;
+            font-style: italic;
+            margin-top: 10px;
+            color: red;
+        }
     </style>
 </head>
 <body>
@@ -116,7 +124,11 @@
         <span id="speed-display" style="color: green;">1x</span>
     </div>
 
+    <!-- Exibe mensagens para o usuário (inclusive loader) -->
     <p id="message" style="visibility: hidden;">Loading...</p>
+    <!-- Loader amigável -->
+    <p id="loader-message" style="display: none;"></p>
+
     <button id="speak-button" style="display: none;">Press to Start</button>
     <button id="back-button">Back</button>
 
@@ -150,6 +162,7 @@
         const backButton = document.getElementById("back-button");
         const speedSlider = document.getElementById("voice-speed");
         const speedDisplay = document.getElementById("speed-display");
+        const loaderMessage = document.getElementById("loader-message");
 
         // Constantes para as imagens do robô
         const ROBOT_GIF = "../../imagens/robo1.gif";
@@ -252,9 +265,7 @@
                 }
 
                 try {
-                    console.log("[index.html] Enviando mensagem do usuário para /api/chat...");
-
-                    // 🔴 ALTERAÇÃO: Usamos a URL do backend no Render:
+                    console.log("[index.html] Enviando mensagem do usuário para a IA (/api/chat)...");
                     const response = await fetch('https://hannah-backend.onrender.com/api/chat', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -304,11 +315,9 @@
         // ==================================
         async function speakUsingGoogleTTS(text) {
             try {
-                // Captura dinamicamente o valor do seletor de velocidade
                 const playbackSpeed = parseFloat(speedSlider.value) || 1.0;
-                console.log("[index.html] Enviando texto para /api/tts:", text, "com playbackSpeed:", playbackSpeed);
+                console.log("[index.html] Enviando texto para TTS (/api/tts):", text, "com playbackSpeed:", playbackSpeed);
 
-                // 🔴 ALTERAÇÃO: URL do backend no Render
                 const resp = await fetch('https://hannah-backend.onrender.com/api/tts', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -391,9 +400,7 @@
 
                         if (userId) {
                             try {
-                                console.log("[index.html] Enviando mensagem do usuário (fallback) para /api/chat...");
-
-                                // 🔴 ALTERAÇÃO: URL do backend no Render
+                                console.log("[index.html] Enviando mensagem (fallback) para /api/chat...");
                                 const response = await fetch('https://hannah-backend.onrender.com/api/chat', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
@@ -431,9 +438,11 @@
                     const unit = urlParams.get('unit') || 'Unit1';
 
                     try {
-                        console.log("[index.html] Chamando /api/start com UID, level e unit...");
+                        // Exibe um aviso de que o robô pode estar adormecido
+                        loaderMessage.style.display = "block";
+                        loaderMessage.innerText = "Waking up Robot Samuel... This may take 20-30 seconds if the server is asleep.";
 
-                        // 🔴 ALTERAÇÃO: URL do backend no Render
+                        console.log("[index.html] Chamando /api/start com UID, level e unit...");
                         const response = await fetch(`https://hannah-backend.onrender.com/api/start?uid=${userId}&level=${level}&unit=${unit}`);
                         if (!response.ok) throw new Error("Failed to initialize conversation.");
 
@@ -443,6 +452,9 @@
 
                         chatHistory = data.chatHistory || [];
                         messageElement.innerText = data.response;
+
+                        // Agora escondemos a mensagem de "waking up" (se tudo deu certo)
+                        loaderMessage.style.display = "none";
 
                         messageElement.style.visibility = "hidden";
                         speakButton.style.display = "block";
@@ -474,9 +486,10 @@
                         }
                     } catch (error) {
                         console.error("[index.html] Erro ao inicializar conversa:", error);
+                        loaderMessage.style.display = "none";
                         messageElement.innerText = "An unexpected error occurred. Try again later.";
-                        speakButton.disabled = true;
                         messageElement.style.visibility = "visible";
+                        speakButton.disabled = true;
                     }
                 } else {
                     console.warn("[index.html] Usuário não está logado. Redirecionando para login...");
