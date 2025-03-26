@@ -98,26 +98,23 @@ Maintain a positive, light, and productive tone.
 }
 
 // Lê o arquivo conversa.txt para recuperar o tópico e conteúdo
-function loadConversationDetails(level, unit) {
-    const filePath = path.join(__dirname, '..', level, unit, 'DataIA', 'conversa.txt');
-    console.log(`📂 Tentando acessar o arquivo: ${filePath}`);
+async function loadConversationDetails(level, unit) {
+    const url = `https://hannahenglishcourse.vercel.app/${level}/${unit}/DataIA/conversa.txt`;
+    console.log(`🌐 Buscando conversa.txt de: ${url}`);
 
-    if (fs.existsSync(filePath)) {
-        const fileContent = fs.readFileSync(filePath, 'utf-8').trim();
-        console.log("✅ Arquivo conversa.txt carregado com sucesso.");
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Status ${response.status}`);
+        const fileContent = await response.text();
 
-        // Divide por linhas, removendo as vazias
         const lines = fileContent.split('\n').filter(line => line.trim() !== '');
-
-        // Primeira linha como tópico
         const topic = lines.length > 0 ? lines[0].trim() : 'General conversation';
-
-        // Remove "###" e numerações do conteúdo
         const sanitizedContent = fileContent.replace(/###|\d+\.\s/g, '').trim();
 
+        console.log("✅ conversa.txt carregado com sucesso via HTTP.");
         return { topic, fullContent: sanitizedContent };
-    } else {
-        console.warn(`⚠️ Arquivo conversa.txt não encontrado: ${filePath}. Usando 'General conversation'.`);
+    } catch (err) {
+        console.warn(`⚠️ Falha ao buscar conversa.txt: ${err.message}`);
         return { topic: 'General conversation', fullContent: '' };
     }
 }
@@ -154,26 +151,8 @@ app.get('/api/start', async (req, res) => {
         }
 
         // Tenta carregar dados do arquivo conversa.txt
-        let conversationDetails = 'General conversation';
-        let conversationFullContent = '';
-        const filePath = path.join(__dirname, '..', studentLevel, studentUnit, 'DataIA', 'conversa.txt');
-        console.log(`📂 Tentando acessar o arquivo: ${filePath}`);
-
-        if (fs.existsSync(filePath)) {
-            const fileContent = fs.readFileSync(filePath, 'utf-8').trim();
-            console.log("✅ Arquivo conversa.txt carregado com sucesso.");
-            const lines = fileContent.split('\n');
-
-            if (lines.length > 0) {
-                conversationDetails = lines[0].trim();
-                conversationFullContent = fileContent;
-                console.log(`📝 Tópico extraído: "${conversationDetails}"`);
-            } else {
-                console.warn("⚠️ O arquivo conversa.txt está vazio. Usando 'General conversation'.");
-            }
-        } else {
-            console.warn(`⚠️ Arquivo conversa.txt não encontrado: ${filePath}. Usando 'General conversation'.`);
-        }
+       const { topic: conversationDetails, fullContent: conversationFullContent } = 
+    await loadConversationDetails(studentLevel, studentUnit);
 
         // Recupera o nome do aluno no Firebase
         const userRef = db.ref(`usuarios/${userId}/nome`);
@@ -260,7 +239,7 @@ app.post('/api/chat', async (req, res) => {
             const studentLevel = req.body.level || "Level1";
             const studentUnit = req.body.unit || "Unit1";
             const { topic: conversationDetails, fullContent: conversationFullContent } =
-                loadConversationDetails(studentLevel, studentUnit);
+    await loadConversationDetails(studentLevel, studentUnit);
 
             // Cria contexto inicial
             const contextMessage = createInitialContext(
