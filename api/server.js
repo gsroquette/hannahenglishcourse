@@ -3,7 +3,7 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
-const { Configuration, OpenAIApi } = require('openai');
+const OpenAI = require('openai');
 const admin = require('firebase-admin');
 
 // ======================
@@ -51,10 +51,9 @@ app.use(bodyParser.json());
 // ===================================
 //  CONFIGURAÇÃO OPENAI
 // ===================================
-const configuration = new Configuration({
-    apiKey: process.env.OPENAI_API_KEY,
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
 });
-const openai = new OpenAIApi(configuration);
 
 // ===================================
 //  ARMAZENAMENTO EM MEMÓRIA
@@ -276,10 +275,10 @@ app.post('/api/chat', async (req, res) => {
         conversations[userId].push({ role: 'user', content: userMessage });
 
         // Chama a OpenAI com o histórico atualizado
-        const completion = await openai.createChatCompletion({
-            model: 'gpt-4o-mini-2024-07-18', // Mantém o modelo solicitado
-            messages: conversations[userId],
-        });
+        const completion = await openai.chat.completions.create({
+  model: 'gpt-4o-mini-2024-07-18',
+  messages: conversations[userId],
+});
 
         const responseMessage = completion.data.choices[0].message.content;
 
