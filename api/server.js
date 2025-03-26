@@ -99,12 +99,20 @@ Maintain a positive, light, and productive tone.
 
 // Lê o arquivo conversa.txt para recuperar o tópico e conteúdo
 async function loadConversationDetails(level, unit) {
+    // LOG adicional para confirmar quais parâmetros foram recebidos
+    console.log(`[loadConversationDetails] Recebido level="${level}", unit="${unit}"`);
+
+    // Monta a URL de onde o arquivo será buscado
     const url = `https://hannahenglishcourse.vercel.app/${level}/${unit}/DataIA/conversa.txt`;
-    console.log(`🌐 Buscando conversa.txt de: ${url}`);
+
+    // LOG adicional para ver a URL exata
+    console.log(`[loadConversationDetails] Buscando conversa.txt de: ${url}`);
 
     try {
         const response = await fetch(url);
-        if (!response.ok) throw new Error(`Status ${response.status}`);
+        if (!response.ok) {
+            throw new Error(`Status ${response.status}`);
+        }
         const fileContent = await response.text();
 
         const lines = fileContent.split('\n').filter(line => line.trim() !== '');
@@ -141,9 +149,10 @@ app.get('/api/start', async (req, res) => {
     try {
         const userId = req.query.uid;
         const studentLevel = req.query.level || "Level1"; 
-        const studentUnit = req.query.unit || "Unit1";   
+        const studentUnit = req.query.unit || "Unit1";
 
-        console.log("✅ Request recebido em /api/start com parâmetros:", { userId, studentLevel, studentUnit });
+        // LOG adicional
+        console.log(`[GET /api/start] userId="${userId}", level="${studentLevel}", unit="${studentUnit}"`);
 
         if (!userId) {
             console.error("❌ User ID está ausente.");
@@ -151,8 +160,8 @@ app.get('/api/start', async (req, res) => {
         }
 
         // Tenta carregar dados do arquivo conversa.txt
-       const { topic: conversationDetails, fullContent: conversationFullContent } = 
-    await loadConversationDetails(studentLevel, studentUnit);
+        const { topic: conversationDetails, fullContent: conversationFullContent } = 
+            await loadConversationDetails(studentLevel, studentUnit);
 
         // Recupera o nome do aluno no Firebase
         const userRef = db.ref(`usuarios/${userId}/nome`);
@@ -164,7 +173,7 @@ app.get('/api/start', async (req, res) => {
         }
 
         const studentName = snapshot.val();
-        console.log(`✅ Nome do usuário recuperado: ${studentName}`);
+        console.log(`✅ Nome do usuário recuperado do Firebase: ${studentName}`);
 
         // Cria o contexto inicial
         const contextMessage = createInitialContext(
@@ -213,7 +222,8 @@ app.post('/api/chat', async (req, res) => {
     const userId = req.body.uid;
     const userMessage = req.body.message;
 
-    console.log(`🔍 Requisição recebida em /api/chat. userId=${userId}, mensagem="${userMessage}"`);
+    // LOG adicional
+    console.log(`[POST /api/chat] userId="${userId}", userMessage="${userMessage}"`);
 
     // Valida os parâmetros recebidos
     if (typeof userId !== 'string' || !userId.trim() || typeof userMessage !== 'string' || !userMessage.trim()) {
@@ -236,10 +246,16 @@ app.post('/api/chat', async (req, res) => {
                 console.log(`✅ Nome do usuário recuperado do Firebase: ${studentName}`);
             }
 
+            // Se a chamada vier sem "level" e "unit" no body, usamos defaults
             const studentLevel = req.body.level || "Level1";
             const studentUnit = req.body.unit || "Unit1";
+
+            // LOG adicional
+            console.log(`[POST /api/chat] Carregando conversa.txt com level="${studentLevel}", unit="${studentUnit}" (fallback)`);
+
+            // Carrega o conversa.txt
             const { topic: conversationDetails, fullContent: conversationFullContent } =
-    await loadConversationDetails(studentLevel, studentUnit);
+                await loadConversationDetails(studentLevel, studentUnit);
 
             // Cria contexto inicial
             const contextMessage = createInitialContext(
