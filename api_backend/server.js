@@ -280,7 +280,7 @@ app.post('/api/chat', async (req, res) => {
   messages: conversations[userId],
 });
 
-        const responseMessage = completion.data.choices[0].message.content;
+const responseMessage = completion.choices[0].message.content;
 
         // Adiciona a resposta da IA ao histórico
         conversations[userId].push({ role: 'assistant', content: responseMessage });
