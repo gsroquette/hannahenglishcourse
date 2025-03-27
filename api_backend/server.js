@@ -102,7 +102,7 @@ async function loadConversationDetails(level, unit) {
     console.log(`[loadConversationDetails] Recebido level="${level}", unit="${unit}"`);
 
     // Monta a URL de onde o arquivo será buscado
-    const url = `https://hannahenglishcourse.vercel.app/${level}/${unit}/DataIA/conversa.txt`;
+    const url = `https://hannahenglishcourse.netlify.app/${level}/${unit}/DataIA/conversa.txt`;
 
     // LOG adicional para ver a URL exata
     console.log(`[loadConversationDetails] Buscando conversa.txt de: ${url}`);
