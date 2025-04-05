@@ -238,6 +238,31 @@
       border-radius: 5px;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
+
+/* Estilo melhorado para os checkboxes */
+.progress-container input[type="checkbox"] {
+  margin-right: 8px;
+  transform: scale(1.2);
+}
+
+/* Melhoria na visualização das unidades */
+[id^="student-"][id*="-Unit"] {
+  background-color: white;
+  padding: 10px;
+  margin-top: 5px;
+  border-radius: 5px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border-left: 3px solid #4CAF50;
+}
+
+/* Garante que o container de progresso tenha espaço suficiente */
+.progress-container {
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 15px;
+  background-color: white;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
 </style>
 </head>
 <body>
@@ -565,110 +590,136 @@
       }
     };
 
-    function toggleProgress(teacherId, classId, studentId) {
-      const progressContainer = document.getElementById(`progress-container-${studentId}`);
-      
-      if (progressContainer.style.display === 'none' || progressContainer.style.display === '') {
-        progressContainer.style.display = 'block';
-        progressContainer.innerHTML = `
-          <div style="position: relative;">
-            <button class="close-button" onclick="closeProgress('${studentId}')" style="position: absolute; top: -10px; right: -10px;">&times;</button>
-            <p>Loading...</p>
-          </div>
-        `;
+   function toggleProgress(teacherId, classId, studentId) {
+  const progressContainer = document.getElementById(`progress-container-${studentId}`);
+  
+  if (progressContainer.style.display === 'none' || progressContainer.style.display === '') {
+    progressContainer.style.display = 'block';
+    progressContainer.innerHTML = `
+      <div style="position: relative;">
+        <button class="close-button" onclick="closeProgress('${studentId}')">&times;</button>
+        <p>Loading...</p>
+      </div>
+    `;
 
-        db.ref(`usuarios/${studentId}/progresso`).once('value', snapshot => {
-          if (snapshot.exists()) {
-            let progressHTML = '<div class="progress-panel"><h3>Student Progress</h3>';
+    db.ref(`usuarios/${studentId}/progresso`).once('value', snapshot => {
+      if (snapshot.exists()) {
+        let progressHTML = '<div class="progress-panel"><h3>Student Progress</h3>';
 
-            Object.keys(structure).forEach(levelKey => {
-              const level = levelKey.replace('Level', '');
-              let totalCompletedPhases = 0;
-              let totalPhasesInLevel = 0;
+        // Ordena os níveis corretamente (Level0, Level1, ..., Level4)
+        const levels = ['Level0', 'Level1', 'Level2', 'Level3', 'Level4'];
+        
+        levels.forEach(levelKey => {
+          const levelNum = levelKey.replace('Level', '');
+          let totalCompletedPhases = 0;
+          let totalPhasesInLevel = 0;
 
-              let unitHTML = '';
-              Object.keys(structure[levelKey]).forEach(unitKey => {
-                const totalPhases = structure[levelKey][unitKey];
-                const unitSnap = snapshot.child(`${levelKey}/${unitKey}`);
-                
-                let completedPhases = 0;
-                let phasesHTML = '';
-                let notesHTML = '';
-                let noteCount = 1;
+          let unitHTML = '';
+          const units = Object.keys(structure[levelKey] || {});
+          
+          units.forEach(unitKey => {
+            const totalPhases = structure[levelKey][unitKey];
+            const unitSnap = snapshot.child(`${levelKey}/${unitKey}`);
+            
+            let completedPhases = 0;
+            let phasesHTML = '';
+            let notesHTML = '';
+            let noteCount = 1;
 
-                for (let phaseNumber = 1; phaseNumber <= totalPhases; phaseNumber++) {
-                  const phaseKey = `fase${levelKey === 'Level0' ? phaseNumber : (parseInt(levelKey.replace('Level', '')) * 1000 + phaseNumber)}`;
-                  const phaseSnap = unitSnap.child(phaseKey);
-                  const isComplete = phaseSnap.exists() && phaseSnap.val();
+            // Gera as fases corretamente para cada nível
+            for (let phaseNumber = 1; phaseNumber <= totalPhases; phaseNumber++) {
+              const phaseKey = levelKey === 'Level0' ? 
+                `fase${phaseNumber}` : 
+                `fase${levelNum}${unitKey.replace('Unit', '').padStart(2, '0')}${phaseNumber.toString().padStart(2, '0')}`;
+              
+              const phaseSnap = unitSnap.child(phaseKey);
+              const isComplete = phaseSnap.exists() && phaseSnap.val();
 
-                  if (isComplete) {
-                    completedPhases++;
-                  }
+              if (isComplete) completedPhases++;
 
-                  phasesHTML += `
-                    <p>Phase ${phaseKey}: 
-                      <input type="checkbox" ${isComplete ? 'checked' : ''} 
-                        onchange="updatePhaseStatus('${studentId}', '${levelKey}', '${unitKey}', '${phaseKey}', this.checked)">
-                    </p>`;
-                }
+              phasesHTML += `
+                <div>
+                  <label>
+                    <input type="checkbox" ${isComplete ? 'checked' : ''} 
+                      onchange="updatePhaseStatus('${studentId}', '${levelKey}', '${unitKey}', '${phaseKey}', this.checked)">
+                    Phase ${phaseKey}
+                  </label>
+                </div>
+              `;
+            }
 
-                unitSnap.forEach(childSnap => {
-                  if (childSnap.key.startsWith('nota')) {
-                    const notaValue = childSnap.val();
-                    notesHTML += `
-                      <p>Your Test Score ${noteCount}: <span style="font-weight: bold; color: ${notaValue >= 70 ? 'blue' : 'red'};">${notaValue}</span>
-                      <button onclick="clearIndividualTestScore('${studentId}', '${levelKey}', '${unitKey}', '${childSnap.key}')">Clear Score</button></p>`;
-                    noteCount++;
-                  }
-                });
-
-                totalCompletedPhases += completedPhases;
-                totalPhasesInLevel += totalPhases;
-
-                unitHTML += `
-                  <div>
-                    <button onclick="toggleVisibility('${studentId}-${unitKey}')">Unit ${unitKey.replace('Unit', '')}</button>
-                    <div id="${studentId}-${unitKey}" style="display: none; margin-left: 20px;">
-                      <p>${completedPhases}/${totalPhases} phases completed</p>
-                      ${phasesHTML}
-                      ${notesHTML || '<p>No scores available</p>'}
-                    </div>
+            // Processa as notas
+            unitSnap.forEach(childSnap => {
+              if (childSnap.key.startsWith('nota')) {
+                const notaValue = childSnap.val();
+                notesHTML += `
+                  <div style="margin: 5px 0;">
+                    <span>Test ${noteCount}: </span>
+                    <span style="font-weight: bold; color: ${notaValue >= 70 ? 'blue' : 'red'};">${notaValue}</span>
+                    <button style="margin-left: 10px; padding: 2px 5px;" 
+                      onclick="clearIndividualTestScore('${studentId}', '${levelKey}', '${unitKey}', '${childSnap.key}')">
+                      Clear
+                    </button>
                   </div>
                 `;
-              });
-
-              const progressPercentage = Math.round((totalCompletedPhases / totalPhasesInLevel) * 100);
-              const colorClass = progressPercentage < 25 ? 'low' : progressPercentage < 75 ? 'medium' : 'high';
-              
-              progressHTML += `
-                <h4>LEVEL ${level}</h4>
-                <div class="progress-bar-container">
-                  <div class="progress-bar-fill ${colorClass}" style="width: ${progressPercentage}%;">
-                    <span style="position: absolute; color: white; padding-left: 5px;">${progressPercentage}%</span>
-                  </div>
-                </div>
-                ${unitHTML}
-              `;
+                noteCount++;
+              }
             });
 
-            progressHTML += '</div>';
-            progressContainer.innerHTML = `
-              <div style="position: relative;">
-                <button class="close-button" onclick="closeProgress('${studentId}')" style="position: absolute; top: -10px; right: -10px;">&times;</button>
-                ${progressHTML}
+            totalCompletedPhases += completedPhases;
+            totalPhasesInLevel += totalPhases;
+
+            unitHTML += `
+              <div style="margin-bottom: 15px;">
+                <button onclick="toggleVisibility('${studentId}-${unitKey}')" 
+                  style="background: #4CAF50; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">
+                  Unit ${unitKey.replace('Unit', '')} (${completedPhases}/${totalPhases})
+                </button>
+                <div id="${studentId}-${unitKey}" style="display: none; margin-top: 10px; padding: 10px; background: #f5f5f5; border-radius: 5px;">
+                  ${phasesHTML}
+                  ${notesHTML || '<p>No test scores</p>'}
+                </div>
               </div>
             `;
-          } else {
-            progressContainer.innerHTML = '<div class="progress-panel"><p>No progress data available.</p></div>';
-          }
-        }).catch(error => {
-          console.error("Error loading progress:", error);
-          progressContainer.innerHTML = '<div class="progress-panel"><p>Error loading progress data. Please try again later.</p></div>';
+          });
+
+          const progressPercentage = totalPhasesInLevel > 0 ? 
+            Math.round((totalCompletedPhases / totalPhasesInLevel) * 100) : 0;
+          
+          const colorClass = progressPercentage < 25 ? 'low' : 
+                           progressPercentage < 75 ? 'medium' : 'high';
+          
+          progressHTML += `
+            <div style="margin-bottom: 20px;">
+              <h4>LEVEL ${levelNum}</h4>
+              <div class="progress-bar-container">
+                <div class="progress-bar-fill ${colorClass}" style="width: ${progressPercentage}%;">
+                  ${progressPercentage}%
+                </div>
+              </div>
+              ${unitHTML}
+            </div>
+          `;
         });
+
+        progressHTML += '</div>';
+        progressContainer.innerHTML = `
+          <div style="position: relative;">
+            <button class="close-button" onclick="closeProgress('${studentId}')">&times;</button>
+            ${progressHTML}
+          </div>
+        `;
       } else {
-        progressContainer.style.display = 'none';
+        progressContainer.innerHTML = '<div class="progress-panel"><p>No progress data available.</p></div>';
       }
-    }
+    }).catch(error => {
+      console.error("Error loading progress:", error);
+      progressContainer.innerHTML = '<div class="progress-panel"><p>Error loading progress data.</p></div>';
+    });
+  } else {
+    progressContainer.style.display = 'none';
+  }
+}
 
     function closeProgress(studentId) {
       const progressContainer = document.getElementById(`progress-container-${studentId}`);
