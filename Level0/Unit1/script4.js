@@ -15,13 +15,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentLevel = urlPathParts[1]; // Ex: "Level1"
     const currentUnit = urlPathParts[2]; // Ex: "Unit1"
 
-    const activities = [
-   { id: 1017, name: "Grammar2", path: `/Atividades/Grammar2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1017`, img: "../../imagens/botoes/grammar_button.png", unlocked: false },
-    { id: 1018, name: "QUIZ2", path: `/Atividades/QUIZ2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1018`, img: "../../imagens/botoes/quiz_button.png", unlocked: false },
-    { id: 1019, name: "Dialogo", path: `/Atividades/Dialogo/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1019`, img: "../../imagens/botoes/dialogo_button.png", unlocked: false },
-    { id: 1020, name: "MemoryGame3", path: `/Atividades/MemoryGame3/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1020`, img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
-    { id: 1021, name: "Mixed Letters FIXO2", path: `/Atividades/Mixed Letters FIXO2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1021`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
-    { id: 1022, name: "Missing Word2", path: `/Atividades/Missing Word2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1022`, img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
+   const activities = [
+    { id: 15, name: "Grammar", path: `/Atividades/Grammar/index.html?level=${currentLevel}&unit=${currentUnit}&fase=15`, img: "../../imagens/botoes/grammar_button.png", unlocked: false },
+    { id: 16, name: "Exerciciosdegramatica", path: `/Atividades/Exerciciosdegramatica/index.html?level=${currentLevel}&unit=${currentUnit}&fase=16`, img: "../../imagens/botoes/exercises_button.png", unlocked: false },
+    { id: 17, name: "Speak", path: `/Atividades/Speak/index.html?level=${currentLevel}&unit=${currentUnit}&fase=17`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
+    { id: 18, name: "Speak2", path: `/Atividades/Speak2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=18`, img: "../../imagens/botoes/speak_button.png", unlocked: false },    
 ];
 
     // Fechar o dropdown ao clicar fora dele
