@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentUnit = urlPathParts[2]; // Ex: "Unit1"
 
    const activities = [
-    { id: 5, name: "QUIZ", path: `/Atividades/QUIZ/index.html?level=${currentLevel}&unit=${currentUnit}&fase=5`, img: "../../imagens/botoes/quiz_button.png", unlocked: false },
+    { id: 5, name: "QUIZ_IMAGE", path: `/Atividades/QUIZ_IMAGE/index.html?level=${currentLevel}&unit=${currentUnit}&fase=5`, img: "../../imagens/botoes/quiz_button.png", unlocked: false },
     { id: 6, name: "MemoryGame", path: `/Atividades/MemoryGame/index.html?level=${currentLevel}&unit=${currentUnit}&fase=6`, img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
     { id: 7, name: "WordSearch", path: `/Atividades/WordSearch/index.html?level=${currentLevel}&unit=${currentUnit}&fase=7`, img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
     { id: 8, name: "MemoryGame2", path: `/Atividades/MemoryGame2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=8`, img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
