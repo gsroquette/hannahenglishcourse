@@ -606,19 +606,19 @@
       if (snapshot.exists()) {
         let progressHTML = '<div class="progress-panel"><h3>Student Progress</h3>';
 
-        // Ordena os níveis corretamente
+        // Ordem correta dos níveis
         const levels = ['Level0', 'Level1', 'Level2', 'Level3', 'Level4'];
         
         levels.forEach(levelKey => {
-          const levelNum = levelKey.replace('Level', '');
+          const levelNum = parseInt(levelKey.replace('Level', ''));
           let totalCompletedPhases = 0;
           let totalPhasesInLevel = 0;
 
           let unitHTML = '';
-          const units = Object.keys(structure[levelKey] || {});
+          const units = Object.keys(structure[levelKey] || [];
           
           units.forEach(unitKey => {
-            const unitNum = unitKey.replace('Unit', '');
+            const unitNum = parseInt(unitKey.replace('Unit', ''));
             const totalPhases = structure[levelKey][unitKey];
             const unitSnap = snapshot.child(`${levelKey}/${unitKey}`);
             
@@ -627,44 +627,43 @@
             let notesHTML = '';
             let noteCount = 1;
 
-            // Gera as fases corretamente para cada nível
+            // Geração CORRETA das chaves das fases
             for (let phaseNumber = 1; phaseNumber <= totalPhases; phaseNumber++) {
               let phaseKey;
               
               if (levelKey === 'Level0') {
                 phaseKey = `fase${phaseNumber}`;
               } else {
-                // Formato: fase + nível + número da fase (ex: fase1001 para Level1/Unit1/Phase1)
-                phaseKey = `fase${levelNum}${phaseNumber.toString().padStart(3, '0')}`;
+                // Calcula o número da fase conforme cadastro
+                const faseNumberGlobal = (unitNum - 1) * 30 + phaseNumber;
+                phaseKey = `fase${levelNum}${faseNumberGlobal.toString().padStart(3, '0')}`;
               }
-              
+
               const phaseSnap = unitSnap.child(phaseKey);
               const isComplete = phaseSnap.exists() && phaseSnap.val();
 
               if (isComplete) completedPhases++;
 
               phasesHTML += `
-                <div style="margin: 5px 0;">
-                  <label style="display: flex; align-items: center;">
-                    <input type="checkbox" ${isComplete ? 'checked' : ''} 
-                      onchange="updatePhaseStatus('${studentId}', '${levelKey}', '${unitKey}', '${phaseKey}', this.checked)"
-                      style="margin-right: 8px;">
-                    <span>${phaseKey}</span>
-                  </label>
+                <div style="margin: 5px 0; display: flex; align-items: center;">
+                  <input type="checkbox" ${isComplete ? 'checked' : ''} 
+                    onchange="updatePhaseStatus('${studentId}', '${levelKey}', '${unitKey}', '${phaseKey}', this.checked)"
+                    style="margin-right: 8px; transform: scale(1.2);">
+                  <span>${phaseKey}</span>
                 </div>
               `;
             }
 
-            // Processa as notas
+            // Processamento das notas
             unitSnap.forEach(childSnap => {
               if (childSnap.key.startsWith('nota')) {
                 const notaValue = childSnap.val();
                 notesHTML += `
-                  <div style="margin: 10px 0; padding: 5px; background: #f0f0f0; border-radius: 3px;">
+                  <div style="margin: 10px 0; padding: 8px; background: #f8f8f8; border-radius: 4px;">
                     <span>Test ${noteCount}: </span>
-                    <span style="font-weight: bold; color: ${notaValue >= 70 ? 'blue' : 'red'};">${notaValue}</span>
-                    <button style="margin-left: 10px; padding: 2px 5px; background: #ff4444; color: white; border: none; border-radius: 3px; cursor: pointer;" 
-                      onclick="clearIndividualTestScore('${studentId}', '${levelKey}', '${unitKey}', '${childSnap.key}')">
+                    <span style="font-weight: bold; color: ${notaValue >= 70 ? '#2196F3' : '#f44336'};">${notaValue}</span>
+                    <button onclick="clearIndividualTestScore('${studentId}', '${levelKey}', '${unitKey}', '${childSnap.key}')"
+                      style="margin-left: 10px; padding: 2px 8px; background: #ff4444; color: white; border: none; border-radius: 3px; cursor: pointer;">
                       Clear
                     </button>
                   </div>
@@ -677,15 +676,22 @@
             totalPhasesInLevel += totalPhases;
 
             unitHTML += `
-              <div style="margin-bottom: 20px;">
+              <div style="margin-bottom: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                 <button onclick="toggleVisibility('${studentId}-${unitKey}')" 
-                  style="background: #4CAF50; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                  Unit ${unitNum} (${completedPhases}/${totalPhases})
+                  style="background: #4CAF50; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; width: 100%; text-align: left;">
+                  ▶ Unit ${unitNum} - ${completedPhases}/${totalPhases} phases
                 </button>
-                <div id="${studentId}-${unitKey}" style="display: none; margin-top: 10px; padding: 15px; background: white; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
-                  <h5 style="margin-top: 0; color: #555;">Phases</h5>
-                  ${phasesHTML}
-                  ${notesHTML ? `<h5 style="margin-top: 20px; color: #555;">Test Scores</h5>${notesHTML}` : '<p>No test scores</p>'}
+                <div id="${studentId}-${unitKey}" style="display: none; margin-top: 10px;">
+                  <div style="border-top: 2px solid #eee; padding-top: 10px;">
+                    <h4 style="color: #666; margin: 10px 0;">Phases</h4>
+                    ${phasesHTML}
+                  </div>
+                  ${notesHTML ? `
+                    <div style="border-top: 2px solid #eee; margin-top: 15px; padding-top: 10px;">
+                      <h4 style="color: #666; margin: 10px 0;">Test Scores</h4>
+                      ${notesHTML}
+                    </div>
+                  ` : ''}
                 </div>
               </div>
             `;
@@ -698,9 +704,9 @@
                            progressPercentage < 75 ? 'medium' : 'high';
           
           progressHTML += `
-            <div style="margin-bottom: 30px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-              <h4 style="margin-top: 0; color: #4CAF50;">LEVEL ${levelNum}</h4>
-              <div class="progress-bar-container" style="margin-bottom: 15px;">
+            <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px;">
+              <h3 style="color: #4CAF50; margin-top: 0;">LEVEL ${levelNum}</h3>
+              <div class="progress-bar-container">
                 <div class="progress-bar-fill ${colorClass}" style="width: ${progressPercentage}%;">
                   ${progressPercentage}%
                 </div>
