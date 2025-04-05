@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 const activities = [
     { id: 19, name: "GrammarDialogo", path: `/Atividades/GrammarDialogo/index.html?level=${currentLevel}&unit=${currentUnit}&fase=19`, img: "../../imagens/botoes/conversation_button.png", unlocked: false },
-    { id: 20, name: "QUIZ_IMAGE", path: `/Atividades/QUIZ_IMAGE/index.html?level=${currentLevel}&unit=${currentUnit}&fase=20`, img: "../../imagens/botoes/quiz_button.png", unlocked: false },
+    { id: 20, name: "QUIZ_IMAGE2", path: `/Atividades/QUIZ_IMAGE2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=20`, img: "../../imagens/botoes/quiz_button.png", unlocked: false },
     { id: 21, name: "Diálogo", path: `/Atividades/Dialogo/index.html?level=${currentLevel}&unit=${currentUnit}&fase=21`, img: "../../imagens/botoes/dialogo_button.png", unlocked: false },    
 ];
 
