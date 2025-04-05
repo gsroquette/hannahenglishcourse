@@ -99,14 +99,15 @@
     .progress-container {
       display: none;
       margin-top: 10px;
-      padding: 10px;
+      padding: 15px;
       border: 1px solid #ddd;
       border-radius: 5px;
-      background-color: #f9f9f9;
+      background-color: #ffffff;
       position: relative;
       z-index: 1000;
       max-height: 70vh;
       overflow-y: auto;
+      box-shadow: 0 0 15px rgba(0,0,0,0.2);
     }
 
     .inactive {
@@ -231,27 +232,329 @@
     }
 
     /* Novos estilos adicionados */
+    .phase-item {
+      display: flex;
+      align-items: center;
+      margin: 5px 0;
+      padding: 5px;
+      background-color: #f9f9f9;
+      border-radius: 4px;
+    }
+    
     .phase-checkbox {
       margin-right: 10px;
       transform: scale(1.2);
     }
-
-    .unit-container {
+    
+    .unit-header {
+      background-color: #4CAF50;
+      color: white;
+      padding: 8px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 10px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .level-container {
       background-color: white;
       padding: 15px;
-      margin: 10px 0;
+      margin-bottom: 20px;
       border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
   </style>
 </head>
 <body>
-  <!-- O restante do HTML permanece igual até a seção <script> -->
+  <div class="back-container">
+    <button class="back-button" onclick="window.history.back();">Back</button>
+  </div>
+
+  <h1>Teacher Dashboard</h1>
+
+  <div class="panel" id="teacher-data">
+    <h2>Teacher's Information</h2>
+    <label for="teacher-name">Name</label>
+    <input type="text" id="teacher-name" placeholder="Your name">
+    
+    <label for="teacher-phone">Phone</label>
+    <input type="tel" id="teacher-phone" placeholder="Your phone number">
+    
+    <label>Email</label>
+    <input type="text" id="teacher-email" placeholder="Your email" readonly>
+    
+    <label for="teacher-avatar">Choose Avatar</label>
+    <select id="teacher-avatar">
+      <option value="avatar_professor1.png">Avatar 1</option>
+      <option value="avatar_professor2.png">Avatar 2</option>
+      <option value="avatar_professor3.png">Avatar 3</option>
+      <option value="avatar_professor4.png">Avatar 4</option>
+    </select>
+    <img id="avatar-preview" src="imagens/avatar_professor1.png" alt="Avatar Preview" style="width: 100px; height: 100px; margin-top: 10px;">
+    <div id="loading-spinner" style="display: none; margin-top: 10px;">Loading...</div>
+
+    <button onclick="saveTeacherData()">Save Changes</button>
+  </div>
+
+  <div class="panel" id="classes">
+    <h2>Classes</h2>
+    <div id="class-list"></div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-database.js"></script>
 
   <script>
-    // Configuração do Firebase mantida igual
+    // Configuração do Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+      authDomain: "hannahenglishcourse.firebaseapp.com",
+      databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "hannahenglishcourse",
+      storageBucket: "hannahenglishcourse.appspot.com",
+      messagingSenderId: "449818788486",
+      appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+      measurementId: "G-07VVJG9LRS"
+    };
 
-    // Função toggleProgress corrigida
+    // Inicialização do Firebase
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.database();
+
+    // Verificação de autenticação
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        console.log("Usuário autenticado:", user.uid);
+        loadTeacherData(user.uid);
+      } else {
+        console.log("Nenhum usuário autenticado, redirecionando...");
+        window.location.href = 'login.html';
+      }
+    });
+
+    // Estrutura completa dos níveis e unidades
+    const structure = {
+      Level0: { Unit1: 30, Unit2: 30, Unit3: 30, Unit4: 30, Unit5: 30, Unit6: 30, Unit7: 30, Unit8: 30, Unit9: 30, Unit10: 30 },
+      Level1: { Unit1: 30, Unit2: 30, Unit3: 30, Unit4: 30, Unit5: 30, Unit6: 30, Unit7: 30, Unit8: 30, Unit9: 30, Unit10: 30 },
+      Level2: { Unit1: 30, Unit2: 30, Unit3: 30, Unit4: 30, Unit5: 30, Unit6: 30, Unit7: 30, Unit8: 30, Unit9: 30, Unit10: 30 },
+      Level3: { Unit1: 30, Unit2: 30, Unit3: 30, Unit4: 30, Unit5: 30, Unit6: 30, Unit7: 30, Unit8: 30, Unit9: 30, Unit10: 30 },
+      Level4: { Unit1: 30, Unit2: 30, Unit3: 30, Unit4: 30, Unit5: 30, Unit6: 30, Unit7: 30, Unit8: 30, Unit9: 30, Unit10: 30 }
+    };
+
+    // Função para carregar dados do professor
+    function loadTeacherData(teacherId) {
+      console.log("Carregando dados do professor:", teacherId);
+      const teacherRef = db.ref('usuarios/' + teacherId);
+      
+      teacherRef.once('value').then(snapshot => {
+        const data = snapshot.val();
+        if (!data) {
+          console.error("Nenhum dado encontrado para o professor");
+          return;
+        }
+
+        console.log("Dados do professor:", data);
+        document.getElementById('teacher-name').value = data.nome || '';
+        document.getElementById('teacher-phone').value = data.telefone || '';
+        document.getElementById('teacher-email').value = data.email || '';
+        
+        const avatar = data.avatar || 'avatar_professor1.png';
+        document.getElementById('teacher-avatar').value = avatar;
+        document.getElementById('avatar-preview').src = 'imagens/' + avatar;
+        
+        loadClasses(teacherId);
+      }).catch(error => {
+        console.error("Erro ao carregar dados do professor:", error);
+      });
+    }
+
+    // Função para salvar dados do professor
+    function saveTeacherData() {
+      const teacherId = auth.currentUser.uid;
+      const name = document.getElementById('teacher-name').value;
+      const phone = document.getElementById('teacher-phone').value;
+      const avatar = document.getElementById('teacher-avatar').value;
+
+      db.ref('usuarios/' + teacherId).update({
+        nome: name,
+        telefone: phone,
+        avatar: avatar
+      }).then(() => {
+        alert("Data saved successfully!");
+      }).catch(error => {
+        console.error("Error saving data:", error);
+        alert("Error saving data: " + error.message);
+      });
+    }
+
+    // Função para carregar turmas
+    function loadClasses(teacherId) {
+      console.log("Carregando turmas para o professor:", teacherId);
+      const classesRef = db.ref('usuarios/' + teacherId + '/turmas');
+      
+      classesRef.on('value', snapshot => {
+        const classList = document.getElementById('class-list');
+        classList.innerHTML = '';
+
+        if (!snapshot.exists()) {
+          console.log("Nenhuma turma encontrada");
+          return;
+        }
+
+        snapshot.forEach(childSnapshot => {
+          const classData = childSnapshot.val();
+          const classId = childSnapshot.key;
+
+          const classContainer = document.createElement('div');
+          classContainer.classList.add('class-container');
+          classContainer.innerHTML = `
+            <label>Class Name: <input type="text" value="${classData.nome}" onchange="updateClassName('${teacherId}', '${classId}', this.value)"></label>
+            <p>Max. No. of Students: ${classData.alunos}</p>
+            <label for="student-email-${classId}">Add Student by Email</label>
+            <input type="text" id="student-email-${classId}" placeholder="Student's email">
+            <button onclick="addStudentToClass('${teacherId}', '${classId}')">Enroll Student</button>
+            <ul id="student-list-${classId}" class="student-list"></ul>
+          `;
+          
+          classList.appendChild(classContainer);
+          loadStudents(teacherId, classId);
+        });
+      });
+    }
+
+    // Função para atualizar nome da turma
+    function updateClassName(teacherId, classId, newName) {
+      db.ref(`usuarios/${teacherId}/turmas/${classId}/nome`).set(newName)
+        .then(() => console.log("Class name updated"))
+        .catch(error => console.error("Error updating class name:", error));
+    }
+
+    // Função para adicionar aluno à turma
+    function addStudentToClass(teacherId, classId) {
+      const emailInput = document.getElementById(`student-email-${classId}`);
+      const email = emailInput.value.trim();
+
+      if (!email) {
+        alert("Please enter a student's email.");
+        return;
+      }
+
+      db.ref('usuarios').orderByChild('email').equalTo(email).once('value', snapshot => {
+        if (snapshot.exists()) {
+          snapshot.forEach(childSnapshot => {
+            const studentId = childSnapshot.key;
+            const studentRef = db.ref(`usuarios/${studentId}`);
+
+            db.ref(`usuarios/${teacherId}/turmas`).once('value', turmasSnapshot => {
+              let alreadyInClass = false;
+
+              turmasSnapshot.forEach(turmaSnap => {
+                const turmaStudents = turmaSnap.child('students');
+                if (turmaStudents.hasChild(studentId)) {
+                  alreadyInClass = true;
+                }
+              });
+
+              if (alreadyInClass) {
+                alert("This student is already enrolled in another class.");
+              } else {
+                studentRef.child('atrelado_professor').once('value').then(snap => {
+                  const linkedTeacherId = snap.val();
+
+                  if (!linkedTeacherId || linkedTeacherId === teacherId) {
+                    studentRef.child('atrelado_professor').set(teacherId).then(() => {
+                      enrollStudentInClass(teacherId, classId, studentId, childSnapshot.val().nome);
+                    });
+                  } else {
+                    alert("This student is already assigned to another teacher and cannot be added to your class.");
+                  }
+                }).catch(error => {
+                  console.error("Error checking student record:", error);
+                });
+              }
+            });
+          });
+        } else {
+          alert("Student not found in the database.");
+        }
+      });
+
+      emailInput.value = '';
+    }
+
+    // Função para matricular aluno na turma
+    function enrollStudentInClass(teacherId, classId, studentId, studentName) {
+      const classStudentRef = db.ref(`usuarios/${teacherId}/turmas/${classId}/students/${studentId}`);
+      classStudentRef.set({
+        nome: studentName,
+        nivel_em_curso: "Level0" // Alterado para Level0 como padrão
+      }).then(() => {
+        alert("Student added successfully!");
+      }).catch(error => {
+        console.error("Error adding student:", error);
+        alert("Error adding student. Please try again.");
+      });
+    }
+
+    // Função para carregar alunos
+    function loadStudents(teacherId, classId) {
+      const studentList = document.getElementById(`student-list-${classId}`);
+      studentList.innerHTML = '';
+
+      const studentsRef = db.ref(`usuarios/${teacherId}/turmas/${classId}/students`);
+      studentsRef.once('value', snapshot => {
+        if (!snapshot.exists()) {
+          console.log("Nenhum aluno encontrado nesta turma");
+          return;
+        }
+
+        snapshot.forEach(childSnapshot => {
+          const studentData = childSnapshot.val();
+          const studentId = childSnapshot.key;
+
+          db.ref(`usuarios/${studentId}/atrelado_professor`).once('value', snap => {
+            const isAttached = snap.val() !== false;
+
+            const studentItem = document.createElement('li');
+            studentItem.className = isAttached ? 'student-name' : 'student-name inactive';
+            studentItem.innerHTML = `
+              <p onclick="toggleStudentActions('${studentId}')" class="student-link">
+                ${studentData.nome} ${!isAttached ? '<span class="inactive-msg">The student left the class</span>' : ''}
+              </p>
+              <div id="student-actions-${studentId}" class="student-actions">
+                <select ${!isAttached ? 'disabled' : ''} onchange="updateStudentLevel('${teacherId}', '${classId}', '${studentId}', this.value)">
+                  <option value="Level0" ${studentData.nivel_em_curso === 'Level0' ? 'selected' : ''}>Level 0</option>
+                  <option value="Level1" ${studentData.nivel_em_curso === 'Level1' ? 'selected' : ''}>Level 1</option>
+                  <option value="Level2" ${studentData.nivel_em_curso === 'Level2' ? 'selected' : ''}>Level 2</option>
+                  <option value="Level3" ${studentData.nivel_em_curso === 'Level3' ? 'selected' : ''}>Level 3</option>
+                  <option value="Level4" ${studentData.nivel_em_curso === 'Level4' ? 'selected' : ''}>Level 4</option>
+                </select>
+                <button ${!isAttached ? 'disabled' : ''} onclick="toggleProgress('${teacherId}', '${classId}', '${studentId}')">View Progress</button>
+                <button onclick="removeStudentFromClass('${teacherId}', '${classId}', '${studentId}')">Remove</button>
+                <div id="progress-container-${studentId}" class="progress-container"></div>
+              </div>
+            `;
+            studentList.appendChild(studentItem);
+          });
+        });
+      });
+    }
+
+    // Função para atualizar nível do aluno
+    function updateStudentLevel(teacherId, classId, studentId, level) {
+      const studentLevelRef = db.ref(`usuarios/${teacherId}/turmas/${classId}/students/${studentId}/nivel_em_curso`);
+      studentLevelRef.set(level).then(() => {
+        console.log(`Level updated to ${level}`);
+      }).catch(error => {
+        console.error("Error updating student level:", error);
+      });
+    }
+
+    // Função para mostrar/ocultar progresso
     function toggleProgress(teacherId, classId, studentId) {
       const progressContainer = document.getElementById(`progress-container-${studentId}`);
       
@@ -260,7 +563,7 @@
         progressContainer.innerHTML = `
           <div style="position: relative;">
             <button class="close-button" onclick="closeProgress('${studentId}')">&times;</button>
-            <p>Loading...</p>
+            <p>Loading progress...</p>
           </div>
         `;
 
@@ -268,80 +571,202 @@
           if (snapshot.exists()) {
             let progressHTML = '<div class="progress-panel"><h3>Student Progress</h3>';
 
-            // Estrutura corrigida com Level0
-            const structure = {
-              Level0: {Unit1:30,Unit2:30,Unit3:30,Unit4:30,Unit5:30,Unit6:30,Unit7:30,Unit8:30,Unit9:30,Unit10:30},
-              Level1: {Unit1:30,Unit2:30,Unit3:30,Unit4:30,Unit5:30,Unit6:30,Unit7:30,Unit8:30,Unit9:30,Unit10:30},
-              Level2: {Unit1:30,Unit2:30,Unit3:30,Unit4:30,Unit5:30,Unit6:30,Unit7:30,Unit8:30,Unit9:30,Unit10:30},
-              Level3: {Unit1:30,Unit2:30,Unit3:30,Unit4:30,Unit5:30,Unit6:30,Unit7:30,Unit8:30,Unit9:30,Unit10:30},
-              Level4: {Unit1:30,Unit2:30,Unit3:30,Unit4:30,Unit5:30,Unit6:30,Unit7:30,Unit8:30,Unit9:30,Unit10:30}
-            };
+            // Processar todos os níveis
+            ['Level0', 'Level1', 'Level2', 'Level3', 'Level4'].forEach(levelKey => {
+              const levelNum = levelKey.replace('Level', '');
+              progressHTML += `<div class="level-container"><h4>${levelKey}</h4>`;
 
-            ['Level0','Level1','Level2','Level3','Level4'].forEach(levelKey => {
-              const levelNum = levelKey.replace('Level','');
-              progressHTML += `<div class="unit-container"><h4>${levelKey}</h4>`;
-
+              // Processar todas as unidades
               Object.keys(structure[levelKey]).forEach(unitKey => {
-                const unitNum = unitKey.replace('Unit','');
+                const unitNum = unitKey.replace('Unit', '');
                 const totalPhases = structure[levelKey][unitKey];
                 const unitSnap = snapshot.child(`${levelKey}/${unitKey}`);
                 
                 let completedPhases = 0;
                 let phasesHTML = '';
-                
-                for(let phaseNumber=1; phaseNumber<=totalPhases; phaseNumber++){
-                  // Geração correta das chaves
+                let notesHTML = '';
+                let noteCount = 1;
+
+                // Processar todas as fases
+                for (let phaseNumber = 1; phaseNumber <= totalPhases; phaseNumber++) {
                   let phaseKey;
-                  if(levelKey === 'Level0') {
+                  if (levelKey === 'Level0') {
                     phaseKey = `fase${phaseNumber}`;
                   } else {
-                    const faseNumberGlobal = (parseInt(unitNum)-1)*30 + phaseNumber;
-                    phaseKey = `fase${levelNum}${faseNumberGlobal.toString().padStart(3,'0')}`;
+                    // Calcular número da fase no formato correto (ex: fase1001 para Level1/Unit1/Phase1)
+                    const faseNumberGlobal = (parseInt(unitNum) - 1) * 30 + phaseNumber;
+                    phaseKey = `fase${levelNum}${faseNumberGlobal.toString().padStart(3, '0')}`;
                   }
-                  
-                  const isComplete = unitSnap.child(phaseKey).val() || false;
-                  if(isComplete) completedPhases++;
-                  
+
+                  const phaseSnap = unitSnap.child(phaseKey);
+                  const isComplete = phaseSnap.exists() && phaseSnap.val();
+
+                  if (isComplete) completedPhases++;
+
                   phasesHTML += `
-                    <div>
-                      <label>
-                        <input type="checkbox" ${isComplete ? 'checked' : ''} 
-                          onchange="updatePhaseStatus('${studentId}','${levelKey}','${unitKey}','${phaseKey}',this.checked)"
-                          class="phase-checkbox">
-                        ${phaseKey}
-                      </label>
+                    <div class="phase-item">
+                      <input type="checkbox" ${isComplete ? 'checked' : ''} 
+                        onchange="updatePhaseStatus('${studentId}', '${levelKey}', '${unitKey}', '${phaseKey}', this.checked)"
+                        class="phase-checkbox">
+                      <span>${phaseKey}</span>
                     </div>
                   `;
                 }
 
+                // Processar notas
+                unitSnap.forEach(childSnap => {
+                  if (childSnap.key.startsWith('nota')) {
+                    const notaValue = childSnap.val();
+                    notesHTML += `
+                      <div style="margin: 10px 0; padding: 8px; background: #f0f0f0; border-radius: 4px;">
+                        <span>Test ${noteCount}: </span>
+                        <span style="font-weight: bold; color: ${notaValue >= 70 ? '#2196F3' : '#f44336'};">${notaValue}</span>
+                        <button onclick="clearIndividualTestScore('${studentId}', '${levelKey}', '${unitKey}', '${childSnap.key}')"
+                          style="margin-left: 10px; padding: 2px 8px; background: #ff4444; color: white; border: none; border-radius: 3px; cursor: pointer;">
+                          Clear
+                        </button>
+                      </div>
+                    `;
+                    noteCount++;
+                  }
+                });
+
                 progressHTML += `
                   <div>
-                    <button onclick="toggleVisibility('${studentId}-${unitKey}')">
-                      ${unitKey} (${completedPhases}/${totalPhases})
-                    </button>
-                    <div id="${studentId}-${unitKey}" style="display:none; margin-left:20px;">
+                    <div class="unit-header" onclick="toggleVisibility('${studentId}-${unitKey}')">
+                      <span>${unitKey}</span>
+                      <span>${completedPhases}/${totalPhases} completed</span>
+                    </div>
+                    <div id="${studentId}-${unitKey}" style="display: none; margin-top: 10px; padding: 10px;">
+                      <h5>Phases</h5>
                       ${phasesHTML}
+                      ${notesHTML ? `<h5 style="margin-top: 15px;">Test Scores</h5>${notesHTML}` : ''}
                     </div>
                   </div>
                 `;
               });
-              
-              progressHTML += '</div>';
+
+              progressHTML += '</div>'; // Fecha level-container
             });
 
-            progressHTML += '</div>';
-            progressContainer.innerHTML = progressHTML;
+            progressHTML += '</div>'; // Fecha progress-panel
+            progressContainer.innerHTML = `
+              <div style="position: relative;">
+                <button class="close-button" onclick="closeProgress('${studentId}')">&times;</button>
+                ${progressHTML}
+              </div>
+            `;
           } else {
             progressContainer.innerHTML = '<div class="progress-panel"><p>No progress data available.</p></div>';
           }
+        }).catch(error => {
+          console.error("Error loading progress:", error);
+          progressContainer.innerHTML = '<div class="progress-panel"><p>Error loading progress data.</p></div>';
         });
       } else {
         progressContainer.style.display = 'none';
       }
     }
 
-    // Mantenha as outras funções exatamente como estão
-    // ... (funções loadStudents, updateStudentLevel, etc)
+    // Função para fechar o progresso
+    function closeProgress(studentId) {
+      const progressContainer = document.getElementById(`progress-container-${studentId}`);
+      if (progressContainer) {
+        progressContainer.style.display = 'none';
+      }
+    }
+
+    // Função para atualizar status da fase
+    function updatePhaseStatus(studentId, level, unit, phase, isComplete) {
+      const progressRef = db.ref(`usuarios/${studentId}/progresso/${level}/${unit}/${phase}`);
+      progressRef.set(isComplete).then(() => {
+        console.log(`Phase ${phase} status updated to ${isComplete ? 'complete' : 'incomplete'}`);
+      }).catch(error => {
+        console.error("Error updating phase status:", error);
+      });
+    }
+
+    // Função para remover aluno da turma
+    function removeStudentFromClass(teacherId, classId, studentId) {
+      if (confirm("Are you sure you want to remove this student?")) {
+        const studentRef = db.ref(`usuarios/${teacherId}/turmas/${classId}/students/${studentId}`);
+        
+        studentRef.remove().then(() => {
+          alert("Student removed from class successfully!");
+          
+          const studentAtreladoRef = db.ref(`usuarios/${studentId}/atrelado_professor`);
+          studentAtreladoRef.remove().then(() => {
+            console.log("Removed teacher ID from student's atrelado_professor field.");
+          }).catch(error => {
+            console.error("Error removing teacher ID from student's record:", error);
+          });
+          
+          loadStudents(teacherId, classId);
+        }).catch(error => {
+          console.error("Error removing student from class:", error);
+        });
+      }
+    }
+
+    // Função para mostrar/ocultar ações do aluno
+    function toggleStudentActions(studentId) {
+      const studentActions = document.getElementById(`student-actions-${studentId}`);
+      if (studentActions.style.display === 'none' || studentActions.style.display === '') {
+        studentActions.style.display = 'block';
+      } else {
+        studentActions.style.display = 'none';
+      }
+    }
+
+    // Função para limpar nota individual
+    function clearIndividualTestScore(studentId, levelKey, unitKey, noteKey) {
+      if (confirm("Are you sure you want to clear this test score? This action cannot be undone.")) {
+        const noteRef = db.ref(`usuarios/${studentId}/progresso/${levelKey}/${unitKey}/${noteKey}`);
+        
+        noteRef.set(null).then(() => {
+          alert("Test score has been cleared.");
+          toggleProgress('', '', studentId);
+        }).catch(error => {
+          console.error("Error clearing test score:", error);
+          alert("An error occurred while clearing the test score. Please try again later.");
+        });
+      }
+    }
+
+    // Função para mostrar/ocultar unidades
+    function toggleVisibility(unitId) {
+      const unitDiv = document.getElementById(unitId);
+      unitDiv.style.display = unitDiv.style.display === 'none' ? 'block' : 'none';
+    }
+
+    // Carregar avatar quando selecionado
+    document.getElementById('teacher-avatar').addEventListener('change', function() {
+      const avatar = this.value;
+      const avatarPreview = document.getElementById('avatar-preview');
+      const loadingSpinner = document.getElementById('loading-spinner');
+      
+      loadingSpinner.style.display = 'block';
+      avatarPreview.style.display = 'none';
+
+      const img = new Image();
+      img.src = 'imagens/' + avatar;
+
+      img.onload = function() {
+        avatarPreview.src = img.src;
+        loadingSpinner.style.display = 'none';
+        avatarPreview.style.display = 'block';
+      };
+
+      img.onerror = function() {
+        loadingSpinner.textContent = 'Error loading avatar';
+      };
+    });
+
+    // Debug inicial
+    console.log("Teacher Dashboard initialized");
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log("DOM fully loaded");
+    });
   </script>
 </body>
 </html>
