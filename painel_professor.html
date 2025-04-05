@@ -555,118 +555,99 @@
     }
 
     // Função para mostrar/ocultar progresso
-    function toggleProgress(teacherId, classId, studentId) {
-      const progressContainer = document.getElementById(`progress-container-${studentId}`);
-      
-      if (progressContainer.style.display === 'none' || progressContainer.style.display === '') {
-        progressContainer.style.display = 'block';
+   function toggleProgress(teacherId, classId, studentId) {
+  const progressContainer = document.getElementById(`progress-container-${studentId}`);
+  
+  if (progressContainer.style.display === 'none' || progressContainer.style.display === '') {
+    progressContainer.style.display = 'block';
+    progressContainer.innerHTML = `
+      <div style="position: relative;">
+        <button class="close-button" onclick="closeProgress('${studentId}')">&times;</button>
+        <p>Loading progress...</p>
+      </div>
+    `;
+
+    db.ref(`usuarios/${studentId}/progresso`).once('value', snapshot => {
+      if (snapshot.exists()) {
+        let progressHTML = '<div class="progress-panel"><h3>Student Progress</h3>';
+
+        // Estrutura corrigida para todos os níveis
+        const levels = {
+          Level0: { start: 1, prefix: '' },
+          Level1: { start: 1001, prefix: '1' },
+          Level2: { start: 2001, prefix: '2' },
+          Level3: { start: 3001, prefix: '3' },
+          Level4: { start: 4001, prefix: '4' }
+        };
+
+        Object.keys(levels).forEach(levelKey => {
+          const { start, prefix } = levels[levelKey];
+          progressHTML += `<div class="level-container"><h4>${levelKey}</h4>`;
+
+          Object.keys(structure[levelKey]).forEach(unitKey => {
+            const unitNum = unitKey.replace('Unit', '');
+            const totalPhases = structure[levelKey][unitKey];
+            const unitSnap = snapshot.child(`${levelKey}/${unitKey}`);
+            
+            let completedPhases = 0;
+            let phasesHTML = '';
+
+            for (let phaseNumber = 1; phaseNumber <= totalPhases; phaseNumber++) {
+              // Geração CORRETA da chave conforme cadastro original
+              let phaseKey;
+              if (levelKey === 'Level0') {
+                phaseKey = `fase${phaseNumber}`;
+              } else {
+                phaseKey = `fase${prefix}${(parseInt(unitNum) - 1) * 30 + phaseNumber}`;
+              }
+
+              const isComplete = unitSnap.child(phaseKey).val() || false;
+              if (isComplete) completedPhases++;
+
+              phasesHTML += `
+                <div class="phase-item">
+                  <input type="checkbox" ${isComplete ? 'checked' : ''} 
+                    onchange="updatePhaseStatus('${studentId}', '${levelKey}', '${unitKey}', '${phaseKey}', this.checked)"
+                    class="phase-checkbox">
+                  <span>${phaseKey}</span>
+                </div>
+              `;
+            }
+
+            progressHTML += `
+              <div>
+                <div class="unit-header" onclick="toggleVisibility('${studentId}-${unitKey}')">
+                  <span>${unitKey}</span>
+                  <span>${completedPhases}/${totalPhases} completed</span>
+                </div>
+                <div id="${studentId}-${unitKey}" style="display: none; margin-top: 10px; padding: 10px;">
+                  ${phasesHTML}
+                </div>
+              </div>
+            `;
+          });
+
+          progressHTML += '</div>'; // Fecha level-container
+        });
+
+        progressHTML += '</div>'; // Fecha progress-panel
         progressContainer.innerHTML = `
           <div style="position: relative;">
             <button class="close-button" onclick="closeProgress('${studentId}')">&times;</button>
-            <p>Loading progress...</p>
+            ${progressHTML}
           </div>
         `;
-
-        db.ref(`usuarios/${studentId}/progresso`).once('value', snapshot => {
-          if (snapshot.exists()) {
-            let progressHTML = '<div class="progress-panel"><h3>Student Progress</h3>';
-
-            // Processar todos os níveis
-            ['Level0', 'Level1', 'Level2', 'Level3', 'Level4'].forEach(levelKey => {
-              const levelNum = levelKey.replace('Level', '');
-              progressHTML += `<div class="level-container"><h4>${levelKey}</h4>`;
-
-              // Processar todas as unidades
-              Object.keys(structure[levelKey]).forEach(unitKey => {
-                const unitNum = unitKey.replace('Unit', '');
-                const totalPhases = structure[levelKey][unitKey];
-                const unitSnap = snapshot.child(`${levelKey}/${unitKey}`);
-                
-                let completedPhases = 0;
-                let phasesHTML = '';
-                let notesHTML = '';
-                let noteCount = 1;
-
-                // Processar todas as fases
-                for (let phaseNumber = 1; phaseNumber <= totalPhases; phaseNumber++) {
-                  let phaseKey;
-                  if (levelKey === 'Level0') {
-                    phaseKey = `fase${phaseNumber}`;
-                  } else {
-                    // Calcular número da fase no formato correto (ex: fase1001 para Level1/Unit1/Phase1)
-                    const faseNumberGlobal = (parseInt(unitNum) - 1) * 30 + phaseNumber;
-                    phaseKey = `fase${levelNum}${faseNumberGlobal.toString().padStart(3, '0')}`;
-                  }
-
-                  const phaseSnap = unitSnap.child(phaseKey);
-                  const isComplete = phaseSnap.exists() && phaseSnap.val();
-
-                  if (isComplete) completedPhases++;
-
-                  phasesHTML += `
-                    <div class="phase-item">
-                      <input type="checkbox" ${isComplete ? 'checked' : ''} 
-                        onchange="updatePhaseStatus('${studentId}', '${levelKey}', '${unitKey}', '${phaseKey}', this.checked)"
-                        class="phase-checkbox">
-                      <span>${phaseKey}</span>
-                    </div>
-                  `;
-                }
-
-                // Processar notas
-                unitSnap.forEach(childSnap => {
-                  if (childSnap.key.startsWith('nota')) {
-                    const notaValue = childSnap.val();
-                    notesHTML += `
-                      <div style="margin: 10px 0; padding: 8px; background: #f0f0f0; border-radius: 4px;">
-                        <span>Test ${noteCount}: </span>
-                        <span style="font-weight: bold; color: ${notaValue >= 70 ? '#2196F3' : '#f44336'};">${notaValue}</span>
-                        <button onclick="clearIndividualTestScore('${studentId}', '${levelKey}', '${unitKey}', '${childSnap.key}')"
-                          style="margin-left: 10px; padding: 2px 8px; background: #ff4444; color: white; border: none; border-radius: 3px; cursor: pointer;">
-                          Clear
-                        </button>
-                      </div>
-                    `;
-                    noteCount++;
-                  }
-                });
-
-                progressHTML += `
-                  <div>
-                    <div class="unit-header" onclick="toggleVisibility('${studentId}-${unitKey}')">
-                      <span>${unitKey}</span>
-                      <span>${completedPhases}/${totalPhases} completed</span>
-                    </div>
-                    <div id="${studentId}-${unitKey}" style="display: none; margin-top: 10px; padding: 10px;">
-                      <h5>Phases</h5>
-                      ${phasesHTML}
-                      ${notesHTML ? `<h5 style="margin-top: 15px;">Test Scores</h5>${notesHTML}` : ''}
-                    </div>
-                  </div>
-                `;
-              });
-
-              progressHTML += '</div>'; // Fecha level-container
-            });
-
-            progressHTML += '</div>'; // Fecha progress-panel
-            progressContainer.innerHTML = `
-              <div style="position: relative;">
-                <button class="close-button" onclick="closeProgress('${studentId}')">&times;</button>
-                ${progressHTML}
-              </div>
-            `;
-          } else {
-            progressContainer.innerHTML = '<div class="progress-panel"><p>No progress data available.</p></div>';
-          }
-        }).catch(error => {
-          console.error("Error loading progress:", error);
-          progressContainer.innerHTML = '<div class="progress-panel"><p>Error loading progress data.</p></div>';
-        });
       } else {
-        progressContainer.style.display = 'none';
+        progressContainer.innerHTML = '<div class="progress-panel"><p>No progress data available.</p></div>';
       }
-    }
+    }).catch(error => {
+      console.error("Error loading progress:", error);
+      progressContainer.innerHTML = '<div class="progress-panel"><p>Error loading progress data.</p></div>';
+    });
+  } else {
+    progressContainer.style.display = 'none';
+  }
+}
 
     // Função para fechar o progresso
     function closeProgress(studentId) {
