@@ -1,4 +1,4 @@
-const gridSize = 8;
+const gridSize = 10;
 const canvas = document.getElementById('word-search-canvas');
 const ctx = canvas.getContext('2d');
 
