@@ -479,45 +479,58 @@ function getParamsFromURL() {
             return { level: parts[1], unit: parts[2] };
         }
 
-       function goBack() {
-    const { level, unit, fase } = getParamsFromURL();
+       async function goBack() {
+            console.log("[DEBUG] Back button clicked");
+            const { level, unit, fase } = getParamsFromURL();
+            console.log("[DEBUG] URL Params:", { level, unit, fase });
 
-    // Verifica o usuário autenticado
-    firebase.auth().onAuthStateChanged(function(user) {
-        if (!user) {
-            alert("You need to be logged in to proceed.");
-            return;
-        }
+            if (!level || !unit || !fase) {
+                console.warn("[DEBUG] Missing required parameters in URL, allowing back navigation");
+                window.history.back();
+                return;
+            }
 
-        const userId = user.uid;
-        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+            firebase.auth().onAuthStateChanged(async (user) => {
+                if (!user) {
+                    console.warn("[DEBUG] User not authenticated, allowing back navigation");
+                    window.history.back();
+                    return;
+                }
 
-        dbRef.get().then(snapshot => {
-            if (snapshot.exists()) {
-                const progress = snapshot.val();
-                const currentFase = parseInt(fase, 10);
-                const nextFaseKey = `fase${currentFase + 1}`;
+                console.log("[DEBUG] User authenticated:", user.uid);
+                const nextPhase = `fase${parseInt(fase) + 1}`;
+                console.log("[DEBUG] Checking next phase:", nextPhase);
 
-                // Verifica se a próxima fase está desbloqueada
-                if (progress[nextFaseKey]) {
-                    window.history.back(); // Volta para a página anterior
-                } else {
-                    const confirmNavigation = confirm(
-                        "The next phase is locked. Do you still want to go back?"
+                try {
+                    const snapshot = await firebase.database()
+                        .ref(`usuarios/${user.uid}/progresso/${level}/${unit}/${nextPhase}`)
+                        .once("value");
+
+                    console.log("[DEBUG] Snapshot value:", snapshot.val());
+
+                    if (snapshot.val() === true) {
+                        console.log("[DEBUG] Next phase is unlocked, allowing back navigation");
+                        window.history.back();
+                    } else {
+                        console.log("[DEBUG] Next phase is locked, showing confirmation");
+                        const confirmExit = confirm(
+                            "The next phase is locked. Do you still want to go back?"
+                        );
+                        if (confirmExit) {
+                            window.history.back();
+                        }
+                    }
+                } catch (error) {
+                    console.error("[DEBUG] Firebase error:", error);
+                    const confirmExit = confirm(
+                        "Could not verify progress. Do you want to go back anyway?"
                     );
-                    if (confirmNavigation) {
-                        window.history.back(); // Volta para a página anterior
+                    if (confirmExit) {
+                        window.history.back();
                     }
                 }
-            } else {
-                alert("Could not verify progress. Please try again later.");
-            }
-        }).catch(error => {
-            console.error("Error checking progress:", error);
-            alert("An error occurred while checking progress. Please try again.");
-        });
-    });
-}
+            });
+        }
 
         function showCompletionModal() {
             overlay.style.display = 'block';
