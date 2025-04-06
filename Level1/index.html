@@ -139,69 +139,116 @@
             }
         }
 
+        // Função para extrair o nível da URL de forma segura
+        function getCurrentLevel() {
+            try {
+                const matches = window.location.href.match(/Level[A-Za-z0-9]+/);
+                return matches ? matches[0] : 'Level1'; // Default caso não encontre
+            } catch (e) {
+                console.error("Erro ao extrair nível da URL:", e);
+                return 'Level1';
+            }
+        }
+
         // Função melhorada para desbloquear unidades
-        function carregarProgresso(userId, level) {
-            db.ref(`usuarios/${userId}/progresso/${level}`).once('value')
-                .then(snapshot => {
-                    const progresso = snapshot.val();
-                    console.log("Dados do BD:", progresso); // Debug
+        async function carregarProgresso(userId, level) {
+            try {
+                const snapshot = await db.ref(`usuarios/${userId}/progresso/${level}`).once('value');
+                const progresso = snapshot.val();
+                console.log("Progresso carregado:", progresso); // Debug
+                
+                if (!progresso) {
+                    console.log("Nenhum progresso encontrado para este nível");
+                    return;
+                }
+
+                for (let i = 1; i <= 37; i++) {
+                    const unitId = `Unit${i}`;
+                    const button = document.getElementById(`unit${i}`);
                     
-                    for (let i = 1; i <= 37; i++) {
-                        const unitId = `Unit${i}`;
-                        const button = document.getElementById(`unit${i}`);
-                        
-                        if (progresso && progresso[unitId]) {
-                            // Verifica se é um objeto (com fases) ou se está liberado diretamente
-                            if (typeof progresso[unitId] === 'object') {
-                                // Caso tenha estrutura de fases
-                                const fases = progresso[unitId];
-                                const temFaseLiberada = Object.values(fases).some(val => val === true);
-                                if (temFaseLiberada) {
-                                    button.classList.remove('disabled');
-                                }
-                            } else if (progresso[unitId] === true) {
-                                // Caso a unidade esteja liberada diretamente
+                    if (!button) {
+                        console.warn(`Botão ${unitId} não encontrado`);
+                        continue;
+                    }
+
+                    if (progresso[unitId]) {
+                        // Verifica se é um objeto (com fases) ou se está liberado diretamente
+                        if (typeof progresso[unitId] === 'object') {
+                            // Caso tenha estrutura de fases
+                            const fases = progresso[unitId];
+                            const temFaseLiberada = Object.values(fases).some(val => val === true);
+                            if (temFaseLiberada) {
                                 button.classList.remove('disabled');
+                                console.log(`Unidade ${unitId} liberada (tem fases completas)`);
                             }
+                        } else if (progresso[unitId] === true) {
+                            // Caso a unidade esteja liberada diretamente
+                            button.classList.remove('disabled');
+                            console.log(`Unidade ${unitId} liberada (liberação direta)`);
                         }
                     }
-                })
-                .catch(error => {
-                    console.error("Erro ao acessar o banco de dados:", error);
-                });
+                }
+            } catch (error) {
+                console.error("Erro ao carregar progresso:", error);
+            }
         }
 
         // Desbloquear todas as unidades (para professores/proprietários)
         function desbloquearTodasUnidades() {
             for (let i = 1; i <= 37; i++) {
-                document.getElementById(`unit${i}`).classList.remove('disabled');
+                const button = document.getElementById(`unit${i}`);
+                if (button) {
+                    button.classList.remove('disabled');
+                }
+            }
+            console.log("Todas unidades liberadas (modo professor/proprietário)");
+        }
+
+        // Função para verificar o papel do usuário
+        async function verificarPapelUsuario(userId) {
+            try {
+                const snapshot = await db.ref(`usuarios/${userId}/role`).once('value');
+                return snapshot.val();
+            } catch (error) {
+                console.error("Erro ao verificar papel do usuário:", error);
+                return null;
             }
         }
 
-        // Monitorar autenticação e nível atual
-        auth.onAuthStateChanged(user => {
-            if (user) {
-                db.ref(`usuarios/${user.uid}/role`).once('value')
-                    .then(snapshot => {
-                        const role = snapshot.val();
-                        const level = window.location.href.match(/Level\d+/)[0]; // Extrai 'Level1', 'Level2', etc.
-                        document.getElementById('level-display').textContent = level; // Atualiza o cabeçalho
+        // Monitorar autenticação - Versão robusta
+        auth.onAuthStateChanged(async (user) => {
+            try {
+                if (!user) {
+                    console.log("Usuário não autenticado - mantendo unidades bloqueadas");
+                    criarBotoesUnidades();
+                    return;
+                }
 
-                        if (role === 'proprietario' || role === 'professor') {
-                            desbloquearTodasUnidades();
-                        } else {
-                            carregarProgresso(user.uid, level);
-                        }
-                    })
-                    .catch(error => {
-                        console.error("Erro ao verificar o papel do usuário:", error);
-                    });
+                // Extrai nível atual de forma segura
+                const level = getCurrentLevel();
+                document.getElementById('level-display').textContent = level;
+
+                // Verifica papel do usuário
+                const role = await verificarPapelUsuario(user.uid);
+                
+                if (!role) {
+                    console.log("Papel do usuário não definido - tratando como aluno");
+                }
+
+                if (role === 'proprietario' || role === 'professor') {
+                    desbloquearTodasUnidades();
+                } else {
+                    await carregarProgresso(user.uid, level);
+                }
+            } catch (error) {
+                console.error("Erro no fluxo de autenticação:", error);
             }
         });
 
         // Inicialização
         document.addEventListener("DOMContentLoaded", function() {
-            criarBotoesUnidades(); // Cria os 37 botões ao carregar a página
+            criarBotoesUnidades();
+            console.log("Página carregada - 37 unidades criadas");
         });
     </script>
 </body>
