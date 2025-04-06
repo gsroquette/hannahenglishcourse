@@ -12,8 +12,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Extraindo Level e Unit da URL atual
     const urlPathParts = window.location.pathname.split('/');
-    const currentLevel = urlPathParts[1]; // Ex: "Level1"
-    const currentUnit = urlPathParts[2]; // Ex: "Unit1"
+    const capitalizeFirstLetter = str => str.charAt(0).toUpperCase() + str.slice(1);
+    const currentLevel = capitalizeFirstLetter(urlPathParts[1]);
+    const currentUnit = capitalizeFirstLetter(urlPathParts[2]);
+
 
    const activities = [
     { id: 1038, name: "StoryCards", path: `/Atividades/StoryCards/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1038`, img: "../../imagens/botoes/storycards_button.png", unlocked: false },

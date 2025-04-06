@@ -12,8 +12,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Extraindo Level e Unit da URL atual
     const urlPathParts = window.location.pathname.split('/');
-    const currentLevel = urlPathParts[1]; // Ex: "Level1"
-    const currentUnit = urlPathParts[2]; // Ex: "Unit1"
+    const capitalizeFirstLetter = str => str.charAt(0).toUpperCase() + str.slice(1);
+    const currentLevel = capitalizeFirstLetter(urlPathParts[1]);
+    const currentUnit = capitalizeFirstLetter(urlPathParts[2]);
 
    const activities = [
     { id: 1043, name: "MemoryGame", path: `/Atividades/MemoryGame/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1043`, img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
@@ -83,7 +84,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Função para carregar o progresso do usuário
    function loadUserProgress(userId, userAvatar, userRole) {
-    const progressPath = `/usuarios/${userId}/progresso/Level1/Unit1`;
+    const progressPath = `/usuarios/${userId}/progresso/${currentLevel}/${currentUnit}`;
     console.log(`Buscando progresso em: ${progressPath}`);
 
     if (userRole === 'proprietario' || userRole === 'professor') {
