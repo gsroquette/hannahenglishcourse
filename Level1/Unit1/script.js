@@ -102,40 +102,35 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log("Informações de nível e unidade atualizadas na interface.");
 
     // Função para carregar o progresso do usuário
-    function loadUserProgress(userId, userAvatar, userRole) {
-        const progressPath = `/usuarios/${userId}/progresso/${currentLevel}/${currentUnit}`;
-        console.log(`Buscando progresso em: ${progressPath}`);
+  function loadUserProgress(userId, userAvatar, userRole) {
+    // CORREÇÃO DEFINITIVA: Caminho exato conforme seu banco
+    const progressPath = `/usuarios/${userId}/progresso/Level1/Unit1`;
+    console.log(`Buscando progresso em: ${progressPath}`);
 
-        if (userRole === 'proprietario' || userRole === 'professor') {
-            console.log("Usuário é proprietário/professor. Todas as fases desbloqueadas.");
-            activities.forEach(activity => activity.unlocked = true);
-            lastUnlockedIndex = activities.length - 1;
+    if (userRole === 'proprietario' || userRole === 'professor') {
+        activities.forEach(activity => activity.unlocked = true);
+        lastUnlockedIndex = activities.length - 1;
+        initializeMap(userAvatar);
+    } else {
+        database.ref(progressPath).once('value').then(snapshot => {
+            const progress = snapshot.val();
+            console.log("Dados retornados do Firebase:", progress); // Debug crucial
+
+            // Verificação EXPLÍCITA da fase1001
+            if (progress && progress.fase1001 === true) {
+                console.log("Fase 1001 confirmada como DESBLOQUEADA no banco");
+                activities[0].unlocked = true; // StoryCards (1001)
+                lastUnlockedIndex = 0;
+            } else {
+                console.warn("Fase 1001 NÃO encontrada ou está false no banco");
+            }
+
             initializeMap(userAvatar);
-        } else {
-            database.ref(progressPath).once('value').then(snapshot => {
-                const progress = snapshot.val();
-                console.log("Progresso encontrado:", progress);
-
-                activities.forEach((activity, index) => {
-                    const faseKey = `fase${activity.id}`;
-                    if (progress && progress[faseKey] === true) {
-                        console.log(`Fase ${activity.id} (${activity.name}) está desbloqueada.`);
-                        activity.unlocked = true;
-                        lastUnlockedIndex = index;
-                    } else {
-                        console.log(`Fase ${activity.id} (${activity.name}) está bloqueada.`);
-                    }
-                });
-
-                console.log("Índice da última fase desbloqueada:", lastUnlockedIndex);
-                console.log("Status das atividades:", activities.map(a => `${a.id}: ${a.unlocked}`));
-                initializeMap(userAvatar);
-            }).catch(error => {
-                console.error("Erro ao carregar o progresso do usuário:", error);
-                initializeMap(userAvatar);
-            });
-        }
+        }).catch(error => {
+            console.error("Erro fatal ao acessar Firebase:", error);
+        });
     }
+}
 
     // Função para inicializar o mapa
     function initializeMap(userAvatar) {
