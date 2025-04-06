@@ -16,9 +16,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentUnit = urlPathParts[2]; // Ex: "Unit1"
 
   const activities = [
-    { id: 31, name: "Hannah Video", path: `/Atividades/HannahVideo/index.html?level=${currentLevel}&unit=${currentUnit}&fase=31`, img: "../../imagens/botoes/video_button.png", unlocked: false },
-    { id: 32, name: "MatchingGame", path: `/Atividades/MatchingGame/index.html?level=${currentLevel}&unit=${currentUnit}&fase=32`, img: "../../imagens/botoes/matching_game_button.png", unlocked: false },
-    { id: 33, name: "LifeLessons", path: `/Atividades/LifeLessons/index.html?level=${currentLevel}&unit=${currentUnit}&fase=33`, img: "../../imagens/botoes/life_lessons_button.png", unlocked: false },
+    { id: 1031, name: "Hannah Video", path: `/Atividades/HannahVideo/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1031`, img: "../../imagens/botoes/video_button.png", unlocked: false },
+    { id: 1032, name: "MatchingGame", path: `/Atividades/MatchingGame/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1032`, img: "../../imagens/botoes/matching_game_button.png", unlocked: false },
+    { id: 1033, name: "LifeLessons", path: `/Atividades/LifeLessons/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1033`, img: "../../imagens/botoes/life_lessons_button.png", unlocked: false },
 ];
 
     // Fechar o dropdown ao clicar fora dele
