@@ -1,10 +1,8 @@
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("DOM completamente carregado. Iniciando configuração...");
-    
     const database = firebase.database();
     const auth = firebase.auth();
     const loginLink = document.getElementById("loginLink");
-    const loginContainer = document.getElementById("loginContainer");
+    const loginContainer = document.getElementById("loginContainer"); // Definido fora do bloco de autenticação
     const userDropdown = document.getElementById("userDropdown");
     const levelUnitInfo = document.getElementById("levelUnitInfo");
     const mapContainer = document.getElementById('mapContainer');
@@ -12,45 +10,34 @@ document.addEventListener('DOMContentLoaded', function() {
     let player;
     let lastUnlockedIndex = -1;
 
-    console.log("Elementos da DOM capturados com sucesso.");
-
     // Extraindo Level e Unit da URL atual
     const urlPathParts = window.location.pathname.split('/');
     const currentLevel = urlPathParts[1]; // Ex: "Level1"
     const currentUnit = urlPathParts[2]; // Ex: "Unit1"
 
-    console.log(`Nível atual: ${currentLevel}, Unidade atual: ${currentUnit}`);
-
-    const activities = [
-        { id: 1001, name: "StoryCards", path: `/Atividades/StoryCards/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1001`, img: "../../imagens/botoes/storycards_button.png", unlocked: false },
-        { id: 1002, name: "Flashcards", path: `/Atividades/Flashcards/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1002`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-        { id: 1003, name: "Flashcards2", path: `/Atividades/Flashcards2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1003`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-        { id: 1004, name: "Flashcards3", path: `/Atividades/Flashcards3/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1004`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-        { id: 1005, name: "QUIZ", path: `/Atividades/QUIZ/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1005`, img: "../../imagens/botoes/quiz_button.png", unlocked: false },
-    ];
-
-    console.log("Atividades configuradas:", activities);
+   const activities = [
+    { id: 1001, name: "StoryCards", path: `/Atividades/StoryCards/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1001`, img: "../../imagens/botoes/storycards_button.png", unlocked: false },
+    { id: 1002, name: "Flashcards", path: `/Atividades/Flashcards/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1002`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+    { id: 1003, name: "Flashcards2", path: `/Atividades/Flashcards2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1003`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+    { id: 1004, name: "Flashcards3", path: `/Atividades/Flashcards3/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1004`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+    { id: 1005, name: "QUIZ", path: `/Atividades/QUIZ/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1005`, img: "../../imagens/botoes/quiz_button.png", unlocked: false },
+];
 
     // Fechar o dropdown ao clicar fora dele
     document.addEventListener("click", function(event) {
         if (!userDropdown.contains(event.target) && !loginContainer.contains(event.target)) {
             userDropdown.style.display = 'none';
-            console.log("Dropdown fechado.");
         }
     });
 
     // Configuração de autenticação
     auth.onAuthStateChanged(user => {
         if (user) {
-            console.log("Usuário autenticado:", user.uid);
             const userId = user.uid;
             database.ref('/usuarios/' + userId).once('value').then(snapshot => {
                 const userData = snapshot.val();
-                console.log("Dados do usuário:", userData);
                 const userName = userData.nome || user.email;
                 const userAvatar = userData.avatar ? `../../imagens/${userData.avatar}` : '../../imagens/bonequinho.png';
-
-                console.log(`Avatar do usuário: ${userAvatar}, Nome: ${userName}`);
 
                 // Atualiza a interface do usuário com nome e avatar
                 loginLink.innerHTML = `<img src="${userAvatar}" alt="User Icon" class="user-icon"><p class="user-name">${userName}</p>`;
@@ -72,24 +59,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     <a href="/${currentLevel}/${currentUnit}/index.html" class="dropdown-item">SELECT A NEW ACTIVITY</a>
                 `;
                 
-                console.log("Dropdown do usuário configurado.");
-
                 // Evento de clique no loginContainer para abrir/fechar o dropdown
                 loginContainer.addEventListener("click", function(event) {
                     if (event.target.tagName !== 'A') {
                         userDropdown.style.display = userDropdown.style.display === 'flex' ? 'none' : 'flex';
-                        console.log("Dropdown alternado:", userDropdown.style.display);
                     }
                 });
 
                 // Carrega o progresso do usuário e define o avatar no mapa
-                console.log("Carregando progresso do usuário...");
                 loadUserProgress(userId, userAvatar, userData.role);
-            }).catch(error => {
-                console.error("Erro ao carregar dados do usuário:", error);
             });
         } else {
-            console.log("Nenhum usuário autenticado. Redirecionando para login.");
             loginLink.setAttribute('href', 'Formulario/login.html');
         }
     });
@@ -99,36 +79,26 @@ document.addEventListener('DOMContentLoaded', function() {
           ${currentLevel}<br>
           ${currentUnit}
     `;
-    console.log("Informações de nível e unidade atualizadas na interface.");
 
     // Função para carregar o progresso do usuário
     function loadUserProgress(userId, userAvatar, userRole) {
         const progressPath = `/usuarios/${userId}/progresso/${currentLevel}/${currentUnit}`;
-        console.log(`Buscando progresso em: ${progressPath}`);
 
         if (userRole === 'proprietario' || userRole === 'professor') {
-            console.log("Usuário é proprietário/professor. Todas as fases desbloqueadas.");
             activities.forEach(activity => activity.unlocked = true);
-            lastUnlockedIndex = activities.length - 1;
+            lastUnlockedIndex = 0;
             initializeMap(userAvatar);
         } else {
             database.ref(progressPath).once('value').then(snapshot => {
                 const progress = snapshot.val();
-                console.log("Progresso encontrado:", progress);
-
-                activities.forEach((activity, index) => {
-                    const faseKey = `fase${activity.id}`;
-                    if (progress && progress[faseKey] === true) {
-                        console.log(`Fase ${activity.id} (${activity.name}) está desbloqueada.`);
-                        activity.unlocked = true;
-                        lastUnlockedIndex = index;
-                    } else {
-                        console.log(`Fase ${activity.id} (${activity.name}) está bloqueada.`);
-                    }
-                });
-
-                console.log("Índice da última fase desbloqueada:", lastUnlockedIndex);
-                console.log("Status das atividades:", activities.map(a => `${a.id}: ${a.unlocked}`));
+                if (progress) {
+                    activities.forEach((activity, index) => {
+                        if (progress[`fase${activity.id}`] === true) {
+                            activity.unlocked = true;
+                            lastUnlockedIndex = index;
+                        }
+                    });
+                }
                 initializeMap(userAvatar);
             }).catch(error => {
                 console.error("Erro ao carregar o progresso do usuário:", error);
@@ -139,13 +109,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Função para inicializar o mapa
     function initializeMap(userAvatar) {
-        console.log("Inicializando mapa...");
         window.scrollTo(0, 0);
-        
-        // Limpa fases existentes
-        const existingPhases = document.querySelectorAll('.phase');
-        existingPhases.forEach(phase => phase.remove());
-
         activities.forEach((activity, index) => {
             const phaseDiv = document.createElement('div');
             phaseDiv.classList.add('phase');
@@ -166,10 +130,8 @@ document.addEventListener('DOMContentLoaded', function() {
             mapContainer.appendChild(phaseDiv);
 
             if (activity.unlocked) {
-                console.log(`Renderizando fase ${activity.id} como desbloqueada.`);
                 phaseDiv.classList.add('active');
             } else {
-                console.log(`Renderizando fase ${activity.id} como bloqueada.`);
                 phaseDiv.classList.add('locked');
                 const lockIcon = document.createElement('img');
                 lockIcon.src = '../../imagens/lock_icon_resized.png';
@@ -179,10 +141,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             phaseDiv.addEventListener('click', () => {
                 if (activity.unlocked) {
-                    console.log(`Fase ${activity.id} clicada. Redirecionando para: ${activity.path}`);
                     moveToPhase(index, activity.path);
-                } else {
-                    console.log(`Fase ${activity.id} está bloqueada. Ignorando clique.`);
                 }
             });
         });
@@ -191,17 +150,13 @@ document.addEventListener('DOMContentLoaded', function() {
         createPlayer(userAvatar);
 
         if (lastUnlockedIndex >= 0) {
-            console.log(`Última fase desbloqueada: índice ${lastUnlockedIndex}. Posicionando jogador...`);
             const lastUnlockedPhase = document.querySelectorAll('.phase')[lastUnlockedIndex];
             animateUnlock(lastUnlockedPhase);
             scrollToPhase(lastUnlockedIndex);
-        } else {
-            console.log("Nenhuma fase desbloqueada ainda.");
         }
     }
 
     function createPlayer(avatarPath) {
-        console.log(`Criando jogador com avatar: ${avatarPath}`);
         if (!player) {
             player = document.createElement('img');
             player.classList.add('player');
@@ -212,19 +167,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function moveToPhase(index, path = null) {
-        console.log(`Movendo jogador para fase de índice ${index}`);
         const phase = document.querySelectorAll('.phase')[index];
-        if (!phase) {
-            console.error(`Fase de índice ${index} não encontrada.`);
-            return;
-        }
-
         const coords = phase.getBoundingClientRect();
+
         player.style.top = `${coords.top + window.scrollY + coords.height / 2}px`;
         player.style.left = `${coords.left + window.scrollX + coords.width / 2}px`;
 
         if (path) {
-            console.log(`Agendando redirecionamento para: ${path}`);
             setTimeout(() => {
                 window.location.href = path;
             }, 600);
@@ -232,16 +181,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function drawLines() {
-        console.log("Desenhando linhas entre fases...");
         svgContainer.innerHTML = '';
         const phases = document.querySelectorAll('.phase');
         for (let i = 0; i < activities.length - 1; i++) {
             const phase1 = phases[i];
             const phase2 = phases[i + 1];
-            if (!phase1 || !phase2) {
-                console.error(`Fase ${i} ou ${i + 1} não encontrada para desenhar linha.`);
-                continue;
-            }
+            if (!phase1 || !phase2) continue;
 
             const coords1 = phase1.getBoundingClientRect();
             const coords2 = phase2.getBoundingClientRect();
@@ -261,7 +206,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function animateUnlock(phaseDiv) {
-        console.log("Animando desbloqueio de fase...");
         const unlockGif = document.createElement('img');
         unlockGif.src = '../../imagens/cadeado.gif';
         unlockGif.classList.add('unlock-gif');
@@ -272,12 +216,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         setTimeout(() => {
             unlockGif.remove();
-            console.log("Animação de desbloqueio concluída.");
         }, 3000);
     }
 
     function scrollToPhase(index) {
-        console.log(`Rolando página para fase de índice ${index}...`);
         const phase = document.querySelectorAll('.phase')[index];
         if (phase) {
             const coords = phase.getBoundingClientRect();
@@ -285,8 +227,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 top: coords.top + window.scrollY - window.innerHeight / 2,
                 behavior: 'smooth'
             });
-        } else {
-            console.error(`Fase de índice ${index} não encontrada para rolagem.`);
         }
     }
 });
