@@ -16,11 +16,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentUnit = urlPathParts[2]; // Ex: "Unit1"
 
    const activities = [
-    { id: 1001, name: "StoryCards", path: `/Atividades/StoryCards/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1001`, img: "../../imagens/botoes/storycards_button.png", unlocked: false },
-    { id: 1002, name: "Flashcards", path: `/Atividades/Flashcards/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1002`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-    { id: 1003, name: "Flashcards2", path: `/Atividades/Flashcards2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1003`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-    { id: 1004, name: "Flashcards3", path: `/Atividades/Flashcards3/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1004`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-    { id: 1005, name: "QUIZ", path: `/Atividades/QUIZ/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1005`, img: "../../imagens/botoes/quiz_button.png", unlocked: false },
+    { id: 1038, name: "StoryCards", path: `/Atividades/StoryCards/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1038`, img: "../../imagens/botoes/storycards_button.png", unlocked: false },
+    { id: 1039, name: "Flashcards", path: `/Atividades/Flashcards/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1039`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+    { id: 1040, name: "Flashcards2", path: `/Atividades/Flashcards2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1040`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+    { id: 1041, name: "Flashcards3", path: `/Atividades/Flashcards3/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1041`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+    { id: 1042, name: "QUIZ", path: `/Atividades/QUIZ/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1042`, img: "../../imagens/botoes/quiz_button.png", unlocked: false },
 ];
 
     // Fechar o dropdown ao clicar fora dele
