@@ -103,33 +103,31 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Função para carregar o progresso do usuário
  function loadUserProgress(userId, userAvatar, userRole) {
-    // 1. Define o caminho CORRETO (com maiúsculas)
     const progressPath = `/usuarios/${userId}/progresso/Level1/Unit1`;
     console.log(`Buscando progresso em: ${progressPath}`);
 
     if (userRole === 'proprietario' || userRole === 'professor') {
-        // Professores veem tudo desbloqueado
         activities.forEach(activity => activity.unlocked = true);
         lastUnlockedIndex = activities.length - 1;
         initializeMap(userAvatar);
     } else {
-        // Para alunos: busca no Firebase
         database.ref(progressPath).once('value').then(snapshot => {
             const progress = snapshot.val();
             console.log("Progresso encontrado:", progress);
 
-            // 2. Verificação FLEXÍVEL (funciona com QUALQUER ID)
             activities.forEach((activity, index) => {
-                // Procura a chave correspondente ao ID da atividade
+                // Verifica se a fase está liberada no Firebase
                 const faseKey = Object.keys(progress || {}).find(
                     key => key.includes(`fase${activity.id}`) || key.includes(activity.id.toString())
                 );
-
+                
+                // Libera apenas se estiver marcada como true E a anterior estiver completa
                 if (faseKey && progress[faseKey] === true) {
-                    console.log(`Fase ${activity.id} desbloqueada (via chave ${faseKey})`);
-                    activity.unlocked = true;
-                    lastUnlockedIndex = index;
+                    activity.unlocked = (index === 0) || activities[index-1].unlocked; // <<--- REGRA FUNDAMENTAL
+                    if (activity.unlocked) lastUnlockedIndex = index;
                 }
+
+                console.log(`Fase ${activity.id} - liberada? ${activity.unlocked}`);
             });
 
             initializeMap(userAvatar);
