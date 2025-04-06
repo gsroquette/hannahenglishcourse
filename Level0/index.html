@@ -54,7 +54,7 @@
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
             padding: 20px;
-            max-width: 800px;
+            max-width: 1200px;
             margin: 0 auto;
             justify-content: center;
         }
@@ -99,20 +99,9 @@
             <button class="back-button" onclick="window.location.href='../index.html';">Back</button>
         </div>
 
-        <!-- Unidades -->
+        <!-- Container das unidades (será preenchido via JavaScript) -->
         <main>
-            <div class="units">
-                <a href="Unit1/index.html" id="unit1" class="unit-button">Unit 1</a>
-                <a href="Unit2/index.html" id="unit2" class="unit-button disabled">Unit 2</a>
-                <a href="Unit3/index.html" id="unit3" class="unit-button disabled">Unit 3</a>
-                <a href="Unit4/index.html" id="unit4" class="unit-button disabled">Unit 4</a>
-                <a href="Unit5/index.html" id="unit5" class="unit-button disabled">Unit 5</a>
-                <a href="Unit6/index.html" id="unit6" class="unit-button disabled">Unit 6</a>
-                <a href="Unit7/index.html" id="unit7" class="unit-button disabled">Unit 7</a>
-                <a href="Unit8/index.html" id="unit8" class="unit-button disabled">Unit 8</a>
-                <a href="Unit9/index.html" id="unit9" class="unit-button disabled">Unit 9</a>
-                <a href="Unit10/index.html" id="unit10" class="unit-button disabled">Unit 10</a>
-            </div>            
+            <div class="units" id="units-container"></div>            
         </main>
     </div>
 
@@ -136,68 +125,130 @@
         const db = firebase.database();
         const auth = firebase.auth();
 
-        // Função para desbloquear unidades
-        function desbloquearUnidades(userId, role) {
-            if (role === 'proprietario' || role === 'professor') {
-                desbloquearTodasUnidades();
-            } else {
-                carregarProgresso(userId);
+        // Função para criar os 37 botões de unidades
+        function criarBotoesUnidades() {
+            const container = document.getElementById('units-container');
+            container.innerHTML = ''; // Limpa o container antes de adicionar
+            for (let i = 1; i <= 37; i++) {
+                const button = document.createElement('a');
+                button.href = `Unit${i}/index.html`;
+                button.id = `unit${i}`;
+                button.className = 'unit-button disabled'; // Inicia bloqueado
+                button.textContent = `Unit ${i}`;
+                container.appendChild(button);
             }
         }
 
-        // Carregar o progresso do aluno
-        function carregarProgresso(userId) {
-            db.ref(`usuarios/${userId}/progresso/Level1`).once('value')
-                .then(snapshot => {
-                    const progresso = snapshot.val();
-                    const units = document.querySelectorAll('.unit-button');
+        // Função para extrair o nível da URL de forma segura
+        function getCurrentLevel() {
+            try {
+                const matches = window.location.href.match(/Level[A-Za-z0-9]+/);
+                return matches ? matches[0] : 'Level1'; // Default caso não encontre
+            } catch (e) {
+                console.error("Erro ao extrair nível da URL:", e);
+                return 'Level1';
+            }
+        }
+
+        // Função melhorada para desbloquear unidades
+        async function carregarProgresso(userId, level) {
+            try {
+                const snapshot = await db.ref(`usuarios/${userId}/progresso/${level}`).once('value');
+                const progresso = snapshot.val();
+                console.log("Progresso carregado:", progresso); // Debug
+                
+                if (!progresso) {
+                    console.log("Nenhum progresso encontrado para este nível");
+                    return;
+                }
+
+                for (let i = 1; i <= 37; i++) {
+                    const unitId = `Unit${i}`;
+                    const button = document.getElementById(`unit${i}`);
                     
-                    units.forEach(unit => {
-                        const unitId = unit.id.replace('unit', 'Unit');
-                        
-                        if (progresso && progresso[unitId] && progresso[unitId].fase1 === true) {
-                            unit.classList.remove('disabled');
+                    if (!button) {
+                        console.warn(`Botão ${unitId} não encontrado`);
+                        continue;
+                    }
+
+                    if (progresso[unitId]) {
+                        // Verifica se é um objeto (com fases) ou se está liberado diretamente
+                        if (typeof progresso[unitId] === 'object') {
+                            // Caso tenha estrutura de fases
+                            const fases = progresso[unitId];
+                            const temFaseLiberada = Object.values(fases).some(val => val === true);
+                            if (temFaseLiberada) {
+                                button.classList.remove('disabled');
+                                console.log(`Unidade ${unitId} liberada (tem fases completas)`);
+                            }
+                        } else if (progresso[unitId] === true) {
+                            // Caso a unidade esteja liberada diretamente
+                            button.classList.remove('disabled');
+                            console.log(`Unidade ${unitId} liberada (liberação direta)`);
                         }
-                    });
-                })
-                .catch(error => {
-                    console.error("Erro ao acessar o banco de dados:", error);
-                });
+                    }
+                }
+            } catch (error) {
+                console.error("Erro ao carregar progresso:", error);
+            }
         }
 
-        // Desbloquear todas as unidades
+        // Desbloquear todas as unidades (para professores/proprietários)
         function desbloquearTodasUnidades() {
-            const units = document.querySelectorAll('.unit-button');
-            units.forEach(unit => {
-                unit.classList.remove('disabled');
-            });
+            for (let i = 1; i <= 37; i++) {
+                const button = document.getElementById(`unit${i}`);
+                if (button) {
+                    button.classList.remove('disabled');
+                }
+            }
+            console.log("Todas unidades liberadas (modo professor/proprietário)");
         }
 
-        // Monitorar autenticação
-        auth.onAuthStateChanged(user => {
-            if (user) {
-                db.ref(`usuarios/${user.uid}/role`).once('value')
-                    .then(snapshot => {
-                        const role = snapshot.val();
-                        desbloquearUnidades(user.uid, role);
-                    })
-                    .catch(error => {
-                        console.error("Erro ao acessar o banco de dados para verificar o papel:", error);
-                    });
-            } else {
-                console.error("Erro: Usuário não autenticado");
+        // Função para verificar o papel do usuário
+        async function verificarPapelUsuario(userId) {
+            try {
+                const snapshot = await db.ref(`usuarios/${userId}/role`).once('value');
+                return snapshot.val();
+            } catch (error) {
+                console.error("Erro ao verificar papel do usuário:", error);
+                return null;
+            }
+        }
+
+        // Monitorar autenticação - Versão robusta
+        auth.onAuthStateChanged(async (user) => {
+            try {
+                if (!user) {
+                    console.log("Usuário não autenticado - mantendo unidades bloqueadas");
+                    criarBotoesUnidades();
+                    return;
+                }
+
+                // Extrai nível atual de forma segura
+                const level = getCurrentLevel();
+                document.getElementById('level-display').textContent = level;
+
+                // Verifica papel do usuário
+                const role = await verificarPapelUsuario(user.uid);
+                
+                if (!role) {
+                    console.log("Papel do usuário não definido - tratando como aluno");
+                }
+
+                if (role === 'proprietario' || role === 'professor') {
+                    desbloquearTodasUnidades();
+                } else {
+                    await carregarProgresso(user.uid, level);
+                }
+            } catch (error) {
+                console.error("Erro no fluxo de autenticação:", error);
             }
         });
 
-        // Exibir o Level atual
+        // Inicialização
         document.addEventListener("DOMContentLoaded", function() {
-            const levelDisplay = document.getElementById('level-display');
-            const url = window.location.href;
-            const levelMatch = url.match(/Level\d+/);
-
-            if (levelMatch) {
-                levelDisplay.textContent = levelMatch[0]; // Exibe o Level encontrado
-            }
+            criarBotoesUnidades();
+            console.log("Página carregada - 37 unidades criadas");
         });
     </script>
 </body>
