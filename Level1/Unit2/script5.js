@@ -85,30 +85,40 @@ const activities = [
 
     // Função para carregar o progresso do usuário
     function loadUserProgress(userId, userAvatar, userRole) {
-        const progressPath = `/usuarios/${userId}/progresso/${currentLevel}/${currentUnit}`;
+    const progressPath = `/usuarios/${userId}/progresso/Level1/Unit1`;
+    console.log(`Buscando progresso em: ${progressPath}`);
 
-        if (userRole === 'proprietario' || userRole === 'professor') {
-            activities.forEach(activity => activity.unlocked = true);
-            lastUnlockedIndex = 0;
-            initializeMap(userAvatar);
-        } else {
-            database.ref(progressPath).once('value').then(snapshot => {
-                const progress = snapshot.val();
-                if (progress) {
-                    activities.forEach((activity, index) => {
-                        if (progress[`fase${activity.id}`] === true) {
-                            activity.unlocked = true;
-                            lastUnlockedIndex = index;
-                        }
-                    });
+    if (userRole === 'proprietario' || userRole === 'professor') {
+        activities.forEach(activity => activity.unlocked = true);
+        lastUnlockedIndex = activities.length - 1;
+        initializeMap(userAvatar);
+    } else {
+        database.ref(progressPath).once('value').then(snapshot => {
+            const progress = snapshot.val();
+            console.log("Progresso encontrado:", progress);
+
+            activities.forEach((activity, index) => {
+                // Verifica se a fase está liberada no Firebase
+                const faseKey = Object.keys(progress || {}).find(
+                    key => key.includes(`fase${activity.id}`) || key.includes(activity.id.toString())
+                );
+                
+                // Libera apenas se estiver marcada como true E a anterior estiver completa
+                if (faseKey && progress[faseKey] === true) {
+                    activity.unlocked = (index === 0) || activities[index-1].unlocked; // <<--- REGRA FUNDAMENTAL
+                    if (activity.unlocked) lastUnlockedIndex = index;
                 }
-                initializeMap(userAvatar);
-            }).catch(error => {
-                console.error("Erro ao carregar o progresso do usuário:", error);
-                initializeMap(userAvatar);
+
+                console.log(`Fase ${activity.id} - liberada? ${activity.unlocked}`);
             });
-        }
+
+            initializeMap(userAvatar);
+        }).catch(error => {
+            console.error("Erro no Firebase:", error);
+            initializeMap(userAvatar);
+        });
     }
+}
 
     // Função para inicializar o mapa
     function initializeMap(userAvatar) {
