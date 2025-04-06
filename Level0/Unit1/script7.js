@@ -15,14 +15,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentLevel = urlPathParts[1]; // Ex: "Level1"
     const currentUnit = urlPathParts[2]; // Ex: "Unit1"
 
-  const activities = [
-    { id: 34, name: "TestQuizLidoABC", path: `/Atividades/TestQuizLidoABC/index.html?level=${currentLevel}&unit=${currentUnit}&fase=34`, img: "../../imagens/test.png", unlocked: false },
-    { id: 35, name: "TestQuizLeVeAB", path: `/Atividades/TestQuizLeVeAB/index.html?level=${currentLevel}&unit=${currentUnit}&fase=35`, img: "../../imagens/test.png", unlocked: false },
-    { id: 36, name: "TestQuizVeEscutaC", path: `/Atividades/TestQuizVeEscutaC/index.html?level=${currentLevel}&unit=${currentUnit}&fase=36`, img: "../../imagens/test.png", unlocked: false },
-    { id: 37, name: "TestQuizEscutaC2", path: `/Atividades/TestQuizEscutaC2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=37`, img: "../../imagens/test.png", unlocked: false },
-    { id: 38, name: "TestwordB2C", path: `/Atividades/TestwordB2C/index.html?level=${currentLevel}&unit=${currentUnit}&fase=38`, img: "../../imagens/test.png", unlocked: false },
-    { id: 39, name: "Testword2B2C", path: `/Atividades/Testword2B2C/index.html?level=${currentLevel}&unit=${currentUnit}&fase=39`, img: "../../imagens/test.png", unlocked: false },
-    { id: 40, name: "Testword3B2C", path: `/Atividades/Testword3B2C/index.html?level=${currentLevel}&unit=${currentUnit}&fase=40`, img: "../../imagens/test.png", unlocked: false },
+  const activities = [  
+    { id: 23, name: "TestQuizLeVeAB", path: `/Atividades/TestQuizLeVeAB/index.html?level=${currentLevel}&unit=${currentUnit}&fase=23`, img: "../../imagens/test.png", unlocked: false },      
+    { id: 24, name: "TestwordB2C", path: `/Atividades/TestwordB2C/index.html?level=${currentLevel}&unit=${currentUnit}&fase=24`, img: "../../imagens/test.png", unlocked: false },
+    { id: 25, name: "Testword2B2C", path: `/Atividades/Testword2B2C/index.html?level=${currentLevel}&unit=${currentUnit}&fase=25`, img: "../../imagens/test.png", unlocked: false },   
 ];
 
     // Fechar o dropdown ao clicar fora dele
