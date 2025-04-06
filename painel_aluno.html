@@ -353,7 +353,7 @@
       });
     }
 
-    function loadProgress(studentId) {
+   function loadProgress(studentId) {
   const progressContainer = document.getElementById('progress-container');
   const progressRef = db.ref(`usuarios/${studentId}/progresso`);
 
@@ -362,7 +362,6 @@
       let progressHTML = '<div class="progress-panel"><h3>Your Progress</h3>';
 
       Object.keys(structure).forEach(levelKey => {
-        const levelNumber = levelKey.replace('Level', '');
         const levelStart = levelStartNumbers[levelKey] || 1;
         let totalCompletedPhases = 0;
         let totalPhasesInLevel = 0;
@@ -377,13 +376,13 @@
           let phasesHTML = '';
           let notesHTML = '';
 
+          // Calcular fases
           for (let phaseNumber = 1; phaseNumber <= totalPhases; phaseNumber++) {
-            // Cálculo correto do ID da fase
             let phaseNum;
             if (levelKey === 'Level0') {
               phaseNum = phaseNumber;
             } else {
-              phaseNum = levelStart + ((unitNum - 1) * 37) + (phaseNumber - 1);
+              phaseNum = levelStart + ((unitNum - 1) * totalPhases) + (phaseNumber - 1);
             }
             const phaseKey = `fase${phaseNum}`;
             const isComplete = unitSnap.child(phaseKey).val() || false;
@@ -403,22 +402,66 @@
 
           totalPhasesInLevel += totalPhases;
 
-          // Restante da função permanece igual...
-          // ... [código existente para notas e construção do HTML]
+          // Adicionar notas dos testes
+          const testScores = ['nota', 'nota1', 'nota2', 'nota3'];
+          testScores.forEach((scoreKey, index) => {
+            const score = unitSnap.child(scoreKey).val();
+            if (score !== null && score !== undefined) {
+              const scoreClass = score >= 70 ? 'good' : 'bad';
+              notesHTML += `<p class="test-score ${scoreClass}">Test ${index + 1}: ${score}</p>`;
+            }
+          });
+
+          const uniqueUnitId = `${studentId}-${levelKey}-${unitKey}`;
+          
+          progressHTML += `
+            <div class="unit-container">
+              <div class="unit-header" onclick="toggleVisibility('${uniqueUnitId}')">
+                <span>${unitKey}</span>
+                <span>${completedPhases}/${totalPhases} completed</span>
+              </div>
+              <div id="${uniqueUnitId}" style="display: none; margin-top: 10px;">
+                <h5>Phases</h5>
+                ${phasesHTML}
+                <h5>Test Scores</h5>
+                ${notesHTML || '<p>No test scores available</p>'}
+              </div>
+            </div>
+          `;
         });
 
-        // Cálculo da porcentagem de conclusão
+        // Calcular e mostrar progresso do nível
         const progressPercentage = totalPhasesInLevel > 0 
           ? Math.round((totalCompletedPhases / totalPhasesInLevel) * 100)
           : 0;
+        
+        let colorClass = '';
+        if (progressPercentage < 25) {
+          colorClass = 'low';
+        } else if (progressPercentage < 75) {
+          colorClass = 'medium';
+        } else {
+          colorClass = 'high';
+        }
 
-        // Restante da função permanece igual...
+        progressHTML += `
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill ${colorClass}" style="width: ${progressPercentage}%">
+              ${progressPercentage}%
+            </div>
+          </div>
+          </div> <!-- Fecha level-container -->
+        `;
       });
 
+      progressHTML += '</div>'; // Fecha progress-panel
       progressContainer.innerHTML = progressHTML;
     } else {
       progressContainer.innerHTML = '<div class="progress-panel"><p>No progress data available.</p></div>';
     }
+  }).catch(error => {
+    console.error("Error loading progress:", error);
+    progressContainer.innerHTML = '<div class="progress-panel"><p>Error loading progress data.</p></div>';
   });
 }
 
