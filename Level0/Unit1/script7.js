@@ -17,8 +17,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
   const activities = [  
     { id: 23, name: "TestQuizLeVeAB", path: `/Atividades/TestQuizLeVeAB/index.html?level=${currentLevel}&unit=${currentUnit}&fase=23`, img: "../../imagens/test.png", unlocked: false },      
-    { id: 24, name: "TestwordB2C", path: `/Atividades/TestwordB2C/index.html?level=${currentLevel}&unit=${currentUnit}&fase=24`, img: "../../imagens/test.png", unlocked: false },
-    { id: 25, name: "Testword2B2C", path: `/Atividades/Testword2B2C/index.html?level=${currentLevel}&unit=${currentUnit}&fase=25`, img: "../../imagens/test.png", unlocked: false },   
+    { id: 24, name: "TestwordB2CFacil", path: `/Atividades/TestwordB2CFacil/index.html?level=${currentLevel}&unit=${currentUnit}&fase=24`, img: "../../imagens/test.png", unlocked: false },
+    { id: 25, name: "Testword2B2CFacil", path: `/Atividades/Testword2B2CFacil/index.html?level=${currentLevel}&unit=${currentUnit}&fase=25`, img: "../../imagens/test.png", unlocked: false },   
 ];
 
     // Fechar o dropdown ao clicar fora dele
