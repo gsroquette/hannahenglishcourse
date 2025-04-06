@@ -102,32 +102,40 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log("Informações de nível e unidade atualizadas na interface.");
 
     // Função para carregar o progresso do usuário
-  function loadUserProgress(userId, userAvatar, userRole) {
-    // CORREÇÃO DEFINITIVA: Caminho exato conforme seu banco
+ function loadUserProgress(userId, userAvatar, userRole) {
+    // 1. Define o caminho CORRETO (com maiúsculas)
     const progressPath = `/usuarios/${userId}/progresso/Level1/Unit1`;
     console.log(`Buscando progresso em: ${progressPath}`);
 
     if (userRole === 'proprietario' || userRole === 'professor') {
+        // Professores veem tudo desbloqueado
         activities.forEach(activity => activity.unlocked = true);
         lastUnlockedIndex = activities.length - 1;
         initializeMap(userAvatar);
     } else {
+        // Para alunos: busca no Firebase
         database.ref(progressPath).once('value').then(snapshot => {
             const progress = snapshot.val();
-            console.log("Dados retornados do Firebase:", progress); // Debug crucial
+            console.log("Progresso encontrado:", progress);
 
-            // Verificação EXPLÍCITA da fase1001
-            if (progress && progress.fase1001 === true) {
-                console.log("Fase 1001 confirmada como DESBLOQUEADA no banco");
-                activities[0].unlocked = true; // StoryCards (1001)
-                lastUnlockedIndex = 0;
-            } else {
-                console.warn("Fase 1001 NÃO encontrada ou está false no banco");
-            }
+            // 2. Verificação FLEXÍVEL (funciona com QUALQUER ID)
+            activities.forEach((activity, index) => {
+                // Procura a chave correspondente ao ID da atividade
+                const faseKey = Object.keys(progress || {}).find(
+                    key => key.includes(`fase${activity.id}`) || key.includes(activity.id.toString())
+                );
+
+                if (faseKey && progress[faseKey] === true) {
+                    console.log(`Fase ${activity.id} desbloqueada (via chave ${faseKey})`);
+                    activity.unlocked = true;
+                    lastUnlockedIndex = index;
+                }
+            });
 
             initializeMap(userAvatar);
         }).catch(error => {
-            console.error("Erro fatal ao acessar Firebase:", error);
+            console.error("Erro no Firebase:", error);
+            initializeMap(userAvatar);
         });
     }
 }
