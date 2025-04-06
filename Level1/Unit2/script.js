@@ -82,7 +82,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Função para carregar o progresso do usuário
    function loadUserProgress(userId, userAvatar, userRole) {
-    const progressPath = `/usuarios/${userId}/progresso/Level1/Unit1`;
+    const progressPath = `/usuarios/${userId}/progresso/${currentLevel}/${currentUnit}`;
     console.log(`Buscando progresso em: ${progressPath}`);
 
     if (userRole === 'proprietario' || userRole === 'professor') {
