@@ -12,16 +12,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Extraindo Level e Unit da URL atual
     const urlPathParts = window.location.pathname.split('/');
-    const currentLevel = urlPathParts[1]; // Ex: "Level1"
-    const currentUnit = urlPathParts[2]; // Ex: "Unit1"
+    const capitalizeFirstLetter = str => str.charAt(0).toUpperCase() + str.slice(1);
+    const currentLevel = capitalizeFirstLetter(urlPathParts[1]);
+    const currentUnit = capitalizeFirstLetter(urlPathParts[2]);
 
-    const activities = [
-    { id: 1011, name: "Mixed Letters FIXO", path: `/Atividades/Mixed Letters FIXO/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1011`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
-    { id: 1012, name: "WordSearch", path: `/Atividades/WordSearch/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1012`, img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
-    { id: 1013, name: "Missing Word", path: `/Atividades/Missing Word/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1013`, img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
-    { id: 1014, name: "Flashcards3", path: `/Atividades/Flashcards3/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1014`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-    { id: 1015, name: "WordSearch2", path: `/Atividades/WordSearch2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1015`, img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
-    { id: 1016, name: "Speak3", path: `/Atividades/Speak3/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1016`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
+   const activities = [
+    { id: 10, name: "Hannah Video", path: `/Atividades/HannahVideo/index.html?level=${currentLevel}&unit=${currentUnit}&fase=10`, img: "../../imagens/botoes/video_button.png", unlocked: false },
+    { id: 11, name: "Missing Word", path: `/Atividades/Missing Word/index.html?level=${currentLevel}&unit=${currentUnit}&fase=11`, img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
+    { id: 12, name: "Missing Word2", path: `/Atividades/Missing Word2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=12`, img: "../../imagens/botoes/missing_word_button.png", unlocked: false },   
+    { id: 13, name: "Mixed Letters FIXO", path: `/Atividades/Mixed Letters FIXO/index.html?level=${currentLevel}&unit=${currentUnit}&fase=13`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
+    { id: 14, name: "Mixed Letters FIXO2", path: `/Atividades/Mixed Letters FIXO2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=14`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false }, 
 ];
 
     // Fechar o dropdown ao clicar fora dele
@@ -82,31 +82,41 @@ document.addEventListener('DOMContentLoaded', function() {
     `;
 
     // Função para carregar o progresso do usuário
-    function loadUserProgress(userId, userAvatar, userRole) {
-        const progressPath = `/usuarios/${userId}/progresso/${currentLevel}/${currentUnit}`;
+   function loadUserProgress(userId, userAvatar, userRole) {
+   const progressPath = `/usuarios/${userId}/progresso/${currentLevel}/${currentUnit}`;
+   console.log(`Buscando progresso em: ${progressPath}`);
 
-        if (userRole === 'proprietario' || userRole === 'professor') {
-            activities.forEach(activity => activity.unlocked = true);
-            lastUnlockedIndex = 0;
-            initializeMap(userAvatar);
-        } else {
-            database.ref(progressPath).once('value').then(snapshot => {
-                const progress = snapshot.val();
-                if (progress) {
-                    activities.forEach((activity, index) => {
-                        if (progress[`fase${activity.id}`] === true) {
-                            activity.unlocked = true;
-                            lastUnlockedIndex = index;
-                        }
-                    });
+    if (userRole === 'proprietario' || userRole === 'professor') {
+        activities.forEach(activity => activity.unlocked = true);
+        lastUnlockedIndex = activities.length - 1;
+        initializeMap(userAvatar);
+    } else {
+        database.ref(progressPath).once('value').then(snapshot => {
+            const progress = snapshot.val();
+            console.log("Progresso encontrado:", progress);
+
+            activities.forEach((activity, index) => {
+                // Verifica se a fase está liberada no Firebase
+                const faseKey = Object.keys(progress || {}).find(
+                    key => key.includes(`fase${activity.id}`) || key.includes(activity.id.toString())
+                );
+                
+                // Libera apenas se estiver marcada como true E a anterior estiver completa
+                if (faseKey && progress[faseKey] === true) {
+                    activity.unlocked = (index === 0) || activities[index-1].unlocked; // <<--- REGRA FUNDAMENTAL
+                    if (activity.unlocked) lastUnlockedIndex = index;
                 }
-                initializeMap(userAvatar);
-            }).catch(error => {
-                console.error("Erro ao carregar o progresso do usuário:", error);
-                initializeMap(userAvatar);
+
+                console.log(`Fase ${activity.id} - liberada? ${activity.unlocked}`);
             });
-        }
+
+            initializeMap(userAvatar);
+        }).catch(error => {
+            console.error("Erro no Firebase:", error);
+            initializeMap(userAvatar);
+        });
     }
+}
 
     // Função para inicializar o mapa
     function initializeMap(userAvatar) {

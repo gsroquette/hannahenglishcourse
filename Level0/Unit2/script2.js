@@ -12,15 +12,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Extraindo Level e Unit da URL atual
     const urlPathParts = window.location.pathname.split('/');
-    const currentLevel = urlPathParts[1]; // Ex: "Level1"
-    const currentUnit = urlPathParts[2]; // Ex: "Unit1"
+    const capitalizeFirstLetter = str => str.charAt(0).toUpperCase() + str.slice(1);
+    const currentLevel = capitalizeFirstLetter(urlPathParts[1]);
+    const currentUnit = capitalizeFirstLetter(urlPathParts[2]);
 
-    const activities = [
-    { id: 1006, name: "MemoryGame", path: `/Atividades/MemoryGame/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1006`, img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
-    { id: 1007, name: "Speak", path: `/Atividades/Speak/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1007`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
-    { id: 1008, name: "Flashcards2", path: `/Atividades/Flashcards2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1008`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-    { id: 1009, name: "MemoryGame2", path: `/Atividades/MemoryGame2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1009`, img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
-    { id: 1010, name: "Speak2", path: `/Atividades/Speak2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1010`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
+   const activities = [
+    { id: 5, name: "QUIZ_IMAGE", path: `/Atividades/QUIZ_IMAGE/index.html?level=${currentLevel}&unit=${currentUnit}&fase=5`, img: "../../imagens/botoes/quiz_button.png", unlocked: false },
+    { id: 6, name: "MemoryGame", path: `/Atividades/MemoryGame/index.html?level=${currentLevel}&unit=${currentUnit}&fase=6`, img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
+    { id: 7, name: "WordSearchFacil", path: `/Atividades/WordSearchFacil/index.html?level=${currentLevel}&unit=${currentUnit}&fase=7`, img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
+    { id: 8, name: "MemoryGame2", path: `/Atividades/MemoryGame2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=8`, img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
+    { id: 9, name: "WordSearchFacil2", path: `/Atividades/WordSearchFacil2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=9`, img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },    
 ];
 
     // Fechar o dropdown ao clicar fora dele
@@ -81,31 +82,41 @@ document.addEventListener('DOMContentLoaded', function() {
     `;
 
     // Função para carregar o progresso do usuário
-    function loadUserProgress(userId, userAvatar, userRole) {
-        const progressPath = `/usuarios/${userId}/progresso/${currentLevel}/${currentUnit}`;
+   function loadUserProgress(userId, userAvatar, userRole) {
+    const progressPath = `/usuarios/${userId}/progresso/${currentLevel}/${currentUnit}`;
+    console.log(`Buscando progresso em: ${progressPath}`);
 
-        if (userRole === 'proprietario' || userRole === 'professor') {
-            activities.forEach(activity => activity.unlocked = true);
-            lastUnlockedIndex = 0;
-            initializeMap(userAvatar);
-        } else {
-            database.ref(progressPath).once('value').then(snapshot => {
-                const progress = snapshot.val();
-                if (progress) {
-                    activities.forEach((activity, index) => {
-                        if (progress[`fase${activity.id}`] === true) {
-                            activity.unlocked = true;
-                            lastUnlockedIndex = index;
-                        }
-                    });
+    if (userRole === 'proprietario' || userRole === 'professor') {
+        activities.forEach(activity => activity.unlocked = true);
+        lastUnlockedIndex = activities.length - 1;
+        initializeMap(userAvatar);
+    } else {
+        database.ref(progressPath).once('value').then(snapshot => {
+            const progress = snapshot.val();
+            console.log("Progresso encontrado:", progress);
+
+            activities.forEach((activity, index) => {
+                // Verifica se a fase está liberada no Firebase
+                const faseKey = Object.keys(progress || {}).find(
+                    key => key.includes(`fase${activity.id}`) || key.includes(activity.id.toString())
+                );
+                
+                // Libera apenas se estiver marcada como true E a anterior estiver completa
+                if (faseKey && progress[faseKey] === true) {
+                    activity.unlocked = (index === 0) || activities[index-1].unlocked; // <<--- REGRA FUNDAMENTAL
+                    if (activity.unlocked) lastUnlockedIndex = index;
                 }
-                initializeMap(userAvatar);
-            }).catch(error => {
-                console.error("Erro ao carregar o progresso do usuário:", error);
-                initializeMap(userAvatar);
+
+                console.log(`Fase ${activity.id} - liberada? ${activity.unlocked}`);
             });
-        }
+
+            initializeMap(userAvatar);
+        }).catch(error => {
+            console.error("Erro no Firebase:", error);
+            initializeMap(userAvatar);
+        });
     }
+}
 
     // Função para inicializar o mapa
     function initializeMap(userAvatar) {
