@@ -256,16 +256,36 @@
             });
         }
 
-        async function checkPhaseProgress(uid, level, unit) {
-            try {
-                const dbRef = firebase.database().ref(`usuarios/${uid}/progresso/${level}/${unit}/fase2`);
-                const snapshot = await dbRef.once("value");
-                return snapshot.val();
-            } catch (error) {
-                console.error("Error checking phase progress:", error);
-                return false;
+        async function handleBackButtonClick() {
+    const { level, unit, fase } = getParamsFromURL();
+
+    if (!level || !unit || !fase) {
+        alert("Level, Unit or Fase not identified in the URL.");
+        return;
+    }
+
+    firebase.auth().onAuthStateChanged(async (user) => {
+        if (user) {
+            const uid = user.uid;
+            const isPhaseCompleted = await checkPhaseProgress(uid, level, unit, fase);
+
+            if (isPhaseCompleted) {
+                console.log("Next phase is already unlocked. Going back.");
+                window.history.back();
+            } else {
+                const confirmExit = confirm(
+                    "The next phase is not completed. Do you wish to leave anyway?"
+                );
+                if (confirmExit) {
+                    console.log("User chose to leave without completing the phase. Going back.");
+                    window.history.back();
+                }
             }
+        } else {
+            alert("Please log in to save your progress and continue.");
         }
+    });
+}
     </script>
 
     <style>
