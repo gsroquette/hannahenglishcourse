@@ -247,11 +247,11 @@ function getPhaseFromURL() {
 }
 
 function getLevelAndUnitFromURL() {
-    const url = window.location.pathname;
-    const parts = url.split('/');
-    const level = parts[1];
-    const unit = parts[2];
-    return { level, unit };
+    const params = new URLSearchParams(window.location.search);
+    return {
+        level: params.get('level'),
+        unit: params.get('unit')
+    };
 }
 
 // Função para verificar autenticação do usuário
