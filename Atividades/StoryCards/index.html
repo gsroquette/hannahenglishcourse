@@ -226,37 +226,6 @@
         });
 
         async function handleBackButtonClick() {
-            const { level, unit } = getParamsFromURL();
-
-            if (!level || !unit) {
-                alert("Level or Unit not identified in the URL.");
-                return;
-            }
-
-            firebase.auth().onAuthStateChanged(async (user) => {
-                if (user) {
-                    const uid = user.uid;
-                    const isPhaseCompleted = await checkPhaseProgress(uid, level, unit);
-
-                    if (isPhaseCompleted) {
-                        console.log("Phase completed. Navigating back.");
-                        window.history.back(); // Retorna à página anterior
-                    } else {
-                        const confirmExit = confirm(
-                            "The next phase is not completed. Do you wish to leave anyway?"
-                        );
-                        if (confirmExit) {
-                            console.log("User chose to leave without completing the phase. Navigating back.");
-                            window.history.back(); // Retorna à página anterior
-                        }
-                    }
-                } else {
-                    alert("Please log in to save your progress and continue.");
-                }
-            });
-        }
-
-        async function handleBackButtonClick() {
     const { level, unit, fase } = getParamsFromURL();
 
     if (!level || !unit || !fase) {
@@ -285,6 +254,19 @@
             alert("Please log in to save your progress and continue.");
         }
     });
+}
+
+async function checkPhaseProgress(uid, level, unit, currentFase) {
+    try {
+        const currentNumber = parseInt(currentFase.replace("fase", ""));
+        const nextFase = `fase${currentNumber + 1}`;
+        const dbRef = firebase.database().ref(`usuarios/${uid}/progresso/${level}/${unit}/${nextFase}`);
+        const snapshot = await dbRef.once("value");
+        return snapshot.val(); // true se estiver liberada, false se não
+    } catch (error) {
+        console.error("Error checking phase progress:", error);
+        return false;
+    }
 }
     </script>
 
