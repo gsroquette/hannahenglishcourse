@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const urlPathParts = window.location.pathname.split('/');
     const capitalizeFirstLetter = str => str.charAt(0).toUpperCase() + str.slice(1);
     const currentLevel = capitalizeFirstLetter(urlPathParts[1]);
-    const currentUnit = capitalizeFirstLetter(urlPathParts[2]);S
+    const currentUnit = capitalizeFirstLetter(urlPathParts[2]);
 
    const activities = [
     { id: 1049, name: "Grammar", path: `/Atividades/Grammar/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1049`, img: "../../imagens/botoes/grammar_button.png", unlocked: false },
