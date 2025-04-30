@@ -58,24 +58,18 @@ self.addEventListener('fetch', event => {
   console.log('[SW] Interceptando requisição:', event.request.url);
 
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      if (cached) {
-        console.log('[SW] Servindo do cache:', event.request.url);
-        return cached;
-      }
-
-      return fetch(event.request)
-        .then(response => {
-          console.log('[SW] Requisição bem-sucedida. Cacheando dinamicamente:', event.request.url);
-          return caches.open(cacheName).then(cache => {
-            cache.put(event.request, response.clone());
-            return response;
-          });
-        })
-        .catch(error => {
-          console.warn('[SW] Falha na rede. Tentando fallback offline.html:', event.request.url);
-          return caches.match('/offline.html');
+    fetch(event.request)
+      .then(response => {
+        console.log('[SW] Requisição bem-sucedida. Cacheando dinamicamente:', event.request.url);
+        return caches.open(cacheName).then(cache => {
+          cache.put(event.request, response.clone());
+          return response;
         });
-    })
+      })
+      .catch(error => {
+        console.warn('[SW] Falha na rede. Exibindo offline.html:', event.request.url);
+        return caches.match('/offline.html');
+      })
   );
 });
+
