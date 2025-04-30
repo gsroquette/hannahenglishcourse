@@ -1,4 +1,4 @@
-const cacheName = 'hannah-course-v3';
+const cacheName = 'hannah-course-v4';
 const staticAssets = [
   '/',
   '/index.html',
@@ -45,30 +45,50 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  console.log('[SW] Interceptando requisição:', event.request.url);
+  const requestURL = new URL(event.request.url);
+  let requestToMatch = event.request;
 
+  // Redireciona /LevelX/ para /LevelX/index.html
+  if (requestURL.pathname.endsWith('/')) {
+    requestToMatch = new Request(requestURL.pathname + 'index.html', {
+      method: event.request.method,
+      headers: event.request.headers,
+      mode: event.request.mode,
+      credentials: event.request.credentials,
+      redirect: event.request.redirect
+    });
+  }
+
+  console.log('[SW] Interceptando:', requestToMatch.url);
+
+  // ⚠️ FORÇA A EXIBIÇÃO DO OFFLINE.HTML QUANDO ESTIVER OFFLINE
+  if (!self.navigator.onLine) {
+    console.warn('[SW] Dispositivo offline — exibindo fallback');
+    const acceptsHTML = event.request.headers.get('accept')?.includes('text/html');
+    if (acceptsHTML) {
+      event.respondWith(caches.match('/offline.html'));
+    } else {
+      event.respondWith(new Response('', { status: 503, statusText: 'Offline' }));
+    }
+    return;
+  }
+
+  // ONLINE: buscar e cachear
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      if (cached) {
-        console.log('[SW] Servindo do cache:', event.request.url);
-        return cached;
-      }
-
-      return fetch(event.request)
-        .then(response => {
-          return caches.open(cacheName).then(cache => {
-            cache.put(event.request, response.clone());
-            return response;
-          });
-        })
-        .catch(() => {
-          console.warn('[SW] Sem conexão. Exibindo fallback...');
-          const acceptsHTML = event.request.headers.get('accept')?.includes('text/html');
-          if (acceptsHTML) {
-            return caches.match('/offline.html');
-          }
-          return new Response('', { status: 503, statusText: 'Offline' });
+    fetch(event.request)
+      .then(response => {
+        return caches.open(cacheName).then(cache => {
+          cache.put(event.request, response.clone());
+          return response;
         });
-    })
+      })
+      .catch(() => {
+        console.warn('[SW] Erro na rede. Fallback para offline.html se for HTML');
+        const acceptsHTML = event.request.headers.get('accept')?.includes('text/html');
+        if (acceptsHTML) {
+          return caches.match('/offline.html');
+        }
+        return new Response('', { status: 503, statusText: 'Offline' });
+      })
   );
 });
