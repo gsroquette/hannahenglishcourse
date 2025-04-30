@@ -1,10 +1,10 @@
-const cacheName = 'hannah-course-v2';
+
+const cacheName = 'hannah-course-v3';
 const staticAssets = [
   '/',
   '/index.html',
   '/CSS/styles.css',
   '/imagens/hannah_logo.png',
-  '/imagens/icon-192x192.png',
   '/imagens/icon-512x512.png',
   '/Formulario/login.html',
   '/Level0/index.html',
@@ -15,7 +15,6 @@ const staticAssets = [
   '/offline.html'
 ];
 
-// Instala o service worker e faz cache dos arquivos estáticos
 self.addEventListener('install', event => {
   console.log('[SW] Instalando...');
   event.waitUntil(
@@ -24,34 +23,26 @@ self.addEventListener('install', event => {
       return cache.addAll(staticAssets);
     })
   );
-  self.skipWaiting(); // ativa imediatamente
+  self.skipWaiting();
 });
 
-// Ativa e limpa caches antigos
 self.addEventListener('activate', event => {
   console.log('[SW] Ativando...');
   event.waitUntil(
     caches.keys().then(keys => {
       return Promise.all(
-        keys
-          .filter(key => key !== cacheName)
-          .map(key => {
-            console.log('[SW] Removendo cache antigo:', key);
-            return caches.delete(key);
-          })
+        keys.filter(key => key !== cacheName).map(key => caches.delete(key))
       );
     })
   );
   self.clients.claim();
 });
 
-// Intercepta as requisições
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
 
-  // ⚠️ Evita interferir no login
   if (event.request.url.includes('/Formulario/login.html')) {
-    console.log('[SW] Ignorando cache para login:', event.request.url);
+    console.log('[SW] Ignorando login:', event.request.url);
     return;
   }
 
@@ -60,16 +51,17 @@ self.addEventListener('fetch', event => {
   event.respondWith(
     fetch(event.request)
       .then(response => {
-        console.log('[SW] Requisição bem-sucedida. Cacheando dinamicamente:', event.request.url);
         return caches.open(cacheName).then(cache => {
           cache.put(event.request, response.clone());
           return response;
         });
       })
-      .catch(error => {
-        console.warn('[SW] Falha na rede. Exibindo offline.html:', event.request.url);
-        return caches.match('/offline.html');
+      .catch(() => {
+        console.warn('[SW] Sem conexão. Exibindo fallback...');
+        if (event.request.destination === 'document') {
+          return caches.match('/offline.html');
+        }
+        return new Response('', {{ status: 503, statusText: 'Offline' }});
       })
   );
 });
-
