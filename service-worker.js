@@ -7,11 +7,12 @@ const staticAssets = [
   '/imagens/icon-192x192.png',
   '/imagens/icon-512x512.png',
   '/Formulario/login.html',
-  '/nivelA/index.html',
-  '/nivelB/index.html',
-  '/nivelC/index.html',
-  '/nivelD/index.html',
-  '/offline.html' // Página offline
+  '/Level0/index.html',
+  '/Level1/index.html',
+  '/Level2/index.html',
+  '/Level3/index.html',
+  '/Level4/index.html',
+  '/offline.html'
 ];
 
 // Instala o service worker e faz cache dos arquivos estáticos
