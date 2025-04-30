@@ -49,19 +49,26 @@ self.addEventListener('fetch', event => {
   console.log('[SW] Interceptando requisição:', event.request.url);
 
   event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        return caches.open(cacheName).then(cache => {
-          cache.put(event.request, response.clone());
-          return response;
+    caches.match(event.request).then(cached => {
+      if (cached) {
+        console.log('[SW] Servindo do cache:', event.request.url);
+        return cached;
+      }
+
+      return fetch(event.request)
+        .then(response => {
+          return caches.open(cacheName).then(cache => {
+            cache.put(event.request, response.clone());
+            return response;
+          });
+        })
+        .catch(() => {
+          console.warn('[SW] Sem conexão. Exibindo fallback...');
+          if (event.request.destination === 'document') {
+            return caches.match('/offline.html');
+          }
+          return new Response('', { status: 503, statusText: 'Offline' });
         });
-      })
-      .catch(() => {
-        console.warn('[SW] Sem conexão. Exibindo fallback...');
-        if (event.request.destination === 'document') {
-          return caches.match('/offline.html');
-        }
-       return new Response('', { status: 503, statusText: 'Offline' });
-      })
+    })
   );
 });
