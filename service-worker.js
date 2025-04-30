@@ -49,6 +49,12 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
 
+  // ⚠️ Evita interferir no login
+  if (event.request.url.includes('/Formulario/login.html')) {
+    console.log('[SW] Ignorando cache para login:', event.request.url);
+    return;
+  }
+
   console.log('[SW] Interceptando requisição:', event.request.url);
 
   event.respondWith(
@@ -67,9 +73,9 @@ self.addEventListener('fetch', event => {
           });
         })
         .catch(error => {
-  console.warn('[SW] Falha na rede. Tentando fallback offline.html:', event.request.url);
-  return caches.match('/offline.html');
-});
+          console.warn('[SW] Falha na rede. Tentando fallback offline.html:', event.request.url);
+          return caches.match('/offline.html');
+        });
     })
   );
 });
