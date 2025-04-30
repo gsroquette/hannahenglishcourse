@@ -1,28 +1,30 @@
-const cacheName = 'hannah-course-v1';
-const assetsToCache = [
+const cacheName = 'hannah-course-v2';
+const staticAssets = [
   '/',
   '/index.html',
-  '/CSS/styles.css', // Ajuste conforme o nome exato do arquivo CSS
+  '/CSS/styles.css',
   '/imagens/hannah_logo.png',
   '/imagens/icon-192x192.png',
   '/imagens/icon-512x512.png',
-  '/Formulario/login.html', // Inclua outras páginas necessárias para o funcionamento offline
+  '/Formulario/login.html',
   '/nivelA/index.html',
   '/nivelB/index.html',
   '/nivelC/index.html',
-  '/nivelD/index.html'
+  '/nivelD/index.html',
+  '/offline.html' // Página que você pode criar para mostrar quando offline
 ];
 
-// Evento de instalação: Armazena em cache os arquivos essenciais
+// Instala o service worker e faz cache dos arquivos
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(cacheName).then(cache => {
-      return cache.addAll(assetsToCache);
+      return cache.addAll(staticAssets);
     })
   );
+  self.skipWaiting(); // ativa imediatamente
 });
 
-// Evento de ativação: Remove caches antigos
+// Ativa e limpa caches antigos
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => {
@@ -31,13 +33,29 @@ self.addEventListener('activate', event => {
       );
     })
   );
+  self.clients.claim(); // assume controle imediato
 });
 
-// Evento de fetch: Serve recursos do cache quando disponíveis
+// Responde às requisições
 self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return;
+
   event.respondWith(
-    caches.match(event.request).then(response => {
-      return response || fetch(event.request);
+    caches.match(event.request).then(cached => {
+      return cached || fetch(event.request)
+        .then(response => {
+          // Cache dinâmico para imagens e outros
+          return caches.open(cacheName).then(cache => {
+            cache.put(event.request, response.clone());
+            return response;
+          });
+        })
+        .catch(() => {
+          // Se estiver offline e não achou em cache
+          if (event.request.destination === 'document') {
+            return caches.match('/offline.html');
+          }
+        });
     })
   );
 });
