@@ -65,7 +65,7 @@
 
     /* ============ BOTÃO PWA – NOVO DESIGN ============ */
     #installBtn{
-      display:none;               /* aparece por JS */
+      display:none;
       position:fixed;
       bottom:calc(env(safe-area-inset-bottom,0px) + 24px);
       right:24px;
@@ -85,7 +85,6 @@
     }
     #installBtn::before{content:"📲";font-size:24px;}
     #installBtn:hover{transform:scale(1.05);box-shadow:0 8px 16px rgba(0,0,0,.35);}
-    /* animação pulse */
     @keyframes pulse{
       0%{transform:scale(1);box-shadow:0 0 0 0 rgba(255,87,34,.7);}
       70%{transform:scale(1.05);box-shadow:0 0 0 12px rgba(255,87,34,0);}
@@ -138,7 +137,7 @@
 
   <!-- ================== SCRIPTS ================== -->
   <script>
-    /* ---------- 1) Configuração Firebase (sem alterações) ---------- */
+    /* ---------- 1) Configuração Firebase ---------- */
     var firebaseConfig={apiKey:"AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
       authDomain:"hannahenglishcourse.firebaseapp.com",
       databaseURL:"https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
@@ -151,8 +150,43 @@
 
     /* ---------- 2) Variáveis globais ---------- */
     let englishVoice=null,hasEnglishVoice=false,deferredPrompt;
+    const installBtn=document.getElementById("installBtn");
 
-    /* ---------- 3) Utilidades TTS ---------- */
+    /* ---------- 3) Detecta modo standalone: se já instalado, remove o botão ---------- */
+    const isStandalone=window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone===true;
+    if(isStandalone){
+      installBtn.remove(); /* nunca mostra dentro do app instalado */
+    }else{
+      /* ---------- 4) Evento beforeinstallprompt ---------- */
+      window.addEventListener("beforeinstallprompt",e=>{
+        e.preventDefault();
+        deferredPrompt=e;
+        installBtn.style.display="flex";
+        installBtn.classList.add("pulse");
+        console.log("[PWA] beforeinstallprompt disparou");
+      });
+    }
+
+    /* ---------- 5) Clique no botão de instalar ---------- */
+    installBtn.onclick=()=>{
+      installBtn.classList.remove("pulse");
+      installBtn.style.display="none";
+      if(deferredPrompt){
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(c=>{
+          console.log("[PWA] escolha:",c.outcome);
+          deferredPrompt=null;
+        });
+      }
+    };
+
+    /* ---------- 6) Evento appinstalled ---------- */
+    window.addEventListener("appinstalled",()=>{
+      console.log("[PWA] instalado 🎉");
+      installBtn.remove();
+    });
+
+    /* ---------- 7) TTS util ---------- */
     function pickAnyEnglishVoice(){const voices=speechSynthesis.getVoices()||[];
       for(const v of voices){if(v.lang.toLowerCase().includes("en")){hasEnglishVoice=true;return v;}}
       hasEnglishVoice=false;return null;}
@@ -160,12 +194,12 @@
       const text="Hi, I'm Samuel! Click to discover the best and most fun way to learn English, or join us to play an exciting game!";
       const utt=new SpeechSynthesisUtterance(text);
       if(englishVoice)utt.voice=englishVoice;
-      utt.onstart=()=>{document.getElementById("roboImage").src="imagens/robo_fala.gif";};
-      utt.onend=()=>{document.getElementById("roboImage").src="imagens/robo_estatico.png";};
+      utt.onstart=()=>document.getElementById("roboImage").src="imagens/robo_fala.gif";
+      utt.onend=()=>document.getElementById("roboImage").src="imagens/robo_estatico.png";
       speechSynthesis.speak(utt);
     }
 
-    /* ---------- 4) Autenticação & UI ---------- */
+    /* ---------- 8) Autenticação & UI (sem alterações na lógica original) ---------- */
     firebase.auth().onAuthStateChanged(user=>{
       const loginLink=document.getElementById("loginLink");
       const userDropdown=document.getElementById("userDropdown");
@@ -175,19 +209,13 @@
       const subtitleLoggedIn=document.getElementById("subtitleLoggedIn");
 
       if(user){
-        subtitleLoggedOut.style.display="none";
-        subtitleLoggedIn.style.display="block";
-        roboContainer.style.display="flex";
-        invitationContainer.style.display="flex";
-
-        const userRef=firebase.database().ref("usuarios/"+user.uid);
-        userRef.once("value").then(snap=>{
-          const d=snap.val()||{};
-          const name=d.nome||user.email;
+        subtitleLoggedOut.style.display="none";subtitleLoggedIn.style.display="block";
+        roboContainer.style.display="flex";invitationContainer.style.display="flex";
+        firebase.database().ref("usuarios/"+user.uid).once("value").then(s=>{
+          const d=s.val()||{};const name=d.nome||user.email;
           const avatar=d.avatar?`imagens/${d.avatar}`:"imagens/bonecologin1.png";
           loginLink.innerHTML=`<img src="${avatar}" class="user-icon"><p class="user-name">${name}</p>`;
           loginLink.removeAttribute("href");
-
           let dash="";
           if(d.role==="proprietario"||d.role==="professor"){
             dash=`<a href="painel_${d.role==='proprietario'?'proprietario':'professor'}.html" class="dashboard-link">${d.role.toUpperCase()} DASHBOARD</a>`;
@@ -196,8 +224,7 @@
             dash='<a href="painel_aluno.html" class="dashboard-link">STUDENT DASHBOARD</a>';
             if(d.atrelado_professor){
               firebase.database().ref("usuarios/"+d.atrelado_professor).once("value").then(p=>{
-                const pd=p.val();const turmaId="-O8mdLgStvNqNf6x-O5l";
-                const alunoId=user.uid;
+                const pd=p.val();const turmaId="-O8mdLgStvNqNf6x-O5l";const alunoId=user.uid;
                 const reg=pd?.turmas?.[turmaId]?.students?.[alunoId];
                 const nivel=reg?.nivel_em_curso||null;
                 nivel?liberarNiveis([nivel]):liberarNiveis(["Level1"]);
@@ -212,28 +239,19 @@
           });
         });
       }else{
-        subtitleLoggedOut.style.display="block";
-        subtitleLoggedIn.style.display="none";
-        roboContainer.style.display="flex";
-        invitationContainer.style.display="flex";
+        subtitleLoggedOut.style.display="block";subtitleLoggedIn.style.display="none";
+        roboContainer.style.display="flex";invitationContainer.style.display="flex";
         loginLink.setAttribute("href","Formulario/login.html");
         bloquearTodosNiveis();
       }
     });
 
-    function bloquearTodosNiveis(){
-      document.querySelectorAll(".level-button").forEach(b=>{
-        b.style.filter="grayscale(100%)";b.style.pointerEvents="none";
-      });
-    }
-    function liberarNiveis(arr){
-      document.querySelectorAll(".level-button").forEach(b=>{
-        arr.includes(b.id)?(b.style.filter="none",b.style.pointerEvents="auto"):
-                           (b.style.filter="grayscale(100%)",b.style.pointerEvents="none");
-      });
-    }
+    function bloquearTodosNiveis(){document.querySelectorAll(".level-button").forEach(b=>{
+      b.style.filter="grayscale(100%)";b.style.pointerEvents="none";});}
+    function liberarNiveis(arr){document.querySelectorAll(".level-button").forEach(b=>{
+      arr.includes(b.id)?(b.style.filter="none",b.style.pointerEvents="auto"):
+                         (b.style.filter="grayscale(100%)",b.style.pointerEvents="none");});}
 
-    /* ---------- 5) Dropdown login ---------- */
     document.getElementById("loginContainer").onclick=e=>{
       if(!firebase.auth().currentUser)return;
       e.preventDefault();
@@ -244,21 +262,17 @@
       if(!document.getElementById("loginContainer").contains(e.target))
         document.getElementById("userDropdown").style.display="none";
     });
-
-    /* ---------- 6) Logout ---------- */
     document.addEventListener("click",e=>{
       if(e.target.id==="logout"){
         firebase.auth().signOut().then(()=>location.reload());
       }
     });
-
-    /* ---------- 7) Convite & Jogos ---------- */
     document.addEventListener("DOMContentLoaded",()=>{
       document.getElementById("invitationButton").onclick=()=>window.location.href="Apresentacao/propaganda.html";
       document.getElementById("freeGamesButton").onclick=()=>window.location.href="https://hannahenglishcourse.vercel.app/game.html";
     });
 
-    /* ---------- 8) TTS setup + scroll subtitle ---------- */
+    /* ---------- 9) TTS/scroll init ---------- */
     speechSynthesis.onvoiceschanged=()=>englishVoice=pickAnyEnglishVoice();
     document.addEventListener("DOMContentLoaded",()=>{
       englishVoice=pickAnyEnglishVoice();
@@ -266,28 +280,6 @@
       document.getElementById("subtitleLoggedOut").onclick=()=>window.scrollTo({top:0,behavior:"smooth"});
     });
     window.addEventListener("beforeunload",()=>speechSynthesis.cancel());
-
-    /* ---------- 9) Botão de instalação PWA ---------- */
-    const installBtn=document.getElementById("installBtn");
-    window.addEventListener("beforeinstallprompt",e=>{
-      e.preventDefault();
-      deferredPrompt=e;
-      installBtn.style.display="flex";
-      installBtn.classList.add("pulse");
-      console.log("[PWA] beforeinstallprompt disparou");
-    });
-    installBtn.onclick=()=>{
-      installBtn.classList.remove("pulse");
-      installBtn.style.display="none";
-      if(deferredPrompt){
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then(c=>{
-          console.log("[PWA] escolha:",c.outcome);
-          deferredPrompt=null;
-        });
-      }
-    };
-    window.addEventListener("appinstalled",()=>console.log("[PWA] instalado 🎉"));
 
     /* ---------- 10) Service-Worker ---------- */
     if('serviceWorker' in navigator){
