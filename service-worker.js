@@ -1,4 +1,3 @@
-
 const cacheName = 'hannah-course-v3';
 const staticAssets = [
   '/',
@@ -64,7 +63,8 @@ self.addEventListener('fetch', event => {
         })
         .catch(() => {
           console.warn('[SW] Sem conexão. Exibindo fallback...');
-          if (event.request.destination === 'document') {
+          const acceptsHTML = event.request.headers.get('accept')?.includes('text/html');
+          if (acceptsHTML) {
             return caches.match('/offline.html');
           }
           return new Response('', { status: 503, statusText: 'Offline' });
