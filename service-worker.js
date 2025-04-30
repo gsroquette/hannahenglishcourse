@@ -11,13 +11,15 @@ const staticAssets = [
   '/nivelB/index.html',
   '/nivelC/index.html',
   '/nivelD/index.html',
-  '/offline.html' // Página que você pode criar para mostrar quando offline
+  '/offline.html' // Página offline
 ];
 
-// Instala o service worker e faz cache dos arquivos
+// Instala o service worker e faz cache dos arquivos estáticos
 self.addEventListener('install', event => {
+  console.log('[SW] Instalando...');
   event.waitUntil(
     caches.open(cacheName).then(cache => {
+      console.log('[SW] Armazenando em cache estático:', staticAssets);
       return cache.addAll(staticAssets);
     })
   );
@@ -26,32 +28,45 @@ self.addEventListener('install', event => {
 
 // Ativa e limpa caches antigos
 self.addEventListener('activate', event => {
+  console.log('[SW] Ativando...');
   event.waitUntil(
     caches.keys().then(keys => {
       return Promise.all(
-        keys.filter(key => key !== cacheName).map(key => caches.delete(key))
+        keys
+          .filter(key => key !== cacheName)
+          .map(key => {
+            console.log('[SW] Removendo cache antigo:', key);
+            return caches.delete(key);
+          })
       );
     })
   );
-  self.clients.claim(); // assume controle imediato
+  self.clients.claim();
 });
 
-// Responde às requisições
+// Intercepta as requisições
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
 
+  console.log('[SW] Interceptando requisição:', event.request.url);
+
   event.respondWith(
     caches.match(event.request).then(cached => {
-      return cached || fetch(event.request)
+      if (cached) {
+        console.log('[SW] Servindo do cache:', event.request.url);
+        return cached;
+      }
+
+      return fetch(event.request)
         .then(response => {
-          // Cache dinâmico para imagens e outros
+          console.log('[SW] Requisição bem-sucedida. Cacheando dinamicamente:', event.request.url);
           return caches.open(cacheName).then(cache => {
             cache.put(event.request, response.clone());
             return response;
           });
         })
-        .catch(() => {
-          // Se estiver offline e não achou em cache
+        .catch(error => {
+          console.warn('[SW] Falha na rede. Tentando fallback offline.html:', event.request.url);
           if (event.request.destination === 'document') {
             return caches.match('/offline.html');
           }
