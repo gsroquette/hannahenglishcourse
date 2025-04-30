@@ -61,7 +61,7 @@ self.addEventListener('fetch', event => {
         if (event.request.destination === 'document') {
           return caches.match('/offline.html');
         }
-        return new Response('', {{ status: 503, statusText: 'Offline' }});
+       return new Response('', { status: 503, statusText: 'Offline' });
       })
   );
 });
