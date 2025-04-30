@@ -67,11 +67,9 @@ self.addEventListener('fetch', event => {
           });
         })
         .catch(error => {
-          console.warn('[SW] Falha na rede. Tentando fallback offline.html:', event.request.url);
-          if (event.request.destination === 'document') {
-            return caches.match('/offline.html');
-          }
-        });
+  console.warn('[SW] Falha na rede. Tentando fallback offline.html:', event.request.url);
+  return caches.match('/offline.html');
+});
     })
   );
 });
