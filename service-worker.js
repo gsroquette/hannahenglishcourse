@@ -3,7 +3,7 @@ const staticAssets = [
   '/',
   '/index.html',
   '/CSS/styles.css',
-  '/manifest.json', // ✅ adicionado
+  '/manifest.json',
   '/imagens/hannah_logo.png',
   '/imagens/icon-512x512.png',
   '/Formulario/login.html',
@@ -38,40 +38,44 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
+// Função utilitária para detectar se é uma navegação HTML
+function isHTMLRequest(request) {
+  return request.headers.get('accept')?.includes('text/html');
+}
+
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
 
-  // ✅ Tratar manifest.json separadamente
-  if (event.request.url.includes('manifest.json')) {
-    console.log('[SW] Tratando manifest.json diretamente');
+  const url = new URL(event.request.url);
+  const request = event.request;
+
+  // Ignorar login (sensível)
+  if (url.pathname.includes('/Formulario/login.html')) {
+    console.log('[SW] Ignorando cache de login:', url.href);
+    return;
+  }
+
+  // Manifest: tratar diretamente
+  if (url.pathname.endsWith('manifest.json')) {
+    console.log('[SW] Tratando manifest.json');
     event.respondWith(
-      fetch(event.request)
-        .catch(() => caches.match('/manifest.json'))
+      fetch(request).catch(() => caches.match('/manifest.json'))
     );
     return;
   }
 
-  // Evitar cache de login (ou outras rotas sensíveis)
-  if (event.request.url.includes('/Formulario/login.html')) {
-    console.log('[SW] Ignorando login:', event.request.url);
-    return;
+  // Redirecionar diretórios para index.html
+  let finalRequest = request;
+  if (url.pathname.endsWith('/')) {
+    finalRequest = new Request(url.pathname + 'index.html', { headers: request.headers });
   }
 
-  const requestURL = new URL(event.request.url);
-  let requestToMatch = event.request;
+  console.log('[SW] Interceptando:', finalRequest.url);
 
-  // Redireciona /LevelX/ para /LevelX/index.html
- if (requestURL.pathname.endsWith('/')) {
-  requestToMatch = new Request(requestURL.pathname + 'index.html');
-}
-
-  console.log('[SW] Interceptando:', requestToMatch.url);
-
-  // ⚠️ OFFLINE: mostrar fallback apropriado
-  if (!self.navigator.onLine) {
-    console.warn('[SW] Dispositivo offline — exibindo fallback');
-    const acceptsHTML = event.request.headers.get('accept')?.includes('text/html');
-    if (acceptsHTML) {
+  // Dispositivo offline → fallback
+  if (!navigator.onLine) {
+    console.warn('[SW] Offline — fornecendo conteúdo em cache.');
+    if (isHTMLRequest(request)) {
       event.respondWith(caches.match('/offline.html'));
     } else {
       event.respondWith(new Response('', { status: 503, statusText: 'Offline' }));
@@ -79,19 +83,18 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // ONLINE: busca da rede com fallback para cache
+  // Online: fetch + cache fallback
   event.respondWith(
-    fetch(event.request)
+    fetch(finalRequest)
       .then(response => {
         return caches.open(cacheName).then(cache => {
-          cache.put(event.request, response.clone());
+          cache.put(finalRequest, response.clone());
           return response;
         });
       })
       .catch(() => {
-        console.warn('[SW] Erro na rede. Fallback para offline.html se for HTML');
-        const acceptsHTML = event.request.headers.get('accept')?.includes('text/html');
-        if (acceptsHTML) {
+        console.warn('[SW] Falha na rede. Verificando cache.');
+        if (isHTMLRequest(finalRequest)) {
           return caches.match('/offline.html');
         }
         return new Response('', { status: 503, statusText: 'Offline' });
