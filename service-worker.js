@@ -61,15 +61,9 @@ self.addEventListener('fetch', event => {
   let requestToMatch = event.request;
 
   // Redireciona /LevelX/ para /LevelX/index.html
-  if (requestURL.pathname.endsWith('/')) {
-    requestToMatch = new Request(requestURL.pathname + 'index.html', {
-      method: event.request.method,
-      headers: event.request.headers,
-      mode: event.request.mode,
-      credentials: event.request.credentials,
-      redirect: event.request.redirect
-    });
-  }
+ if (requestURL.pathname.endsWith('/')) {
+  requestToMatch = new Request(requestURL.pathname + 'index.html');
+}
 
   console.log('[SW] Interceptando:', requestToMatch.url);
 
