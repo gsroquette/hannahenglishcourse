@@ -3,6 +3,7 @@ const staticAssets = [
   '/',
   '/index.html',
   '/CSS/styles.css',
+  '/manifest.json', // ✅ adicionado
   '/imagens/hannah_logo.png',
   '/imagens/icon-512x512.png',
   '/Formulario/login.html',
@@ -40,6 +41,17 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
 
+  // ✅ Tratar manifest.json separadamente
+  if (event.request.url.includes('manifest.json')) {
+    console.log('[SW] Tratando manifest.json diretamente');
+    event.respondWith(
+      fetch(event.request)
+        .catch(() => caches.match('/manifest.json'))
+    );
+    return;
+  }
+
+  // Evitar cache de login (ou outras rotas sensíveis)
   if (event.request.url.includes('/Formulario/login.html')) {
     console.log('[SW] Ignorando login:', event.request.url);
     return;
@@ -61,7 +73,7 @@ self.addEventListener('fetch', event => {
 
   console.log('[SW] Interceptando:', requestToMatch.url);
 
-  // ⚠️ FORÇA A EXIBIÇÃO DO OFFLINE.HTML QUANDO ESTIVER OFFLINE
+  // ⚠️ OFFLINE: mostrar fallback apropriado
   if (!self.navigator.onLine) {
     console.warn('[SW] Dispositivo offline — exibindo fallback');
     const acceptsHTML = event.request.headers.get('accept')?.includes('text/html');
@@ -73,7 +85,7 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // ONLINE: buscar e cachear
+  // ONLINE: busca da rede com fallback para cache
   event.respondWith(
     fetch(event.request)
       .then(response => {
