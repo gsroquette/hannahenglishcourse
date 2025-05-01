@@ -1,25 +1,25 @@
-<!DOCTYPE html>  
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Hannah English - Learning English through Bible Stories</title>
 
-  <!-- ▸▸▸ FAVICONS ◂◂◂ -->
+  <!-- ▸▸ FAVICONS ◂◂ -->
   <link rel="icon" type="image/x-icon" href="favicon.ico"/>
-  <link rel="icon" type="image/png" sizes="16x16"   href="favicon-16x16.png"/>
-  <link rel="icon" type="image/png" sizes="32x32"   href="favicon-32x32.png"/>
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png"/>
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png"/>
   <link rel="icon" type="image/png" sizes="192x192" href="android-chrome-192x192.png"/>
   <link rel="icon" type="image/png" sizes="512x512" href="android-chrome-512x512.png"/>
-  <link rel="apple-touch-icon" sizes="180x180"      href="apple-touch-icon.png"/>
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png"/>
 
-  <!-- ▸▸▸ CSS PRINCIPAL ◂◂◂ -->
+  <!-- ▸▸ CSS PRINCIPAL ◂◂ -->
   <link rel="stylesheet" href="CSS/styles.css"/>
 
-  <!-- ▸▸▸ MANIFESTO PWA ◂◂◂ -->
+  <!-- ▸▸ MANIFESTO PWA ◂◂ -->
   <link rel="manifest" href="manifest.json"/>
 
-  <!-- ▸▸▸ FIREBASE ◂◂◂ -->
+  <!-- ▸▸ FIREBASE ◂◂ -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
@@ -27,9 +27,9 @@
   <style>
     /* ---------- layout original ---------- */
     body{margin:0;font-family:Arial, sans-serif;overflow:auto;}
+    html,body{height:100%;}
     .container{width:100%;max-width:1200px;margin:0 auto;padding:20px;text-align:center;position:relative;
       background-image:url('imagens/fundo.png');background-repeat:repeat;background-size:200%;overflow:auto;}
-    html,body{height:100%;}
     .subtitle{margin-top:40px;font-size:24px;font-weight:bold;color:#333;text-align:center;}
     .levels{display:flex;flex-wrap:wrap;justify-content:center;gap:20px;padding:20px;}
     .level-button{width:200px;height:200px;background-size:cover;background-repeat:no-repeat;display:inline-block;}
@@ -75,13 +75,6 @@
     #iosInstallBanner{display:none;position:fixed;bottom:0;left:0;right:0;background:#fffbe8;border-top:1px solid #ccc;
       padding:12px 16px;text-align:center;font-size:16px;z-index:10000;}
     #iosInstallBanner button{margin-left:10px;background:#ff5722;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;}
-
-    /* ---------- BOTÃO “OPEN IN APP” (fora do PWA) ---------- */
-    #openAppBtn{
-      display:none;position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 24px);left:24px;z-index:9999;
-      background:#4caf50;color:#fff;border:none;padding:14px 24px;border-radius:50px;font-size:18px;font-weight:700;
-      box-shadow:0 6px 12px rgba(0,0,0,.25);cursor:pointer;text-decoration:none;}
-    #openAppBtn:hover{transform:scale(1.05);box-shadow:0 8px 16px rgba(0,0,0,.35);}
   </style>
 </head>
 
@@ -130,13 +123,6 @@
   <!-- Botão flutuante PWA -->
   <button id="installBtn" disabled>Install App</button>
 
-  <!-- Botão “Open in App” (aparece só fora do PWA) -->
-  <!-- Ajuste o package do seu TWA se necessário -->
-  <a id="openAppBtn"
-     href="intent://hannahenglishcourse.netlify.app/#Intent;scheme=https;package=com.hannahenglishcourse.twa;end">
-     Open in App
-  </a>
-
   <!-- Banner iOS -->
   <div id="iosInstallBanner">
     To install the app, tap the <strong>Share</strong> button and choose “Add to Home Screen”.
@@ -166,37 +152,39 @@
     }
 
     /* ---------- Variáveis globais ---------- */
-    let englishVoice=null,
-        deferredPrompt=null;
+    let englishVoice=null;
+    let deferredPrompt=null;
     const installBtn=document.getElementById("installBtn");
-    const openAppBtn=document.getElementById("openAppBtn");
 
     /* ---------- Detecção de ambiente ---------- */
     const ua=navigator.userAgent.toLowerCase();
-    const isIOS   = /iphone|ipad|ipod/.test(ua);
-    const supportsBIP = ('onbeforeinstallprompt' in window);
+    const isIOS=/iphone|ipad|ipod/.test(ua);
 
-    /* ---------- Função p/ ocultar botão e avisar ---------- */
-    function hideInstallWithMessage(){
-      installBtn.remove();
-      setTimeout(()=>{
-        const open=confirm("It looks like you already have the app installed. Would you like to open it?");
-        if(open) alert("Please open the app from your home screen or app drawer.");
-      },500);
+    /* ---------- Função: exibir botão instalar ---------- */
+    function showInstallButton(){
+      installBtn.disabled=false;
+      installBtn.style.display='flex';
+      installBtn.classList.add('pulse');
     }
 
-    /* ---------- Verificar se app já está instalado ---------- */
-    function verificarInstalacao(){
-      if(isInStandaloneMode()){                         // ← verificação reforçada
-        hideInstallWithMessage();
-        return;
+    /* ---------- Função: esconder botão instalar ---------- */
+    function hideInstallButton(){
+      installBtn.style.display='none';
+      installBtn.classList.remove('pulse');
+      installBtn.disabled=true;
+    }
+
+    /* ---------- Lógica de controle de botões ---------- */
+    function controlPWAButtons(){
+      if(isInStandaloneMode()){
+        hideInstallButton();
+        return; // já está no app
       }
-      if('getInstalledRelatedApps' in navigator){
-        navigator.getInstalledRelatedApps()
-          .then(apps=>{
-            if(apps.length>0) hideInstallWithMessage();
-          })
-          .catch(console.error);
+      // Se temos deferredPrompt -> mostra instalar
+      if(deferredPrompt){
+        showInstallButton();
+      }else{
+        hideInstallButton(); // navegadores que já instalaram ou não suportam ainda
       }
     }
 
@@ -207,40 +195,55 @@
       document.getElementById("iosBannerClose").onclick=()=>iosBanner.style.display="none";
     }
 
+    /* ---------- Evento beforeinstallprompt ---------- */
+    window.addEventListener('beforeinstallprompt',e=>{
+      if(isInStandaloneMode()) return; // ignore se já estiver no app
+      e.preventDefault();
+      deferredPrompt=e;
+      showInstallButton();
+    });
+
+    /* ---------- Clique no botão instalar ---------- */
+    installBtn.addEventListener('click',async ()=>{
+      if(!deferredPrompt) return;
+      hideInstallButton();
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt=null;
+      // depois de interação, reavaliar visibilidade
+      setTimeout(controlPWAButtons,500);
+    });
+
+    /* ---------- appinstalled ---------- */
+    window.addEventListener('appinstalled',()=>{
+      deferredPrompt=null;
+      hideInstallButton();
+    });
+
+    /* ---------- Verificar se PWA já instalado por outros meios ---------- */
+    async function verificarInstalacaoInicial(){
+      if(isInStandaloneMode()){
+        hideInstallButton();
+        return;
+      }
+      if('getInstalledRelatedApps' in navigator){
+        try{
+          const apps=await navigator.getInstalledRelatedApps();
+          if(apps.length>0){
+            hideInstallButton();
+          }
+        }catch(err){console.error(err);}
+      }
+      controlPWAButtons();
+    }
+
     /* ---------- Rede ---------- */
     function updateNetworkStatus(){
       if(!navigator.onLine) installBtn.disabled=true;
       else if(deferredPrompt) installBtn.disabled=false;
     }
-    window.addEventListener("online",updateNetworkStatus);
-    window.addEventListener("offline",updateNetworkStatus);
-
-    /* ---------- beforeinstallprompt ---------- */
-    if(!isInStandaloneMode() && !isIOS){
-      window.addEventListener("beforeinstallprompt",(e)=>{
-        e.preventDefault();
-        deferredPrompt=e;
-        try{sessionStorage.setItem("bip", "1");}catch{}
-        installBtn.disabled=false;
-        installBtn.style.display="flex";
-        installBtn.classList.add("pulse");
-      });
-    }
-
-    /* ---------- Clique instalar ---------- */
-    installBtn.onclick=async ()=>{
-      if(!deferredPrompt) return;
-      installBtn.classList.remove("pulse");
-      installBtn.style.display="none";
-      deferredPrompt.prompt();
-      await deferredPrompt.userChoice.finally(()=>{
-        deferredPrompt=null;
-        try{sessionStorage.removeItem("bip");}catch{}
-      });
-    };
-
-    /* ---------- appinstalled ---------- */
-    window.addEventListener("appinstalled",hideInstallWithMessage);
+    window.addEventListener('online',updateNetworkStatus);
+    window.addEventListener('offline',updateNetworkStatus);
 
     /* ---------- TTS util ---------- */
     function pickVoice(){
@@ -350,25 +353,12 @@
     /* ---------- DOM Ready ---------- */
     document.addEventListener("DOMContentLoaded",()=>{
       englishVoice=pickVoice();
-
-      /* recuperar BIP armazenado para manter botão visível */
-      if(sessionStorage.getItem("bip") && !isInStandaloneMode()){
-        installBtn.disabled=false;
-        installBtn.style.display="flex";
-        installBtn.classList.add("pulse");
-      }
-
-      /* botão “Open in App” só fora do modo standalone */
-      if(!isInStandaloneMode()){
-        openAppBtn.style.display="flex";
-      }
-
       document.getElementById("playTTSBtn").onclick=speakRobot;
       document.getElementById("invitationButton").onclick=()=>location.href="Apresentacao/propaganda.html";
       document.getElementById("freeGamesButton").onclick   =()=>location.href="https://hannahenglishcourse.vercel.app/game.html";
       document.getElementById("subtitleLoggedOut").onclick=()=>window.scrollTo({top:0,behavior:"smooth"});
       updateNetworkStatus();
-      verificarInstalacao();
+      verificarInstalacaoInicial();
     });
     window.addEventListener("beforeunload",()=>speechSynthesis.cancel());
 
