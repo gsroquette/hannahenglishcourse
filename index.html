@@ -149,7 +149,6 @@
     const isStandalone=window.matchMedia("(display-mode: standalone)").matches || navigator.standalone===true;
     const isIOS=/iphone|ipad|ipod/.test(ua);
     const supportsBIP='onbeforeinstallprompt' in window;
-    const isChrome=/chrome/i.test(ua)&&!!window.chrome&&!/edge|edg|opr|brave/i.test(ua);
 
     /* ---------- Banner iOS ---------- */
     if(isIOS && !isStandalone){
@@ -169,7 +168,7 @@
     window.addEventListener('online',updateNetworkStatus);
     window.addEventListener('offline',updateNetworkStatus);
 
-    /* ---------- Evento beforeinstallprompt ---------- */
+    /* ---------- beforeinstallprompt ---------- */
     if(!isStandalone && !isIOS){
       window.addEventListener("beforeinstallprompt",e=>{
         e.preventDefault();
@@ -177,16 +176,34 @@
         installBtn.disabled=false;
         installBtn.style.display="flex";
         installBtn.classList.add("pulse");
-        console.log("[PWA] beforeinstallprompt capturado");
       });
     }
 
-    /* ---------- Fallback para navegadores sem suporte ---------- */
-    setTimeout(()=>{
-      if(!isStandalone && !isIOS && !deferredPrompt && !supportsBIP){
-        alert("Your browser may not support automatic installation. Try using Chrome or Edge for the best experience.");
+    /* ---------- Detecção de app já instalado fora do modo standalone ---------- */
+    function checkIfAppInstalled(){
+      if('getInstalledRelatedApps' in navigator){
+        navigator.getInstalledRelatedApps().then(apps=>{
+          if(apps.length>0){
+            // App instalado mas usuário abriu no navegador
+            installBtn.style.display="none";
+            const openApp=confirm("It looks like you already have the app installed. Would you like to open it?");
+            if(openApp){
+              alert("Open the app from your home screen or app drawer.");
+            }
+          }else{
+            // Se não há apps instalados e não há deferredPrompt, mostrar fallback
+            if(!deferredPrompt && !supportsBIP && !isIOS){
+              alert("Your browser may not support automatic installation. Try using Chrome or Edge for the best experience.");
+            }
+          }
+        }).catch(()=>{});
+      }else{
+        // Navegador sem suporte à API
+        if(!deferredPrompt && !supportsBIP && !isIOS){
+          alert("Your browser may not support automatic installation. Try using Chrome or Edge for the best experience.");
+        }
       }
-    },8000);
+    }
 
     /* ---------- Clique no botão de instalar ---------- */
     installBtn.onclick=()=>{
@@ -281,6 +298,7 @@
       document.getElementById("freeGamesButton").onclick=()=>location.href="https://hannahenglishcourse.vercel.app/game.html";
       document.getElementById("subtitleLoggedOut").onclick=()=>window.scrollTo({top:0,behavior:"smooth"});
       updateNetworkStatus();
+      checkIfAppInstalled();   /* <-- chamada aqui */
     });
     window.addEventListener("beforeunload",()=>speechSynthesis.cancel());
 
