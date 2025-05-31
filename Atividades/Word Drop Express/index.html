@@ -14,10 +14,10 @@
     html, body {
       width: 100vw;
       height: 100vh;
-      overflow: hidden; /* Impede scroll por padrão */
       background: url('../../../imagens/fundo.png') repeat;
       position: relative;
       font-family: "Times New Roman", Times, serif;
+      /* Removido overflow:hidden global para evitar que trem seja cortado */
     }
 
     /* ========== OVERLAY “ROTATE TO LANDSCAPE” ========== */
@@ -35,7 +35,7 @@
       text-align: center;
       padding: 1rem;
       box-sizing: border-box;
-      z-index: 2000;               /* acima de todos os elementos do jogo */
+      z-index: 3000;               /* acima de todos os elementos do jogo */
     }
     #rotate-overlay p {
       font-size: 1.3rem;
@@ -47,7 +47,7 @@
       position: relative;
       width: 100%;
       height: 100%;
-      overflow: hidden;
+      overflow: hidden; /* impede scroll mas não corta o trem */
     }
 
     /* ========== TREM E VAGÕES ========== */
@@ -56,37 +56,36 @@
       bottom: 0;
       left: 0;
       width: 100%;
-      height: 25vh;        /* usa 25% da altura da viewport */
-      background: #2c3e50; /* cor de trilho/fundo do trem */
+      height: 20vh;        /* 20% da altura da viewport, deixa mais espaço ao jogo */
+      background: #2c3e50; /* cor do trilho/fundo do trem */
       display: flex;
       align-items: flex-end;
       justify-content: space-around;
       padding-bottom: 10px;
-      z-index: 0;          /* fica abaixo de balões e imagens */
+      z-index: 100;        /* deve ficar acima do plano de fundo e abaixo dos balões */
     }
     .wagon {
       position: relative;
       width: calc(100% / var(--num-wagons)); /* divide igualmente a largura */
-      height: 80%;                           /* 80% da altura do container do trem */
+      height: 80%;                           /* 80% da altura do #train */
       background: #ecf0f1;
       border: 3px solid #34495e;
       border-radius: 5px;
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 1;        /* garante que balões/imagens fiquem acima */
+      z-index: 101;        /* ligeiramente acima do trem, mas abaixo de balões */
       padding: 4px;
     }
     .wagon .word {
-      /* font-size relativo: 20% da largura de cada vagão */
-      font-size: calc((100vw / var(--num-wagons)) * 0.2);
-      max-font-size: 24px;  /* limite superior */
-      min-font-size: 12px;  /* limite inferior */
+      /* Ajuste de fonte usando clamp para nunca cortar e caber em qualquer número de vagões */
+      /* 12px é o mínimo, 24px é o máximo, e o valor intermediário escala de acordo com a largura de cada vagão */
+      font-size: clamp(12px, calc((100vw / var(--num-wagons)) * 0.18), 24px);
       line-height: 1.1;
       color: #2c3e50;
       text-transform: uppercase;
       text-align: center;
-      word-break: break-word; /* garante quebra de palavras para não cortar */
+      word-break: break-word; /* evita corte de texto */
       overflow-wrap: break-word;
     }
     .wagon.correct {
@@ -101,36 +100,29 @@
     /* ========== BALÕES + IMAGENS ========== */
     .balloon {
       position: absolute;
-      /* usa 10vw (10% da largura da viewport), mas tem limites superior e inferior */
-      width: 10vw;
-      height: 12vw; /* mantém proporção aproximada 100x120 */
-      max-width: 100px;
-      max-height: 120px;
-      min-width: 50px;
-      min-height: 60px;
+      /* Usa unidades relativas com limites para garantir que nunca cubram os vagões */
+      width: clamp(50px, 10vw, 100px);
+      height: clamp(60px, 12vw, 120px);
       background: url('balloon.png') no-repeat center center;
       background-size: contain;
       cursor: pointer;
       transition: transform 0.2s ease;
-      z-index: 1000; /* sempre acima dos vagões */
+      z-index: 200; /* sempre acima dos vagões, mas abaixo do overlay */
     }
     .balloon:hover {
       transform: scale(1.1);
     }
-    /* A imagem fica logo abaixo do balão, mas nunca sobrepõe os vagões */
+    /* A imagem fica logo abaixo do balão, sem sobrepor os vagões */
     .balloon img {
       position: absolute;
-      top: calc(100% + 5px); /* toma 100% da altura + 5px de espaço reduzido */
+      top: calc(100% + 5px); /* 100% da altura do balão + 5px de espaço */
       left: 50%;
       transform: translateX(-50%);
-      width: 8vw;            /* 8% da largura da viewport */
-      height: 8vw;           /* mantém proporção quadrada para as imagens */
-      max-width: 80px;
-      max-height: 80px;
-      min-width: 40px;
-      min-height: 40px;
+      width: clamp(40px, 8vw, 80px);
+      height: clamp(40px, 8vw, 80px);
       object-fit: contain;
       pointer-events: none;
+      z-index: 201; /* acima do balão, mas não interfere nos vagões */
     }
 
     /* ========== FEEDBACK DE ERRO ========== */
@@ -145,7 +137,7 @@
       border-radius: 8px;
       font-size: 1.2em;
       display: none;
-      z-index: 1500;
+      z-index: 250; /* acima dos balões, mas abaixo do overlay */
     }
 
     /* ========== BOTÃO DE REINICIAR ========== */
@@ -160,7 +152,7 @@
       border-radius: 5px;
       cursor: pointer;
       font-size: 1em;
-      z-index: 1500;
+      z-index: 250;
       box-shadow: 0 4px 8px rgba(0,0,0,0.2);
       transition: background-color 0.3s ease;
     }
@@ -171,20 +163,16 @@
     /* ========== ANIMAÇÃO DE QUEDA DA IMAGEM ========== */
     .falling {
       position: absolute;
-      width: 8vw;   /* 8% da largura da viewport */
-      height: 8vw;
-      max-width: 80px;
-      max-height: 80px;
-      min-width: 40px;
-      min-height: 40px;
+      width: clamp(40px, 8vw, 80px);
+      height: clamp(40px, 8vw, 80px);
       object-fit: contain;
       pointer-events: none;
-      z-index: 500; /* abaixo dos balões, mas acima dos vagões */
+      z-index: 150; /* abaixo dos balões, mas acima do trem/vagões */
     }
   </style>
 </head>
 <body>
-  <!-- Overlay que pede para girar para paisagem -->
+  <!-- Overlay que pede para girar para paisagem (Landscape) -->
   <div id="rotate-overlay">
     <p>Please rotate your device to Landscape mode to play.</p>
   </div>
@@ -196,7 +184,7 @@
     <!-- Feedback de erro -->
     <div id="feedback">Try Again!</div>
 
-    <!-- Contêiner do trem e vagões -->
+    <!-- Contêiner do trem e vagões (sempre visível na base) -->
     <div id="train"></div>
   </div>
 
@@ -237,16 +225,27 @@
     // =================================================
     function checkOrientation() {
       if (window.innerHeight > window.innerWidth) {
-        // Modo retrato → exibe overlay e pausa o jogo (se necessário)
+        // Modo retrato → exibe overlay e pausa o jogo (se houver loop em andamento)
         overlay.style.display = 'flex';
       } else {
         overlay.style.display = 'none';
       }
     }
 
-    window.addEventListener('resize', checkOrientation);
-    window.addEventListener('orientationchange', checkOrientation);
-    window.addEventListener('load', checkOrientation);
+    window.addEventListener('resize', () => {
+      checkOrientation();
+      // Ao redimensionar, queremos reposicionar trem e balões, então:
+      resizeTrain();
+    });
+    window.addEventListener('orientationchange', () => {
+      checkOrientation();
+      resizeTrain();
+    });
+    window.addEventListener('load', () => {
+      checkOrientation();
+      // Só inicia o carregamento de dados após verificar orientação
+      loadCardsData(initWordDropGame);
+    });
 
     // =================================================
     // 1) Lê parâmetros level e unit da URL
@@ -329,6 +328,9 @@
         trainElement.appendChild(wagon);
       });
 
+      // Depois que os vagões estão criados, ajusta a altura/posição no resize
+      resizeTrain();
+
       // 3.2) Gera balões com imagens
       imagesList.forEach(imgObj => {
         createBalloon(imgObj);
@@ -345,7 +347,18 @@
     }
 
     // =================================================
-    // 4) CRIAÇÃO DO BALÃO (com imagem logo abaixo)
+    // 4) FUNÇÃO PARA AJUSTAR POSICIONAMENTO E TAMANHO DO TREM
+    //    Assegura que o trem sempre fique visível na base
+    // =================================================
+    function resizeTrain() {
+      // #train já está em bottom:0 e height:20vh. Apenas garantir que covere toda largura.
+      trainElement.style.width = window.innerWidth + 'px';
+      trainElement.style.height = (window.innerHeight * 0.20) + 'px'; // 20% da altura
+      // Os vagões têm width calc(100%/numWagons). CSS cuida disso automaticamente.
+    }
+
+    // =================================================
+    // 5) CRIAÇÃO DO BALÃO (com imagem logo abaixo)
     // =================================================
     function createBalloon(imgObj) {
       // Cria elemento “balão”
@@ -354,10 +367,12 @@
       balloon.dataset.pair = imgObj.pair;
       balloon.dataset.word = imgObj.word;
 
-      // Posição inicial
+      // Precisamos aguardar um tick para que width/height via CSS sejam aplicados
+      document.body.appendChild(balloon);
+      const balloonRect = balloon.getBoundingClientRect();
+      const balloonW    = balloonRect.width;
       const initialTop  = window.innerHeight * 0.05; // 5% do topo
       const screenW     = window.innerWidth;
-      const balloonW    = balloon.getBoundingClientRect().width || (window.innerWidth * 0.1);
       const randomX     = Math.floor(Math.random() * (screenW - balloonW - 20)) + 10;
       balloon.style.top  = initialTop + 'px';
       balloon.style.left = randomX + 'px';
@@ -373,14 +388,10 @@
       });
 
       // ===== Propriedades de animação para flutuar (X e Y) =====
-      // Velocidade horizontal em px/ms
       const speedX    = getRandomBetween(0.03, 0.07);
-      // DEFINE O SENTIDO: +1 PARA DIREITA / -1 PARA ESQUERDA
       const direction = Math.random() < 0.5 ? -1 : 1;
-      // Oscilação vertical (amplitude em px e frequência em ms)
       const ampY      = getRandomBetween(10, 30);
       const freqY     = getRandomBetween(0.002, 0.005);
-      // Fases iniciais aleatórias para X e Y
       const phaseX    = Math.random() * 2 * Math.PI;
       const phaseY    = Math.random() * 2 * Math.PI;
 
@@ -397,8 +408,6 @@
         lastTimestamp: null
       };
 
-      // Adiciona ao DOM e ao array global
-      document.body.appendChild(balloon);
       balloonsArray.push(balloon);
     }
 
@@ -408,11 +417,11 @@
     }
 
     // =================================================
-    // 5) AO CLICAR NO BALÃO: remove balão e inicia queda da imagem
+    // 6) AO CLICAR NO BALÃO: remove balão e inicia queda da imagem
     // =================================================
     function popBalloon(balloonElem, imgObj) {
       const startRect = balloonElem.getBoundingClientRect();
-      balloonElem.remove(); // retira o balão atual
+      balloonElem.remove(); // retira o balão
       const idx = balloonsArray.indexOf(balloonElem);
       if (idx !== -1) balloonsArray.splice(idx, 1);
 
@@ -420,18 +429,20 @@
       const fallingImg = document.createElement('img');
       fallingImg.src = imgObj.src;
       fallingImg.classList.add('falling');
-      // Ajusta posição inicial do “falling”
-      fallingImg.style.left = startRect.left + (startRect.width - fallingImg.getBoundingClientRect().width) / 2 + 'px';
+
+      // Aguarda o browser definir tamanho do .falling via CSS e então posiciona
+      document.body.appendChild(fallingImg);
+      const imgRect = fallingImg.getBoundingClientRect();
+      fallingImg.style.left = (startRect.left + (startRect.width - imgRect.width) / 2) + 'px';
       fallingImg.style.top  = startRect.top + 'px';
       fallingImg.dataset.pair = imgObj.pair;
       fallingImg.dataset.word = imgObj.word;
 
-      document.body.appendChild(fallingImg);
       animateFall(fallingImg);
     }
 
     // =================================================
-    // 6) ANIMAÇÃO DA QUEDA: verifica colisão com vagões
+    // 7) ANIMAÇÃO DA QUEDA: verifica colisão com vagões
     // =================================================
     function animateFall(imgElement) {
       const speed = 4; // pixels por frame
@@ -477,18 +488,16 @@
     }
 
     // =================================================
-    // 7) TRATAMENTO DE ACERTO: encaixa imagem no vagão
+    // 8) TRATAMENTO DE ACERTO: encaixa imagem no vagão
     // =================================================
     function handleCorrectDrop(wagonElem, imgElement) {
       const wRect = wagonElem.getBoundingClientRect();
       imgElement.style.position = 'absolute';
       imgElement.style.top  = (wRect.top + wRect.height * 0.1) + 'px';
       imgElement.style.left = (wRect.left + (wRect.width - imgElement.getBoundingClientRect().width) / 2) + 'px';
-      imgElement.style.width  = '8vw';
-      imgElement.style.height = '8vw';
-      imgElement.style.maxWidth = '80px';
-      imgElement.style.maxHeight = '80px';
-      imgElement.style.zIndex = '1';
+      imgElement.style.width  = clampSize('8vw', '40px', '80px');
+      imgElement.style.height = clampSize('8vw', '40px', '80px');
+      imgElement.style.zIndex = '101';
 
       wagonElem.classList.add('correct');
       correctCount++;
@@ -498,8 +507,19 @@
       }
     }
 
+    // Helper para calcular clamp em JS, caso precise usar dinamicamente
+    function clampSize(valueVW, minPx, maxPx) {
+      // valueVW ex: "8vw"; minPx ex: "40px"; maxPx ex: "80px"
+      // Calcula 8vw em pixels
+      const vw = window.innerWidth * (parseFloat(valueVW) / 100);
+      const min = parseFloat(minPx);
+      const max = parseFloat(maxPx);
+      const clamped = Math.min(Math.max(vw, min), max);
+      return clamped + 'px';
+    }
+
     // =================================================
-    // 8) TRATAMENTO DE ERRO: volta imediatamente ao jogo
+    // 9) TRATAMENTO DE ERRO: volta imediatamente ao jogo
     // =================================================
     function handleWrongDrop(imgElement) {
       showFeedback();
@@ -515,7 +535,7 @@
     }
 
     // =================================================
-    // 9) FEEDBACK VISUAL “Try Again!”
+    // 10) FEEDBACK VISUAL “Try Again!”
     // =================================================
     function showFeedback() {
       feedbackElement.style.display = 'block';
@@ -525,14 +545,14 @@
     }
 
     // =================================================
-    // 10) MODAL DE CONCLUSÃO
+    // 11) MODAL DE CONCLUSÃO
     // =================================================
     function showCompletionModal() {
       alert("Congratulations! You completed this phase.");
     }
 
     // =================================================
-    // 11) ATUALIZAÇÃO DO PRÓXIMO PHASE (igual ao original)
+    // 12) ATUALIZAÇÃO DO PRÓXIMO PHASE (igual ao original)
     // =================================================
     function updateNextPhaseAuth() {
       firebase.auth().onAuthStateChanged(user => {
@@ -567,13 +587,13 @@
       }
     }
 
-    function getPhaseFromURL() {
+    function getParamsFromURL() {
       const params = new URLSearchParams(window.location.search);
       return params.get('fase');
     }
 
     // =================================================
-    // 12) REINICIAR O JOGO
+    // 13) REINICIAR O JOGO
     // =================================================
     function restartGame() {
       // Zeramos contagem de acertos
@@ -598,13 +618,6 @@
       // 5) Recria o layout de vagões + balões do zero
       initWordDropGame();
     }
-
-    // =================================================
-    // 13) INICIALIZAÇÃO AO CARREGAR PÁGINA
-    // =================================================
-    window.addEventListener('load', () => {
-      loadCardsData(initWordDropGame);
-    });
 
     // =================================================
     // 14) ANIMAÇÃO DE VOO (HORIZONTAL + OSCILAÇÃO VERTICAL)
@@ -647,8 +660,7 @@
     // 15) EVENT LISTENER PARA REDIMENSIONAMENTO (extra)
     // =================================================
     window.addEventListener('resize', () => {
-      // Se desejar, reposicione balões aqui recalculando props.topBase,
-      // mas não é estritamente necessário neste exemplo.
+      // Poderia reposicionar balões recalculando props.topBase se necessário
     });
   </script>
 </body>
