@@ -11,12 +11,13 @@
       padding: 0;
       box-sizing: border-box;
     }
-    body {
-      font-family: "Times New Roman", Times, serif;
-      background: url('../../../imagens/fundo.png') repeat;
+    html, body {
+      width: 100vw;
       height: 100vh;
-      overflow: hidden;
+      overflow: hidden; /* Impede scroll por padrão */
+      background: url('../../../imagens/fundo.png') repeat;
       position: relative;
+      font-family: "Times New Roman", Times, serif;
     }
 
     /* ========== OVERLAY “ROTATE TO LANDSCAPE” ========== */
@@ -46,6 +47,7 @@
       position: relative;
       width: 100%;
       height: 100%;
+      overflow: hidden;
     }
 
     /* ========== TREM E VAGÕES ========== */
@@ -54,30 +56,38 @@
       bottom: 0;
       left: 0;
       width: 100%;
-      height: 25%;         /* altura fixa para o trem */
+      height: 25vh;        /* usa 25% da altura da viewport */
       background: #2c3e50; /* cor de trilho/fundo do trem */
       display: flex;
       align-items: flex-end;
       justify-content: space-around;
       padding-bottom: 10px;
+      z-index: 0;          /* fica abaixo de balões e imagens */
     }
     .wagon {
       position: relative;
-      width: calc(100% / var(--num-wagons)); /* dividimos igualmente */
-      height: 80%;
+      width: calc(100% / var(--num-wagons)); /* divide igualmente a largura */
+      height: 80%;                           /* 80% da altura do container do trem */
       background: #ecf0f1;
       border: 3px solid #34495e;
       border-radius: 5px;
       display: flex;
       align-items: center;
       justify-content: center;
+      z-index: 1;        /* garante que balões/imagens fiquem acima */
+      padding: 4px;
     }
     .wagon .word {
-      font-size: 1.5em;
+      /* font-size relativo: 20% da largura de cada vagão */
+      font-size: calc((100vw / var(--num-wagons)) * 0.2);
+      max-font-size: 24px;  /* limite superior */
+      min-font-size: 12px;  /* limite inferior */
+      line-height: 1.1;
       color: #2c3e50;
       text-transform: uppercase;
       text-align: center;
-      padding: 5px;
+      word-break: break-word; /* garante quebra de palavras para não cortar */
+      overflow-wrap: break-word;
     }
     .wagon.correct {
       animation: glow 0.8s ease-out forwards;
@@ -91,24 +101,34 @@
     /* ========== BALÕES + IMAGENS ========== */
     .balloon {
       position: absolute;
-      width: 100px; /* mantém balão grande */
-      height: 120px;
-      background: url('balloon.png') no-repeat center center; /* caminho para o seu balloon.png */
+      /* usa 10vw (10% da largura da viewport), mas tem limites superior e inferior */
+      width: 10vw;
+      height: 12vw; /* mantém proporção aproximada 100x120 */
+      max-width: 100px;
+      max-height: 120px;
+      min-width: 50px;
+      min-height: 60px;
+      background: url('balloon.png') no-repeat center center;
       background-size: contain;
       cursor: pointer;
       transition: transform 0.2s ease;
+      z-index: 1000; /* sempre acima dos vagões */
     }
     .balloon:hover {
       transform: scale(1.1);
     }
-    /* A imagem fica próxima ao balão, 10px abaixo */
+    /* A imagem fica logo abaixo do balão, mas nunca sobrepõe os vagões */
     .balloon img {
       position: absolute;
-      top: calc(100% + 10px); /* 100% do balão + 10px de espaço */
+      top: calc(100% + 5px); /* toma 100% da altura + 5px de espaço reduzido */
       left: 50%;
       transform: translateX(-50%);
-      width: 80px;
-      height: 80px;
+      width: 8vw;            /* 8% da largura da viewport */
+      height: 8vw;           /* mantém proporção quadrada para as imagens */
+      max-width: 80px;
+      max-height: 80px;
+      min-width: 40px;
+      min-height: 40px;
       object-fit: contain;
       pointer-events: none;
     }
@@ -125,7 +145,7 @@
       border-radius: 8px;
       font-size: 1.2em;
       display: none;
-      z-index: 1000;
+      z-index: 1500;
     }
 
     /* ========== BOTÃO DE REINICIAR ========== */
@@ -140,7 +160,7 @@
       border-radius: 5px;
       cursor: pointer;
       font-size: 1em;
-      z-index: 1000;
+      z-index: 1500;
       box-shadow: 0 4px 8px rgba(0,0,0,0.2);
       transition: background-color 0.3s ease;
     }
@@ -151,11 +171,15 @@
     /* ========== ANIMAÇÃO DE QUEDA DA IMAGEM ========== */
     .falling {
       position: absolute;
-      width: 60px;
-      height: 60px;
+      width: 8vw;   /* 8% da largura da viewport */
+      height: 8vw;
+      max-width: 80px;
+      max-height: 80px;
+      min-width: 40px;
+      min-height: 40px;
       object-fit: contain;
       pointer-events: none;
-      z-index: 500;
+      z-index: 500; /* abaixo dos balões, mas acima dos vagões */
     }
   </style>
 </head>
@@ -212,13 +236,11 @@
     //  ORIENTAÇÃO E RESIZE (overlay em modo retrato)
     // =================================================
     function checkOrientation() {
-      // Se a altura for maior que a largura => retrato
       if (window.innerHeight > window.innerWidth) {
+        // Modo retrato → exibe overlay e pausa o jogo (se necessário)
         overlay.style.display = 'flex';
-        // Caso queira pausar alguma animação do jogo, faça aqui
       } else {
         overlay.style.display = 'none';
-        // Caso tenha pausado algo, retome aqui
       }
     }
 
@@ -335,7 +357,7 @@
       // Posição inicial
       const initialTop  = window.innerHeight * 0.05; // 5% do topo
       const screenW     = window.innerWidth;
-      const balloonW    = 100; // largura fixa (igual ao CSS)
+      const balloonW    = balloon.getBoundingClientRect().width || (window.innerWidth * 0.1);
       const randomX     = Math.floor(Math.random() * (screenW - balloonW - 20)) + 10;
       balloon.style.top  = initialTop + 'px';
       balloon.style.left = randomX + 'px';
@@ -356,9 +378,9 @@
       // DEFINE O SENTIDO: +1 PARA DIREITA / -1 PARA ESQUERDA
       const direction = Math.random() < 0.5 ? -1 : 1;
       // Oscilação vertical (amplitude em px e frequência em ms)
-      const ampY      = getRandomBetween(10, 30);     // +/- amplitude
-      const freqY     = getRandomBetween(0.002, 0.005); // frequência (px/ms)
-      // Fases iniciais aleatórias para X e Y, de modo que não fiquem todos sincronizados
+      const ampY      = getRandomBetween(10, 30);
+      const freqY     = getRandomBetween(0.002, 0.005);
+      // Fases iniciais aleatórias para X e Y
       const phaseX    = Math.random() * 2 * Math.PI;
       const phaseY    = Math.random() * 2 * Math.PI;
 
@@ -398,7 +420,8 @@
       const fallingImg = document.createElement('img');
       fallingImg.src = imgObj.src;
       fallingImg.classList.add('falling');
-      fallingImg.style.left = startRect.left + (startRect.width - 60) / 2 + 'px';
+      // Ajusta posição inicial do “falling”
+      fallingImg.style.left = startRect.left + (startRect.width - fallingImg.getBoundingClientRect().width) / 2 + 'px';
       fallingImg.style.top  = startRect.top + 'px';
       fallingImg.dataset.pair = imgObj.pair;
       fallingImg.dataset.word = imgObj.word;
@@ -460,9 +483,11 @@
       const wRect = wagonElem.getBoundingClientRect();
       imgElement.style.position = 'absolute';
       imgElement.style.top  = (wRect.top + wRect.height * 0.1) + 'px';
-      imgElement.style.left = (wRect.left + (wRect.width - imgElement.width) / 2) + 'px';
-      imgElement.style.width  = '80px';
-      imgElement.style.height = '80px';
+      imgElement.style.left = (wRect.left + (wRect.width - imgElement.getBoundingClientRect().width) / 2) + 'px';
+      imgElement.style.width  = '8vw';
+      imgElement.style.height = '8vw';
+      imgElement.style.maxWidth = '80px';
+      imgElement.style.maxHeight = '80px';
       imgElement.style.zIndex = '1';
 
       wagonElem.classList.add('correct');
@@ -608,8 +633,7 @@
         }
 
         // CALCULA OSCILAÇÃO VERTICAL (senoide)
-        // topBase + amplitudeY * sin( phaseY + frequência * tempoTotal )
-        const timeTotal = timestamp; // podemos usar timestamp inteiro como “tempo total”
+        const timeTotal = timestamp;
         const oscY      = props.amplitudeY * Math.sin(props.phaseY + props.frequencyY * timeTotal);
         const newTop    = props.topBase + oscY;
 
@@ -620,11 +644,11 @@
     }
 
     // =================================================
-    // 15) EVENT LISTENER PARA REDIMENSIONAMENTO
+    // 15) EVENT LISTENER PARA REDIMENSIONAMENTO (extra)
     // =================================================
     window.addEventListener('resize', () => {
-      // Não reposicionamos balões no resize neste exemplo. Caso deseje,
-      // poderia recalcular props.topBase aqui, ou mesmo recolocar todos os balões.
+      // Se desejar, reposicione balões aqui recalculando props.topBase,
+      // mas não é estritamente necessário neste exemplo.
     });
   </script>
 </body>
