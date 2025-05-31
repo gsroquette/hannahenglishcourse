@@ -69,10 +69,9 @@
         /* ========== BALÕES + IMAGENS ========== */
         .balloon {
             position: absolute;
-            /* Aumentamos o tamanho do balão */
-            width: 100px;
+            width: 100px;   /* mantemos o balão maior */
             height: 120px;
-            background: url('balloon.png') no-repeat center center; /* imagem de fundo do balão */
+            background: url('balloon.png') no-repeat center center;
             background-size: contain;
             cursor: pointer;
             transition: transform 0.2s ease;
@@ -80,21 +79,12 @@
         .balloon:hover {
             transform: scale(1.1);
         }
-        /* “Fio” que liga o balão à imagem */
-        .balloon::after {
-            content: '';
-            position: absolute;
-            top: 100%;               /* começa bem embaixo do balão */
-            left: 50%;
-            width: 2px;
-            height: 20px;            /* comprimeineto do fio */
-            background: #34495e;     /* cor do fio */
-            transform: translateX(-50%);
-        }
-        /* A imagem fica abaixo do fio (ou seja, abaixo do balão) */
+        /* Removido o pseudo-elemento ::after (linha que conectava ao balão) */
+
+        /* A imagem fica mais próxima do balão: apenas 10px abaixo */
         .balloon img {
             position: absolute;
-            top: calc(100% + 20px);  /* 100% do balão + 20px do fio */
+            top: calc(100% + 10px);  /* 100% da altura do balão + 10px de distância */
             left: 50%;
             transform: translateX(-50%);
             width: 80px;
@@ -103,7 +93,7 @@
             pointer-events: none;
         }
 
-        /* ========== FEEDBACK DE ERRO PARCIAL ========== */
+        /* ========== FEEDBACK DE ERRO ========== */
         #feedback {
             position: absolute;
             top: 45%;
@@ -161,7 +151,7 @@
         <div id="train"></div>
     </div>
 
-    <!-- Firebase SDK (se você quiser manter controle de progresso, igual ao original) -->
+    <!-- Firebase SDK (mantida igual ao seu código original) -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
@@ -180,22 +170,20 @@
         firebase.initializeApp(firebaseConfig);
         // =================================================================================
 
-        // Controles gerais do jogo
-        const gameContainer = document.getElementById('game-container');
+        // Referências de DOM
         const trainElement = document.getElementById('train');
         const feedbackElement = document.getElementById('feedback');
-        const restartBtn = document.getElementById('restart-button');
 
         let wordsList = [];          // Array das palavras (strings)
-        let imagesList = [];         // Array de objetos { src: caminho, pair: 'pairX', word: 'palavra' }
-        let numWagons = 0;           // Quantidade de vagões (mesmo número de palavras)
+        let imagesList = [];         // Array de objetos { src, pair, word }
+        let numWagons = 0;           // Quantidade de vagões (= número de palavras)
         let correctCount = 0;        // Quantos pares já foram acertados
 
-        // Lista de balões criados (para animar)
+        // Armazena todos os balões atuais para animar horizontalmente
         const balloonsArray = [];
 
         // =================================================
-        // 1) Lê parâmetros level e unit da URL, iguais ao original
+        // 1) Lê parâmetros level e unit da URL
         // =================================================
         function getParamsFromURL() {
             const params = new URLSearchParams(window.location.search);
@@ -207,7 +195,7 @@
         }
 
         // =================================================
-        // 2) Carrega palavras e imagens do seu diretório, igual ao jogo da memória
+        // 2) Carrega palavras e imagens do diretório
         // =================================================
         function loadCardsData(callback) {
             const { level, unit } = getParamsFromURL();
@@ -256,12 +244,12 @@
             correctCount = 0;
             trainElement.innerHTML = '';
             removeAllBalloons();
-            balloonsArray.length = 0; // limpa também o array de balões
+            balloonsArray.length = 0; // limpa o array de balões
 
-            // Configura CSS custom-property para calcular largura dos vagões
+            // Ajusta a largura dos vagões conforme número de palavras
             trainElement.style.setProperty('--num-wagons', numWagons);
 
-            // 3.1) Gera/DESENHA os vagões com as palavras
+            // 3.1) Gera os vagões com as palavras
             wordsList.forEach((word, index) => {
                 const wagon = document.createElement('div');
                 wagon.classList.add('wagon');
@@ -275,100 +263,99 @@
                 trainElement.appendChild(wagon);
             });
 
-            // 3.2) Gera os balões com imagens (no topo), cada um em x aleatório
+            // 3.2) Gera os balões com imagens no topo
             imagesList.forEach((imgObj, idx) => {
-                createBalloon(imgObj, idx);
+                createBalloon(imgObj);
             });
 
-            // Inicia animação de flutuação dos balões
+            // Inicia a animação de deslocamento horizontal
             requestAnimationFrame(animateBalloons);
         }
 
-        // Função auxiliar: remove balões pré-existentes (ao reiniciar)
+        // Remove todos os balões pré-existentes
         function removeAllBalloons() {
             const existing = document.querySelectorAll('.balloon');
             existing.forEach(b => b.remove());
         }
 
         // =================================================
-        // 4) CRIAÇÃO DO BALÃO (click para “estourar” e cair a imagem)
+        // 4) CRIAÇÃO DO BALÃO (com imagem pendurada)
         // =================================================
-        function createBalloon(imgObj, idx) {
-            // Cria elemento pai “balloon”
+        function createBalloon(imgObj) {
+            // Cria elemento “balão”
             const balloon = document.createElement('div');
             balloon.classList.add('balloon');
             balloon.dataset.pair = imgObj.pair;
             balloon.dataset.word = imgObj.word;
 
-            // Define posição inicial (top e left) em pixels
-            const initialTop = window.innerHeight * 0.05; // 5% do topo em pixels
+            // Define posição inicial:
+            const initialTop = window.innerHeight * 0.05; // 5% do topo
             const screenW = window.innerWidth;
-            const balloonWidth = 100; // de acordo com a CSS atualizada
-            const maxLeft = screenW - balloonWidth - 20; // margem de 20px
-            const randomX = Math.floor(Math.random() * (maxLeft - 20)) + 20;
+            const balloonWidth = 100; // igual ao CSS
+            // Escolhe X aleatório em toda a largura
+            const randomX = Math.floor(Math.random() * (screenW - balloonWidth - 20)) + 10;
 
+            // Ajusta estilo inicial
             balloon.style.top = initialTop + 'px';
             balloon.style.left = randomX + 'px';
 
-            // Anexa a imagem dentro do balão (ela ficará abaixo do balão, após o “fio”)
+            // Anexa a imagem (pendurada logo abaixo):
             const imgTag = document.createElement('img');
             imgTag.src = imgObj.src;
             balloon.appendChild(imgTag);
 
-            // Evento de clique: estoura e chama queda
+            // Evento de clique: “estourar” e iniciar queda
             balloon.addEventListener('click', () => {
                 popBalloon(balloon, imgObj);
             });
 
-            // Prepara parâmetros para animação de flutuação
-            const amplitudeX = getRandomBetween(20, 50);      // desvio horizontal máximo (px)
-            const amplitudeY = getRandomBetween(20, 50);      // desvio vertical máximo (px)
-            const speed = getRandomBetween(0.002, 0.005);     // “velocidade” da flutuação
-            const phaseX = Math.random() * Math.PI * 2;       // fase inicial horizontal
-            const phaseY = Math.random() * Math.PI * 2;       // fase inicial vertical
-
+            // ====== Propriedades para a animação horizontal ======
+            const speedX = getRandomBetween(0.03, 0.07); // px por milissegundo (aprox.)
+            // Direção aleatória: +1 (para direita) ou -1 (para esquerda)
+            const direction = Math.random() < 0.5 ? -1 : 1;
             balloon._floatProps = {
-                initialLeft: randomX,
-                initialTop: initialTop,
-                amplitudeX,
-                amplitudeY,
-                speed,
-                phaseX,
-                phaseY,
-                startTime: null  // será definido na primeira chamada de animateBalloons
+                speedX,
+                direction,
+                startLeft: randomX,
+                top: initialTop,
+                width: balloonWidth,
+                lastTimestamp: null
             };
 
-            // Adiciona ao DOM e ao array para animação
+            // Adiciona ao DOM e ao array para animar
             document.body.appendChild(balloon);
             balloonsArray.push(balloon);
         }
 
-        // Pequeña função utilitária para gerar um número aleatório entre min e max (inclusive)
+        // Gera número aleatório entre min e max (incluindo decimal)
         function getRandomBetween(min, max) {
             return min + Math.random() * (max - min);
         }
 
         // =================================================
-        // 5) AO CLICAR NO BALÃO: “estoura” e inicia queda da imagem
+        // 5) AO CLICAR NO BALÃO: remove balão e inicia queda da imagem
         // =================================================
         function popBalloon(balloonElem, imgObj) {
-            // Antes de remover o balão, captura sua posição na tela
+            // Captura posição atual do balão
             const startRect = balloonElem.getBoundingClientRect();
-            balloonElem.remove(); // retira o balão “estourado”
+            // Remove o balão “estourado”
+            balloonElem.remove();
+            // Se existia no array de animação, remove também
+            const idx = balloonsArray.indexOf(balloonElem);
+            if (idx !== -1) balloonsArray.splice(idx, 1);
 
-            // Cria elemento de imagem que irá cair (na mesma posição do balão)
+            // Cria elemento de imagem que vai “cair”
             const fallingImg = document.createElement('img');
             fallingImg.src = imgObj.src;
             fallingImg.classList.add('falling');
-            // Centraliza a imagem em relação ao balão
+            // Centraliza em relação ao balão
             fallingImg.style.left = startRect.left + (startRect.width - 60)/2 + 'px';
             fallingImg.style.top = startRect.top + 'px';
             fallingImg.dataset.pair = imgObj.pair;
             fallingImg.dataset.word = imgObj.word;
 
             document.body.appendChild(fallingImg);
-
-            // Inicia animação de queda
+            // Inicia a animação de queda
             animateFall(fallingImg);
         }
 
@@ -381,12 +368,11 @@
                 const currTop = parseFloat(imgElement.style.top);
                 imgElement.style.top = (currTop + speed) + 'px';
 
-                // Verifica se já atingiu o topo do trem
                 const trainRect = trainElement.getBoundingClientRect();
                 const imgRect = imgElement.getBoundingClientRect();
 
                 if (imgRect.bottom >= trainRect.top) {
-                    // Verificar em qual vagão caiu (pelo centro da imagem)
+                    // Encontrou o trem: verificar em qual vagão
                     const centerX = imgRect.left + imgRect.width / 2;
                     const wagons = Array.from(document.querySelectorAll('.wagon'));
                     let landedWagon = null;
@@ -402,81 +388,80 @@
                     if (landedWagon) {
                         const correctPair = landedWagon.dataset.pair;
                         if (correctPair === imgElement.dataset.pair) {
-                            // ========== ACERTO ==========
+                            // ======= ACERTO =======
                             handleCorrectDrop(landedWagon, imgElement);
                         } else {
-                            // ========= ERRO =========
+                            // ======= ERRO =======
                             handleWrongDrop(imgElement);
                         }
                     } else {
-                        // Se não estiver sobre nenhum vagão, simplesmente remove a imagem
-                        imgElement.remove();
+                        // Caiu fora de qualquer vagão: volta ao jogo
+                        handleWrongDrop(imgElement);
                     }
                     return;
                 }
-
-                // Continua a animação
+                // Continua descendo
                 requestAnimationFrame(step);
             }
             requestAnimationFrame(step);
         }
 
         // =================================================
-        // 7) TRATAMENTO DE ACERTO: “encaixa” a imagem no vagão
+        // 7) TRATAMENTO DE ACERTO: encaixa imagem no vagão
         // =================================================
         function handleCorrectDrop(wagonElem, imgElement) {
-            // Posiciona a imagem dentro do vagão, ajustando coordenadas
             const wRect = wagonElem.getBoundingClientRect();
             imgElement.style.position = 'absolute';
-            imgElement.style.top = (wRect.top + wRect.height * 0.1) + 'px';  
+            imgElement.style.top = (wRect.top + wRect.height * 0.1) + 'px';
             imgElement.style.left = (wRect.left + (wRect.width - imgElement.width)/2) + 'px';
             imgElement.style.width = '80px';
             imgElement.style.height = '80px';
             imgElement.style.zIndex = '1';
 
-            // Marca vagão com classe de “acerto” para animação
             wagonElem.classList.add('correct');
-
-            // Incrementa contador de acertos
             correctCount++;
             if (correctCount === numWagons) {
-                // Todas as palavras foram encontradas: fase concluída
                 showCompletionModal();
                 updateNextPhaseAuth();
             }
         }
 
         // =================================================
-        // 8) TRATAMENTO DE ERRO: exibe feedback e remove a imagem
+        // 8) TRATAMENTO DE ERRO: volta imediatamente ao jogo
         // =================================================
         function handleWrongDrop(imgElement) {
-            // Exibe mensagem de erro rápida
+            // Exibe feedback breve
             showFeedback();
-            // Remove a imagem errada após um breve delay
-            setTimeout(() => {
-                imgElement.remove();
-            }, 500);
+            // Captura os dados do imgElement (pair e word)
+            const pair = imgElement.dataset.pair;
+            // Remove a imagem caída
+            imgElement.remove();
+            // Recria o balão com a mesma imagem
+            const imgObj = imagesList.find(obj => obj.pair === pair);
+            if (imgObj) {
+                createBalloon(imgObj);
+            }
         }
 
         // =================================================
-        // 9) FEEDBACK VISUAL DE “TRY AGAIN”
+        // 9) FEEDBACK VISUAL “TRY AGAIN”
         // =================================================
         function showFeedback() {
             feedbackElement.style.display = 'block';
             setTimeout(() => {
                 feedbackElement.style.display = 'none';
-            }, 1000);
+            }, 800);
         }
 
         // =================================================
-        // 10) MOSTRAR MODAL DE CONCLUSÃO (BÁSICO)
+        // 10) MODAL DE CONCLUSÃO
         // =================================================
         function showCompletionModal() {
             alert("Congratulations! You completed this phase.");
         }
 
         // =================================================
-        // 11) ATUALIZAÇÃO DO PRÓXIMO PHASE (igual ao seu original)
+        // 11) ATUALIZAÇÃO DO PRÓXIMO PHASE (igual ao original)
         // =================================================
         function updateNextPhaseAuth() {
             firebase.auth().onAuthStateChanged(function(user) {
@@ -520,7 +505,6 @@
         // 12) FUNÇÃO PARA REINICIAR O JOGO
         // =================================================
         function restartGame() {
-            // Remove todas as imagens “caídas” e balões, reseta variáveis
             correctCount = 0;
             removeAllBalloons();
             balloonsArray.length = 0;
@@ -535,34 +519,45 @@
         });
 
         // =================================================
-        // 14) ANIMAÇÃO DE FLUTUAÇÃO DOS BALÕES
-        //     (move cada balão com senóides aleatórias, simulando voo)
+        // 14) ANIMAÇÃO DE FLUTUAÇÃO HORIZONTAL DOS BALÕES
         // =================================================
         function animateBalloons(timestamp) {
             for (let balloon of balloonsArray) {
                 const props = balloon._floatProps;
-                if (!props.startTime) {
-                    props.startTime = timestamp;
+                if (!props.lastTimestamp) {
+                    props.lastTimestamp = timestamp;
                 }
-                const t = timestamp - props.startTime;
+                const delta = timestamp - props.lastTimestamp; // tempo em ms desde o último frame
+                props.lastTimestamp = timestamp;
 
-                // calcula deslocamento usando senóide
-                const dx = props.amplitudeX * Math.sin(props.phaseX + props.speed * t);
-                const dy = props.amplitudeY * Math.sin(props.phaseY + props.speed * t);
+                // Calcula deslocamento horizontal: speedX * direção * Δtempo
+                let currLeft = parseFloat(balloon.style.left);
+                const moveX = props.speedX * props.direction * delta;
+                let newLeft = currLeft + moveX;
 
-                // aplica transform sobre a posição inicial
-                balloon.style.transform = `translate(${dx}px, ${dy}px)`;
+                // Se passar do limite direito, reaparece à esquerda
+                if (newLeft > window.innerWidth) {
+                    newLeft = -props.width;
+                }
+                // Se passar do limite esquerdo, reaparece à direita
+                if (newLeft < -props.width) {
+                    newLeft = window.innerWidth;
+                }
+
+                balloon.style.left = newLeft + 'px';
+                // Mantém sempre a mesma top (não mexemos na vertical)
+                balloon.style.top = props.top + 'px';
             }
             requestAnimationFrame(animateBalloons);
         }
 
         // =================================================
         // 15) EVENT LISTENER PARA REDIMENSIONAMENTO
-        //     (se desejar reposicionar balões ao redimensionar, pode implementar aqui)
+        //     (se quiser ajustar algo quando redimensionar a janela)
         // =================================================
         window.addEventListener('resize', () => {
-            // Neste exemplo, não estamos reposicionando, mas você poderia
-            // recalcular props.initialLeft e props.initialTop aqui, se necessário.
+            // Neste exemplo, não reposicionamos balões ao redimensionar.
+            // Mas, se desejar, pode atualizar props.top ou props.startLeft aqui.
         });
     </script>
 </body>
