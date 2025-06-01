@@ -21,44 +21,29 @@ const fasesConfig = {
     { name: "Mixed Letters2", path: "Mixed Letters FIXO2",img: "mixed_letters_students.png" }
   ],
   writing: [
-    { name: "QUIZ_IMAGE",     path: "QUIZ_IMAGE",       img: "quiz_button.png" },
-    { name: "MemoryGame",     path: "MemoryGame",       img: "memorygame_button.png" },
-    { name: "WordSearchFacil",  path: "WordSearchFacil",   img: "wordsearch_button.png" },
-    { name: "MemoryGame2",    path: "MemoryGame2",      img: "memorygame_button.png" },
+    { name: "QUIZ_IMAGE",       path: "QUIZ_IMAGE",       img: "quiz_button.png" },
+    { name: "MemoryGame",       path: "MemoryGame",       img: "memorygame_button.png" },
+    { name: "WordSearchFacil",  path: "WordSearchFacil",  img: "wordsearch_button.png" },
+    { name: "MemoryGame2",      path: "MemoryGame2",      img: "memorygame_button.png" },
     { name: "WordSearchFacil2", path: "WordSearchFacil2", img: "wordsearch_button.png" }
   ],
   Bible: [
-    { name: "Matching Game", path: "MatchingGame",        img: "matching_game_button.png" }
+    { name: "Matching Game", path: "MatchingGame", img: "matching_game_button.png" }
   ],
   apresentacao: [
-    /* aqui não havia fases específicas no script6.js: 
-       você pode adicionar conforme necessidade */
+    /* Se quiser adicionar fases aqui, faça:
+       { name: "MatchingGame", path: "MatchingGame", img: "matching_game_button.png" }
+    */
   ],
   test: [
-    { name: "TestQuizLeVeAB",    path: "TestQuizLeVeAB",     img: "test.png" },
-    { name: "TestwordB2CFacil",  path: "TestwordB2CFacil",   img: "test.png" },
-    { name: "Testword2B2CFacil", path: "Testword2B2CFacil",  img: "test.png" }
+    { name: "TestQuizLeVeAB",    path: "TestQuizLeVeAB",    img: "test.png" },
+    { name: "TestwordB2CFacil",  path: "TestwordB2CFacil",  img: "test.png" },
+    { name: "Testword2B2CFacil", path: "Testword2B2CFacil", img: "test.png" }
   ],
+  // Caso queira manter “writing2” (usado antes em grammar), inclua aqui e use ?activity=writing2
   writing2: [
-    { name: "GrammarDialogo",    path: "GrammarDialogo",   img: "conversation_button.png" },
-    { name: "QUIZ_IMAGE2",       path: "QUIZ_IMAGE2",      img: "quiz_button.png" },
-    { name: "Diálogo",           path: "Dialogo",          img: "dialogo_button.png" }
+    { name: "GrammarDialogo", path: "GrammarDialogo", img: "conversation_button.png" },
+    { name: "QUIZ_IMAGE2",    path: "QUIZ_IMAGE2",    img: "quiz_button.png" },
+    { name: "Diálogo",        path: "Dialogo",        img: "dialogo_button.png" }
   ]
 };
-
-/** 
- * Algumas observações:
- *  - A chave “writing2” corresponde ao HTML “grammar.html”? 
- *    No seu “script5.js” original, as fases de id 19–21 vinham de “grammar.html”. 
- *    Se preferir nomear essa seção como “grammarDialogo” ou algo similar, basta
- *    ajustar tanto o link no botão de seleção (fases.html?activity=writing2) 
- *    quanto o nome da chave aqui.
- *
- *  - A entrada “apresentacao” foi deixada vazia porque, no script6.js, só havia 
- *    uma fase (id 22) chamada “MatchingGame”. Se for necessário manter exatamente 
- *    “apresentacao.html” mapeie aqui a mesma fase, por exemplo:
- *      apresentacao: [
- *        { name: "MatchingGame", path: "MatchingGame", img: "matching_game_button.png" }
- *      ]
- *    E ajuste o parâmetro de URL ao linkar.
- */

@@ -2,27 +2,27 @@ document.addEventListener('DOMContentLoaded', function() {
   // ------------------------------
   // 1) Captura elementos da DOM
   // ------------------------------
-  const database = firebase.database();
-  const auth     = firebase.auth();
-  const loginLink       = document.getElementById("loginLink");
-  const loginContainer  = document.getElementById("loginContainer");
-  const userDropdown    = document.getElementById("userDropdown");
-  const levelUnitInfo   = document.getElementById("levelUnitInfo");
-  const mapContainer    = document.getElementById("mapContainer");
-  const svgContainer    = document.getElementById("linesSvg");
+  const database      = firebase.database();
+  const auth          = firebase.auth();
+  const loginLink     = document.getElementById("loginLink");
+  const loginContainer= document.getElementById("loginContainer");
+  const userDropdown  = document.getElementById("userDropdown");
+  const levelUnitInfo = document.getElementById("levelUnitInfo");
+  const mapContainer  = document.getElementById("mapContainer");
+  const svgContainer  = document.getElementById("linesSvg");
   let player;
   let lastUnlockedIndex = -1;
 
   // ------------------------------
   // 2) Lê parâmetros da URL
   //    - activity (ex: “grammar”)
-  //    - level (ex: “Level1”)
-  //    - unit  (ex: “Unit2”)
+  //    - level (ex: “level0”)
+  //    - unit  (ex: “unit1”)
   // ------------------------------
-  const params = new URLSearchParams(window.location.search);
+  const params       = new URLSearchParams(window.location.search);
   const activityType = params.get('activity') || '';
-  const currentLevel = params.get('level') || '';
-  const currentUnit  = params.get('unit')  || '';
+  const currentLevel = params.get('level')    || '';
+  const currentUnit  = params.get('unit')     || '';
 
   // Atualiza texto “Level / Unit” no topo:
   levelUnitInfo.innerHTML = `${currentLevel}<br>${currentUnit}`;
@@ -57,13 +57,13 @@ document.addEventListener('DOMContentLoaded', function() {
     if (user) {
       const userId = user.uid;
       database.ref('/usuarios/' + userId).once('value').then(snapshot => {
-        const userData = snapshot.val();
+        const userData   = snapshot.val();
         const userName   = userData.nome || user.email;
         const userAvatar = userData.avatar ? `../../imagens/${userData.avatar}` : '../../imagens/bonequinho.png';
 
         // Atualiza loginLink: avatar + nome
-        loginLink.innerHTML = `<img src="${userAvatar}" alt="User Icon" class="user-icon">` +
-                              `<p class="user-name">${userName}</p>`;
+        loginLink.innerHTML = `<img src="${userAvatar}" alt="User Icon" class="user-icon">
+                                <p class="user-name">${userName}</p>`;
         loginLink.removeAttribute('href');
 
         // Monta link para dashboard conforme role
@@ -71,9 +71,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (userData.role === 'proprietario' || userData.role === 'professor') {
           dashboardLink = userData.role === 'proprietario'
             ? '<a href="../../painel_proprietario.html" class="dropdown-item">OWNER DASHBOARD</a>'
-            : '<a href="../../painel_professor.html" class="dropdown-item">TEACHER DASHBOARD</a>';
+            : '<a href="../../painel_professor.html"  class="dropdown-item">TEACHER DASHBOARD</a>';
         } else if (userData.role === 'aluno') {
-          dashboardLink = '<a href="../../painel_aluno.html" class="dropdown-item">STUDENT DASHBOARD</a>';
+          dashboardLink = '<a href="../../painel_aluno.html"    class="dropdown-item">STUDENT DASHBOARD</a>';
         }
 
         userDropdown.innerHTML = `
@@ -83,18 +83,16 @@ document.addEventListener('DOMContentLoaded', function() {
           <a href="/${currentLevel}/${currentUnit}/index.html" class="dropdown-item">SELECT A NEW ACTIVITY</a>
         `;
 
-        // Toggle dropdown ao clicar em container (exceto em <a>)
+        // Toggle dropdown ao clicar no container (exceto em <a>)
         loginContainer.addEventListener("click", function(ev) {
           if (ev.target.tagName !== 'A') {
             userDropdown.style.display = userDropdown.style.display === 'flex' ? 'none' : 'flex';
           }
         });
 
-        // Carrega progresso (chama initializeMap depois)
+        // Carrega progresso no Firebase e chama initializeMap
         loadUserProgress(userId, userAvatar, userData.role);
-      }).catch(err => {
-        console.error("Erro ao carregar dados do usuário:", err);
-      });
+      }).catch(err => console.error("Erro ao carregar dados do usuário:", err));
     } else {
       loginLink.setAttribute('href', 'Formulario/login.html');
     }
@@ -114,11 +112,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const progress = snapshot.val() || {};
         activities.forEach((activity, idx) => {
           // procura chave “fase<ID>” no objeto
-          const faseKey = Object.keys(progress).find(key => 
+          const faseKey = Object.keys(progress).find(key =>
             key.includes(`fase${activity.id}`) || key.includes(activity.id.toString())
           );
           if (faseKey && progress[faseKey] === true) {
-            activity.unlocked = (idx === 0) || activities[idx-1].unlocked;
+            activity.unlocked = (idx === 0) || activities[idx - 1].unlocked;
             if (activity.unlocked) lastUnlockedIndex = idx;
           }
         });
@@ -141,8 +139,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Calcula “baseTopPosition” (altura do título + margem de 20px)
     const titleContainer = document.querySelector('.title-container');
-    const titleBottom = titleContainer.offsetTop + titleContainer.offsetHeight;
-    const baseTopPosition = titleBottom + 20;
+    const titleBottom    = titleContainer.offsetTop + titleContainer.offsetHeight;
+    const baseTopPosition= titleBottom + 20;
 
     activities.forEach((activity, index) => {
       // Cria <div class="phase">
@@ -150,18 +148,18 @@ document.addEventListener('DOMContentLoaded', function() {
       phaseDiv.classList.add('phase');
 
       // Distância vertical: 20% em portrait, 30% em landscape
-      const isLandscape = window.innerWidth > window.innerHeight;
+      const isLandscape    = window.innerWidth > window.innerHeight;
       const spacingPercent = isLandscape ? 30 : 20;
-      const topPosition = baseTopPosition + index * (spacingPercent * window.innerHeight / 100);
+      const topPosition    = baseTopPosition + index * (spacingPercent * window.innerHeight / 100);
 
       // Distância horizontal limitada a 400px do centro
-      const maxOffset = 400; 
-      const screenCenter = window.innerWidth / 2;
-      const offset = Math.min(window.innerWidth * 0.4, maxOffset);
-      const horizontalPositionPx = screenCenter + (index % 2 === 0 ? -offset : offset);
+      const maxOffset      = 400;
+      const screenCenter   = window.innerWidth / 2;
+      const offset         = Math.min(window.innerWidth * 0.4, maxOffset);
+      const horizontalPx   = screenCenter + (index % 2 === 0 ? -offset : offset);
 
       phaseDiv.style.top  = `${topPosition}px`;
-      phaseDiv.style.left = `${horizontalPositionPx}px`;
+      phaseDiv.style.left = `${horizontalPx}px`;
 
       // Insere imagem da fase
       const imgEl = document.createElement('img');
@@ -239,7 +237,7 @@ document.addEventListener('DOMContentLoaded', function() {
     svgContainer.innerHTML = '';
     const phases = document.querySelectorAll('.phase');
     for (let i = 0; i < activities.length - 1; i++) {
-      const p1 = phases[i], p2 = phases[i+1];
+      const p1 = phases[i], p2 = phases[i + 1];
       if (!p1 || !p2) continue;
       const c1 = p1.getBoundingClientRect();
       const c2 = p2.getBoundingClientRect();
@@ -249,7 +247,7 @@ document.addEventListener('DOMContentLoaded', function() {
       const cpY2 = c2.top  - 150;
       const path = document.createElementNS('http://www.w3.org/2000/svg','path');
       const d = `M ${c1.left + c1.width/2} ${c1.top + c1.height/2}
-                 C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, 
+                 C ${cpX1} ${cpY1}, ${cpX2} ${cpY2},
                    ${c2.left + c2.width/2} ${c2.top + c2.height/2}`;
       path.setAttribute('d', d);
       path.setAttribute('class', 'path path-blue');
@@ -261,8 +259,8 @@ document.addEventListener('DOMContentLoaded', function() {
   // 10) Anima desbloqueio (gif + som)
   // ------------------------------
   function animateUnlock(phaseDiv) {
-    const unlockGif = document.createElement('img');
-    unlockGif.src = '../../imagens/cadeado.gif';
+    const unlockGif   = document.createElement('img');
+    unlockGif.src     = '../../imagens/cadeado.gif';
     unlockGif.classList.add('unlock-gif');
     phaseDiv.appendChild(unlockGif);
     const unlockSound = new Audio('../../imagens/unlock-padlock.mp3');
@@ -278,7 +276,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!phase) return;
     const coords = phase.getBoundingClientRect();
     window.scrollTo({
-      top: coords.top + window.scrollY - window.innerHeight/2,
+      top: coords.top + window.scrollY - window.innerHeight / 2,
       behavior: 'smooth'
     });
   }
