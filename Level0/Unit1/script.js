@@ -160,7 +160,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const isLandscape = window.innerWidth > window.innerHeight;
             const spacingPercent = isLandscape ? 30 : 20;
             const topPosition = baseTopPosition + index * (spacingPercent * window.innerHeight / 100);
-            const horizontalPosition = index % 2 === 0 ? 10 : 85;
+            const maxOffset = 400; // distância máxima a partir do centro, em pixels
+            const screenCenter = window.innerWidth / 2;
+            const offset = Math.min(window.innerWidth * 0.4, maxOffset); // máximo 40% da tela ou 400px
+            const horizontalPositionPx = screenCenter + (index % 2 === 0 ? -offset : offset);
+            phaseDiv.style.left = `${horizontalPositionPx}px`;
             phaseDiv.style.top = `${topPosition}px`;
             phaseDiv.style.left = `${horizontalPosition}%`;
 
