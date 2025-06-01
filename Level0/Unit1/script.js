@@ -166,7 +166,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const horizontalPositionPx = screenCenter + (index % 2 === 0 ? -offset : offset);
             phaseDiv.style.left = `${horizontalPositionPx}px`;
             phaseDiv.style.top = `${topPosition}px`;
-            phaseDiv.style.left = `${horizontalPosition}%`;
 
             const phaseImage = document.createElement('img');
             phaseImage.src = activity.img;
