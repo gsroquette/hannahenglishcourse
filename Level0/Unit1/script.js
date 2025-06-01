@@ -123,7 +123,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Libera apenas se estiver marcada como true E a anterior estiver completa
                     if (faseKey && progress[faseKey] === true) {
-                        activity.unlocked = (index === 0) || activities[index-1].unlocked; // <<--- REGRA FUNDAMENTAL
+                        activity.unlocked = (index === 0) || activities[index-1].unlocked;
                         if (activity.unlocked) lastUnlockedIndex = index;
                     }
 
@@ -143,24 +143,22 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log("Inicializando mapa...");
         window.scrollTo(0, 0);
         
-        // Limpa fases existentes
-        const existingPhases = document.querySelectorAll('.phase');
-        existingPhases.forEach(phase => phase.remove());
+        // Remove fases existentes
+        document.querySelectorAll('.phase').forEach(phase => phase.remove());
 
-        // Determinar dinâmica do deslocamento vertical, para sempre respeitar a altura do título
+        // 1. Calcula o final exato do bloco de título dentro de mapContainer
         const titleContainer = document.querySelector('.title-container');
-        const titleHeight = titleContainer ? titleContainer.offsetHeight : 0;
-        // Espaçamento extra de 20px logo abaixo do título
-        const baseTopPosition = titleHeight + 20;
+        const titleBottom = titleContainer.offsetTop + titleContainer.offsetHeight;
+        // Espaçamento extra de 20px abaixo do título
+        const baseTopPosition = titleBottom + 20;
 
         activities.forEach((activity, index) => {
             const phaseDiv = document.createElement('div');
             phaseDiv.classList.add('phase');
 
-            // Calcula posição vertical relativa, partindo de baseTopPosition
-            let topPosition = baseTopPosition + index * 20 * window.innerHeight / 100;
-            let horizontalPosition = index % 2 === 0 ? 10 : 85;
-
+            // Posiciona cada fase a partir de baseTopPosition
+            const topPosition = baseTopPosition + index * (20 * window.innerHeight / 100);
+            const horizontalPosition = index % 2 === 0 ? 10 : 85;
             phaseDiv.style.top = `${topPosition}px`;
             phaseDiv.style.left = `${horizontalPosition}%`;
 
