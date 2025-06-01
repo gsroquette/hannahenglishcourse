@@ -157,7 +157,9 @@ document.addEventListener('DOMContentLoaded', function() {
             phaseDiv.classList.add('phase');
 
             // Posiciona cada fase a partir de baseTopPosition
-            const topPosition = baseTopPosition + index * (50 * window.innerHeight / 100);
+            const isLandscape = window.innerWidth > window.innerHeight;
+            const spacingPercent = isLandscape ? 50 : 20;
+            const topPosition = baseTopPosition + index * (spacingPercent * window.innerHeight / 100);
             const horizontalPosition = index % 2 === 0 ? 10 : 85;
             phaseDiv.style.top = `${topPosition}px`;
             phaseDiv.style.left = `${horizontalPosition}%`;
