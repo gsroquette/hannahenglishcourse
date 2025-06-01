@@ -237,10 +237,57 @@
     const balloonsArray = [];
 
     /* ===========================================
+       0) TENTAR LOCK DE ORIENTAÇÃO QUANDO RODAR COMO PWA
+       =========================================== */
+    function tryLockLandscape() {
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+                        || window.navigator.standalone === true;
+      if (!isStandalone) return;
+
+      function lockNow() {
+        if (screen.orientation && screen.orientation.lock) {
+          screen.orientation.lock('landscape').catch(err => {
+            console.warn('Não foi possível travar em landscape:', err);
+          });
+        }
+      }
+
+      if (document.fullscreenElement || document.webkitFullscreenElement) {
+        lockNow();
+      } else {
+        const rfs = document.documentElement.requestFullscreen 
+                  || document.documentElement.webkitRequestFullscreen;
+        if (rfs) {
+          rfs.call(document.documentElement)
+            .then(lockNow)
+            .catch(err => {
+              console.warn('Erro ao entrar em fullscreen para lock:', err);
+              lockNow();
+            });
+        } else {
+          lockNow();
+        }
+      }
+    }
+    tryLockLandscape();
+
+    /* ===========================================
        1) DETECTAR ORIENTAÇÃO E AJUSTAR OVERLAY
        =========================================== */
     function checkOrientation() {
-      // Se a altura for maior que a largura → modo retrato
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+                        || window.navigator.standalone === true;
+
+      if (isStandalone && screen.orientation && screen.orientation.type) {
+        if (screen.orientation.type.startsWith('portrait')) {
+          overlay.style.display = 'flex';
+        } else {
+          overlay.style.display = 'none';
+        }
+        return;
+      }
+
+      // Fallback para navegador normal
       if (window.innerHeight > window.innerWidth) {
         overlay.style.display = 'flex';
       } else {
@@ -672,7 +719,6 @@
       }
       requestAnimationFrame(animateBalloons);
     }
-
   </script>
 </body>
 </html>
