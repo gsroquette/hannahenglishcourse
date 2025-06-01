@@ -17,17 +17,17 @@ document.addEventListener('DOMContentLoaded', function() {
     // Extraindo Level e Unit da URL atual
     const urlPathParts = window.location.pathname.split('/');
     const capitalizeFirstLetter = str => str.charAt(0).toUpperCase() + str.slice(1);
-    const currentLevel = capitalizeFirstLetter(urlPathParts[1]);
-    const currentUnit = capitalizeFirstLetter(urlPathParts[2]);
+    const currentLevel = capitalizeFirstLetter(urlPathParts[1] || '');
+    const currentUnit = capitalizeFirstLetter(urlPathParts[2] || '');
 
     console.log(`Nível atual: ${currentLevel}, Unidade atual: ${currentUnit}`);
 
     const activities = [
-    { id: 1, name: "StoryCards", path: `/Atividades/StoryCards/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1`, img: "../../imagens/botoes/storycards_button.png", unlocked: false },
-    { id: 2, name: "Flashcards", path: `/Atividades/Flashcards/index.html?level=${currentLevel}&unit=${currentUnit}&fase=2`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-    { id: 3, name: "Flashcards2", path: `/Atividades/Flashcards2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=3`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },   
-    { id: 4, name: "Fill in the Blanks", path: `/Atividades/Fill%20in%20the%20Blanks/index.html?level=${currentLevel}&unit=${currentUnit}&fase=4`, img: "../../imagens/botoes/fillintheblanks_button.png", unlocked: false },
-];
+        { id: 1, name: "StoryCards", path: `/Atividades/StoryCards/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1`, img: "../../imagens/botoes/storycards_button.png", unlocked: false },
+        { id: 2, name: "Flashcards", path: `/Atividades/Flashcards/index.html?level=${currentLevel}&unit=${currentUnit}&fase=2`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
+        { id: 3, name: "Flashcards2", path: `/Atividades/Flashcards2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=3`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },   
+        { id: 4, name: "Fill in the Blanks", path: `/Atividades/Fill%20in%20the%20Blanks/index.html?level=${currentLevel}&unit=${currentUnit}&fase=4`, img: "../../imagens/botoes/fillintheblanks_button.png", unlocked: false },
+    ];
 
     console.log("Atividades configuradas:", activities);
 
@@ -102,41 +102,41 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log("Informações de nível e unidade atualizadas na interface.");
 
     // Função para carregar o progresso do usuário
- function loadUserProgress(userId, userAvatar, userRole) {
-    const progressPath = `/usuarios/${userId}/progresso/${currentLevel}/${currentUnit}`;
-    console.log(`Buscando progresso em: ${progressPath}`);
+    function loadUserProgress(userId, userAvatar, userRole) {
+        const progressPath = `/usuarios/${userId}/progresso/${currentLevel}/${currentUnit}`;
+        console.log(`Buscando progresso em: ${progressPath}`);
 
-    if (userRole === 'proprietario' || userRole === 'professor') {
-        activities.forEach(activity => activity.unlocked = true);
-        lastUnlockedIndex = activities.length - 1;
-        initializeMap(userAvatar);
-    } else {
-        database.ref(progressPath).once('value').then(snapshot => {
-            const progress = snapshot.val();
-            console.log("Progresso encontrado:", progress);
+        if (userRole === 'proprietario' || userRole === 'professor') {
+            activities.forEach(activity => activity.unlocked = true);
+            lastUnlockedIndex = activities.length - 1;
+            initializeMap(userAvatar);
+        } else {
+            database.ref(progressPath).once('value').then(snapshot => {
+                const progress = snapshot.val();
+                console.log("Progresso encontrado:", progress);
 
-            activities.forEach((activity, index) => {
-                // Verifica se a fase está liberada no Firebase
-                const faseKey = Object.keys(progress || {}).find(
-                    key => key.includes(`fase${activity.id}`) || key.includes(activity.id.toString())
-                );
-                
-                // Libera apenas se estiver marcada como true E a anterior estiver completa
-                if (faseKey && progress[faseKey] === true) {
-                    activity.unlocked = (index === 0) || activities[index-1].unlocked; // <<--- REGRA FUNDAMENTAL
-                    if (activity.unlocked) lastUnlockedIndex = index;
-                }
+                activities.forEach((activity, index) => {
+                    // Verifica se a fase está liberada no Firebase
+                    const faseKey = Object.keys(progress || {}).find(
+                        key => key.includes(`fase${activity.id}`) || key.includes(activity.id.toString())
+                    );
+                    
+                    // Libera apenas se estiver marcada como true E a anterior estiver completa
+                    if (faseKey && progress[faseKey] === true) {
+                        activity.unlocked = (index === 0) || activities[index-1].unlocked; // <<--- REGRA FUNDAMENTAL
+                        if (activity.unlocked) lastUnlockedIndex = index;
+                    }
 
-                console.log(`Fase ${activity.id} - liberada? ${activity.unlocked}`);
+                    console.log(`Fase ${activity.id} - liberada? ${activity.unlocked}`);
+                });
+
+                initializeMap(userAvatar);
+            }).catch(error => {
+                console.error("Erro no Firebase:", error);
+                initializeMap(userAvatar);
             });
-
-            initializeMap(userAvatar);
-        }).catch(error => {
-            console.error("Erro no Firebase:", error);
-            initializeMap(userAvatar);
-        });
+        }
     }
-}
 
     // Função para inicializar o mapa
     function initializeMap(userAvatar) {
@@ -147,11 +147,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const existingPhases = document.querySelectorAll('.phase');
         existingPhases.forEach(phase => phase.remove());
 
+        // Determinar dinâmica do deslocamento vertical, para sempre respeitar a altura do título
+        const titleContainer = document.querySelector('.title-container');
+        const titleHeight = titleContainer ? titleContainer.offsetHeight : 0;
+        // Espaçamento extra de 20px logo abaixo do título
+        const baseTopPosition = titleHeight + 20;
+
         activities.forEach((activity, index) => {
             const phaseDiv = document.createElement('div');
             phaseDiv.classList.add('phase');
 
-            const baseTopPosition = 200;
+            // Calcula posição vertical relativa, partindo de baseTopPosition
             let topPosition = baseTopPosition + index * 20 * window.innerHeight / 100;
             let horizontalPosition = index % 2 === 0 ? 10 : 85;
 
