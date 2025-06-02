@@ -1,11 +1,14 @@
+// script.js
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log("DOM completamente carregado. Iniciando configuração...");
 
-    // Lê o parâmetro 'trecho' da URL
+    // 1️⃣ Lê o parâmetro 'trecho' da URL
     const params = new URLSearchParams(window.location.search);
     const trechoSelecionado = params.get("trecho");
     console.log("Trecho selecionado via URL:", trechoSelecionado);
-    
+
+    // 2️⃣ Referências principais
     const database = firebase.database();
     const auth = firebase.auth();
     const loginLink = document.getElementById("loginLink");
@@ -19,164 +22,204 @@ document.addEventListener('DOMContentLoaded', function() {
 
     console.log("Elementos da DOM capturados com sucesso.");
 
-    // Extraindo Level e Unit da URL atual
+    // 3️⃣ Extrai Level e Unit da URL atual
+    // Ex: pathname "/level0/unit1/fases" → ["", "level0", "unit1", "fases"]
     const urlPathParts = window.location.pathname.split('/');
-    const capitalizeFirstLetter = str => str ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase() : '';
+    const capitalizeFirstLetter = str =>
+        str
+            ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
+            : '';
     const currentLevel = capitalizeFirstLetter(urlPathParts[1] || '');
     const currentUnit = capitalizeFirstLetter(urlPathParts[2] || '');
 
-// Obtem dinamicamente as atividades com base no trecho selecionado
-const activities = getActivitiesByTrecho(trechoSelecionado, currentLevel, currentUnit);
-console.log("Atividades configuradas:", activities);
-
     console.log(`Nível atual: ${currentLevel}, Unidade atual: ${currentUnit}`);
+    console.log("Path completo:", window.location.pathname);
 
+    // 4️⃣ Obtem atividades dinamicamente com base no trecho selecionado
+    const activities = getActivitiesByTrecho(trechoSelecionado, currentLevel, currentUnit);
     console.log("Atividades configuradas:", activities);
+    if (!activities.length) {
+        console.warn(`Nenhuma atividade encontrada para trecho="${trechoSelecionado}".`);
+    }
 
-    // Fechar o dropdown ao clicar fora dele
+    // 5️⃣ Atualiza texto de nível/unidade na interface
+    levelUnitInfo.innerHTML = `
+        ${currentLevel}<br>
+        ${currentUnit}
+    `;
+    console.log("Informações de nível e unidade atualizadas na interface.");
+
+    // 6️⃣ Fecha o dropdown ao clicar fora dele
     document.addEventListener("click", function(event) {
-        if (!userDropdown.contains(event.target) && !loginContainer.contains(event.target)) {
+        if (
+            !userDropdown.contains(event.target) &&
+            !loginContainer.contains(event.target)
+        ) {
             userDropdown.style.display = 'none';
             console.log("Dropdown fechado.");
         }
     });
 
-    // Configuração de autenticação
+    // 7️⃣ Caso de usuário autenticado ou não:
     auth.onAuthStateChanged(user => {
         if (user) {
             console.log("Usuário autenticado:", user.uid);
             const userId = user.uid;
-            database.ref('/usuarios/' + userId).once('value').then(snapshot => {
-                const userData = snapshot.val();
-                console.log("Dados do usuário:", userData);
-                const userName = userData.nome || user.email;
-                const userAvatar = userData.avatar ? `../../imagens/${userData.avatar}` : '../../imagens/bonequinho.png';
 
-                console.log(`Avatar do usuário: ${userAvatar}, Nome: ${userName}`);
+            database
+                .ref('/usuarios/' + userId)
+                .once('value')
+                .then(snapshot => {
+                    const userData = snapshot.val();
+                    console.log("Dados do usuário:", userData);
 
-                // Atualiza a interface do usuário com nome e avatar
-                loginLink.innerHTML = `<img src="${userAvatar}" alt="User Icon" class="user-icon"><p class="user-name">${userName}</p>`;
-                loginLink.removeAttribute('href');
+                    const userName = userData.nome || user.email;
+                    const userAvatar = userData.avatar
+                        ? `../../imagens/${userData.avatar}`
+                        : '../../imagens/bonequinho.png';
 
-                let dashboardLink = '';
-                if (userData.role === 'proprietario' || userData.role === 'professor') {
-                    dashboardLink = userData.role === 'proprietario' ? 
-                                    '<a href="../../painel_proprietario.html" class="dropdown-item">OWNER DASHBOARD</a>' : 
-                                    '<a href="../../painel_professor.html" class="dropdown-item">TEACHER DASHBOARD</a>';
-                } else if (userData.role === 'aluno') {
-                    dashboardLink = '<a href="../../painel_aluno.html" class="dropdown-item">STUDENT DASHBOARD</a>';
-                }
+                    // Atualiza UI com nome e avatar
+                    loginLink.innerHTML = `
+                        <img src="${userAvatar}" alt="User Icon" class="user-icon">
+                        <p class="user-name">${userName}</p>
+                    `;
+                    loginLink.removeAttribute('href');
 
-                userDropdown.innerHTML = `
-                    ${dashboardLink}
-                    <a href="/index.html" class="dropdown-item">SELECT A NEW LEVEL</a>
-                    <a href="/${currentLevel}/index.html" class="dropdown-item">SELECT A NEW UNIT</a>
-                    <a href="/${currentLevel}/${currentUnit}/index.html" class="dropdown-item">SELECT A NEW ACTIVITY</a>
-                `;
-                
-                console.log("Dropdown do usuário configurado.");
-
-                // Evento de clique no loginContainer para abrir/fechar o dropdown
-                loginContainer.addEventListener("click", function(event) {
-                    if (event.target.tagName !== 'A') {
-                        userDropdown.style.display = userDropdown.style.display === 'flex' ? 'none' : 'flex';
-                        console.log("Dropdown alternado:", userDropdown.style.display);
+                    // Monta opções de dashboard conforme função
+                    let dashboardLink = '';
+                    if (
+                        userData.role === 'proprietario' ||
+                        userData.role === 'professor'
+                    ) {
+                        dashboardLink =
+                            userData.role === 'proprietario'
+                                ? '<a href="../../painel_proprietario.html" class="dropdown-item">OWNER DASHBOARD</a>'
+                                : '<a href="../../painel_professor.html" class="dropdown-item">TEACHER DASHBOARD</a>';
+                    } else if (userData.role === 'aluno') {
+                        dashboardLink = '<a href="../../painel_aluno.html" class="dropdown-item">STUDENT DASHBOARD</a>';
                     }
-                });
 
-                // Carrega o progresso do usuário e define o avatar no mapa
-                console.log("Carregando progresso do usuário...");
-                loadUserProgress(userId, userAvatar, userData.role);
-            }).catch(error => {
-                console.error("Erro ao carregar dados do usuário:", error);
-            });
+                    userDropdown.innerHTML = `
+                        ${dashboardLink}
+                        <a href="/index.html" class="dropdown-item">SELECT A NEW LEVEL</a>
+                        <a href="/${currentLevel}/index.html" class="dropdown-item">SELECT A NEW UNIT</a>
+                        <a href="/${currentLevel}/${currentUnit}/index.html" class="dropdown-item">SELECT A NEW ACTIVITY</a>
+                    `;
+                    console.log("Dropdown do usuário configurado.");
+
+                    // Toggle do dropdown ao clicar no loginContainer
+                    loginContainer.addEventListener("click", function(event) {
+                        if (event.target.tagName !== 'A') {
+                            userDropdown.style.display =
+                                userDropdown.style.display === 'flex' ? 'none' : 'flex';
+                            console.log("Dropdown alternado:", userDropdown.style.display);
+                        }
+                    });
+
+                    // Carrega progresso e, em seguida, inicializa o mapa
+                    console.log("Carregando progresso do usuário...");
+                    loadUserProgress(userId, userAvatar, userData.role);
+                })
+                .catch(error => {
+                    console.error("Erro ao carregar dados do usuário:", error);
+                    // Mesmo se houver erro no Firebase, mostra fases básicas (bloqueadas)
+                    initializeMap('../../imagens/bonequinho.png');
+                });
         } else {
-            console.log("Nenhum usuário autenticado. Redirecionando para login.");
+            console.log("Nenhum usuário autenticado.");
+            // Deixa o link apontando para login
             loginLink.setAttribute('href', 'Formulario/login.html');
+
+            // Exibe fases básicas mesmo sem usuário (todas bloqueadas)
+            initializeMap('../../imagens/bonequinho.png');
         }
     });
 
-    // Atualiza o texto com o nível e a unidade atual
-    levelUnitInfo.innerHTML = `
-          ${currentLevel}<br>
-          ${currentUnit}
-    `;
-    console.log("Informações de nível e unidade atualizadas na interface.");
-
-    // Função para carregar o progresso do usuário
+    // 8️⃣ Função para carregar o progresso do usuário
     function loadUserProgress(userId, userAvatar, userRole) {
         const progressPath = `/usuarios/${userId}/progresso/${currentLevel}/${currentUnit}`;
         console.log(`Buscando progresso em: ${progressPath}`);
 
         if (userRole === 'proprietario' || userRole === 'professor') {
-            activities.forEach(activity => activity.unlocked = true);
+            // Proprietário/professor libera todas as atividades
+            activities.forEach(activity => (activity.unlocked = true));
             lastUnlockedIndex = activities.length - 1;
             initializeMap(userAvatar);
         } else {
-            database.ref(progressPath).once('value').then(snapshot => {
-                const progress = snapshot.val();
-                console.log("Progresso encontrado:", progress);
+            database
+                .ref(progressPath)
+                .once('value')
+                .then(snapshot => {
+                    const progress = snapshot.val() || {};
+                    console.log("Progresso encontrado:", progress);
 
-                activities.forEach((activity, index) => {
-                    // Verifica se a fase está liberada no Firebase
-                    const faseKey = Object.keys(progress || {}).find(
-                        key => key.includes(`fase${activity.id}`) || key.includes(activity.id.toString())
-                    );
-                    
-                    // Libera apenas se estiver marcada como true E a anterior estiver completa
-                    if (faseKey && progress[faseKey] === true) {
-                        activity.unlocked = (index === 0) || activities[index-1].unlocked;
-                        if (activity.unlocked) lastUnlockedIndex = index;
-                    }
+                    activities.forEach((activity, index) => {
+                        // Chave de fase: ex. "fase1", ou apenas "1" no Firebase
+                        const faseKey = Object.keys(progress).find(
+                            key =>
+                                key.includes(`fase${activity.id}`) ||
+                                key.includes(activity.id.toString())
+                        );
 
-                    console.log(`Fase ${activity.id} - liberada? ${activity.unlocked}`);
+                        // Libera se a fase estiver marcada como true e a anterior desbloqueada
+                        if (faseKey && progress[faseKey] === true) {
+                            activity.unlocked =
+                                index === 0 || activities[index - 1].unlocked;
+                            if (activity.unlocked) {
+                                lastUnlockedIndex = index;
+                            }
+                        }
+                        console.log(`Fase ${activity.id} - liberada? ${activity.unlocked}`);
+                    });
+
+                    initializeMap(userAvatar);
+                })
+                .catch(error => {
+                    console.error("Erro no Firebase:", error);
+                    initializeMap(userAvatar);
                 });
-
-                initializeMap(userAvatar);
-            }).catch(error => {
-                console.error("Erro no Firebase:", error);
-                initializeMap(userAvatar);
-            });
         }
     }
 
-    // Função para inicializar o mapa
-    function initializeMap(userAvatar) {
+    // 9️⃣ Função para inicializar o mapa e desenhar fases
+    function initializeMap(avatarPath) {
         console.log("Inicializando mapa...");
         window.scrollTo(0, 0);
-        
-        // Remove fases existentes
+
+        // Limpa fases atuais (caso haja)
         document.querySelectorAll('.phase').forEach(phase => phase.remove());
 
-        // 1. Calcula o final exato do bloco de título dentro de mapContainer
+        // Calcula baseTopPosition (logo abaixo do título)
         const titleContainer = document.querySelector('.title-container');
         const titleBottom = titleContainer.offsetTop + titleContainer.offsetHeight;
-        // Espaçamento extra de 20px abaixo do título
-        const baseTopPosition = titleBottom + 20;
+        const baseTopPosition = titleBottom + 20; // 20px de espaçamento
 
         activities.forEach((activity, index) => {
             const phaseDiv = document.createElement('div');
             phaseDiv.classList.add('phase');
 
-            // Posiciona cada fase a partir de baseTopPosition
+            // Calcula posição vertical (percentual) e horizontal (alternate)
             const isLandscape = window.innerWidth > window.innerHeight;
             const spacingPercent = isLandscape ? 30 : 20;
-            const topPosition = baseTopPosition + index * (spacingPercent * window.innerHeight / 100);
-            const maxOffset = 400; // distância máxima a partir do centro, em pixels
+            const topPosition =
+                baseTopPosition + index * (spacingPercent * window.innerHeight / 100);
+            const maxOffset = 400; // máximo de 400px a partir do centro
             const screenCenter = window.innerWidth / 2;
-            const offset = Math.min(window.innerWidth * 0.4, maxOffset); // máximo 40% da tela ou 400px
-            const horizontalPositionPx = screenCenter + (index % 2 === 0 ? -offset : offset);
+            const offset = Math.min(window.innerWidth * 0.4, maxOffset);
+            const horizontalPositionPx =
+                screenCenter + (index % 2 === 0 ? -offset : offset);
+
             phaseDiv.style.left = `${horizontalPositionPx}px`;
             phaseDiv.style.top = `${topPosition}px`;
 
+            // Imagem da fase
             const phaseImage = document.createElement('img');
             phaseImage.src = activity.img;
             phaseImage.alt = activity.name;
             phaseImage.classList.add('phase-img');
             phaseDiv.appendChild(phaseImage);
 
-            mapContainer.appendChild(phaseDiv);
-
+            // Se estiver destravada, adiciona classe "active"; caso contrário, "locked"
             if (activity.unlocked) {
                 console.log(`Renderizando fase ${activity.id} como desbloqueada.`);
                 phaseDiv.classList.add('active');
@@ -189,6 +232,7 @@ console.log("Atividades configuradas:", activities);
                 phaseDiv.appendChild(lockIcon);
             }
 
+            // Ao clicar em uma fase destravada, redireciona para activity.path
             phaseDiv.addEventListener('click', () => {
                 if (activity.unlocked) {
                     console.log(`Fase ${activity.id} clicada. Redirecionando para: ${activity.path}`);
@@ -197,10 +241,12 @@ console.log("Atividades configuradas:", activities);
                     console.log(`Fase ${activity.id} está bloqueada. Ignorando clique.`);
                 }
             });
+
+            mapContainer.appendChild(phaseDiv);
         });
 
         drawLines();
-        createPlayer(userAvatar);
+        createPlayer(avatarPath);
 
         if (lastUnlockedIndex >= 0) {
             console.log(`Última fase desbloqueada: índice ${lastUnlockedIndex}. Posicionando jogador...`);
@@ -212,6 +258,7 @@ console.log("Atividades configuradas:", activities);
         }
     }
 
+    // 1️⃣0️⃣ Função para criar o "jogador" (avatar) no mapa
     function createPlayer(avatarPath) {
         console.log(`Criando jogador com avatar: ${avatarPath}`);
         if (!player) {
@@ -220,9 +267,11 @@ console.log("Atividades configuradas:", activities);
             mapContainer.appendChild(player);
         }
         player.src = avatarPath;
+        // Posiciona no centro da primeira fase desbloqueada ou no índice 0
         moveToPhase(lastUnlockedIndex > 0 ? lastUnlockedIndex - 1 : 0);
     }
 
+    // 1️⃣1️⃣ Função para mover o jogador e, se houver "path", redireciona
     function moveToPhase(index, path = null) {
         console.log(`Movendo jogador para fase de índice ${index}`);
         const phase = document.querySelectorAll('.phase')[index];
@@ -243,10 +292,12 @@ console.log("Atividades configuradas:", activities);
         }
     }
 
+    // 1️⃣2️⃣ Função para desenhar linhas entre fases
     function drawLines() {
         console.log("Desenhando linhas entre fases...");
         svgContainer.innerHTML = '';
         const phases = document.querySelectorAll('.phase');
+
         for (let i = 0; i < activities.length - 1; i++) {
             const phase1 = phases[i];
             const phase2 = phases[i + 1];
@@ -257,21 +308,26 @@ console.log("Atividades configuradas:", activities);
 
             const coords1 = phase1.getBoundingClientRect();
             const coords2 = phase2.getBoundingClientRect();
+
+            // Pontos de controle para curva suave
             const controlPointX1 = coords1.left + (coords2.left - coords1.left) * 0.33;
             const controlPointY1 = coords1.top + (coords2.top - coords1.top) * 0.33 + 150;
             const controlPointX2 = coords1.left + (coords2.left - coords1.left) * 0.66;
             const controlPointY2 = coords2.top - 150;
 
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const d = `M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2} 
-                       C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2}, 
-                       ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}`;
+            const d = `
+                M ${coords1.left + coords1.width / 2} ${coords1.top + coords1.height / 2}
+                C ${controlPointX1} ${controlPointY1}, ${controlPointX2} ${controlPointY2},
+                  ${coords2.left + coords2.width / 2} ${coords2.top + coords2.height / 2}
+            `;
             path.setAttribute('d', d);
             path.setAttribute('class', 'path path-blue');
             svgContainer.appendChild(path);
         }
     }
 
+    // 1️⃣3️⃣ Função para animar desbloqueio (GIF + som)
     function animateUnlock(phaseDiv) {
         console.log("Animando desbloqueio de fase...");
         const unlockGif = document.createElement('img');
@@ -288,6 +344,7 @@ console.log("Atividades configuradas:", activities);
         }, 3000);
     }
 
+    // 1️⃣4️⃣ Função para rolar suavemente até a fase especificada
     function scrollToPhase(index) {
         console.log(`Rolando página para fase de índice ${index}...`);
         const phase = document.querySelectorAll('.phase')[index];
