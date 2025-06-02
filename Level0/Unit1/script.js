@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Extraindo Level e Unit da URL atual
     const urlPathParts = window.location.pathname.split('/');
-    const capitalizeFirstLetter = str => str.charAt(0).toUpperCase() + str.slice(1);
+    const capitalizeFirstLetter = str => str ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase() : '';
     const currentLevel = capitalizeFirstLetter(urlPathParts[1] || '');
     const currentUnit = capitalizeFirstLetter(urlPathParts[2] || '');
 
