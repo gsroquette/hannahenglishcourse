@@ -1,5 +1,10 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log("DOM completamente carregado. Iniciando configuração...");
+
+    // Lê o parâmetro 'trecho' da URL
+    const params = new URLSearchParams(window.location.search);
+    const trechoSelecionado = params.get("trecho");
+    console.log("Trecho selecionado via URL:", trechoSelecionado);
     
     const database = firebase.database();
     const auth = firebase.auth();
@@ -20,14 +25,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentLevel = capitalizeFirstLetter(urlPathParts[1] || '');
     const currentUnit = capitalizeFirstLetter(urlPathParts[2] || '');
 
-    console.log(`Nível atual: ${currentLevel}, Unidade atual: ${currentUnit}`);
+// Obtem dinamicamente as atividades com base no trecho selecionado
+const activities = getActivitiesByTrecho(trechoSelecionado, currentLevel, currentUnit);
+console.log("Atividades configuradas:", activities);
 
-    const activities = [
-        { id: 1, name: "StoryCards", path: `/Atividades/StoryCards/index.html?level=${currentLevel}&unit=${currentUnit}&fase=1`, img: "../../imagens/botoes/storycards_button.png", unlocked: false },
-        { id: 2, name: "Flashcards", path: `/Atividades/Flashcards/index.html?level=${currentLevel}&unit=${currentUnit}&fase=2`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-        { id: 3, name: "Flashcards2", path: `/Atividades/Flashcards2/index.html?level=${currentLevel}&unit=${currentUnit}&fase=3`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },   
-        { id: 4, name: "Fill in the Blanks", path: `/Atividades/Fill%20in%20the%20Blanks/index.html?level=${currentLevel}&unit=${currentUnit}&fase=4`, img: "../../imagens/botoes/fillintheblanks_button.png", unlocked: false },
-    ];
+    console.log(`Nível atual: ${currentLevel}, Unidade atual: ${currentUnit}`);
 
     console.log("Atividades configuradas:", activities);
 
