@@ -42,16 +42,16 @@ function getActivitiesByTrecho(trecho, level, unit) {
                 { id: 1024, name: "Exerciciosdegramatica3", path: `/Atividades/Exerciciosdegramatica3/index.html?level=${level}&unit=${unit}&fase=1024`, img: "../../imagens/botoes/exercises_button.png", unlocked: false },
                 { id: 1025, name: "GrammarDialogo", path: `/Atividades/GrammarDialogo/index.html?level=${level}&unit=${unit}&fase=1025`, img: "../../imagens/botoes/conversation_button.png", unlocked: false },
                 { id: 1026, name: "QUIZ2", path: `/Atividades/QUIZ2/index.html?level=${level}&unit=${unit}&fase=1026`, img: "../../imagens/botoes/quiz_button.png", unlocked: false },
-                { id: 1027, name: "Diálogo", path: `/Atividades/Dialogo/index.html?level=${level}&unit=${unit}&fase=1027`, img: "../../imagens/botoes/dialogo_button.png", unlocked: false },
-                { id: 1028, name: "Speak", path: `/Atividades/Speak/index.html?level=${level}&unit=${unit}&fase=1028`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
-                { id: 1029, name: "Speak2", path: `/Atividades/Speak2/index.html?level=${level}&unit=${unit}&fase=1029`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
-                { id: 1030, name: "Speak3", path: `/Atividades/Speak3/index.html?level=${level}&unit=${unit}&fase=1030`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
+                { id: 1027, name: "Diálogo", path: `/Atividades/Dialogo/index.html?level=${level}&unit=${unit}&fase=1027`, img: "../../imagens/botoes/dialogo_button.png", unlocked: false },                
             ];
         case "trecho6":
-            return [
+            return [                
                 { id: 1031, name: "Hannah Video", path: `/Atividades/HannahVideo/index.html?level=${level}&unit=${unit}&fase=1031`, img: "../../imagens/botoes/video_button.png", unlocked: false },
                 { id: 1032, name: "MatchingGame", path: `/Atividades/MatchingGame/index.html?level=${level}&unit=${unit}&fase=1032`, img: "../../imagens/botoes/matching_game_button.png", unlocked: false },
                 { id: 1033, name: "LifeLessons", path: `/Atividades/LifeLessons/index.html?level=${level}&unit=${unit}&fase=1033`, img: "../../imagens/botoes/life_lessons_button.png", unlocked: false },
+                { id: 1028, name: "Speak", path: `/Atividades/Speak/index.html?level=${level}&unit=${unit}&fase=1028`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
+                { id: 1029, name: "Speak2", path: `/Atividades/Speak2/index.html?level=${level}&unit=${unit}&fase=1029`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
+                { id: 1030, name: "Speak3", path: `/Atividades/Speak3/index.html?level=${level}&unit=${unit}&fase=1030`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
             ];
         case "trecho7":
             return [
