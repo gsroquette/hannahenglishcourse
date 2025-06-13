@@ -45,13 +45,13 @@ function getActivitiesByTrecho(trecho, level, unit) {
                 { id: 1027, name: "Diálogo", path: `/Atividades/Dialogo/index.html?level=${level}&unit=${unit}&fase=1027`, img: "../../imagens/botoes/dialogo_button.png", unlocked: false },                
             ];
         case "trecho6":
-            return [
-                { id: 1028, name: "Speak", path: `/Atividades/Speak/index.html?level=${level}&unit=${unit}&fase=1028`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
-                { id: 1029, name: "Speak2", path: `/Atividades/Speak2/index.html?level=${level}&unit=${unit}&fase=1029`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
-                { id: 1030, name: "Speak3", path: `/Atividades/Speak3/index.html?level=${level}&unit=${unit}&fase=1030`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
+            return [                
                 { id: 1031, name: "Hannah Video", path: `/Atividades/HannahVideo/index.html?level=${level}&unit=${unit}&fase=1031`, img: "../../imagens/botoes/video_button.png", unlocked: false },
                 { id: 1032, name: "MatchingGame", path: `/Atividades/MatchingGame/index.html?level=${level}&unit=${unit}&fase=1032`, img: "../../imagens/botoes/matching_game_button.png", unlocked: false },
                 { id: 1033, name: "LifeLessons", path: `/Atividades/LifeLessons/index.html?level=${level}&unit=${unit}&fase=1033`, img: "../../imagens/botoes/life_lessons_button.png", unlocked: false },
+                { id: 1028, name: "Speak", path: `/Atividades/Speak/index.html?level=${level}&unit=${unit}&fase=1028`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
+                { id: 1029, name: "Speak2", path: `/Atividades/Speak2/index.html?level=${level}&unit=${unit}&fase=1029`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
+                { id: 1030, name: "Speak3", path: `/Atividades/Speak3/index.html?level=${level}&unit=${unit}&fase=1030`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
             ];
         case "trecho7":
             return [
