@@ -233,7 +233,7 @@
     </div>
 
     <div id="content">
-        <!-- Conteúdo do arquivo (texto.txt ou lesson.txt via URL) será carregado aqui -->
+        <!-- Dynamic content will be loaded here -->
     </div>
 
     <button class="btn-download" onclick="generatePDF()">Download as PDF</button>
@@ -245,20 +245,14 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
 <script>
-    // lê parâmetro da URL
-    function getURLParam(name) {
-        const params = new URLSearchParams(window.location.search);
-        return params.get(name);
-    }
-
-    // Firebase config e init
+    // Configuração do Firebase (inclui sua apikey)
     const firebaseConfig = {
-        apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+        apiKey: "AIzaSyDGgo2H_hDKXF88xN7XLFNUj8ikMY7Xdc",
         authDomain: "hannahenglishcourse.firebaseapp.com",
         projectId: "hannahenglishcourse",
         storageBucket: "hannahenglishcourse.appspot.com",
         messagingSenderId: "449818788486",
-        appId: "1:449818788486:web:…",
+        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
         measurementId: "G-07VVJG9LRS",
         databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
     };
@@ -269,8 +263,11 @@
     let isTextFileLoaded = false;
 
     function getLevelAndUnitFromURL() {
-        const p = new URLSearchParams(window.location.search);
-        return { level: p.get('level'), unit: p.get('unit') };
+        const params = new URLSearchParams(window.location.search);
+        return {
+            level: params.get('level'),
+            unit: params.get('unit')
+        };
     }
 
     function loadTextFile() {
@@ -278,16 +275,17 @@
         totalAnswers = 0;
 
         const { level, unit } = getLevelAndUnitFromURL();
-        // prioriza URL ?lessonPath=…
-        const lessonPath = getURLParam('lessonPath');
-        const filePath = lessonPath 
-            || `../../${level}/${unit}/DataGrammar3/texto.txt`;
+        const filePath = `../../${level}/${unit}/DataGrammar3/texto.txt`;
 
         fetch(filePath)
-            .then(r => r.ok ? r.text() : Promise.reject(r.statusText))
+            .then(response => {
+                if (!response.ok) throw new Error(response.statusText);
+                return response.text();
+            })
             .then(data => {
                 const contentDiv = document.getElementById('content');
                 let html = '', inTable = false, isHeader = true;
+
                 data.split('\n').forEach(line => {
                     const t = line.trim();
                     if (t.startsWith('Title: ')) {
@@ -310,41 +308,41 @@
                         html += '</tbody></table>';
                     }
                     else if (inTable) {
-                        const cols = t.split('|').map(c=>c.trim());
+                        const cols = t.split('|').map(c => c.trim());
                         if (isHeader) {
-                            html += '<thead><tr>' 
-                                 + cols.map(c=>`<th>${c}</th>`).join('') 
-                                 + '</tr></thead><tbody>';
+                            html += '<thead><tr>' +
+                                    cols.map(c => `<th>${c}</th>`).join('') +
+                                    '</tr></thead><tbody>';
                             isHeader = false;
                         } else {
-                            html += '<tr>' 
-                                 + cols.map(c=>`<td>${c}</td>`).join('') 
-                                 + '</tr>';
+                            html += '<tr>' +
+                                    cols.map(c => `<td>${c}</td>`).join('') +
+                                    '</tr>';
                         }
                     }
                     else if (t.includes('[Answer:')) {
-                        const [q,a] = t.split('[Answer:');
-                        const ans = a.replace(']','').trim();
-                        const qHtml = q.replace('___','<input class="answer-input"/>');
-                        html += `<p>${qHtml} 
+                        const [q, a] = t.split('[Answer:');
+                        const ans = a.replace(']', '').trim();
+                        const qHtml = q.replace('___', '<input type="text" class="answer-input" placeholder="Type here..." />');
+                        html += `<p>${qHtml}
                                     <button class="check-btn" data-answer="${ans}" onclick="checkAnswer(this)">Check</button>
-                                    <span class="answer">${ans}</span>
+                                    <span class="answer" style="display:none;">${ans}</span>
                                  </p>`;
                         totalAnswers++;
                     }
                     else {
                         const f = t
-                            .replace(/\*\*\*(.*?)\*\*\*/g,'<b><i>$1</i></b>')
-                            .replace(/\*\*(.*?)\*\*/g,'<b>$1</b>')
-                            .replace(/\*(.*?)\*/g,'<i>$1</i>');
+                            .replace(/\*\*\*(.*?)\*\*\*/g, '<b><i>$1</i></b>')
+                            .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+                            .replace(/\*(.*?)\*/g, '<i>$1</i>');
                         html += `<p>${f}</p>`;
                     }
                 });
-                if (inTable) html += '</div>';
+
                 contentDiv.innerHTML = html;
                 isTextFileLoaded = true;
             })
-            .catch(err => console.error('Erro:', err));
+            .catch(console.error);
     }
 
     function checkAnswer(btn) {
@@ -374,34 +372,46 @@
     }
 
     function generatePDF() {
-        const lessonPath = getURLParam('lessonPath')
-            || 'texto.txt';
-        fetch(lessonPath)
-            .then(r=>r.text())
+        const { level, unit } = getLevelAndUnitFromURL();
+        const filePath = `../../${level}/${unit}/DataGrammar3/texto.txt`;
+
+        fetch(filePath)
+            .then(r => r.text())
             .then(data => {
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF();
-                let y=20, margin=20, maxW=170;
-                doc.addImage('Logo.png','PNG',90,y,30,30); y+=40;
+                let y = 20, margin = 20, maxW = 170;
+                doc.addImage('Logo.png','PNG',90,y,30,30); y += 40;
+
                 data.split('\n').forEach(line => {
                     const txt = line.replace(/\[Answer:.*?\]/g,'');
                     doc.setFontSize(line.startsWith('Title: ')?16:12);
-                    const lines = doc.splitTextToSize(txt,maxW);
-                    doc.text(lines,margin,y);
-                    y += lines.length*10;
+                    const lines = doc.splitTextToSize(txt, maxW);
+                    doc.text(lines, margin, y);
+                    y += lines.length * 10;
                     if (y > doc.internal.pageSize.height - margin) {
-                        doc.addPage(); y = margin;
+                        doc.addPage();
+                        y = margin;
                     }
                 });
-                doc.save('lesson.pdf');
+                doc.save('grammar_lesson_creation.pdf');
             })
             .catch(console.error);
     }
 
+    function setupBackButton() {
+        const backButton = document.querySelector('.back-button');
+        backButton.addEventListener('click', async e => {
+            e.preventDefault();
+            history.back();
+        });
+    }
+
     function loadProfessorButtons() {
+        const buttonContainer = document.querySelector('.button-container');
+        buttonContainer.innerHTML = '';
         const { level, unit } = getLevelAndUnitFromURL();
-        const container = document.querySelector('.button-container');
-        container.innerHTML = '';
+
         for (let i = 1; i <= 10; i++) {
             const img = new Image();
             img.src = `professores/professor${i}.png`;
@@ -410,28 +420,41 @@
                 const btn = document.createElement('button');
                 btn.appendChild(img);
                 btn.onclick = () => {
-                    // monta caminho da lesson.txt e reabre este index
-                    const lp = `../../${level}/${unit}/DataGrammar3/aulas/aula${i}/lesson.txt`;
+                    // monta o caminho do lesson.txt daquela aula
+                    const lessonPath = `../../${level}/${unit}/DataGrammar3/aulas/aula${i}/lesson.txt`;
+                    // redireciona para o index na pasta Aulas_traduzidas,
+                    // que vai ler esse lesson.txt via URL
                     window.location.href =
-                      `index.html?level=${level}&unit=${unit}&lessonPath=${encodeURIComponent(lp)}`;
+                        `../../../Atividades/Aulas_traduzidas/index.html?lessonPath=${encodeURIComponent(lessonPath)}` +
+                        `&level=${level}&unit=${unit}`;
                 };
-                container.appendChild(btn);
+                buttonContainer.appendChild(btn);
             };
         }
     }
 
     function updateImagePath() {
         const { level, unit } = getLevelAndUnitFromURL();
-        const img = document.getElementById('main-image');
         const path = `../../${level}/${unit}/DataGrammar3/image.png`;
-        fetch(path).then(r=> r.ok ? img.src = path : Promise.reject())
-                  .catch(()=> img.src = 'default-image.png');
+        const img = document.getElementById('main-image');
+        fetch(path)
+            .then(r => r.ok ? img.src = path : Promise.reject())
+            .catch(() => img.src = 'default-image.png');
+    }
+
+    function getLevelAndUnitFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        return {
+            level: params.get('level'),
+            unit: params.get('unit')
+        };
     }
 
     document.addEventListener('DOMContentLoaded', () => {
         loadTextFile();
-        loadProfessorButtons();
+        setupBackButton();
         updateImagePath();
+        loadProfessorButtons();
     });
 </script>
 </body>
