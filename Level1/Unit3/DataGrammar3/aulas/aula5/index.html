@@ -141,13 +141,12 @@
     let texts = [];
     let isPlaying = false;
     let currentIndex = 0;
-    let utterance;
     let pauseTimeout;
 
     async function loadTextFile() {
-      const response = await fetch('lesson.txt');
-      if (!response.ok) { alert('Não foi possível carregar a lição.'); return; }
-      const data = await response.text();
+      const resp = await fetch('lesson.txt');
+      if (!resp.ok) { alert('Não foi possível carregar a lição.'); return; }
+      const data = await resp.text();
       processTextFile(data);
     }
 
@@ -160,112 +159,158 @@
         const parts = line.split('|');
         const type = parts[0];
         const lang = parts[1] || '';
-        const text = parts.slice(2).join('|').trim();
+        const raw = parts.slice(2).join('|').trim();
         let el;
 
-        switch (type) {
-          case 'title':
-            el = document.createElement('h1');
-            el.textContent = text;
-            break;
-          case 'subtitle':
-            el = document.createElement('h2');
-            el.textContent = text;
-            break;
-          case 'text':
-            el = document.createElement('p');
-            el.textContent = text;
-            break;
-          case 'text-bold':
-            el = document.createElement('p');
-            el.style.fontWeight = 'bold';
-            el.textContent = text;
-            break;
-          case 'text-bold-large':
-            el = document.createElement('p');
-            el.style.fontWeight = 'bold';
-            el.style.fontSize = '1.5em';
-            el.textContent = text;
-            break;
-          case 'spacer':
-            el = document.createElement('div');
-            el.className = 'spacer';
-            break;
-          case 'image':
-            el = document.createElement('img');
-            el.src = '../../' + text;
-            el.alt = 'Imagem da lição';
-            break;
-          case 'table-row':
-            el = document.createElement('pre');
-            el.className = 'table-line';
-            el.textContent = text;
-            break;
-          default:
-            console.warn('Tipo desconhecido:', type);
+        if (type === 'table-row') {
+          // criar linha de tabela mista
+          el = document.createElement('pre');
+          el.className = 'table-line';
+          const cells = raw.split('|').map(c => c.trim());
+          let html = '';
+          cells.forEach((cell, i) => {
+            const m = cell.match(/\[([^\]]+)\](.*)/);
+            if (m) {
+              const cellLang = m[1];
+              const cellText = m[2].trim();
+              html += `<span lang="${cellLang}">${cellText}</span>`;
+            } else {
+              html += cell;
+            }
+            if (i < cells.length - 1) html += ' | ';
+          });
+          el.innerHTML = html;
+          texts.push({ id: index, type: 'table-row', element: el });
+        } else {
+          // tipos normais
+          let text = raw;
+          switch (type) {
+            case 'title':
+              el = document.createElement('h1');
+              el.textContent = text;
+              break;
+            case 'subtitle':
+              el = document.createElement('h2');
+              el.textContent = text;
+              break;
+            case 'text':
+              el = document.createElement('p');
+              el.textContent = text;
+              break;
+            case 'text-bold':
+              el = document.createElement('p');
+              el.style.fontWeight = 'bold';
+              el.textContent = text;
+              break;
+            case 'text-bold-large':
+              el = document.createElement('p');
+              el.style.fontWeight = 'bold';
+              el.style.fontSize = '1.5em';
+              el.textContent = text;
+              break;
+            case 'spacer':
+              el = document.createElement('div');
+              el.className = 'spacer';
+              break;
+            case 'image':
+              el = document.createElement('img');
+              el.src = '../../' + raw;
+              el.alt = 'Imagem da lição';
+              break;
+            default:
+              console.warn('Tipo desconhecido:', type);
+          }
+          if (el) texts.push({ id: index, type, lang, text: raw, element: el });
         }
 
         if (el) {
-          el.lang = lang;
           el.dataset.index = index;
           contentDiv.appendChild(el);
           if (type !== 'spacer' && type !== 'image') {
-            texts.push({ id: index, lang, text });
             el.addEventListener('click', () => handleTextClick(index));
           }
         }
       });
     }
 
-    function handleTextClick(index) {
+    function handleTextClick(idx) {
       speechSynthesis.cancel();
-      currentIndex = texts.findIndex(t => t.id === index);
+      currentIndex = texts.findIndex(t => t.id === idx);
       isPlaying = true;
       clearTimeout(pauseTimeout);
-      updateButton();
+      toggleButtonLabel();
       speakText(currentIndex);
     }
 
     function toggleLesson() {
       isPlaying = !isPlaying;
-      updateButton();
+      toggleButtonLabel();
       if (isPlaying) speakText(currentIndex); else pauseLesson();
     }
 
-    function updateButton() {
+    function toggleButtonLabel() {
       const btn = document.getElementById('toggleButton');
-      const iconClass = isPlaying ? 'bi-pause-fill' : 'bi-play-fill';
-      btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi ${iconClass}" viewBox="0 0 16 16"></svg> ${isPlaying ? 'Pause' : 'Start'} Lesson`;
+      const icon = isPlaying ? 'bi-pause-fill' : 'bi-play-fill';
+      btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi ${icon}" viewBox="0 0 16 16"></svg> ${isPlaying ? 'Pause' : 'Start'} Lesson`;
     }
 
     function speakText(idx) {
       if (idx >= texts.length) return pauseLesson();
-      const { text, lang } = texts[idx];
-      const el = document.querySelector(`[data-index='${texts[idx].id}']`);
-      if (!text) return;
+      const entry = texts[idx];
+      const el = entry.element;
       document.querySelectorAll('.highlight').forEach(e => e.classList.remove('highlight'));
       el.classList.add('highlight');
-      utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = lang;
-      const robot = document.getElementById('robotImage');
-      robot.src = '../../../../../imagens/robo1.gif';
-      utterance.onend = () => {
-        el.classList.remove('highlight');
-        currentIndex++;
-        if (isPlaying) speakText(currentIndex); else pauseLesson();
-      };
-      speechSynthesis.cancel();
-      speechSynthesis.speak(utterance);
+
+      if (entry.type === 'table-row') {
+        // fala células em sequência
+        const spans = Array.from(el.querySelectorAll('span'));
+        let i = 0;
+        function speakCell() {
+          if (i >= spans.length) {
+            spans.forEach(s => s.classList.remove('highlight'));
+            el.classList.remove('highlight');
+            currentIndex++;
+            return isPlaying ? speakText(currentIndex) : pauseLesson();
+          }
+          const span = spans[i];
+          span.classList.add('highlight');
+          const utter = new SpeechSynthesisUtterance(span.textContent);
+          utter.lang = span.getAttribute('lang');
+          utter.onend = () => {
+            span.classList.remove('highlight');
+            i++;
+            speakCell();
+          };
+          speechSynthesis.cancel();
+          speechSynthesis.speak(utter);
+        }
+        speakCell();
+      } else {
+        const utter = new SpeechSynthesisUtterance(entry.text);
+        utter.lang = entry.lang;
+        utter.onend = () => {
+          el.classList.remove('highlight');
+          currentIndex++;
+          isPlaying ? speakText(currentIndex) : pauseLesson();
+        };
+        const robot = document.getElementById('robotImage');
+        robot.src = '../../../../../imagens/robo1.gif';
+        speechSynthesis.cancel();
+        speechSynthesis.speak(utter);
+      }
+
       el.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
 
     function pauseLesson() {
       speechSynthesis.cancel();
       isPlaying = false;
-      updateButton();
+      toggleButtonLabel();
       const robot = document.getElementById('robotImage');
       robot.src = '../../../../../imagens/robo1_static.png';
-      pauseTimeout = setTimeout(() => { robot.src = '../../../../../imagens/robo2.gif'; }, 5000);
+      pauseTimeout = setTimeout(() => {
+        robot.src = '../../../../../imagens/robo2.gif';
+      }, 5000);
     }
 
     window.onload = loadTextFile;
