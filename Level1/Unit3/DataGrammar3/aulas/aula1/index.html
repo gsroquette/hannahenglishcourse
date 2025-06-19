@@ -93,7 +93,6 @@
     .spacer {
       margin: 20px 0;
       border-top: 2px solid #4CAF50;
-      clear: both;
       width: 100%;
       height: 2px;
     }
@@ -117,7 +116,7 @@
   <header>
     <div class="header-content">
       <h1>GRAMMAR</h1>
-      <img id="robotImage" src="../../../../../imagens/robo1_static.png" alt="Robô Animado" class="robot">
+      <img id="robotImage" src="../../../../../imagens/robo1_static.png" alt="Robô Animado">
     </div>
     <div class="button-container">
       <button onclick="history.back()" aria-label="Voltar">
@@ -126,7 +125,7 @@
         </svg>
         Back
       </button>
-      <button id="toggleButton" class="start-lesson" onclick="toggleLesson()" aria-label="Iniciar ou pausar a lição">
+      <button id="toggleButton" onclick="toggleLesson()" aria-label="Iniciar ou pausar a lição">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-play-fill" viewBox="0 0 16 16" id="toggleIcon">
           <path d="M11.596 8.697l-6.363 3.692A.5.5 0 0 1 4.5 12.846V3.154a.5.5 0 0 1 .733-.442l6.363 3.692a.5.5 0 0 1 0 .884z"/>
         </svg>
@@ -143,7 +142,6 @@
     let isPlaying = false;
     let currentIndex = 0;
     let utterance;
-    let isTransitioning = false;
     let pauseTimeout;
 
     async function loadTextFile() {
@@ -154,7 +152,7 @@
         processTextFile(data);
       } catch (error) {
         console.error(error);
-        alert('Não foi possível carregar a lição. Por favor, verifique o arquivo.');
+        alert('Não foi possível carregar a lição.');
       }
     }
 
@@ -163,61 +161,41 @@
       const contentDiv = document.getElementById('content');
 
       lines.forEach((line, index) => {
-        if (line.trim()) {
-          const [type, lang, text] = line.split('|');
-          if (type) {
-            let element;
+        if (!line.trim()) return;
+        const parts = line.split('|');
+        const type = parts[0];
+        const lang = parts[1] || '';
+        const text = parts.slice(2).join('|').trim();
+        let element;
 
-            switch (type) {
-              case 'title':
-                element = document.createElement('h1');
-                break;
-              case 'subtitle':
-                element = document.createElement('h2');
-                break;
-              case 'text':
-                element = document.createElement('p');
-                break;
-              case 'text-bold':
-                element = document.createElement('p');
-                element.style.fontWeight = 'bold';
-                break;
-              case 'text-bold-large':
-                element = document.createElement('p');
-                element.style.fontWeight = 'bold';
-                element.style.fontSize = '1.5em';
-                break;
-              case 'spacer':
-                element = document.createElement('div');
-                element.className = 'spacer';
-                break;
-              case 'image':
-                element = document.createElement('img');
-                element.src = '../../' + text.trim();
-                element.alt = "Imagem da lição";
-                break;
-              case 'table-row':
-                element = document.createElement('pre');
-                element.className = 'table-line';
-                element.textContent = text;
-                break;
-              default:
-                console.warn(`Tipo desconhecido: ${type}`);
-            }
+        switch (type) {
+          case 'title': element = document.createElement('h1'); break;
+          case 'subtitle': element = document.createElement('h2'); break;
+          case 'text': element = document.createElement('p'); break;
+          case 'text-bold': element = document.createElement('p'); element.style.fontWeight = 'bold'; break;
+          case 'text-bold-large': element = document.createElement('p'); element.style.fontWeight = 'bold'; element.style.fontSize = '1.5em'; break;
+          case 'spacer': element = document.createElement('div'); element.className = 'spacer'; break;
+          case 'image':
+            element = document.createElement('img');
+            element.src = '../../../../../' + text;
+            element.alt = 'Imagem da lição';
+            break;
+          case 'table-row':
+            element = document.createElement('pre');
+            element.className = 'table-line';
+            element.textContent = text;
+            break;
+          default:
+            console.warn('Tipo desconhecido:', type);
+        }
 
-            if (element) {
-              element.lang = lang || '';
-              element.dataset.index = index;
-              contentDiv.appendChild(element);
-
-              if (type !== 'spacer' && type !== 'image') {
-                texts.push({ id: element.dataset.index, lang, text: text ? text.trim() : '' });
-
-                element.addEventListener('click', () => {
-                  handleTextClick(parseInt(element.dataset.index));
-                });
-              }
-            }
+        if (element) {
+          element.lang = lang;
+          element.dataset.index = index;
+          contentDiv.appendChild(element);
+          if (type !== 'spacer' && type !== 'image') {
+            texts.push({ id: index, lang, text });
+            element.addEventListener('click', () => handleTextClick(index));
           }
         }
       });
@@ -225,102 +203,57 @@
 
     function handleTextClick(index) {
       speechSynthesis.cancel();
-      currentIndex = texts.findIndex(item => item.id == index);
+      currentIndex = texts.findIndex(t => t.id === index);
       isPlaying = true;
       clearTimeout(pauseTimeout);
-      updateButtonState();
-      speakSpecific(currentIndex);
+      updateButton();
+      speakText(currentIndex);
     }
 
     function toggleLesson() {
       isPlaying = !isPlaying;
-      updateButtonState();
-      if (isPlaying) {
-        clearTimeout(pauseTimeout);
-        startLesson();
-      } else {
-        pauseLesson();
-      }
+      updateButton();
+      if (isPlaying) startLesson(); else pauseLesson();
     }
 
     function startLesson() {
       if (currentIndex >= texts.length) currentIndex = 0;
-      speakNext();
+      speakText(currentIndex);
     }
 
     function pauseLesson() {
       speechSynthesis.cancel();
       isPlaying = false;
-      isTransitioning = false;
-      updateButtonState();
-      const robotImage = document.getElementById('robotImage');
-      robotImage.src = '../../../../../imagens/robo1_static.png';
-      pauseTimeout = setTimeout(() => {
-        robotImage.src = '../../../../../imagens/robo2.gif';
-      }, 5000);
+      updateButton();
+      const robot = document.getElementById('robotImage');
+      robot.src = '../../../../../imagens/robo1_static.png';
+      pauseTimeout = setTimeout(() => { robot.src = '../../../../../imagens/robo2.gif'; }, 5000);
     }
 
-    function updateButtonState() {
-      const button = document.getElementById('toggleButton');
-      const icon = isPlaying ? 'bi-pause-fill' : 'bi-play-fill';
-      button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi ${icon}" viewBox="0 0 16 16"></svg> ${isPlaying ? 'Pause' : 'Start'} Lesson`;
+    function updateButton() {
+      const btn = document.getElementById('toggleButton');
+      const iconClass = isPlaying ? 'bi-pause-fill' : 'bi-play-fill';
+      btn.innerHTML = `<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" fill=\"currentColor\" class=\"bi ${iconClass}\" viewBox=\"0 0 16 16\"></svg> ${isPlaying ? 'Pause' : 'Start'} Lesson`;
     }
 
-    function speakNext() {
-      if (currentIndex < texts.length) {
-        isTransitioning = true;
-        speakSpecific(currentIndex);
-      } else {
-        pauseLesson();
-      }
-    }
-
-    function speakSpecific(index) {
-      const { text, lang } = texts[index];
-      const element = document.querySelector(`[data-index='${texts[index].id}']`);
-
-      if (!text.trim()) {
-        currentIndex++;
-        speakNext();
-        return;
-      }
-
-      if (!element) {
-        console.warn(`Elemento não encontrado: ${texts[index].id}`);
-        currentIndex++;
-        speakNext();
-        return;
-      }
-
-      document.querySelectorAll('.highlight').forEach(el => el.classList.remove('highlight'));
-      element.classList.add('highlight');
-
+    function speakText(idx) {
+      if (idx >= texts.length) return pauseLesson();
+      const { text, lang } = texts[idx];
+      const el = document.querySelector(`[data-index='${texts[idx].id}']`);
+      if (!text) return;
+      document.querySelectorAll('.highlight').forEach(e => e.classList.remove('highlight'));
+      el.classList.add('highlight');
       utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = lang;
-
-      const robotImage = document.getElementById('robotImage');
-      robotImage.src = '../../../../../imagens/robo1.gif';
-
+      const robot = document.getElementById('robotImage');
+      robot.src = '../../../../../imagens/robo1.gif';
       utterance.onend = () => {
-        element.classList.remove('highlight');
-        currentIndex++;
-        if (isPlaying && currentIndex < texts.length) {
-          speakNext();
-        } else {
-          isTransitioning = false;
-          robotImage.src = '../../../../../imagens/robo1_static.png';
-        }
+        el.classList.remove('highlight');
+        if (isPlaying) { currentIndex++; speakText(currentIndex); } else pauseLesson();
       };
-
       speechSynthesis.cancel();
       speechSynthesis.speak(utterance);
-      scrollToElement(element);
-    }
-
-    function scrollToElement(element) {
-      const contentWrapper = document.getElementById('contentWrapper');
-      const position = element.offsetTop - (contentWrapper.clientHeight / 2);
-      contentWrapper.scrollTo({ top: position, behavior: 'smooth' });
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
 
     window.onload = loadTextFile;
