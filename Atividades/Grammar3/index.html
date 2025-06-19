@@ -400,21 +400,23 @@ if (!btn.parentNode.querySelector('.see-answer-btn')) {
     const { level, unit } = getLevelAndUnitFromURL();
     saveProgress(level, unit);
 }
-/**
- * Grava no Firebase que a fase foi completada
- */
+
 function saveProgress(level, unit) {
     const user = firebase.auth().currentUser;
     if (!user) {
         console.warn('Usuário não autenticado — não será salvo progresso');
         return;
     }
+
     const userId = user.uid;
+    const currentPhase = getPhaseFromURL();
+    const phaseKey = currentPhase ? `fase${currentPhase}` : 'fase1'; // padrão para fase1 se não tiver na URL
+
     firebase.database()
         .ref(`usuarios/${userId}/progresso/${level}/${unit}`)
-        .set({ completed: true })
-        .then(() => console.log('Progresso salvo:', level, unit))
-        .catch(console.error);
+        .update({ [phaseKey]: true })
+        .then(() => console.log(`✅ Progresso salvo em usuarios/${userId}/progresso/${level}/${unit}/${phaseKey}`))
+        .catch(error => console.error('Erro ao salvar progresso:', error));
 }
 
     function generatePDF() {
@@ -494,6 +496,11 @@ function saveProgress(level, unit) {
         updateImagePath();
         loadProfessorButtons();
     });
+
+function getPhaseFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('fase');
+}
 </script>
 </body>
 </html>
