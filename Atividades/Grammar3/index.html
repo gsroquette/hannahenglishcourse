@@ -260,23 +260,29 @@
 
 let isUserChecked = false;
 
+let triedWaiting = false;
+
 firebase.auth().onAuthStateChanged(user => {
     if (user) {
         console.log('✅ Usuário logado:', user.uid);
         initializeAppContent();
-    } else {
-        console.warn('⚠️ Usuário ainda não autenticado. Aguardando confirmação...');
-
+    } else if (!triedWaiting) {
+        // Espera um pouco mais ANTES de tomar a decisão de redirecionar
+        triedWaiting = true;
+        console.warn('🕒 Aguardando autenticação do Firebase...');
         setTimeout(() => {
-            const currentUser = firebase.auth().currentUser;
-            if (!currentUser) {
-                console.error('⛔ Sem usuário confirmado após espera. Redirecionando para login.');
-                window.location.href = 'https://hannahenglishcourse.netlify.app/formulario/login';
-            } else {
-                console.log('✅ Usuário confirmado após espera:', currentUser.uid);
+            const retryUser = firebase.auth().currentUser;
+            if (retryUser) {
+                console.log('✅ Usuário autenticado após espera:', retryUser.uid);
                 initializeAppContent();
+            } else {
+                console.error('⛔ Usuário não autenticado após tentativa. Redirecionando.');
+                window.location.href = 'https://hannahenglishcourse.netlify.app/formulario/login';
             }
-        }, 1000); // ou aumente para 1500ms se precisar
+        }, 1500); // tempo de espera um pouco maior para dar tempo ao Firebase
+    } else {
+        console.error('⛔ Usuário não autenticado. Redirecionando.');
+        window.location.href = 'https://hannahenglishcourse.netlify.app/formulario/login';
     }
 });
 
