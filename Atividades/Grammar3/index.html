@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Indefinite Articles - The Creation Story</title>
     <style>
         body {
@@ -38,7 +38,7 @@
             background-color: #f0f0f0;
             box-shadow: 3px 3px 7px rgba(0, 0, 0, 0.2);
         }
-        .back-button {
+        .back-button {            
             background-color: #007bff;
             color: white;
             padding: 10px 15px;
@@ -202,7 +202,7 @@
             color: #fff;
         }
         .grammar-table td {
-            background-color: white; /* Todas as linhas com fundo branco */
+            background-color: white;
         }
     </style>
 </head>
@@ -225,7 +225,7 @@
     <h1 id="title"></h1>
 
     <div class="image-container">
-        <img id="main-image" src="image.png" alt="Example Image" />
+        <img id="main-image" src="image.png" alt="Example Image">
     </div>
 
     <div class="button-container">
@@ -233,11 +233,7 @@
     </div>
 
     <div id="content">
-        <!-- Dynamic content from texto.txt will be loaded here -->
-    </div>
-
-    <div id="lesson">
-        <!-- Conteúdo do lesson.txt carregado dinamicamente -->
+        <!-- Conteúdo do arquivo (texto.txt ou lesson.txt via URL) será carregado aqui -->
     </div>
 
     <button class="btn-download" onclick="generatePDF()">Download as PDF</button>
@@ -249,14 +245,21 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
 <script>
-    // Firebase config
+    // lê parâmetro da URL
+    function getURLParam(name) {
+        const params = new URLSearchParams(window.location.search);
+        return params.get(name);
+    }
+
+    // Firebase config e init
     const firebaseConfig = {
         apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
         authDomain: "hannahenglishcourse.firebaseapp.com",
         projectId: "hannahenglishcourse",
         storageBucket: "hannahenglishcourse.appspot.com",
         messagingSenderId: "449818788486",
-        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+        appId: "1:449818788486:web:…",
+        measurementId: "G-07VVJG9LRS",
         databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
     };
     firebase.initializeApp(firebaseConfig);
@@ -265,157 +268,170 @@
     let clickedAnswers = 0;
     let isTextFileLoaded = false;
 
-    function getURLParam(name) {
-        const params = new URLSearchParams(window.location.search);
-        return params.get(name);
+    function getLevelAndUnitFromURL() {
+        const p = new URLSearchParams(window.location.search);
+        return { level: p.get('level'), unit: p.get('unit') };
     }
 
     function loadTextFile() {
         if (isTextFileLoaded) return;
         totalAnswers = 0;
-        const textoPath = getURLParam('textoPath') || 'texto.txt';
-        fetch(textoPath)
+
+        const { level, unit } = getLevelAndUnitFromURL();
+        // prioriza URL ?lessonPath=…
+        const lessonPath = getURLParam('lessonPath');
+        const filePath = lessonPath 
+            || `../../${level}/${unit}/DataGrammar3/texto.txt`;
+
+        fetch(filePath)
             .then(r => r.ok ? r.text() : Promise.reject(r.statusText))
             .then(data => {
                 const contentDiv = document.getElementById('content');
-                let html = '';
-                let inTable = false, isHeader = true;
+                let html = '', inTable = false, isHeader = true;
                 data.split('\n').forEach(line => {
                     const t = line.trim();
                     if (t.startsWith('Title: ')) {
-                        document.getElementById('title').innerText = t.replace('Title: ','');
+                        document.getElementById('title').innerText = t.replace('Title: ', '');
                         document.getElementById('title').classList.add('page-title');
-                    } else if (t.startsWith('## ')) {
-                        html += `<h3 class="subtitle">${t.replace('## ','').toUpperCase()}</h3>`;
-                    } else if (t.startsWith('# ')) {
-                        if (inTable){ html += '</div>'; inTable=false; }
-                        html += `<div class="section"><h2>${t.replace('# ','')}</h2>`;
-                    } else if (t.toLowerCase()==='tablestart') {
-                        inTable = true; isHeader=true;
+                    }
+                    else if (t.startsWith('## ')) {
+                        html += `<h3 class="subtitle">${t.slice(3).toUpperCase()}</h3>`;
+                    }
+                    else if (t.startsWith('# ')) {
+                        if (inTable) { html += '</div>'; inTable = false; }
+                        html += `<div class="section"><h2>${t.slice(2)}</h2>`;
+                    }
+                    else if (t.toLowerCase() === 'tablestart') {
+                        inTable = true; isHeader = true;
                         html += '<table class="grammar-table">';
-                    } else if (t.toLowerCase()==='tableend') {
-                        inTable=false;
+                    }
+                    else if (t.toLowerCase() === 'tableend') {
+                        inTable = false;
                         html += '</tbody></table>';
-                    } else if (inTable) {
+                    }
+                    else if (inTable) {
                         const cols = t.split('|').map(c=>c.trim());
                         if (isHeader) {
-                            html += '<thead><tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr></thead><tbody>';
-                            isHeader=false;
+                            html += '<thead><tr>' 
+                                 + cols.map(c=>`<th>${c}</th>`).join('') 
+                                 + '</tr></thead><tbody>';
+                            isHeader = false;
                         } else {
-                            html += '<tr>'+cols.map(c=>`<td>${c}</td>`).join('')+'</tr>';
+                            html += '<tr>' 
+                                 + cols.map(c=>`<td>${c}</td>`).join('') 
+                                 + '</tr>';
                         }
-                    } else if (t.includes('[Answer:')) {
+                    }
+                    else if (t.includes('[Answer:')) {
                         const [q,a] = t.split('[Answer:');
                         const ans = a.replace(']','').trim();
-                        const qHtml = q.replace('___','<input type="text" class="answer-input" placeholder="..."/>');
-                        html += `<p>${qHtml} <button class="check-btn" data-answer="${ans}" onclick="checkAnswer(this)">Check</button><span class="answer">${ans}</span></p>`;
+                        const qHtml = q.replace('___','<input class="answer-input"/>');
+                        html += `<p>${qHtml} 
+                                    <button class="check-btn" data-answer="${ans}" onclick="checkAnswer(this)">Check</button>
+                                    <span class="answer">${ans}</span>
+                                 </p>`;
                         totalAnswers++;
-                    } else {
-                        const formatted = t
+                    }
+                    else {
+                        const f = t
                             .replace(/\*\*\*(.*?)\*\*\*/g,'<b><i>$1</i></b>')
                             .replace(/\*\*(.*?)\*\*/g,'<b>$1</b>')
                             .replace(/\*(.*?)\*/g,'<i>$1</i>');
-                        html += `<p>${formatted}</p>`;
+                        html += `<p>${f}</p>`;
                     }
                 });
                 if (inTable) html += '</div>';
                 contentDiv.innerHTML = html;
                 isTextFileLoaded = true;
             })
-            .catch(console.error);
-    }
-
-    function loadLessonContent() {
-        const lessonPath = getURLParam('lessonPath') || '';
-        if (!lessonPath) return;
-        fetch(lessonPath)
-            .then(r=> r.ok ? r.text() : Promise.reject(r.statusText))
-            .then(txt=> {
-                document.getElementById('lesson').innerText = txt;
-            })
-            .catch(console.error);
+            .catch(err => console.error('Erro:', err));
     }
 
     function checkAnswer(btn) {
-        const input = btn.previousElementSibling;
+        const inp = btn.previousElementSibling;
         const correct = btn.getAttribute('data-answer').toLowerCase();
-        if (input.value.trim().toLowerCase() === correct) {
-            input.style.backgroundColor='lightgreen';
-            if (!btn.disabled) { clickedAnswers++; btn.disabled=true; }
+        if (inp.value.trim().toLowerCase() === correct) {
+            inp.style.background = 'lightgreen';
+            if (!btn.disabled) { clickedAnswers++; btn.disabled = true; }
         } else {
-            input.style.backgroundColor='lightcoral';
+            inp.style.background = 'lightcoral';
             if (!btn.parentNode.querySelector('.see-answer-btn')) {
                 const b = document.createElement('button');
-                b.textContent='See Answer';
-                b.className='see-answer-btn';
-                b.onclick=()=> input.value = correct;
+                b.className = 'see-answer-btn';
+                b.textContent = 'See Answer';
+                b.onclick = () => inp.value = correct;
                 btn.parentNode.appendChild(b);
             }
         }
-        if (clickedAnswers===totalAnswers) showCompletionMessage();
+        if (clickedAnswers === totalAnswers) showCompletionMessage();
     }
 
     function showCompletionMessage() {
-        document.getElementById('completionModal').style.display='block';
+        document.getElementById('completionModal').style.display = 'block';
     }
     function closeModal() {
-        document.getElementById('completionModal').style.display='none';
+        document.getElementById('completionModal').style.display = 'none';
     }
 
     function generatePDF() {
-        fetch(getURLParam('textoPath')||'texto.txt')
+        const lessonPath = getURLParam('lessonPath')
+            || 'texto.txt';
+        fetch(lessonPath)
             .then(r=>r.text())
-            .then(data=>{
+            .then(data => {
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF();
                 let y=20, margin=20, maxW=170;
                 doc.addImage('Logo.png','PNG',90,y,30,30); y+=40;
-                doc.setFontSize(12);
-                doc.text("Name: __________ Date: ____",margin,y); y+=20;
-                data.split('\n').forEach(line=>{
+                data.split('\n').forEach(line => {
                     const txt = line.replace(/\[Answer:.*?\]/g,'');
                     doc.setFontSize(line.startsWith('Title: ')?16:12);
-                    if (line.startsWith('Title: ')) {
-                        doc.text(line.replace('Title: ','') ,margin,y);
-                        y+=20;
-                    } else {
-                        const split = doc.splitTextToSize(txt,maxW);
-                        doc.text(split, margin, y);
-                        y+= split.length*10;
-                    }
-                    if (y>doc.internal.pageSize.height-margin) {
-                        doc.addPage(); y=margin;
+                    const lines = doc.splitTextToSize(txt,maxW);
+                    doc.text(lines,margin,y);
+                    y += lines.length*10;
+                    if (y > doc.internal.pageSize.height - margin) {
+                        doc.addPage(); y = margin;
                     }
                 });
-                doc.save("lesson.pdf");
+                doc.save('lesson.pdf');
             })
             .catch(console.error);
     }
 
     function loadProfessorButtons() {
+        const { level, unit } = getLevelAndUnitFromURL();
         const container = document.querySelector('.button-container');
         container.innerHTML = '';
-        const textoBase = getURLParam('textoPath')||'';
-        for (let i=1; i<=10; i++) {
+        for (let i = 1; i <= 10; i++) {
             const img = new Image();
             img.src = `professores/professor${i}.png`;
             img.alt = `Professor ${i}`;
-            img.onload = ()=>{
+            img.onload = () => {
                 const btn = document.createElement('button');
                 btn.appendChild(img);
-                btn.onclick = ()=> {
-                    const lessonPath = `${textoBase.replace(/texto\.txt$/,'')}aula${i}/lesson.txt`;
-                    window.location.href = `index.html?lessonPath=${encodeURIComponent(lessonPath)}`;
+                btn.onclick = () => {
+                    // monta caminho da lesson.txt e reabre este index
+                    const lp = `../../${level}/${unit}/DataGrammar3/aulas/aula${i}/lesson.txt`;
+                    window.location.href =
+                      `index.html?level=${level}&unit=${unit}&lessonPath=${encodeURIComponent(lp)}`;
                 };
                 container.appendChild(btn);
             };
         }
     }
 
-    document.addEventListener('DOMContentLoaded', ()=>{
+    function updateImagePath() {
+        const { level, unit } = getLevelAndUnitFromURL();
+        const img = document.getElementById('main-image');
+        const path = `../../${level}/${unit}/DataGrammar3/image.png`;
+        fetch(path).then(r=> r.ok ? img.src = path : Promise.reject())
+                  .catch(()=> img.src = 'default-image.png');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
         loadTextFile();
-        loadLessonContent();
         loadProfessorButtons();
+        updateImagePath();
     });
 </script>
 </body>
