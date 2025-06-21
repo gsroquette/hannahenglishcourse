@@ -97,88 +97,91 @@ const getPhaseFromURL=()=>new URLSearchParams(location.search).get('fase')||'1';
 /* ---------- Conteúdo ---------- */
 function initializeAppContent(){loadTextFile();setupBackButton();updateImagePath();loadProfessorButtons();}
 
-function loadTextFile() {
-  if (isTextFileLoaded) return;
-  const { level, unit } = getLevelAndUnitFromURL();
-  const filePath = `../../${level}/${unit}/DataGrammar3/texto.txt`;
+function loadTextFile(){
+  if(isTextFileLoaded) return;
+  const {level,unit}=getLevelAndUnitFromURL();
+  const filePath=`../../${level}/${unit}/DataGrammar3/texto.txt`;
 
-  fetch(filePath).then(r => {
-    if (!r.ok) throw new Error(r.status);
-    return r.text();
-  }).then(txt => {
-    const content = document.getElementById('content');
-    let html = '', inTable = false, isHeader = true, inSection = false;
+  fetch(filePath).then(r=>{if(!r.ok)throw new Error(r.status);return r.text();})
+  .then(txt=>{
+    const content=document.getElementById('content');
+    let html='', inTable=false, isHeader=true;
 
-    txt.split('\n').forEach(line => {
-      const t = line.trim();
-
-      if (t.startsWith('Title: ')) {
-        document.getElementById('title').innerText = t.replace('Title: ', '');
-        document.getElementById('title').classList.add('page-title');
-      }
-
-      else if (t.startsWith('## ')) {
-        html += `<h3 class="subtitle">${t.slice(3).toUpperCase()}</h3>`;
-      }
-
-      else if (t.startsWith('#IMG:')) {
-        const img = t.split(':')[1].trim();
-        const base = filePath.substring(0, filePath.lastIndexOf('/'));
-        html += `<img src="${base}/${img}" onerror="this.onerror=null;this.src='${base}/../${img}'"
-                  alt="${img}" style="max-width:100%;display:block;margin:20px auto;border-radius:8px;">`;
-      }
-
-      else if (t.startsWith('# ')) {
-        if (inTable) { html += '</tbody></table>'; inTable = false; }
-        if (inSection) { html += '</div>'; inSection = false; }
-        html += `<div class="section"><h2>${t.slice(2)}</h2>`;
-        inSection = true;
-      }
-
-      else if (t.toLowerCase() === 'tablestart') {
-        inTable = true;
-        isHeader = true;
-        html += '<table class="grammar-table">';
-      }
-
-      else if (t.toLowerCase() === 'tableend') {
-        inTable = false;
-        html += '</tbody></table>';
-      }
-
-      else if (inTable) {
-        const cols = t.split('|').map(c => c.trim());
-        if (isHeader) {
-          html += '<thead><tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
-          isHeader = false;
-        } else {
-          html += '<tr>' + cols.map(c => `<td>${c}</td>`).join('') + '</tr>';
-        }
-      }
-
-      else if (t.includes('[Answer:')) {
-        const [q, a] = t.split('[Answer:');
-        const ans = a.replace(']', '').trim();
-        html += `<p>${q.replace('___', '<input type="text" class="answer-input" placeholder="Type here...">')}
-                  <button class="check-btn" data-answer="${ans}" onclick="checkAnswer(this)">Check</button>
-                  <span class="answer" style="display:none">${ans}</span></p>`;
+    txt.split('\n').forEach(line=>{
+      const t=line.trim();
+      if(t.startsWith('Title: ')){document.getElementById('title').innerText=t.replace('Title: ','');
+        document.getElementById('title').classList.add('page-title');}
+      else if(t.startsWith('## ')) html+=`<h3 class="subtitle">${t.slice(3).toUpperCase()}</h3>`;
+      else if(t.startsWith('#IMG:')){
+        const img=t.split(':')[1].trim(), base=filePath.substring(0,filePath.lastIndexOf('/'));
+        html+=`<img src="${base}/${img}" onerror="this.onerror=null;this.src='${base}/../${img}'"
+               alt="${img}" style="max-width:100%;display:block;margin:20px auto;border-radius:8px;">`;
+      }else if(t.startsWith('# ')){ if(inTable){html+='</div>';inTable=false;} html+=`<div class="section"><h2>${t.slice(2)}</h2>`;}
+      else if(t.toLowerCase()==='tablestart'){inTable=true;isHeader=true;html+='<table class="grammar-table">';}
+      else if(t.toLowerCase()==='tableend'){inTable=false;html+='</tbody></table></div>';}
+      else if(inTable){
+        const cols=t.split('|').map(c=>c.trim());
+        if(isHeader){html+='<thead><tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr></thead><tbody>';isHeader=false;}
+        else html+='<tr>'+cols.map(c=>`<td>${c}</td>`).join('')+'</tr>';
+      }else if(t.includes('[Answer:')){
+        const [q,a]=t.split('[Answer:'), ans=a.replace(']','').trim();
+        html+=`<p>${q.replace('___','<input type="text" class="answer-input" placeholder="Type here...">')}
+               <button class="check-btn" data-answer="${ans}" onclick="checkAnswer(this)">Check</button>
+               <span class="answer" style="display:none">${ans}</span></p>`; /* NEW – hidden span */
         totalAnswers++;
-      }
-
-      else {
-        const f = t.replace(/\*\*\*(.*?)\*\*\*/g, '<b><i>$1</i></b>')
-                   .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
-                   .replace(/\*(.*?)\*/g, '<i>$1</i>');
-        html += `<p>${f}</p>`;
+      }else{
+        const f=t.replace(/\*\*\*(.*?)\*\*\*/g,'<b><i>$1</i></b>').replace(/\*\*(.*?)\*\*/g,'<b>$1</b>').replace(/\*(.*?)\*/g,'<i>$1</i>');
+        html+=`<p>${f}</p>`;
       }
     });
 
-    if (inTable) html += '</tbody></table>';
-    if (inSection) html += '</div>'; // fecha a última seção aberta
+    if(inTable) html+='</div>';  /* NEW – garante fechamento */
+    content.innerHTML=html;
+    isTextFileLoaded=true;
+  })
+  .catch(console.error);
+}
 
-    content.innerHTML = html;
-    isTextFileLoaded = true;
-  }).catch(console.error);
+function checkAnswer(btn){
+  const inp=btn.parentNode.querySelector('.answer-input');
+  if(inp.value.trim().toLowerCase()===btn.dataset.answer.toLowerCase()){
+    inp.style.background='lightgreen'; if(!btn.disabled){clickedAnswers++;btn.disabled=true;}
+  }else{
+    inp.style.background='lightcoral';
+    if(!btn.parentNode.querySelector('.see-answer-btn')){
+      const b=document.createElement('button');b.className='see-answer-btn';b.textContent='See Answer';
+      b.onclick=()=>{btn.nextElementSibling.style.display='inline';b.disabled=true;};
+      btn.parentNode.appendChild(b);
+    }
+  }
+  if(clickedAnswers===totalAnswers) showCompletionMessage();
+}
+
+function closeModal(){document.getElementById('completionModal').style.display='none';}
+
+function showCompletionMessage(){
+  document.getElementById('completionModal').style.display='block';
+  firebase.auth().onAuthStateChanged(u=>{if(u)updateNextPhase(u.uid);});
+}
+
+/* ---------- Progresso ---------- */
+async function updateNextPhase(userId){
+  const phase=getPhaseFromURL(), {level,unit}=getLevelAndUnitFromURL();
+  const dbRoot=firebase.database().ref(`usuarios/${userId}/progresso`);
+
+  try{
+    if(phase==='last'){
+      const nextUnit=`Unit${parseInt(unit.replace('Unit',''))+1}`;
+      await dbRoot.child(`${level}/${nextUnit}`).set({fase1:true});                /* NEW */
+    }else if(phase==='end'){
+      const nextLevel=`Level${parseInt(level.replace('Level',''))+1}`;
+      await dbRoot.child(`${nextLevel}/Unit1`).set({fase1:true});
+    }else{
+      const nextPhase=`fase${parseInt(phase)+1}`;
+      await dbRoot.child(`${level}/${unit}`).update({[`fase${phase}`]:true,[nextPhase]:true});
+    }
+    console.log('✅ Progresso atualizado.');
+  }catch(e){console.error('Erro ao atualizar progresso:',e);}
 }
 
 /* ---------- PDF ---------- */
