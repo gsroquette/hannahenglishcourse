@@ -40,7 +40,6 @@
   .grammar-table{width:100%;border-collapse:collapse;margin:15px 0;}
   .grammar-table th,.grammar-table td{border:1px solid #ccc;padding:8px;text-align:left;}
   .grammar-table th{background:#28a745;color:#fff;}
-  .grammar-table td {background: #fff;}
 </style>
 </head>
 
@@ -98,123 +97,49 @@ const getPhaseFromURL=()=>new URLSearchParams(location.search).get('fase')||'1';
 /* ---------- Conteúdo ---------- */
 function initializeAppContent(){loadTextFile();setupBackButton();updateImagePath();loadProfessorButtons();}
 
-function loadTextFile() {
-  if (isTextFileLoaded) return;
-  const { level, unit } = getLevelAndUnitFromURL();
-  const filePath = `../../${level}/${unit}/DataGrammar3/texto.txt`;
+function loadTextFile(){
+  if(isTextFileLoaded) return;
+  const {level,unit}=getLevelAndUnitFromURL();
+  const filePath=`../../${level}/${unit}/DataGrammar2/texto.txt`;
 
-  fetch(filePath)
-    .then(response => {
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return response.text();
-    })
-    .then(text => {
-      const contentEl = document.getElementById('content');
-      let html = '';
-      let inTable = false;
-      let isTableHeader = true;
-      let sectionOpen = false;
+  fetch(filePath).then(r=>{if(!r.ok)throw new Error(r.status);return r.text();})
+  .then(txt=>{
+    const content=document.getElementById('content');
+    let html='', inTable=false, isHeader=true;
 
-      const closeSection = () => {
-        if (sectionOpen) {
-          html += '</div>';
-          sectionOpen = false;
-        }
-      };
-
-      text.split('\n').forEach(rawLine => {
-        const line = rawLine.trim();
-        // Título
-        if (line.startsWith('Title: ')) {
-          document.getElementById('title').innerText = line.replace('Title: ', '');
-          document.getElementById('title').classList.add('page-title');
-        }
-        // Subtítulo (##)
-        else if (line.startsWith('## ')) {
-          html += `<h3 class="subtitle">${line.slice(3).toUpperCase()}</h3>`;
-        }
-        // Imagem inline
-        else if (line.startsWith('#IMG:')) {
-          const imgName = line.split(':')[1].trim();
-          const base = filePath.substring(0, filePath.lastIndexOf('/'));
-          html += `<img src="${base}/${imgName}" 
-                        onerror="this.onerror=null;this.src='${base}/../${imgName}'" 
-                        alt="${imgName}" 
-                        style="max-width:100%;display:block;margin:20px auto;border-radius:8px;">`;
-        }
-        // Nova seção (# )
-        else if (line.startsWith('# ')) {
-          // Fecha tabela aberta
-          if (inTable) {
-            html += isTableHeader ? '</table>' : '</tbody></table>';
-            inTable = false;
-            isTableHeader = true;
-          }
-          // Fecha seção anterior
-          closeSection();
-          // Abre nova seção
-          html += `<div class="section"><h2>${line.slice(2)}</h2>`;
-          sectionOpen = true;
-        }
-        // Início de tabela
-        else if (line.toLowerCase() === 'tablestart') {
-          html += `<table class="grammar-table">`;
-          inTable = true;
-          isTableHeader = true;
-        }
-        // Fim de tabela
-        else if (line.toLowerCase() === 'tableend') {
-          if (inTable) {
-            html += isTableHeader ? '</table>' : '</tbody></table>';
-            inTable = false;
-            isTableHeader = true;
-          }
-          closeSection();
-        }
-        // Conteúdo de tabela
-        else if (inTable) {
-          const cols = line.split('|').map(c => c.trim());
-          if (isTableHeader) {
-            html += `<thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>`;
-            isTableHeader = false;
-          } else {
-            html += `<tr>${cols.map(c => `<td>${c}</td>`).join('')}</tr>`;
-          }
-        }
-        // Questões com resposta
-        else if (line.includes('[Answer:')) {
-          const [questionPart, answerPart] = line.split('[Answer:');
-          const answer = answerPart.replace(']', '').trim();
-          const questionHtml = questionPart.replace('___', '<input type="text" class="answer-input" placeholder="Type here...">');
-          html += `<p>${questionHtml} 
-                    <button class="check-btn" data-answer="${answer}" onclick="checkAnswer(this)">
-                      Check
-                    </button> 
-                    <span class="answer" style="display:none">${answer}</span>
-                   </p>`;
-          totalAnswers++;
-        }
-        // Parágrafos comuns (com formatação Markdown)
-        else {
-          const formatted = line
-            .replace(/\*\*\*(.*?)\*\*\*/g, '<b><i>$1</i></b>')
-            .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
-            .replace(/\*(.*?)\*/g, '<i>$1</i>');
-          html += `<p>${formatted}</p>`;
-        }
-      });
-
-      // Fecha tabela ou seção pendente no final do arquivo
-      if (inTable) {
-        html += '</tbody></table>';
-        inTable = false;
+    txt.split('\n').forEach(line=>{
+      const t=line.trim();
+      if(t.startsWith('Title: ')){document.getElementById('title').innerText=t.replace('Title: ','');
+        document.getElementById('title').classList.add('page-title');}
+      else if(t.startsWith('## ')) html+=`<h3 class="subtitle">${t.slice(3).toUpperCase()}</h3>`;
+      else if(t.startsWith('#IMG:')){
+        const img=t.split(':')[1].trim(), base=filePath.substring(0,filePath.lastIndexOf('/'));
+        html+=`<img src="${base}/${img}" onerror="this.onerror=null;this.src='${base}/../${img}'"
+               alt="${img}" style="max-width:100%;display:block;margin:20px auto;border-radius:8px;">`;
+      }else if(t.startsWith('# ')){ if(inTable){html+='</div>';inTable=false;} html+=`<div class="section"><h2>${t.slice(2)}</h2>`;}
+      else if(t.toLowerCase()==='tablestart'){inTable=true;isHeader=true;html+='<table class="grammar-table">';}
+      else if(t.toLowerCase()==='tableend'){inTable=false;html+='</tbody></table></div>';}
+      else if(inTable){
+        const cols=t.split('|').map(c=>c.trim());
+        if(isHeader){html+='<thead><tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr></thead><tbody>';isHeader=false;}
+        else html+='<tr>'+cols.map(c=>`<td>${c}</td>`).join('')+'</tr>';
+      }else if(t.includes('[Answer:')){
+        const [q,a]=t.split('[Answer:'), ans=a.replace(']','').trim();
+        html+=`<p>${q.replace('___','<input type="text" class="answer-input" placeholder="Type here...">')}
+               <button class="check-btn" data-answer="${ans}" onclick="checkAnswer(this)">Check</button>
+               <span class="answer" style="display:none">${ans}</span></p>`; /* NEW – hidden span */
+        totalAnswers++;
+      }else{
+        const f=t.replace(/\*\*\*(.*?)\*\*\*/g,'<b><i>$1</i></b>').replace(/\*\*(.*?)\*\*/g,'<b>$1</b>').replace(/\*(.*?)\*/g,'<i>$1</i>');
+        html+=`<p>${f}</p>`;
       }
-      closeSection();
+    });
 
-      contentEl.innerHTML = html;
-      isTextFileLoaded = true;
-    })
-    .catch(error => console.error(error));
+    if(inTable) html+='</div>';  /* NEW – garante fechamento */
+    content.innerHTML=html;
+    isTextFileLoaded=true;
+  })
+  .catch(console.error);
 }
 
 function checkAnswer(btn){
