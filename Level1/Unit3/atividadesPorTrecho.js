@@ -58,7 +58,7 @@ function getActivitiesByTrecho(trecho, level, unit) {
                 { id: 1034, name: "TestQuizLidoABC", path: `/Atividades/TestQuizLidoABC/index.html?level=${level}&unit=${unit}&fase=1034`, img: "../../imagens/test.png", unlocked: false },
                 { id: 1035, name: "TestwordB2C", path: `/Atividades/TestwordB2C/index.html?level=${level}&unit=${unit}&fase=1035`, img: "../../imagens/test.png", unlocked: false },
                 { id: 1036, name: "Testword2B2C", path: `/Atividades/Testword2B2C/index.html?level=${level}&unit=${unit}&fase=1036`, img: "../../imagens/test.png", unlocked: false },
-                { id: last, name: "Testword3B2C", path: `/Atividades/Testword3B2C/index.html?level=${level}&unit=${unit}&fase=last`, img: "../../imagens/test.png", unlocked: false },
+                { id: l037, name: "Testword3B2C", path: `/Atividades/Testword3B2C/index.html?level=${level}&unit=${unit}&fase=last`, img: "../../imagens/test.png", unlocked: false },
             ];
         default:
             return [];
