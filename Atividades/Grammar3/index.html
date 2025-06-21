@@ -99,87 +99,120 @@ const getPhaseFromURL=()=>new URLSearchParams(location.search).get('fase')||'1';
 function initializeAppContent(){loadTextFile();setupBackButton();updateImagePath();loadProfessorButtons();}
 
 function loadTextFile() {
+  /* --- evita recarregar e zera contadores --- */
   if (isTextFileLoaded) return;
+  totalAnswers = 0;
+  clickedAnswers = 0;
+
+  /* --- caminho dinâmico do texto --- */
   const { level, unit } = getLevelAndUnitFromURL();
   const filePath = `../../${level}/${unit}/DataGrammar3/texto.txt`;
 
-  fetch(filePath).then(r => {
-    if (!r.ok) throw new Error(r.status);
-    return r.text();
-  }).then(txt => {
-    const content = document.getElementById('content');
-    let html = '', inTable = false, isHeader = true, inSection = false;
+  fetch(filePath)
+    .then(res => {
+      if (!res.ok) throw new Error(`Erro ${res.status} ao buscar ${filePath}`);
+      return res.text();
+    })
+    .then(txt => {
+      const content = document.getElementById('content');
+      let html = '';
+      let inSection = false;
+      let inTable = false;
+      let isHeader = true;
 
-    txt.split('\n').forEach(line => {
-      const t = line.trim();
+      /* ---------- varre cada linha ---------- */
+      txt.split('\n').forEach(raw => {
+        const line = raw.trim();
+        if (!line) return;                               // pula linha em branco
 
-      if (t.startsWith('Title: ')) {
-        document.getElementById('title').innerText = t.replace('Title: ', '');
-        document.getElementById('title').classList.add('page-title');
-      }
-
-      else if (t.startsWith('## ')) {
-        html += `<h3 class="subtitle">${t.slice(3).toUpperCase()}</h3>`;
-      }
-
-      else if (t.startsWith('#IMG:')) {
-        const img = t.split(':')[1].trim();
-        const base = filePath.substring(0, filePath.lastIndexOf('/'));
-        html += `<img src="${base}/${img}" onerror="this.onerror=null;this.src='${base}/../${img}'"
-                  alt="${img}" style="max-width:100%;display:block;margin:20px auto;border-radius:8px;">`;
-      }
-
-      else if (t.startsWith('# ')) {
-        if (inTable) { html += '</tbody></table>'; inTable = false; }
-        if (inSection) { html += '</div>'; inSection = false; }
-        html += `<div class="section"><h2>${t.slice(2)}</h2>`;
-        inSection = true;
-      }
-
-      else if (t.toLowerCase() === 'tablestart') {
-        inTable = true;
-        isHeader = true;
-        html += '<table class="grammar-table">';
-      }
-
-      else if (t.toLowerCase() === 'tableend') {
-        inTable = false;
-        html += '</tbody></table>';
-      }
-
-      else if (inTable) {
-        const cols = t.split('|').map(c => c.trim());
-        if (isHeader) {
-          html += '<thead><tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
-          isHeader = false;
-        } else {
-          html += '<tr>' + cols.map(c => `<td>${c}</td>`).join('') + '</tr>';
+        /* Título principal (fora de qualquer seção) */
+        if (line.startsWith('Title: ')) {
+          document.getElementById('title').innerText = line.replace('Title: ', '');
+          document.getElementById('title').classList.add('page-title');
+          return;
         }
-      }
 
-      else if (t.includes('[Answer:')) {
-        const [q, a] = t.split('[Answer:');
-        const ans = a.replace(']', '').trim();
-        html += `<p>${q.replace('___', '<input type="text" class="answer-input" placeholder="Type here...">')}
-                  <button class="check-btn" data-answer="${ans}" onclick="checkAnswer(this)">Check</button>
-                  <span class="answer" style="display:none">${ans}</span></p>`;
-        totalAnswers++;
-      }
+        /* Subtítulo “## ” (aula usa para destacar partes) */
+        if (line.startsWith('## ')) {
+          html += `<h3 class="subtitle">${line.slice(3).toUpperCase()}</h3>`;
+          return;
+        }
 
-      else {
-        const f = t.replace(/\*\*\*(.*?)\*\*\*/g, '<b><i>$1</i></b>')
-                   .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
-                   .replace(/\*(.*?)\*/g, '<i>$1</i>');
-        html += `<p>${f}</p>`;
-      }
-    });
+        /* Linha de imagem “#IMG: nome.png” */
+        if (line.startsWith('#IMG:')) {
+          const img = line.split(':')[1].trim();
+          const base = filePath.substring(0, filePath.lastIndexOf('/'));
+          html += `<img src="${base}/${img}" alt="${img}"
+                       onerror="this.onerror=null;this.src='${base}/../${img}'"
+                       style="max-width:100%;display:block;margin:20px auto;border-radius:8px;">`;
+          return;
+        }
 
-    if (inTable) html += '</tbody></table>';
-    if (inSection) html += '</div>'; // fecha a última seção aberta
+        /* Início de seção “# Título” (fundo verde claro) */
+        if (line.startsWith('# ')) {
+          if (inTable) { html += '</tbody></table>'; inTable = false; }
+          if (inSection) { html += '</div>'; inSection = false; }
 
-    content.innerHTML = html;
-    isTextFileLoaded = true;
-  }).catch(console.error);
+          html += `<div class="section"><h2>${line.slice(2)}</h2>`;
+          inSection = true;
+          return;
+        }
+
+        /* Início e fim de tabela */
+        if (line.toLowerCase() === 'tablestart') {
+          inTable = true;
+          isHeader = true;
+          html += '<table class="grammar-table">';
+          return;
+        }
+        if (line.toLowerCase() === 'tableend') {
+          if (inTable) { html += '</tbody></table>'; inTable = false; }
+          return;   // mantém a seção aberta
+        }
+
+        /* Linhas internas da tabela */
+        if (inTable) {
+          const cols = line.split('|').map(c => c.trim());
+          if (isHeader) {
+            html += '<thead><tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
+            isHeader = false;
+          } else {
+            html += '<tr>' + cols.map(c => `<td>${c}</td>`).join('') + '</tr>';
+          }
+          return;
+        }
+
+        /* Exercícios com resposta  “[Answer: …]” */
+        if (line.includes('[Answer:')) {
+          const [q, a]  = line.split('[Answer:');
+          const answer  = (a || '').replace(']', '').trim();
+          const qHtml   = q.replace('___',
+                            '<input type="text" class="answer-input" placeholder="Type here...">');
+          html += `<p>${qHtml}
+                     <button class="check-btn" data-answer="${answer}" onclick="checkAnswer(this)">Check</button>
+                     <span class="answer" style="display:none">${answer}</span>
+                   </p>`;
+          totalAnswers++;
+          return;
+        }
+
+        /* Parágrafos normais (negrito/itálico simples) */
+        const formatted = line
+                            .replace(/\*\*\*(.*?)\*\*\*/g, '<b><i>$1</i></b>')
+                            .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+                            .replace(/\*(.*?)\*/g, '<i>$1</i>');
+        html += `<p>${formatted}</p>`;
+      });
+
+      /* Fecha o que ainda estiver aberto */
+      if (inTable)   html += '</tbody></table>';
+      if (inSection) html += '</div>';
+
+      /* Joga tudo na página */
+      content.innerHTML = html;
+      isTextFileLoaded = true;
+    })
+    .catch(err => console.error('loadTextFile error:', err));
 }
 
 /* ---------- PDF ---------- */
