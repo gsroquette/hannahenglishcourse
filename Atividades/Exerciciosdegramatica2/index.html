@@ -253,6 +253,48 @@ textarea.answer-input {
           page-break-inside: avoid; /* Evita corte de imagem */
       }
 
+      /* Estilos específicos para PDF */
+      .pdf-optimized {
+          font-size: 14px;
+          line-height: 1.5;
+      }
+
+      .pdf-optimized .exercise-block {
+          margin-bottom: 25px;
+          page-break-inside: avoid;
+      }
+
+      .pdf-optimized .exercise-title {
+          page-break-after: avoid;
+          margin-bottom: 15px;
+      }
+
+      .pdf-optimized .answer-line {
+          display: flex;
+          align-items: center;
+          margin: 8px 0;
+          page-break-inside: avoid;
+      }
+
+      .pdf-optimized .image-container {
+          text-align: center;
+          margin: 15px 0;
+          page-break-inside: avoid;
+      }
+
+      .pdf-optimized .answer-input {
+          border: 1px solid #000 !important;
+          min-height: 20px;
+          margin: 0 10px;
+      }
+
+      .pdf-optimized .large-answer-field {
+          border-bottom: 1px solid #000;
+          min-height: 25px;
+          width: 100%;
+          display: inline-block;
+      }
+
       @media (max-width: 600px) {
           .container {
               padding: 10px;
@@ -395,7 +437,7 @@ textarea.answer-input {
         try {
             if (fase === "last") {
                 const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-                await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
+                await firebase.database().ref(`usuarios/${userId}/progresso/${nextUnit}`).set({ fase1: true });
             } else if (fase === "end") {
                 const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
                 await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
@@ -748,7 +790,7 @@ function parseFileLines(lines) {
         //-------------- #IMG --------------
         if (line.toUpperCase().startsWith('#IMG:')) {
             let file = line.substring(5).trim();
-            htmlAccum += `<div class="exercise-line"><img data-imgfile="${file}" style="max-width:100%; height:auto;" alt="Image" crossorigin="anonymous"></div>`;
+            htmlAccum += `<div class="image-container"><img data-imgfile="${file}" style="max-width:100%; height:auto;" alt="Image" crossorigin="anonymous"></div>`;
             nextLine();
             continue;
         }
@@ -1273,66 +1315,141 @@ function parseFileLines(lines) {
     }
 
     //====================================================
-    //  (10) Geração de PDF
+    //  (10) Geração de PDF - VERSÃO ATUALIZADA
     //====================================================
     function generatePDF() {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF('p', 'pt', 'a4');
+        return new Promise((resolve, reject) => {
+            try {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF('p', 'pt', 'a4');
+                
+                // Mostrar loading
+                const loadingElement = showLoadingIndicator();
+                
+                // Clona e prepara o conteúdo
+                const containerClone = preparePDFContent();
+                
+                // Configurações do PDF
+                const pdfOptions = {
+                    x: 15,
+                    y: 15,
+                    width: 570,
+                    windowWidth: 800,
+                    autoPaging: 'text',
+                    html2canvas: {
+                        scale: 0.8,
+                        useCORS: true,
+                        allowTaint: true,
+                        logging: true,
+                        letterRendering: true,
+                        async: true,
+                        onclone: function(clonedDoc) {
+                            clonedDoc.body.classList.add('pdf-optimized');
+                        }
+                    },
+                    callback: function(pdf) {
+                        loadingElement.remove();
+                        pdf.save("Grammar_Exercises.pdf");
+                        resolve();
+                    }
+                };
+                
+                // Gera o PDF
+                doc.html(containerClone, pdfOptions);
+                
+            } catch (error) {
+                console.error("PDF generation error:", error);
+                reject(error);
+            }
+        });
+    }
 
-      // Clona a div.container
-      const containerOriginal = document.querySelector('.container');
-      let containerClone = containerOriginal.cloneNode(true);
+    function showLoadingIndicator() {
+        const loadingElement = document.createElement('div');
+        loadingElement.innerHTML = `
+            <div style="position:fixed; top:0; left:0; width:100%; height:100%; 
+                       background:rgba(0,0,0,0.7); display:flex; justify-content:center; 
+                       align-items:center; z-index:9999;">
+                <div style="background:white; padding:20px; border-radius:5px;">
+                    Generating PDF, please wait...
+                </div>
+            </div>
+        `;
+        document.body.appendChild(loadingElement);
+        return loadingElement;
+    }
 
-      // Remove botões no clone
-      let checkAllBtn = containerClone.querySelector('#check-all-btn');
-      if (checkAllBtn) checkAllBtn.remove();
-      let showExamplesBtn = containerClone.querySelector('#show-examples-btn');
-      if (showExamplesBtn) showExamplesBtn.remove();
-      let generatePdfBtn = containerClone.querySelector('#generate-pdf-btn');
-      if (generatePdfBtn) generatePdfBtn.remove();
-      let backButton = containerClone.querySelector('.back-button');
-      if (backButton) backButton.remove();
+    function preparePDFContent() {
+        const containerOriginal = document.querySelector('.container');
+        let containerClone = containerOriginal.cloneNode(true);
+        
+        // Remove elementos não necessários
+        ['#check-all-btn', '#show-examples-btn', '#generate-pdf-btn', '.back-button'].forEach(selector => {
+            const element = containerClone.querySelector(selector);
+            if (element) element.remove();
+        });
+        
+        // Processa campos de resposta
+        processAnswerFields(containerClone);
+        
+        // Melhora exercícios especiais
+        enhanceSpecialExercises(containerClone);
+        
+        return containerClone;
+    }
 
-      // Limpa respostas
-      let allAnswerInputs = containerClone.querySelectorAll('.answer-input');
-      allAnswerInputs.forEach(input => {
-          if (input.tagName.toLowerCase() === 'textarea') {
-              input.value = "";
-              input.textContent = "___________";
-          } else {
-              input.value = "";
-              input.setAttribute('placeholder', '___________');
-          }
-          input.classList.remove('correct', 'incorrect');
-      });
+    function processAnswerFields(container) {
+        // Campos de texto pequenos/medios
+        container.querySelectorAll('.answer-input:not(.size-large):not(.size-huge):not(textarea[rows="4"])').forEach(input => {
+            input.value = "";
+            input.setAttribute('placeholder', '__________');
+        });
 
-      let allFreeText = containerClone.querySelectorAll('.free-text-input');
-      allFreeText.forEach(f => {
-          f.value = "";
-          f.setAttribute('placeholder', '____________');
-      });
+        // Campos grandes (substitui por linha)
+        container.querySelectorAll('.answer-input.size-large, .answer-input.size-huge, textarea[rows="4"]').forEach(input => {
+            const line = document.createElement('div');
+            line.style.borderBottom = '1px solid #000';
+            line.style.minHeight = '20px';
+            line.style.width = '100%';
+            line.style.margin = '5px 0';
+            input.parentNode.replaceChild(line, input);
+        });
 
-      let correctSpans = containerClone.querySelectorAll('.correct-answer-span');
-      correctSpans.forEach(span => {
-          span.style.display = 'none';
-      });
+        // Remove spans de resposta correta
+        container.querySelectorAll('.correct-answer-span').forEach(span => {
+            span.style.display = 'none';
+        });
 
-      // Ajuste para tentar evitar corte horizontal
-      // e melhorar as quebras de página
-      doc.html(containerClone, {
-        x: 10,
-        y: 10,
-        width: 580,           // Um pouco mais que 560 para aproveitar mais a página, mas ainda cabendo
-        windowWidth: 800,
-        autoPaging: 'text', 
-        html2canvas: {
-          scale: 0.75,        // Ajustado para 0.75 para melhor legibilidade
-          useCORS: true
-        },
-        callback: function(pdf) {
-          pdf.save("Hannah_Grammar_Exercises.pdf");
-        }
-      });
+        // Processa campos de texto livre
+        container.querySelectorAll('.free-text-input').forEach(input => {
+            input.value = "";
+            input.setAttribute('placeholder', '__________');
+        });
+    }
+
+    function enhanceSpecialExercises(container) {
+        // Melhora exercícios de ordenação
+        container.querySelectorAll('.choice-container').forEach(container => {
+            if (container.innerHTML.includes('ordering_container')) {
+                container.style.marginLeft = '20px';
+                container.querySelectorAll('.exercise-line').forEach(line => {
+                    line.style.margin = '8px 0';
+                });
+            }
+            
+            // Melhora exercícios de matching
+            if (container.innerHTML.includes('matching_container')) {
+                container.querySelectorAll('.exercise-line').forEach(line => {
+                    line.style.display = 'flex';
+                    line.style.alignItems = 'center';
+                    line.style.margin = '8px 0';
+                    const input = line.querySelector('.answer-input');
+                    if (input) {
+                        input.style.margin = '0 10px';
+                    }
+                });
+            }
+        });
     }
 
     //====================================================
