@@ -297,53 +297,51 @@ textarea.answer-input {
           display: inline-block;
       }
 
-/* Estilos específicos para controle de quebras no PDF */
-    .page-break-avoid {
-        page-break-inside: avoid;
-        break-inside: avoid;
-    }
-    
-    .page-break-before {
-        page-break-before: always;
-        break-before: page;
-    }
-    
-    .exercise-container {
-        margin-bottom: 20px;
-        page-break-inside: avoid;
-        break-inside: avoid;
-    }
-    
-    @media print {
-        .no-print {
-            display: none !important;
-        }
-        
-        body {
-            padding: 20px;
-            line-height: 1.5;
-            font-size: 12pt;
-        }
-        
-        .exercise-title {
-            page-break-after: avoid;
-        }
-        
-        .exercise-line {
-            page-break-inside: avoid;
-        }
-        
-        table {
-            page-break-inside: avoid;
-            width: 100% !important;
-        }
-        
-        img {
-            page-break-inside: avoid;
-            max-height: 400px !important;
-            object-fit: contain;
-        }
-    }
+      /* ===== NOVAS REGRAS PARA CONTROLE DE QUEBRAS ===== */
+      .page-break-avoid {
+          page-break-inside: avoid;
+          break-inside: avoid;
+      }
+      
+      .page-break-before {
+          page-break-before: always;
+          break-before: page;
+      }
+      
+      .exercise-container {
+          margin-bottom: 20px;
+          page-break-inside: avoid;
+          break-inside: avoid;
+      }
+      
+      @media print {
+          .no-print {
+              display: none !important;
+          }
+          
+          body {
+              padding: 0 !important;
+              margin: 0 !important;
+              font-size: 12px !important;
+              line-height: 1.4 !important;
+          }
+          
+          .container {
+              max-width: 100% !important;
+              padding: 5mm !important;
+              margin: 0 !important;
+          }
+          
+          img {
+              max-height: 100mm !important;
+              max-width: 100% !important;
+          }
+          
+          .answer-input, textarea {
+              border: 1px solid #000 !important;
+              background: transparent !important;
+          }
+      }
 
       @media (max-width: 600px) {
           .container {
@@ -378,19 +376,19 @@ textarea.answer-input {
 <body>
 
 <div class="container">
-    <a href="javascript:goBack()" class="back-button">Back</a>
+    <a href="javascript:goBack()" class="back-button no-print">Back</a>
     <h1>Hannah's Grammar Exercises</h1>
 
     <!-- Botão para exibir exemplos do primeiro item de cada exercício -->
-    <button id="show-examples-btn" onclick="showExamples()">Show Examples</button>
+    <button id="show-examples-btn" class="no-print" onclick="showExamples()">Show Examples</button>
 
     <div id="exercises"></div>
 
     <!-- Botão para checar TODAS as respostas -->
-    <button id="check-all-btn" onclick="checkAllAnswers()">Check Answers</button>
+    <button id="check-all-btn" class="no-print" onclick="checkAllAnswers()">Check Answers</button>
 
     <!-- Botão para gerar PDF -->
-    <button id="generate-pdf-btn" onclick="generatePDF()" style="display: none;">Generate PDF</button>
+    <button id="generate-pdf-btn" class="no-print" onclick="generatePDF()" style="display: none;">Generate PDF</button>
 </div>
 
 <!-- Modal -->
@@ -1365,241 +1363,190 @@ function parseFileLines(lines) {
     }
 
     // ====================================================
-//  (10) Geração de PDF — versão estável
-// ====================================================
-async function generatePDF () {
-  try {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });   // mm facilita margens
+    //  (10) Geração de PDF
+    // ====================================================
+    async function generatePDF() {
+        try {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ 
+                unit: 'mm', 
+                format: 'a4',
+                compress: true 
+            });
 
-    const loading = showLoadingIndicator();
+            const loading = showLoadingIndicator();
+            
+            // 1. Clona e prepara o conteúdo
+            const clone = preparePDFContent();
+            
+            // 2. Aplica transformação de escala
+            clone.style.transform = "scale(0.8)";
+            clone.style.transformOrigin = "top left";
+            clone.style.width = "210mm";
+            
+            // 3. Força novas quebras de página
+            enhancePagination(clone);
 
-    // 1) Clona e limpa o conteúdo
-    const clone = preparePDFContent();
-    enhancePagination(clone);           // evita quebras internas
+            // 4. Gera o PDF com margens adequadas
+            await doc.html(clone, {
+                x: 15,
+                y: 15,
+                width: 180, // 210 - 15*2
+                windowWidth: 1200,
+                autoPaging: 'text',
+                
+                pagebreak: { 
+                    mode: 'css',
+                    avoid: '.page-break-avoid',
+                    before: '.page-break-before'
+                },
+                
+                html2canvas: {
+                    scale: 0.5,
+                    useCORS: true,
+                    allowTaint: true,
+                    logging: false
+                },
+                
+                callback: (pdf) => {
+                    loading.remove();
+                    pdf.save('Grammar_Exercises.pdf');
+                }
+            });
 
-    // 2) Gera
-    await doc.html(clone, {
-      x: 10,                            // 10 mm de margem esquerda
-      y: 10,                            // 10 mm de margem superior
-      width: 190,                       // (210 – 2 × 10) mm
-      windowWidth: 800,                 // força html2canvas a usar largura razoável
-      autoPaging: 'slice',
-
-      pagebreak: {
-        mode  : ['css', 'legacy'],
-        avoid : '.page-break-avoid',
-        before: '.force-page-break'
-      },
-
-      html2canvas: {
-        scale : 0.5,                      // melhor equilíbrio nitidez/tamanho
-        useCORS: true,
-        allowTaint: true
-      },
-
-      onclone: docClone => {
-   docClone.body.style.transform       = 'scale(0.8)';
-        docClone.body.style.transformOrigin = 'top left';
-  const style = document.createElement('style');
-  style.textContent = `
-    /* corpo do PDF  ↓– base ≃ 10 px  */
-    .pdf-optimized, .pdf-optimized body {
-      font-size: 1opx !important;
-      line-height: 1.35 !important;
+        } catch (err) {
+            console.error('Erro ao gerar PDF:', err);
+            alert('Erro ao gerar PDF: ' + err.message);
+            document.querySelector('.pdf-loading')?.remove();
+        }
     }
-    /* campos de resposta com borda fina */
-    .pdf-optimized .answer-input,
-    .pdf-optimized textarea {
-      border: 1px solid #000 !important;
+
+    // ====================================================
+    //  Função que agrupa e controla quebras de página
+    // ====================================================
+    function enhancePagination(container) {
+        // Agrupa exercícios em contêineres indivisíveis
+        const elements = Array.from(container.children);
+        let currentContainer = null;
+        
+        elements.forEach(el => {
+            if (el.classList.contains('exercise-title') || 
+                el.classList.contains('exercise-description')) {
+                
+                if (currentContainer) {
+                    currentContainer.classList.add('page-break-avoid');
+                }
+                
+                currentContainer = document.createElement('div');
+                currentContainer.className = 'exercise-container page-break-avoid';
+                container.insertBefore(currentContainer, el);
+            }
+            
+            if (currentContainer) {
+                currentContainer.appendChild(el);
+            }
+        });
+        
+        // Insere quebras antes de elementos grandes
+        const containers = container.querySelectorAll('.exercise-container');
+        containers.forEach((cont, i) => {
+            if (i > 0) {
+                const prevHeight = containers[i-1].offsetHeight;
+                if (prevHeight > 600) { // Se > 60% da página
+                    cont.classList.add('page-break-before');
+                }
+            }
+        });
+        
+        // Protege elementos individuais
+        container.querySelectorAll('img, table').forEach(el => {
+            el.classList.add('page-break-avoid');
+        });
     }
-  `;
-  docClone.head.appendChild(style);
-  docClone.body.classList.add('pdf-optimized');
-},
 
-      callback: (pdf) => {
-        loading.remove();
-        pdf.save('Grammar_Exercises.pdf');
-      }
-    });
-
-  } catch (err) {
-    console.error('PDF generation error:', err);
-    alert('Erro ao gerar PDF: ' + err.message);
-    document.querySelector('.pdf-loading')?.remove();
-  }
-}
-              
+    // ====================================================
+    //  Preparação do conteúdo para PDF
+    // ====================================================
     function preparePDFContent() {
         const containerOriginal = document.querySelector('.container');
-        let containerClone = containerOriginal.cloneNode(true);
+        const containerClone = containerOriginal.cloneNode(true);
         
-        // Remove elementos não necessários
+        // Remove elementos interativos
         ['#check-all-btn', '#show-examples-btn', '#generate-pdf-btn', '.back-button'].forEach(selector => {
-            const element = containerClone.querySelector(selector);
-            if (element) element.remove();
+            const el = containerClone.querySelector(selector);
+            if (el) el.remove();
         });
         
         // Processa campos de resposta
-        processAnswerFields(containerClone);
+        containerClone.querySelectorAll('.answer-input').forEach(input => {
+            if (!input.classList.contains('size-large') && 
+                !input.classList.contains('size-huge')) {
+                input.value = "";
+                input.setAttribute('placeholder', '__________');
+            } else {
+                // Substitui campos grandes por linhas
+                const line = document.createElement('div');
+                line.style.borderBottom = '1px solid #000';
+                line.style.minHeight = '20px';
+                line.style.width = '100%';
+                line.style.margin = '5px 0';
+                input.parentNode.replaceChild(line, input);
+            }
+        });
         
-        // Melhora exercícios especiais
-        enhanceSpecialExercises(containerClone);
+        // Remove feedbacks de correção
+        containerClone.querySelectorAll('.correct, .incorrect, .correct-answer-span').forEach(el => {
+            el.remove();
+        });
         
         return containerClone;
     }
 
-    function processAnswerFields(container) {
-        // Campos de texto pequenos/medios
-        container.querySelectorAll('.answer-input:not(.size-large):not(.size-huge):not(textarea[rows="4"])').forEach(input => {
-            input.value = "";
-            input.setAttribute('placeholder', '__________');
+    // ====================================================
+    //  Indicador de carregamento para PDF
+    // ====================================================
+    function showLoadingIndicator() {
+        // overlay de tela inteira
+        const overlay = document.createElement('div');
+        overlay.className = 'pdf-loading';
+        Object.assign(overlay.style, {
+            position: 'fixed',
+            top: '0',
+            left: '0',
+            width: '100%',
+            height: '100%',
+            background: 'rgba(0,0,0,0.45)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: '10000'
         });
 
-        // Campos grandes (substitui por linha)
-        container.querySelectorAll('.answer-input.size-large, .answer-input.size-huge, textarea[rows="4"]').forEach(input => {
-            const line = document.createElement('div');
-            line.style.borderBottom = '1px solid #000';
-            line.style.minHeight = '20px';
-            line.style.width = '100%';
-            line.style.margin = '5px 0';
-            line.classList.add('page-break-avoid');
-            input.parentNode.replaceChild(line, input);
+        // spinner simples
+        const spinner = document.createElement('div');
+        Object.assign(spinner.style, {
+            width: '60px',
+            height: '60px',
+            border: '8px solid #f3f3f3',
+            borderTop: '8px solid #000',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
         });
+        overlay.appendChild(spinner);
 
-        // Remove spans de resposta correta
-        container.querySelectorAll('.correct-answer-span').forEach(span => {
-            span.style.display = 'none';
-        });
+        // keyframes da animação
+        const styleTag = document.createElement('style');
+        styleTag.textContent = `
+            @keyframes spin {
+                0%   { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }`;
+        document.head.appendChild(styleTag);
 
-        // Processa campos de texto livre
-        container.querySelectorAll('.free-text-input').forEach(input => {
-            input.value = "";
-            input.setAttribute('placeholder', '__________');
-        });
+        // coloca na página e devolve para depois remover
+        document.body.appendChild(overlay);
+        return overlay;
     }
-
-    function enhanceSpecialExercises(container) {
-        // Melhora exercícios de ordenação
-        container.querySelectorAll('.choice-container').forEach(container => {
-            if (container.innerHTML.includes('ordering_container')) {
-                container.style.marginLeft = '20px';
-                container.classList.add('page-break-avoid');
-                container.querySelectorAll('.exercise-line').forEach(line => {
-                    line.style.margin = '8px 0';
-                    line.classList.add('page-break-avoid');
-                });
-            }
-            
-            // Melhora exercícios de matching
-            if (container.innerHTML.includes('matching_container')) {
-                container.classList.add('page-break-avoid');
-                container.querySelectorAll('.exercise-line').forEach(line => {
-                    line.style.display = 'flex';
-                    line.style.alignItems = 'center';
-                    line.style.margin = '8px 0';
-                    line.classList.add('page-break-avoid');
-                    const input = line.querySelector('.answer-input');
-                    if (input) {
-                        input.style.margin = '0 10px';
-                    }
-                });
-            }
-        });
-    }
-
-// ====================================================
-//  Função que agrupa e controla quebras de página
-// ====================================================
-function enhancePagination(container) {
-  // Agrupa cada exercício em um contêiner indivisível
-  const exerciseElements = Array.from(container.children);
-  let currentExerciseContainer = null;
-
-  exerciseElements.forEach(element => {
-    // Detecta início de novo exercício
-    if (element.classList.contains('exercise-title') ||
-        element.classList.contains('exercise-description')) {
-
-      if (currentExerciseContainer) {
-        currentExerciseContainer.classList.add('page-break-avoid');
-      }
-
-      currentExerciseContainer = document.createElement('div');
-      currentExerciseContainer.className = 'exercise-container page-break-avoid';
-      element.parentNode.insertBefore(currentExerciseContainer, element);
-    }
-
-    if (currentExerciseContainer) {
-      currentExerciseContainer.appendChild(element);
-    }
-  });
-
-  // Quebra forçada entre exercícios grandes
-  const exercises = container.querySelectorAll('.exercise-container');
-  exercises.forEach((exercise, index) => {
-    if (index < exercises.length - 1) {
-      const exerciseHeight = exercise.offsetHeight;
-      const remaining     = 800 - (exerciseHeight % 800);
-      if (exerciseHeight > 800 || remaining < 200) {
-        const pageBreak = document.createElement('div');
-        pageBreak.className = 'force-page-break';
-        exercise.parentNode.insertBefore(pageBreak, exercise.nextSibling);
-      }
-    }
-  });
-
-  // Imagens e tabelas não devem quebrar
-  container.querySelectorAll('img, table')
-           .forEach(el => el.classList.add('page-break-avoid'));
-}
-
-// ====================================================
-//  (10-A) Indicar carregamento enquanto o PDF é gerado
-// ====================================================
-function showLoadingIndicator() {
-    // overlay de tela inteira
-    const overlay = document.createElement('div');
-    overlay.className = 'pdf-loading';
-    Object.assign(overlay.style, {
-        position: 'fixed',
-        top: '0',
-        left: '0',
-        width: '100%',
-        height: '100%',
-        background: 'rgba(0,0,0,0.45)',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: '10000'
-    });
-
-    // spinner simples
-    const spinner = document.createElement('div');
-    Object.assign(spinner.style, {
-        width: '60px',
-        height: '60px',
-        border: '8px solid #f3f3f3',
-        borderTop: '8px solid #000',
-        borderRadius: '50%',
-        animation: 'spin 1s linear infinite'
-    });
-    overlay.appendChild(spinner);
-
-    // keyframes da animação
-    const styleTag = document.createElement('style');
-    styleTag.textContent = `
-        @keyframes spin {
-            0%   { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }`;
-    document.head.appendChild(styleTag);
-
-    // coloca na página e devolve para depois remover
-    document.body.appendChild(overlay);
-    return overlay;
-}
 
     //====================================================
     //  (11) Função para mostrar exemplos (primeiro item de cada exercício)
