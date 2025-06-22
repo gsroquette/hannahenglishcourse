@@ -1361,68 +1361,50 @@ function parseFileLines(lines) {
         }
     }
 
-    //====================================================
-    //  (10) Geração de PDF - VERSÃO ATUALIZADA
-    //====================================================
-    async function generatePDF() {
-        try {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('p', 'pt', 'a4');
-            
-            // Mostrar loading
-            const loadingElement = showLoadingIndicator();
-            
-            // Clona e prepara o conteúdo
-            const containerClone = preparePDFContent();
-            
-            // Adiciona classes para controle de quebras
-            enhancePagination(containerClone);
-            
-            // Configurações do PDF
-            const pdfOptions = {
-                x: 15,
-                y: 15,
-                width: 570,
-                windowWidth: 800,
-                autoPaging: 'text',
-                html2canvas: {
-                    scale: 0.75,
-                    useCORS: true,
-                    allowTaint: true,
-                    logging: true,
-                    letterRendering: true,
-                    async: true,
-                    onclone: function(clonedDoc) {
-                        clonedDoc.body.classList.add('pdf-optimized');
-                        // Aplica estilos de impressão diretamente no clone
-                        const style = document.createElement('style');
-                        style.innerHTML = `
-                            .page-break-avoid {
-                                page-break-inside: avoid !important;
-                                break-inside: avoid !important;
-                            }
-                            .exercise-container {
-                                page-break-inside: avoid !important;
-                                break-inside: avoid !important;
-                                margin-bottom: 20px !important;
-                            }
-                            .force-page-break {
-                                page-break-after: always !important;
-                                break-after: page !important;
-                            }
-                            img {
-                                max-height: 400px !important;
-                                object-fit: contain !important;
-                            }
-                        `;
-                        clonedDoc.head.appendChild(style);
-                    }
-                },
-                callback: function(pdf) {
-                    loadingElement.remove();
-                    pdf.save("Grammar_Exercises.pdf");
-                }
-            };
+  // ====================================================
+//  (10) Geração de PDF – versão final
+// ====================================================
+async function generatePDF() {
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'pt', 'a4');
+
+    // overlay de “gerando…”
+    const loadingElement = showLoadingIndicator();
+
+    // clona, limpa e organiza o conteúdo
+    const containerClone = preparePDFContent();
+    enhancePagination(containerClone);   // ← apenas organiza para evitar quebras
+
+    // gera o PDF
+    await doc.html(containerClone, {
+      x: 15,
+      y: 15,
+      width: 570,                       // ≃ 210 mm – 2 cm de margem
+      autoPaging: 'slice',
+      pagebreak: {
+        mode  : ['css', 'legacy'],
+        avoid : '.page-break-avoid',
+        before: '.force-page-break'
+      },
+      html2canvas: {
+        scale          : 0.75,
+        useCORS        : true,
+        allowTaint     : true,
+        letterRendering: true
+      },
+      callback: (pdf) => {
+        loadingElement.remove();
+        pdf.save('Grammar_Exercises.pdf');
+      }
+    });
+
+  } catch (error) {
+    console.error('PDF generation error:', error);
+    alert('Error generating PDF: ' + error.message);
+    document.querySelector('.pdf-loading')?.remove();
+  }
+}
             
             // Gera o PDF
            await doc.html(containerClone, {
@@ -1445,43 +1427,8 @@ function parseFileLines(lines) {
     loadingElement.remove();   // some o spinner
     pdf.save('Grammar_Exercises.pdf');
   }
-});
+});             
                 
-                // Cria novo container para o exercício
-                currentExerciseContainer = document.createElement('div');
-                currentExerciseContainer.className = 'exercise-container page-break-avoid';
-                element.parentNode.insertBefore(currentExerciseContainer, element);
-            }
-            
-            // Adiciona elementos ao container atual
-            if (currentExerciseContainer) {
-                currentExerciseContainer.appendChild(element);
-            }
-        });
-        
-        // Adiciona quebras controladas após cada exercício
-        const exercises = container.querySelectorAll('.exercise-container');
-        exercises.forEach((exercise, index) => {
-            if (index < exercises.length - 1) {
-                // Calcula a altura do exercício
-                const exerciseHeight = exercise.offsetHeight;
-                const remainingSpace = 800 - (exerciseHeight % 800);
-                
-                // Se o exercício for muito grande para a página atual
-                if (exerciseHeight > 800 || remainingSpace < 200) {
-                    const pageBreak = document.createElement('div');
-                    pageBreak.className = 'force-page-break';
-                    exercise.parentNode.insertBefore(pageBreak, exercise.nextSibling);
-                }
-            }
-        });
-        
-        // Garante que imagens e tabelas não sejam quebradas
-        container.querySelectorAll('img, table').forEach(el => {
-            el.classList.add('page-break-avoid');
-        });
-    }
-
     function preparePDFContent() {
         const containerOriginal = document.querySelector('.container');
         let containerClone = containerOriginal.cloneNode(true);
@@ -1559,6 +1506,52 @@ function parseFileLines(lines) {
             }
         });
     }
+
+// ====================================================
+//  Função que agrupa e controla quebras de página
+// ====================================================
+function enhancePagination(container) {
+  // Agrupa cada exercício em um contêiner indivisível
+  const exerciseElements = Array.from(container.children);
+  let currentExerciseContainer = null;
+
+  exerciseElements.forEach(element => {
+    // Detecta início de novo exercício
+    if (element.classList.contains('exercise-title') ||
+        element.classList.contains('exercise-description')) {
+
+      if (currentExerciseContainer) {
+        currentExerciseContainer.classList.add('page-break-avoid');
+      }
+
+      currentExerciseContainer = document.createElement('div');
+      currentExerciseContainer.className = 'exercise-container page-break-avoid';
+      element.parentNode.insertBefore(currentExerciseContainer, element);
+    }
+
+    if (currentExerciseContainer) {
+      currentExerciseContainer.appendChild(element);
+    }
+  });
+
+  // Quebra forçada entre exercícios grandes
+  const exercises = container.querySelectorAll('.exercise-container');
+  exercises.forEach((exercise, index) => {
+    if (index < exercises.length - 1) {
+      const exerciseHeight = exercise.offsetHeight;
+      const remaining     = 800 - (exerciseHeight % 800);
+      if (exerciseHeight > 800 || remaining < 200) {
+        const pageBreak = document.createElement('div');
+        pageBreak.className = 'force-page-break';
+        exercise.parentNode.insertBefore(pageBreak, exercise.nextSibling);
+      }
+    }
+  });
+
+  // Imagens e tabelas não devem quebrar
+  container.querySelectorAll('img, table')
+           .forEach(el => el.classList.add('page-break-avoid'));
+}
 
 // ====================================================
 //  (10-A) Indicar carregamento enquanto o PDF é gerado
