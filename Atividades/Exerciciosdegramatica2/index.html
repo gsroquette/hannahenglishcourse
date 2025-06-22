@@ -250,6 +250,8 @@ textarea.answer-input {
       img {
           max-width: 100% !important;
           height: auto !important;
+          max-height: 120mm !important;   /* não “estoura” a página */
+          object-fit: contain !important;
           page-break-inside: avoid; /* Evita corte de imagem */
       }
 
@@ -333,6 +335,7 @@ textarea.answer-input {
         
         table {
             page-break-inside: avoid;
+            width: 100% !important;
         }
         
         img {
@@ -1362,50 +1365,68 @@ function parseFileLines(lines) {
     }
 
     // ====================================================
-//  (10) Geração de PDF – versão final (única)
+//  (10) Geração de PDF — versão estável
 // ====================================================
-async function generatePDF() {
+async function generatePDF () {
   try {
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('p', 'pt', 'a4');
+    const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });   // mm facilita margens
 
-    // overlay “gerando…”
-    const loadingElement = showLoadingIndicator();
+    const loading = showLoadingIndicator();
 
-    // clona e prepara o conteúdo
-    const containerClone = preparePDFContent();
-    enhancePagination(containerClone);
+    // 1) Clona e limpa o conteúdo
+    const clone = preparePDFContent();
+    enhancePagination(clone);           // evita quebras internas
 
-    // gera o PDF
-    await doc.html(containerClone, {
-      x: 15,
-      y: 15,
-      width: 570,                       // ≃ 210 mm – 2 cm de margem
+    // 2) Gera
+    await doc.html(clone, {
+      x: 10,                            // 10 mm de margem esquerda
+      y: 10,                            // 10 mm de margem superior
+      width: 190,                       // (210 – 2 × 10) mm
+      windowWidth: 800,                 // força html2canvas a usar largura razoável
       autoPaging: 'slice',
+
       pagebreak: {
         mode  : ['css', 'legacy'],
         avoid : '.page-break-avoid',
         before: '.force-page-break'
       },
+
       html2canvas: {
-        scale          : 0.75,
-        useCORS        : true,
-        allowTaint     : true,
-        letterRendering: true
+        scale : 1,                      // melhor equilíbrio nitidez/tamanho
+        useCORS: true,
+        allowTaint: true
       },
-      callback: pdf => {
-        loadingElement.remove();
+
+      onclone: docClone => {
+        // 3) Pequeno ajuste de fonte para caber melhor em A4
+        docClone.body.classList.add('pdf-optimized');
+        const extra = document.createElement('style');
+        extra.textContent = `
+          .pdf-optimized {
+            font-size: 13px !important;
+            line-height: 1.4 !important;
+          }
+          .answer-input, textarea {
+            border: 1px solid #000 !important;
+          }
+        `;
+        docClone.head.appendChild(extra);
+      },
+
+      callback: (pdf) => {
+        loading.remove();
         pdf.save('Grammar_Exercises.pdf');
       }
     });
 
-  } catch (error) {
-    console.error('PDF generation error:', error);
-    alert('Error generating PDF: ' + error.message);
+  } catch (err) {
+    console.error('PDF generation error:', err);
+    alert('Erro ao gerar PDF: ' + err.message);
     document.querySelector('.pdf-loading')?.remove();
   }
-}     
-                
+}
+              
     function preparePDFContent() {
         const containerOriginal = document.querySelector('.container');
         let containerClone = containerOriginal.cloneNode(true);
