@@ -655,372 +655,372 @@ textarea.answer-input {
     //====================================================
     //  (7) Parsing the lines into questionObjects
     //====================================================
-    function parseFileLines(lines) {
-        let htmlAccum = '';  
-        let i = 0;
-        function nextLine() { i++; }
+function parseFileLines(lines) {
+    let htmlAccum = '';  
+    let i = 0;
+    function nextLine() { i++; }
 
-        while (i < lines.length) {
-            let raw = lines[i];
-            let line = raw.trim();
-            if (!line) {
+    while (i < lines.length) {
+        let raw = lines[i];
+        let line = raw.trim();
+        if (!line) {
+            nextLine();
+            continue;
+        }
+
+        //-------------- #TITLE --------------
+        if (line.toUpperCase().startsWith('#TITLE:')) {
+            let titleText = line.substring(7).trim();
+            htmlAccum += `<h2 class="exercise-title">${titleText}</h2>`;
+            nextLine();
+            continue;
+        }
+
+        //-------------- Exercise X: --------------
+        if (/^Exercise\s+\d+:/i.test(line)) {
+            currentExerciseIndex++;
+            exercisesMapping[currentExerciseIndex] = { questions: [] };
+
+            htmlAccum += `<div class="exercise-description">${line}</div>`;
+            nextLine();
+            continue;
+        }
+
+        //-------------- #IMG --------------
+        if (line.toUpperCase().startsWith('#IMG:')) {
+            let file = line.substring(5).trim();
+            htmlAccum += `<div class="exercise-line"><img data-imgfile="${file}" style="max-width:100%; height:auto;" alt="Image" crossorigin="anonymous"></div>`;
+            nextLine();
+            continue;
+        }
+
+        //-------------- #TABLE --------------
+        if (line.toUpperCase().startsWith('#TABLE')) {
+            let tableLines = [];
+            nextLine();
+            while (i < lines.length) {
+                let check = lines[i].trim().toUpperCase();
+                if (check.startsWith('#ENDTABLE')) {
+                    nextLine();
+                    break;
+                }
+                tableLines.push(lines[i]);
                 nextLine();
-                continue;
             }
+            htmlAccum += `<table>`;
+            tableLines.forEach(row => {
+                if (!row) return;
+                let cells = row.split('|').map(x=>x.trim());
+                htmlAccum += `<tr>`;
+                cells.forEach(td => {
+                    htmlAccum += `<td>${td}</td>`;
+                });
+                htmlAccum += `</tr>`;
+            });
+            htmlAccum += `</table>`;
+            continue;
+        }
 
-            //-------------- #TITLE --------------
-            if (line.toUpperCase().startsWith('#TITLE:')) {
-                let titleText = line.substring(7).trim();
-                htmlAccum += `<h2 class="exercise-title">${titleText}</h2>`;
+        //-------------- #BOX --------------
+        if (line.toUpperCase().startsWith('#BOX')) {
+            let boxLines = [];
+            nextLine();
+            while (i < lines.length) {
+                let c = lines[i].trim().toUpperCase();
+                if (c.startsWith('#ENDBOX')) {
+                    nextLine();
+                    break;
+                }
+                boxLines.push(lines[i]);
                 nextLine();
-                continue;
             }
+            let boxHTML = `<div class="info-box">`;
+            boxLines.forEach(bl => {
+                boxHTML += bl + "<br>";
+            });
+            boxHTML += `</div>`;
+            htmlAccum += boxHTML;
+            continue;
+        }
 
-            //-------------- Exercise X: --------------
-            if (/^Exercise\s+\d+:/i.test(line)) {
-                currentExerciseIndex++;
-                exercisesMapping[currentExerciseIndex] = { questions: [] };
-
-                htmlAccum += `<div class="exercise-description">${line}</div>`;
-                nextLine();
-                continue;
-            }
-
-            //-------------- #IMG --------------
-            if (line.toUpperCase().startsWith('#IMG:')) {
-                let file = line.substring(5).trim();
-                htmlAccum += `<div class="exercise-line"><img data-imgfile="${file}" style="max-width:100%; height:auto;" alt="Image" crossorigin="anonymous"></div>`;
-                nextLine();
-                continue;
-            }
-
-            //-------------- #TABLE --------------
-            if (line.toUpperCase().startsWith('#TABLE')) {
-                let tableLines = [];
-                nextLine();
-                while (i < lines.length) {
-                    let check = lines[i].trim().toUpperCase();
-                    if (check.startsWith('#ENDTABLE')) {
-                        nextLine();
-                        break;
-                    }
-                    tableLines.push(lines[i]);
+        //-------------- #MULTIPLE_CHOICE --------------
+        if (line.toUpperCase().startsWith('#MULTIPLE_CHOICE:')) {
+            let questionText = line.substring(17).trim();
+            let questionIndex = questionObjects.length;
+            let options = [];
+            let corrLetter = null;
+            nextLine();
+            while (i < lines.length) {
+                let check = lines[i].trim();
+                if (check.toUpperCase().startsWith('#END_MULTIPLE_CHOICE')) {
+                    nextLine();
+                    break;
+                }
+                if (check.toUpperCase().startsWith('#CORRECT:')) {
+                    corrLetter = check.substring(9).trim();
+                    nextLine();
+                } else {
+                    options.push(lines[i]);
                     nextLine();
                 }
-                htmlAccum += `<table>`;
-                tableLines.forEach(row => {
-                    if (!row) return;
-                    let cells = row.split('|').map(x=>x.trim());
-                    htmlAccum += `<tr>`;
-                    cells.forEach(td => {
-                        htmlAccum += `<td>${td}</td>`;
+            }
+            let containerID = `multichoice_container_${questionIndex}`;
+            htmlAccum += `<div class="exercise-line"><strong>${questionText}</strong></div>`;
+            htmlAccum += `<div class="choice-container" id="${containerID}"></div>`;
+
+            questionObjects.push({
+                qtype: 'multipleChoice',
+                index: questionIndex,
+                questionText,
+                correctAnswer: (corrLetter||'').toUpperCase(),
+                options, 
+                containerDOM: null
+            });
+
+            if (currentExerciseIndex >= 0 && exercisesMapping[currentExerciseIndex]) {
+                exercisesMapping[currentExerciseIndex].questions.push(questionIndex);
+            }
+            continue;
+        }
+
+        //-------------- #TRUE_FALSE --------------
+        if (line.toUpperCase().startsWith('#TRUE_FALSE:')) {
+            let statement = line.substring(11).trim();
+            let questionIndex = questionObjects.length;
+            let correctVal = 'V';
+            nextLine();
+            while (i < lines.length) {
+                let check = lines[i].trim().toUpperCase();
+                if (check.startsWith('#END_TRUE_FALSE')) {
+                    nextLine();
+                    break;
+                }
+                if (check.startsWith('#CORRECT:')) {
+                    correctVal = lines[i].substring(9).trim();
+                    nextLine();
+                } else {
+                    nextLine();
+                }
+            }
+            let containerID = `truefalse_container_${questionIndex}`;
+            htmlAccum += `<div class="exercise-line"><strong>${statement}</strong></div>`;
+            htmlAccum += `
+              <div class="choice-container" id="${containerID}">
+              </div>
+            `;
+            questionObjects.push({
+                qtype: 'trueFalse',
+                index: questionIndex,
+                statement,
+                correctAnswer: correctVal,
+                containerDOM: null
+            });
+
+            if (currentExerciseIndex >= 0 && exercisesMapping[currentExerciseIndex]) {
+                exercisesMapping[currentExerciseIndex].questions.push(questionIndex);
+            }
+            continue;
+        }
+
+        //-------------- #MATCHING --------------
+        if (line.toUpperCase().startsWith('#MATCHING:')) {
+            let questionIndex = questionObjects.length;
+            let pairs = [];
+            nextLine();
+            while (i < lines.length) {
+                let check = lines[i].trim().toUpperCase();
+                if (check.startsWith('#END_MATCHING')) {
+                    nextLine();
+                    break;
+                }
+                if (!lines[i].trim()) {
+                    nextLine();
+                    continue;
+                }
+                if (lines[i].includes('=')) {
+                    let [left, right] = lines[i].split('=');
+                    pairs.push({
+                        leftValue: (left||'').trim(),
+                        correctValue: (right||'').trim()
                     });
-                    htmlAccum += `</tr>`;
-                });
-                htmlAccum += `</table>`;
-                continue;
-            }
-
-            //-------------- #BOX --------------
-            if (line.toUpperCase().startsWith('#BOX')) {
-                let boxLines = [];
+                }
                 nextLine();
-                while (i < lines.length) {
-                    let c = lines[i].trim().toUpperCase();
-                    if (c.startsWith('#ENDBOX')) {
-                        nextLine();
-                        break;
-                    }
-                    boxLines.push(lines[i]);
+            }
+            let containerID = `matching_container_${questionIndex}`;
+            htmlAccum += `<div class="exercise-line"><strong>Match the columns</strong></div>`;
+            htmlAccum += `<div class="choice-container" id="${containerID}"></div>`;
+
+            questionObjects.push({
+                qtype: 'matching',
+                index: questionIndex,
+                pairs, 
+                containerDOM: null
+            });
+
+            if (currentExerciseIndex >= 0 && exercisesMapping[currentExerciseIndex]) {
+                exercisesMapping[currentExerciseIndex].questions.push(questionIndex);
+            }
+            continue;
+        }
+
+        //-------------- #ORDERING --------------
+        if (line.toUpperCase().startsWith('#ORDERING:')) {
+            let questionIndex = questionObjects.length;
+            let items = [];
+            let correctPositions = [];
+            nextLine();
+
+            while (i < lines.length) {
+                let check = lines[i].trim();
+                if (check.toUpperCase().startsWith('#END_ORDERING')) {
+                    nextLine();
+                    break;
+                }
+                if (check.toUpperCase().startsWith('#CORRECT_ORDER:')) {
+                    let seq = check.substring(14).trim();
+                    correctPositions = seq.split(',').map(x => {
+                        let cleaned = x.replace(/[^\d]/g, '').trim(); 
+                        let num = parseInt(cleaned, 10);
+                        if (isNaN(num) || num <= 0) { 
+                            console.error(`Erro ao converter posição: '${x.trim()}' não é número válido.`);
+                            return -1; 
+                        }
+                        return num;
+                    });
+                    nextLine();
+                } else {
+                    if (check) items.push(check);
                     nextLine();
                 }
-                let boxHTML = `<div class="info-box">`;
-                boxLines.forEach(bl => {
-                    boxHTML += bl + "<br>";
-                });
-                boxHTML += `</div>`;
-                htmlAccum += boxHTML;
-                continue;
             }
 
-            //-------------- #MULTIPLE_CHOICE --------------
-            if (line.toUpperCase().startsWith('#MULTIPLE_CHOICE:')) {
-                let questionText = line.substring(17).trim();
-                let questionIndex = questionObjects.length;
-                let options = [];
-                let corrLetter = null;
-                nextLine();
-                while (i < lines.length) {
-                    let check = lines[i].trim();
-                    if (check.toUpperCase().startsWith('#END_MULTIPLE_CHOICE')) {
-                        nextLine();
-                        break;
-                    }
-                    if (check.toUpperCase().startsWith('#CORRECT:')) {
-                        corrLetter = check.substring(9).trim();
-                        nextLine();
-                    } else {
-                        options.push(lines[i]);
-                        nextLine();
-                    }
-                }
-                let containerID = `multichoice_container_${questionIndex}`;
-                htmlAccum += `<div class="exercise-line"><strong>${questionText}</strong></div>`;
-                htmlAccum += `<div class="choice-container" id="${containerID}"></div>`;
+            let containerID = `ordering_container_${questionIndex}`;
+            htmlAccum += `<div class="exercise-line"><strong>Use numbers to arrange in correct order.</strong></div>`;
+            htmlAccum += `<div class="choice-container" id="${containerID}"></div>`;
 
-                questionObjects.push({
-                    qtype: 'multipleChoice',
-                    index: questionIndex,
-                    questionText,
-                    correctAnswer: (corrLetter||'').toUpperCase(),
-                    options, 
-                    containerDOM: null
-                });
+            questionObjects.push({
+                qtype: 'ordering',
+                index: questionIndex,
+                items,
+                correctPositions,
+                containerDOM: null
+            });
 
-                if (currentExerciseIndex >= 0 && exercisesMapping[currentExerciseIndex]) {
-                    exercisesMapping[currentExerciseIndex].questions.push(questionIndex);
-                }
-                continue;
+            if (currentExerciseIndex >= 0 && exercisesMapping[currentExerciseIndex]) {
+                exercisesMapping[currentExerciseIndex].questions.push(questionIndex);
             }
-
-            //-------------- #TRUE_FALSE --------------
-            if (line.toUpperCase().startsWith('#TRUE_FALSE:')) {
-                let statement = line.substring(11).trim();
-                let questionIndex = questionObjects.length;
-                let correctVal = 'V';
-                nextLine();
-                while (i < lines.length) {
-                    let check = lines[i].trim().toUpperCase();
-                    if (check.startsWith('#END_TRUE_FALSE')) {
-                        nextLine();
-                        break;
-                    }
-                    if (check.startsWith('#CORRECT:')) {
-                        correctVal = lines[i].substring(9).trim();
-                        nextLine();
-                    } else {
-                        nextLine();
-                    }
-                }
-                let containerID = `truefalse_container_${questionIndex}`;
-                htmlAccum += `<div class="exercise-line"><strong>${statement}</strong></div>`;
-                htmlAccum += `
-                  <div class="choice-container" id="${containerID}">
-                  </div>
-                `;
-                questionObjects.push({
-                    qtype: 'trueFalse',
-                    index: questionIndex,
-                    statement,
-                    correctAnswer: correctVal,
-                    containerDOM: null
-                });
-
-                if (currentExerciseIndex >= 0 && exercisesMapping[currentExerciseIndex]) {
-                    exercisesMapping[currentExerciseIndex].questions.push(questionIndex);
-                }
-                continue;
-            }
-
-            //-------------- #MATCHING --------------
-            if (line.toUpperCase().startsWith('#MATCHING:')) {
-                let questionIndex = questionObjects.length;
-                let pairs = [];
-                nextLine();
-                while (i < lines.length) {
-                    let check = lines[i].trim().toUpperCase();
-                    if (check.startsWith('#END_MATCHING')) {
-                        nextLine();
-                        break;
-                    }
-                    if (!lines[i].trim()) {
-                        nextLine();
-                        continue;
-                    }
-                    if (lines[i].includes('=')) {
-                        let [left, right] = lines[i].split('=');
-                        pairs.push({
-                            leftValue: (left||'').trim(),
-                            correctValue: (right||'').trim()
-                        });
-                    }
-                    nextLine();
-                }
-                let containerID = `matching_container_${questionIndex}`;
-                htmlAccum += `<div class="exercise-line"><strong>Match the columns</strong></div>`;
-                htmlAccum += `<div class="choice-container" id="${containerID}"></div>`;
-
-                questionObjects.push({
-                    qtype: 'matching',
-                    index: questionIndex,
-                    pairs, 
-                    containerDOM: null
-                });
-
-                if (currentExerciseIndex >= 0 && exercisesMapping[currentExerciseIndex]) {
-                    exercisesMapping[currentExerciseIndex].questions.push(questionIndex);
-                }
-                continue;
-            }
-
-            //-------------- #ORDERING --------------
-            if (line.toUpperCase().startsWith('#ORDERING:')) {
-                let questionIndex = questionObjects.length;
-                let items = [];
-                let correctPositions = [];
-                nextLine();
-
-                while (i < lines.length) {
-                    let check = lines[i].trim();
-                    if (check.toUpperCase().startsWith('#END_ORDERING')) {
-                        nextLine();
-                        break;
-                    }
-                    if (check.toUpperCase().startsWith('#CORRECT_ORDER:')) {
-                        let seq = check.substring(14).trim();
-                        correctPositions = seq.split(',').map(x => {
-                            let cleaned = x.replace(/[^\d]/g, '').trim(); 
-                            let num = parseInt(cleaned, 10);
-                            if (isNaN(num) || num <= 0) { 
-                                console.error(`Erro ao converter posição: '${x.trim()}' não é número válido.`);
-                                return -1; 
-                            }
-                            return num;
-                        });
-                        nextLine();
-                    } else {
-                        if (check) items.push(check);
-                        nextLine();
-                    }
-                }
-
-                let containerID = `ordering_container_${questionIndex}`;
-                htmlAccum += `<div class="exercise-line"><strong>Use numbers to arrange in correct order.</strong></div>`;
-                htmlAccum += `<div class="choice-container" id="${containerID}"></div>`;
-
-                questionObjects.push({
-                    qtype: 'ordering',
-                    index: questionIndex,
-                    items,
-                    correctPositions,
-                    containerDOM: null
-                });
-
-                if (currentExerciseIndex >= 0 && exercisesMapping[currentExerciseIndex]) {
-                    exercisesMapping[currentExerciseIndex].questions.push(questionIndex);
-                }
-                continue;
-            }
-
-            //-------------- [Answer: ] e [FreeText] --------------
-if (line.includes('[Answer:') && line.includes('[FreeText]')) {
-    let [qPart, aPart] = line.split('[Answer:');
-    let correctVal = aPart.split(']')[0].trim();
-    let useTextarea = false;
-    let sizeClass = '';
-
-    let sizeMatch = qPart.match(/\[size:(.*?)\]/);
-    if (sizeMatch) {
-        let sizeVal = sizeMatch[1].trim().toLowerCase();
-        if (sizeVal === 'small') {
-            sizeClass = 'size-small';
-        } else if (sizeVal === 'medium') {
-            sizeClass = 'size-medium';
-        } else if (sizeVal === 'large') {
-            sizeClass = 'size-large';
-        } else if (sizeVal === 'huge') {
-            sizeClass = 'size-huge';
-            useTextarea = true;
+            continue;
         }
-        if (sizeVal === 'essay') useTextarea = true;
-    }
-    
-    let cleanedQ = qPart.replace(/\[size:.*?\]/,'').trim();
-    let placeholderIndex = questionObjects.length;
 
-    // Monta a parte do input de resposta corrigida
-    htmlAccum += `<div class="exercise-line" data-question-idx="${placeholderIndex}" data-qtype="textInputWithFreeText">`;
-    if (!useTextarea) {
-        cleanedQ = cleanedQ.replace('___', `<textarea rows="1" class="answer-input ${sizeClass}"></textarea>`);
-    } else {
-        cleanedQ = cleanedQ.replace('___', `<textarea rows="4" class="answer-input" style="width:100%;"></textarea>`);
-    }
-    htmlAccum += `${cleanedQ}<span class="correct-answer-span"></span></div>`;
+        //-------------- [Answer: ] e [FreeText] --------------
+        if (line.includes('[Answer:') && line.includes('[FreeText]')) {
+            let [qPart, aPart] = line.split('[Answer:');
+            let correctVal = aPart.split(']')[0].trim();
+            let useTextarea = false;
+            let sizeClass = '';
 
-    // Monta a parte do texto livre
-    htmlAccum += `<div class="exercise-line"><span class="free-text-span"><input type="text" class="free-text-input" /></span></div>`;
+            let sizeMatch = qPart.match(/\[size:(.*?)\]/);
+            if (sizeMatch) {
+                let sizeVal = sizeMatch[1].trim().toLowerCase();
+                if (sizeVal === 'small') {
+                    sizeClass = 'size-small';
+                } else if (sizeVal === 'medium') {
+                    sizeClass = 'size-medium';
+                } else if (sizeVal === 'large') {
+                    sizeClass = 'size-large';
+                } else if (sizeVal === 'huge') {
+                    sizeClass = 'size-huge';
+                    useTextarea = true;
+                }
+                if (sizeVal === 'essay') useTextarea = true;
+            }
+            
+            let cleanedQ = qPart.replace(/\[size:.*?\]/,'').trim();
+            let placeholderIndex = questionObjects.length;
 
-    questionObjects.push({
-        qtype: 'textInput',
-        correctAnswer: correctVal,
-        userInputDOM: null,
-        correctSpanDOM: null
-    });
+            // Monta a parte do input de resposta corrigida
+            htmlAccum += `<div class="exercise-line" data-question-idx="${placeholderIndex}" data-qtype="textInputWithFreeText">`;
+            if (!useTextarea) {
+                cleanedQ = cleanedQ.replace('___', `<textarea rows="1" class="answer-input ${sizeClass}"></textarea>`);
+            } else {
+                cleanedQ = cleanedQ.replace('___', `<textarea rows="4" class="answer-input" style="width:100%;"></textarea>`);
+            }
+            htmlAccum += `${cleanedQ}<span class="correct-answer-span"></span></div>`;
 
-    if (currentExerciseIndex >= 0 && exercisesMapping[currentExerciseIndex]) {
-        exercisesMapping[currentExerciseIndex].questions.push(questionObjects.length - 1);
-    }
-    nextLine();
-    continue;
-}
+            // Monta a parte do texto livre
+            htmlAccum += `<div class="exercise-line"><span class="free-text-span"><input type="text" class="free-text-input" /></span></div>`;
 
-if (line.includes('[FreeText]') && !line.includes('[Answer:')) {
-    let stripped = line.replace('[FreeText]','').trim();
-    htmlAccum += `<div class="exercise-line">${stripped} <span class="free-text-span"><input type="text" class="free-text-input" /></span></div>`;
-    nextLine();
-    continue;
-}
+            questionObjects.push({
+                qtype: 'textInput',
+                correctAnswer: correctVal,
+                userInputDOM: null,
+                correctSpanDOM: null
+            });
 
-if (line.includes('[Answer:') && !line.includes('[FreeText]')) {
-    let [qPart, aPart] = line.split('[Answer:');
-    let correctVal = aPart.replace(']','').trim();
-    let useTextarea = false;
-    let sizeClass = '';
-    
-    let sizeM = qPart.match(/\[size:(.*?)\]/);
-    if (sizeM) {
-        let sizeVal = sizeM[1].trim().toLowerCase();
-        if (sizeVal === 'small') {
-            sizeClass = 'size-small';
-        } else if (sizeVal === 'medium') {
-            sizeClass = 'size-medium';
-        } else if (sizeVal === 'large') {
-            sizeClass = 'size-large';
-        } else if (sizeVal === 'huge') {
-            sizeClass = 'size-huge';
-            useTextarea = true;
+            if (currentExerciseIndex >= 0 && exercisesMapping[currentExerciseIndex]) {
+                exercisesMapping[currentExerciseIndex].questions.push(questionObjects.length - 1);
+            }
+            nextLine();
+            continue;
         }
-        if (sizeVal === 'essay') useTextarea = true;
-    }
-    
-    let cQ = qPart.replace(/\[size:.*?\]/,'').trim();
-    let placeIndex = questionObjects.length;
-    htmlAccum += `<div class="exercise-line" data-question-idx="${placeIndex}" data-qtype="textInputOnly">`;
-    if (!useTextarea) {
-        cQ = cQ.replace('___', `<textarea rows="1" class="answer-input ${sizeClass}"></textarea>`);
-    } else {
-        cQ = cQ.replace('___', `<textarea rows="4" class="answer-input" style="width:100%;"></textarea>`);
-    }
-    htmlAccum += `${cQ}<span class="correct-answer-span"></span></div>`;
 
-    questionObjects.push({
-        qtype: 'textInput',
-        correctAnswer: correctVal,
-        userInputDOM: null,
-        correctSpanDOM: null
-    });
+        if (line.includes('[FreeText]') && !line.includes('[Answer:')) {
+            let stripped = line.replace('[FreeText]','').trim();
+            htmlAccum += `<div class="exercise-line">${stripped} <span class="free-text-span"><input type="text" class="free-text-input" /></span></div>`;
+            nextLine();
+            continue;
+        }
 
-    if (currentExerciseIndex >= 0 && exercisesMapping[currentExerciseIndex]) {
-        exercisesMapping[currentExerciseIndex].questions.push(questionObjects.length - 1);
+        if (line.includes('[Answer:') && !line.includes('[FreeText]')) {
+            let [qPart, aPart] = line.split('[Answer:');
+            let correctVal = aPart.replace(']','').trim();
+            let useTextarea = false;
+            let sizeClass = '';
+            
+            let sizeM = qPart.match(/\[size:(.*?)\]/);
+            if (sizeM) {
+                let sizeVal = sizeM[1].trim().toLowerCase();
+                if (sizeVal === 'small') {
+                    sizeClass = 'size-small';
+                } else if (sizeVal === 'medium') {
+                    sizeClass = 'size-medium';
+                } else if (sizeVal === 'large') {
+                    sizeClass = 'size-large';
+                } else if (sizeVal === 'huge') {
+                    sizeClass = 'size-huge';
+                    useTextarea = true;
+                }
+                if (sizeVal === 'essay') useTextarea = true;
+            }
+            
+            let cQ = qPart.replace(/\[size:.*?\]/,'').trim();
+            let placeIndex = questionObjects.length;
+            htmlAccum += `<div class="exercise-line" data-question-idx="${placeIndex}" data-qtype="textInputOnly">`;
+            if (!useTextarea) {
+                cQ = cQ.replace('___', `<textarea rows="1" class="answer-input ${sizeClass}"></textarea>`);
+            } else {
+                cQ = cQ.replace('___', `<textarea rows="4" class="answer-input" style="width:100%;"></textarea>`);
+            }
+            htmlAccum += `${cQ}<span class="correct-answer-span"></span></div>`;
+
+            questionObjects.push({
+                qtype: 'textInput',
+                correctAnswer: correctVal,
+                userInputDOM: null,
+                correctSpanDOM: null
+            });
+
+            if (currentExerciseIndex >= 0 && exercisesMapping[currentExerciseIndex]) {
+                exercisesMapping[currentExerciseIndex].questions.push(questionObjects.length - 1);
+            }
+            nextLine();
+            continue;
+        }
+
+        //-------------- Se não caiu em nada, é texto simples --------------
+        htmlAccum += `<div class="exercise-line">${line}</div>`;
+        nextLine();
     }
-    nextLine();
-    continue;
-}
-
-//-------------- Se não caiu em nada, é texto simples --------------
-htmlAccum += `<div class="exercise-line">${line}</div>`;
-nextLine();
- }
 
     return htmlAccum;
 }
