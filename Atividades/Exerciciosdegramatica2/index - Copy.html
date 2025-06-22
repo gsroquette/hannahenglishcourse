@@ -80,6 +80,7 @@
   width: auto;
   min-width: 30px;
   max-width: 100%;
+  width: auto !important; /* Força prioridade sobre o inline */
   min-height: 40px;
   height: auto;
   box-sizing: border-box;
@@ -88,9 +89,51 @@
   transform: none;
 }
 
+ .answer-input.size-small {
+        width: 30px !important;
+        min-width: 30px !important;
+        max-width: 30px !important;
+}
+
+    .answer-input.size-medium {
+        width: 150px !important;
+        min-width: 150px !important;
+}
+
+.answer-input.size-large { 
+  width: 300px !important; 
+  min-width: 300px !important;
+}
+
+.answer-input.size-huge { 
+  width: 800px !important;
+  min-width: 800px !important;
+  max-width: 100%; /* Para ser responsivo */
+}
+
+/* Para mobile */
+@media (max-width: 900px) {
+    .answer-input.size-huge {
+        width: 100% !important;
+        min-width: 100% !important;
+    }
+}
+
+/* Campos do tipo essay (não precisam de classe especial) */
+textarea.answer-input[rows="4"] {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+}
+
 @media (max-width: 600px) {
   .answer-input {
     max-width: 90vw; /* em celular, o campo nunca vai passar da tela */
+  }
+  .answer-input.size-large,
+  .answer-input.size-huge {
+    width: 100% !important;
+    min-width: 100% !important;
   }
 }
 
@@ -99,7 +142,7 @@ textarea.answer-input {
   white-space: pre-wrap;
   word-break: break-word;
 }
- 
+
       .free-text-span {
           border-bottom: 1px solid #000; 
           display: inline-block;
@@ -415,31 +458,141 @@ textarea.answer-input {
     //====================================================
     //  (6) Check Answers
     //====================================================
-    function checkAllAnswers() {
-        checkCount++;
-        let allCorrect = true;
-        let wrongItems = [];
+   function checkAllAnswers() {
+    checkCount++;
+    let allCorrect = true;
+    let wrongItems = [];
 
-        // Loop principal das questões
-        questionObjects.forEach(qObj => {
+    // Loop principal das questões
+    questionObjects.forEach(qObj => {
+        //-------------- TEXT INPUT --------------
+        if (qObj.qtype === 'textInput') {
+            const userAnswer = qObj.userInputDOM.value.trim().toLowerCase();
+            const correct = qObj.correctAnswer.trim().toLowerCase();
+            if (userAnswer === correct) {
+                qObj.userInputDOM.classList.remove('incorrect');
+                qObj.userInputDOM.classList.add('correct');
+                qObj.correctSpanDOM.style.display = 'none';
+            } else {
+                allCorrect = false;
+                wrongItems.push(qObj.userInputDOM);
+                qObj.userInputDOM.classList.remove('correct');
+                qObj.userInputDOM.classList.add('incorrect');
+            }
+        }
 
-            //-------------- TEXT INPUT --------------
-            if (qObj.qtype === 'textInput') {
-                const userAnswer = qObj.userInputDOM.value.trim().toLowerCase();
-                const correct = qObj.correctAnswer.trim().toLowerCase();
-                if (userAnswer === correct) {
-                    qObj.userInputDOM.classList.remove('incorrect');
-                    qObj.userInputDOM.classList.add('correct');
-                    qObj.correctSpanDOM.style.display = 'none';
+        //-------------- MULTIPLE CHOICE --------------
+        else if (qObj.qtype === 'multipleChoice') {
+            const radios = qObj.containerDOM.querySelectorAll('input[type="radio"]');
+            let userChoice = null;
+            radios.forEach(r => {
+                if (r.checked) {
+                    userChoice = r.value.trim().toUpperCase();
+                }
+            });
+            if (!userChoice || userChoice !== qObj.correctAnswer.toUpperCase()) {
+                allCorrect = false;
+                wrongItems.push(qObj.containerDOM);
+                qObj.containerDOM.style.color = 'red';
+            } else {
+                qObj.containerDOM.style.color = 'blue';
+            }
+        }
+
+        //-------------- TRUE/FALSE --------------
+        else if (qObj.qtype === 'trueFalse') {
+            const radios = qObj.containerDOM.querySelectorAll('input[type="radio"]');
+            let userChoice = null;
+            radios.forEach(r => {
+                if (r.checked) {
+                    userChoice = r.value.trim().toUpperCase();
+                }
+            });
+            if (!userChoice || userChoice !== qObj.correctAnswer.toUpperCase()) {
+                allCorrect = false;
+                wrongItems.push(qObj.containerDOM);
+                qObj.containerDOM.style.color = 'red';
+            } else {
+                qObj.containerDOM.style.color = 'blue';
+            }
+        }
+
+        //-------------- MATCHING --------------
+        else if (qObj.qtype === 'matching') {
+            let mismatch = false;
+            qObj.pairs.forEach(pair => {
+                const typed = pair.inputDOM.value.trim().toLowerCase();
+                const corr = pair.correctValue.trim().toLowerCase();
+                if (typed !== corr) {
+                    mismatch = true;
+                    wrongItems.push(pair.inputDOM);
+                    pair.inputDOM.classList.remove('correct');
+                    pair.inputDOM.classList.add('incorrect');
                 } else {
-                    allCorrect = false;
-                    wrongItems.push(qObj.userInputDOM);
-                    qObj.userInputDOM.classList.remove('correct');
-                    qObj.userInputDOM.classList.add('incorrect');
+                    pair.inputDOM.classList.remove('incorrect');
+                    pair.inputDOM.classList.add('correct');
+                }
+            });
+            if (mismatch) allCorrect = false;
+        }
+
+        //-------------- ORDERING --------------
+        else if (qObj.qtype === 'ordering') {
+            let containerDOM = qObj.containerDOM;
+            let inputs = containerDOM.querySelectorAll('input.answer-input');
+            let anyWrong = false;
+
+            for (let i = 0; i < qObj.items.length; i++) {
+                const correctPos = qObj.correctPositions[i]; 
+                let userVal = parseInt(inputs[i].value.trim(), 10);
+
+                if (isNaN(userVal)) userVal = 0;
+
+                if (userVal !== correctPos) {
+                    anyWrong = true;
+                    inputs[i].classList.remove('correct');
+                    inputs[i].classList.add('incorrect');
+
+                    let correctSpan = inputs[i].parentNode.querySelector('.correct-answer-span');
+                    if (checkCount >= 3 && correctSpan) {
+                        correctSpan.textContent = `Right position: ${correctPos}`;
+                        correctSpan.style.display = 'inline';
+                    }
+                } else {
+                    inputs[i].classList.remove('incorrect');
+                    inputs[i].classList.add('correct');
+                    let correctSpan = inputs[i].parentNode.querySelector('.correct-answer-span');
+                    if (correctSpan) {
+                        correctSpan.style.display = 'none';
+                    }
                 }
             }
 
-            //-------------- MULTIPLE CHOICE --------------
+            if (anyWrong) allCorrect = false;
+        }
+    });
+
+    // Se existem erros e o usuário é aluno atrelado a professor => toco o alarme
+    if (!allCorrect) {
+        if (userData.role === 'aluno' && userData.atrelado_professor && userData.atrelado_professor.trim() !== '') {
+            playAlarm();
+        }
+        if (wrongItems.length > 0 && wrongItems[0].scrollIntoView) {
+            wrongItems[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
+    //-------------- TERCEIRA TENTATIVA => MOSTRAR RESPOSTAS --------------
+    if (checkCount === 3 && !allCorrect) {
+        questionObjects.forEach(qObj => {
+            if (qObj.qtype === 'textInput') {
+                const typed = qObj.userInputDOM.value.trim().toLowerCase();
+                const correct = qObj.correctAnswer.trim().toLowerCase();
+                if (typed !== correct) {
+                    qObj.correctSpanDOM.textContent = `Right answer: ${qObj.correctAnswer}`;
+                    qObj.correctSpanDOM.style.display = 'inline';
+                }
+            }
             else if (qObj.qtype === 'multipleChoice') {
                 const radios = qObj.containerDOM.querySelectorAll('input[type="radio"]');
                 let userChoice = null;
@@ -449,15 +602,12 @@ textarea.answer-input {
                     }
                 });
                 if (!userChoice || userChoice !== qObj.correctAnswer.toUpperCase()) {
-                    allCorrect = false;
-                    wrongItems.push(qObj.containerDOM);
-                    qObj.containerDOM.style.color = 'red';
-                } else {
-                    qObj.containerDOM.style.color = 'blue';
+                    qObj.containerDOM.insertAdjacentHTML(
+                        'beforeend',
+                        `<div class="exercise-line" style="color:blue; font-weight:bold;">Right answer: ${qObj.correctAnswer}</div>`
+                    );
                 }
             }
-
-            //-------------- TRUE/FALSE --------------
             else if (qObj.qtype === 'trueFalse') {
                 const radios = qObj.containerDOM.querySelectorAll('input[type="radio"]');
                 let userChoice = null;
@@ -467,154 +617,90 @@ textarea.answer-input {
                     }
                 });
                 if (!userChoice || userChoice !== qObj.correctAnswer.toUpperCase()) {
-                    allCorrect = false;
-                    wrongItems.push(qObj.containerDOM);
-                    qObj.containerDOM.style.color = 'red';
-                } else {
-                    qObj.containerDOM.style.color = 'blue';
+                    qObj.containerDOM.insertAdjacentHTML(
+                        'beforeend',
+                        `<div class="exercise-line" style="color:blue; font-weight:bold;">Right answer: ${qObj.correctAnswer}</div>`
+                    );
                 }
             }
-
-            //-------------- MATCHING --------------
             else if (qObj.qtype === 'matching') {
-                let mismatch = false;
                 qObj.pairs.forEach(pair => {
                     const typed = pair.inputDOM.value.trim().toLowerCase();
                     const corr = pair.correctValue.trim().toLowerCase();
                     if (typed !== corr) {
-                        mismatch = true;
-                        wrongItems.push(pair.inputDOM);
-                        pair.inputDOM.classList.remove('correct');
-                        pair.inputDOM.classList.add('incorrect');
-                    } else {
-                        pair.inputDOM.classList.remove('incorrect');
-                        pair.inputDOM.classList.add('correct');
+                        pair.correctSpanDOM.textContent = `Right answer: ${pair.correctValue}`;
+                        pair.correctSpanDOM.style.display = 'inline';
                     }
                 });
-                if (mismatch) allCorrect = false;
             }
-
-            //-------------- ORDERING --------------
             else if (qObj.qtype === 'ordering') {
                 let containerDOM = qObj.containerDOM;
                 let inputs = containerDOM.querySelectorAll('input.answer-input');
-                let anyWrong = false;
-
                 for (let i = 0; i < qObj.items.length; i++) {
-                    const correctPos = qObj.correctPositions[i]; 
-                    let userVal = parseInt(inputs[i].value.trim(), 10);
-
+                    const correctPos = qObj.correctPositions[i];
+                    const userVal = parseInt(inputs[i].value.trim(), 10);
                     if (isNaN(userVal) || userVal !== correctPos) {
-                        anyWrong = true;
-                        inputs[i].classList.remove('correct');
-                        inputs[i].classList.add('incorrect');
-
-                        let correctSpan = inputs[i].parentNode.querySelector('.correct-answer-span');
-                        if (checkCount >= 3 && correctSpan) {
-                            correctSpan.textContent = `Right position: ${correctPos}`;
-                            correctSpan.style.display = 'inline';
-                        }
-                    } else {
-                        inputs[i].classList.remove('incorrect');
-                        inputs[i].classList.add('correct');
-                        let correctSpan = inputs[i].parentNode.querySelector('.correct-answer-span');
-                        if (correctSpan) {
-                            correctSpan.style.display = 'none';
+                        const span = inputs[i].parentNode.querySelector('.correct-answer-span');
+                        if (span) {
+                            span.textContent = `Right position: ${correctPos}`;
+                            span.style.display = 'inline';
                         }
                     }
                 }
-
-                if (anyWrong) allCorrect = false;
             }
         });
+    }
 
-        // Se existem erros e o usuário é aluno atrelado a professor => toco o alarme
-        if (!allCorrect) {
-            if (userData.role === 'aluno' && userData.atrelado_professor && userData.atrelado_professor.trim() !== '') {
-                playAlarm();
-            }
-            if (wrongItems.length > 0 && wrongItems[0].scrollIntoView) {
-                wrongItems[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
+    // Verificar novamente se todas estão corretas (mesmo após mostrar respostas na 3a tentativa)
+    const finalCheck = questionObjects.every(qObj => {
+        if (qObj.qtype === 'textInput') {
+            return qObj.userInputDOM.value.trim().toLowerCase() === qObj.correctAnswer.trim().toLowerCase();
         }
-
-        //-------------- TERCEIRA TENTATIVA => MOSTRAR RESPOSTAS --------------
-        if (checkCount === 3) {
-            questionObjects.forEach(qObj => {
-                if (qObj.qtype === 'textInput') {
-                    const typed = qObj.userInputDOM.value.trim().toLowerCase();
-                    const correct = qObj.correctAnswer.trim().toLowerCase();
-                    if (typed !== correct) {
-                        qObj.correctSpanDOM.textContent = `Right answer: ${qObj.correctAnswer}`;
-                        qObj.correctSpanDOM.style.display = 'inline';
-                    }
-                }
-                else if (qObj.qtype === 'multipleChoice') {
-                    const radios = qObj.containerDOM.querySelectorAll('input[type="radio"]');
-                    let userChoice = null;
-                    radios.forEach(r => {
-                        if (r.checked) {
-                            userChoice = r.value.trim().toUpperCase();
-                        }
-                    });
-                    if (!userChoice || userChoice !== qObj.correctAnswer.toUpperCase()) {
-                        qObj.containerDOM.insertAdjacentHTML(
-                            'beforeend',
-                            `<div class="exercise-line" style="color:blue; font-weight:bold;">Right answer: ${qObj.correctAnswer}</div>`
-                        );
-                    }
-                }
-                else if (qObj.qtype === 'trueFalse') {
-                    const radios = qObj.containerDOM.querySelectorAll('input[type="radio"]');
-                    let userChoice = null;
-                    radios.forEach(r => {
-                        if (r.checked) {
-                            userChoice = r.value.trim().toUpperCase();
-                        }
-                    });
-                    if (!userChoice || userChoice !== qObj.correctAnswer.toUpperCase()) {
-                        qObj.containerDOM.insertAdjacentHTML(
-                            'beforeend',
-                            `<div class="exercise-line" style="color:blue; font-weight:bold;">Right answer: ${qObj.correctAnswer}</div>`
-                        );
-                    }
-                }
-                else if (qObj.qtype === 'matching') {
-                    qObj.pairs.forEach(pair => {
-                        const typed = pair.inputDOM.value.trim().toLowerCase();
-                        const corr = pair.correctValue.trim().toLowerCase();
-                        if (typed !== corr) {
-                            pair.correctSpanDOM.textContent = `Right answer: ${pair.correctValue}`;
-                            pair.correctSpanDOM.style.display = 'inline';
-                        }
-                    });
-                }
-                else if (qObj.qtype === 'ordering') {
-                    let containerDOM = qObj.containerDOM;
-                    let inputs = containerDOM.querySelectorAll('input.answer-input');
-                    for (let i = 0; i < qObj.items.length; i++) {
-                        const correctPos = qObj.correctPositions[i];
-                        const userVal = parseInt(inputs[i].value.trim(), 10);
-                        if (userVal !== correctPos) {
-                            const span = inputs[i].parentNode.querySelector('.correct-answer-span');
-                            if (span) {
-                                span.textContent = `Right position: ${correctPos}`;
-                                span.style.display = 'inline';
-                            }
-                        }
-                    }
+        else if (qObj.qtype === 'multipleChoice') {
+            const radios = qObj.containerDOM.querySelectorAll('input[type="radio"]');
+            let userChoice = null;
+            radios.forEach(r => {
+                if (r.checked) {
+                    userChoice = r.value.trim().toUpperCase();
                 }
             });
-            markPhaseCompleted();
-            showModal();
-        } else {
-            // Se não é terceira tentativa e está tudo certo => concluído
-            if (allCorrect) {
-                markPhaseCompleted();
-                showModal();
-            }
+            return userChoice && userChoice === qObj.correctAnswer.toUpperCase();
         }
+        else if (qObj.qtype === 'trueFalse') {
+            const radios = qObj.containerDOM.querySelectorAll('input[type="radio"]');
+            let userChoice = null;
+            radios.forEach(r => {
+                if (r.checked) {
+                    userChoice = r.value.trim().toUpperCase();
+                }
+            });
+            return userChoice && userChoice === qObj.correctAnswer.toUpperCase();
+        }
+        else if (qObj.qtype === 'matching') {
+            return qObj.pairs.every(pair => {
+                return pair.inputDOM.value.trim().toLowerCase() === pair.correctValue.trim().toLowerCase();
+            });
+        }
+        else if (qObj.qtype === 'ordering') {
+            let inputs = qObj.containerDOM.querySelectorAll('input.answer-input');
+            for (let i = 0; i < qObj.items.length; i++) {
+                const correctPos = qObj.correctPositions[i];
+                const userVal = parseInt(inputs[i].value.trim(), 10);
+                if (isNaN(userVal) || userVal !== correctPos) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return true;
+    });
+
+    // Só libera se todas estiverem corretas
+    if (finalCheck) {
+        markPhaseCompleted();
+        showModal();
     }
+}
 
     function showModal() {
         const overlay = document.getElementById('completion-modal-overlay');
@@ -628,368 +714,408 @@ textarea.answer-input {
     //====================================================
     //  (7) Parsing the lines into questionObjects
     //====================================================
-    function parseFileLines(lines) {
-        let htmlAccum = '';  
-        let i = 0;
-        function nextLine() { i++; }
+function parseFileLines(lines) {
+    let htmlAccum = '';  
+    let i = 0;
+    function nextLine() { i++; }
 
-        while (i < lines.length) {
-            let raw = lines[i];
-            let line = raw.trim();
-            if (!line) {
-                nextLine();
-                continue;
-            }
-
-            //-------------- #TITLE --------------
-            if (line.toUpperCase().startsWith('#TITLE:')) {
-                let titleText = line.substring(7).trim();
-                htmlAccum += `<h2 class="exercise-title">${titleText}</h2>`;
-                nextLine();
-                continue;
-            }
-
-            //-------------- Exercise X: --------------
-            if (/^Exercise\s+\d+:/i.test(line)) {
-                currentExerciseIndex++;
-                exercisesMapping[currentExerciseIndex] = { questions: [] };
-
-                htmlAccum += `<div class="exercise-description">${line}</div>`;
-                nextLine();
-                continue;
-            }
-
-            //-------------- #IMG --------------
-            if (line.toUpperCase().startsWith('#IMG:')) {
-                let file = line.substring(5).trim();
-                htmlAccum += `<div class="exercise-line"><img data-imgfile="${file}" style="max-width:100%; height:auto;" alt="Image" crossorigin="anonymous"></div>`;
-                nextLine();
-                continue;
-            }
-
-            //-------------- #TABLE --------------
-            if (line.toUpperCase().startsWith('#TABLE')) {
-                let tableLines = [];
-                nextLine();
-                while (i < lines.length) {
-                    let check = lines[i].trim().toUpperCase();
-                    if (check.startsWith('#ENDTABLE')) {
-                        nextLine();
-                        break;
-                    }
-                    tableLines.push(lines[i]);
-                    nextLine();
-                }
-                htmlAccum += `<table>`;
-                tableLines.forEach(row => {
-                    if (!row) return;
-                    let cells = row.split('|').map(x=>x.trim());
-                    htmlAccum += `<tr>`;
-                    cells.forEach(td => {
-                        htmlAccum += `<td>${td}</td>`;
-                    });
-                    htmlAccum += `</tr>`;
-                });
-                htmlAccum += `</table>`;
-                continue;
-            }
-
-            //-------------- #BOX --------------
-            if (line.toUpperCase().startsWith('#BOX')) {
-                let boxLines = [];
-                nextLine();
-                while (i < lines.length) {
-                    let c = lines[i].trim().toUpperCase();
-                    if (c.startsWith('#ENDBOX')) {
-                        nextLine();
-                        break;
-                    }
-                    boxLines.push(lines[i]);
-                    nextLine();
-                }
-                let boxHTML = `<div class="info-box">`;
-                boxLines.forEach(bl => {
-                    boxHTML += bl + "<br>";
-                });
-                boxHTML += `</div>`;
-                htmlAccum += boxHTML;
-                continue;
-            }
-
-            //-------------- #MULTIPLE_CHOICE --------------
-            if (line.toUpperCase().startsWith('#MULTIPLE_CHOICE:')) {
-                let questionText = line.substring(17).trim();
-                let questionIndex = questionObjects.length;
-                let options = [];
-                let corrLetter = null;
-                nextLine();
-                while (i < lines.length) {
-                    let check = lines[i].trim();
-                    if (check.toUpperCase().startsWith('#END_MULTIPLE_CHOICE')) {
-                        nextLine();
-                        break;
-                    }
-                    if (check.toUpperCase().startsWith('#CORRECT:')) {
-                        corrLetter = check.substring(9).trim();
-                        nextLine();
-                    } else {
-                        options.push(lines[i]);
-                        nextLine();
-                    }
-                }
-                let containerID = `multichoice_container_${questionIndex}`;
-                htmlAccum += `<div class="exercise-line"><strong>${questionText}</strong></div>`;
-                htmlAccum += `<div class="choice-container" id="${containerID}"></div>`;
-
-                questionObjects.push({
-                    qtype: 'multipleChoice',
-                    index: questionIndex,
-                    questionText,
-                    correctAnswer: (corrLetter||'').toUpperCase(),
-                    options, 
-                    containerDOM: null
-                });
-
-                if (currentExerciseIndex >= 0 && exercisesMapping[currentExerciseIndex]) {
-                    exercisesMapping[currentExerciseIndex].questions.push(questionIndex);
-                }
-                continue;
-            }
-
-            //-------------- #TRUE_FALSE --------------
-            if (line.toUpperCase().startsWith('#TRUE_FALSE:')) {
-                let statement = line.substring(11).trim();
-                let questionIndex = questionObjects.length;
-                let correctVal = 'V';
-                nextLine();
-                while (i < lines.length) {
-                    let check = lines[i].trim().toUpperCase();
-                    if (check.startsWith('#END_TRUE_FALSE')) {
-                        nextLine();
-                        break;
-                    }
-                    if (check.startsWith('#CORRECT:')) {
-                        correctVal = lines[i].substring(9).trim();
-                        nextLine();
-                    } else {
-                        nextLine();
-                    }
-                }
-                let containerID = `truefalse_container_${questionIndex}`;
-                htmlAccum += `<div class="exercise-line"><strong>${statement}</strong></div>`;
-                htmlAccum += `
-                  <div class="choice-container" id="${containerID}">
-                  </div>
-                `;
-                questionObjects.push({
-                    qtype: 'trueFalse',
-                    index: questionIndex,
-                    statement,
-                    correctAnswer: correctVal,
-                    containerDOM: null
-                });
-
-                if (currentExerciseIndex >= 0 && exercisesMapping[currentExerciseIndex]) {
-                    exercisesMapping[currentExerciseIndex].questions.push(questionIndex);
-                }
-                continue;
-            }
-
-            //-------------- #MATCHING --------------
-            if (line.toUpperCase().startsWith('#MATCHING:')) {
-                let questionIndex = questionObjects.length;
-                let pairs = [];
-                nextLine();
-                while (i < lines.length) {
-                    let check = lines[i].trim().toUpperCase();
-                    if (check.startsWith('#END_MATCHING')) {
-                        nextLine();
-                        break;
-                    }
-                    if (!lines[i].trim()) {
-                        nextLine();
-                        continue;
-                    }
-                    if (lines[i].includes('=')) {
-                        let [left, right] = lines[i].split('=');
-                        pairs.push({
-                            leftValue: (left||'').trim(),
-                            correctValue: (right||'').trim()
-                        });
-                    }
-                    nextLine();
-                }
-                let containerID = `matching_container_${questionIndex}`;
-                htmlAccum += `<div class="exercise-line"><strong>Match the columns</strong></div>`;
-                htmlAccum += `<div class="choice-container" id="${containerID}"></div>`;
-
-                questionObjects.push({
-                    qtype: 'matching',
-                    index: questionIndex,
-                    pairs, 
-                    containerDOM: null
-                });
-
-                if (currentExerciseIndex >= 0 && exercisesMapping[currentExerciseIndex]) {
-                    exercisesMapping[currentExerciseIndex].questions.push(questionIndex);
-                }
-                continue;
-            }
-
-            //-------------- #ORDERING --------------
-            if (line.toUpperCase().startsWith('#ORDERING:')) {
-                let questionIndex = questionObjects.length;
-                let items = [];
-                let correctPositions = [];
-                nextLine();
-
-                while (i < lines.length) {
-                    let check = lines[i].trim();
-                    if (check.toUpperCase().startsWith('#END_ORDERING')) {
-                        nextLine();
-                        break;
-                    }
-                    if (check.toUpperCase().startsWith('#CORRECT_ORDER:')) {
-                        let seq = check.substring(14).trim();
-                        correctPositions = seq.split(',').map(x => {
-                            let cleaned = x.replace(/[^\d]/g, '').trim(); 
-                            let num = parseInt(cleaned, 10);
-                            if (isNaN(num) || num <= 0) { 
-                                console.error(`Erro ao converter posição: '${x.trim()}' não é número válido.`);
-                                return -1; 
-                            }
-                            return num;
-                        });
-                        nextLine();
-                    } else {
-                        if (check) items.push(check);
-                        nextLine();
-                    }
-                }
-
-                let containerID = `ordering_container_${questionIndex}`;
-                htmlAccum += `<div class="exercise-line"><strong>Use numbers to arrange in correct order.</strong></div>`;
-                htmlAccum += `<div class="choice-container" id="${containerID}"></div>`;
-
-                questionObjects.push({
-                    qtype: 'ordering',
-                    index: questionIndex,
-                    items,
-                    correctPositions,
-                    containerDOM: null
-                });
-
-                if (currentExerciseIndex >= 0 && exercisesMapping[currentExerciseIndex]) {
-                    exercisesMapping[currentExerciseIndex].questions.push(questionIndex);
-                }
-                continue;
-            }
-
-            //-------------- [Answer: ] e [FreeText] --------------
-            if (line.includes('[Answer:') && line.includes('[FreeText]')) {
-                let [qPart, aPart] = line.split('[Answer:');
-                let correctVal = aPart.split(']')[0].trim();
-                let inputSize = '150px';
-                let useTextarea = false;
-
-                let sizeMatch = qPart.match(/\[size:(.*?)\]/);
-                if (sizeMatch) {
-                    let sizeVal = sizeMatch[1].trim().toLowerCase();
-                    if (sizeVal === 'small') inputSize = '30px';
-                    if (sizeVal === 'medium') inputSize = '150px';
-                    if (sizeVal === 'large') inputSize = '300px';
-                    if (sizeVal === 'huge') {
-    inputSize = '800px';
-    useTextarea = true;
-}
-if (sizeVal === 'essay') useTextarea = true;
-                }
-                let cleanedQ = qPart.replace(/\[size:.*?\]/,'').trim();
-                let placeholderIndex = questionObjects.length;
-
-                // Monta a parte do input de resposta corrigida
-                htmlAccum += `<div class="exercise-line" data-question-idx="${placeholderIndex}" data-qtype="textInputWithFreeText">`;
-                if (!useTextarea) {
-                    cleanedQ = cleanedQ.replace('___', `<textarea rows="1" class="answer-input" style="width:${inputSize};"></textarea>`);
-                } else {
-                    cleanedQ = cleanedQ.replace('___', `<textarea rows="4" class="answer-input" style="width:100%;"></textarea>`);
-                }
-                htmlAccum += `${cleanedQ}<span class="correct-answer-span"></span></div>`;
-
-                // Monta a parte do texto livre
-                htmlAccum += `<div class="exercise-line"><span class="free-text-span"><input type="text" class="free-text-input" /></span></div>`;
-
-                questionObjects.push({
-                    qtype: 'textInput',
-                    correctAnswer: correctVal,
-                    userInputDOM: null,
-                    correctSpanDOM: null
-                });
-
-                if (currentExerciseIndex >= 0 && exercisesMapping[currentExerciseIndex]) {
-                    exercisesMapping[currentExerciseIndex].questions.push(questionObjects.length - 1);
-                }
-                nextLine();
-                continue;
-            }
-
-            if (line.includes('[FreeText]') && !line.includes('[Answer:')) {
-                let stripped = line.replace('[FreeText]','').trim();
-                htmlAccum += `<div class="exercise-line">${stripped} <span class="free-text-span"><input type="text" class="free-text-input" /></span></div>`;
-                nextLine();
-                continue;
-            }
-
-            if (line.includes('[Answer:') && !line.includes('[FreeText]')) {
-                let [qPart, aPart] = line.split('[Answer:');
-                let correctVal = aPart.replace(']','').trim();
-                let inputSize = '150px';
-                let useTextarea = false;
-                let sizeM = qPart.match(/\[size:(.*?)\]/);
-                if (sizeM) {
-                    let sVal = sizeM[1].trim().toLowerCase();
-                    if (sVal === 'small') inputSize = '30px';
-                    if (sVal === 'medium') inputSize = '150px';
-                    if (sVal === 'large') inputSize = '300px';
-                    if (sVal === 'huge') inputSize = '800px';
-                    if (sVal === 'essay') useTextarea = true;
-                }
-                let cQ = qPart.replace(/\[size:.*?\]/,'').trim();
-                let placeIndex = questionObjects.length;
-                htmlAccum += `<div class="exercise-line" data-question-idx="${placeIndex}" data-qtype="textInputOnly">`;
-                if (!useTextarea) {
-                    cQ = cQ.replace('___', `<textarea rows="1" class="answer-input" style="width:${inputSize};"></textarea>`);
-                } else {
-                    cQ = cQ.replace('___', `<textarea rows="4" class="answer-input" style="width:100%;"></textarea>`);
-                }
-                htmlAccum += `${cQ}<span class="correct-answer-span"></span></div>`;
-
-                questionObjects.push({
-                    qtype: 'textInput',
-                    correctAnswer: correctVal,
-                    userInputDOM: null,
-                    correctSpanDOM: null
-                });
-
-                if (currentExerciseIndex >= 0 && exercisesMapping[currentExerciseIndex]) {
-                    exercisesMapping[currentExerciseIndex].questions.push(questionObjects.length - 1);
-                }
-                nextLine();
-                continue;
-            }
-
-            //-------------- Se não caiu em nada, é texto simples --------------
-            htmlAccum += `<div class="exercise-line">${line}</div>`;
+    while (i < lines.length) {
+        let raw = lines[i];
+        let line = raw.trim();
+        if (!line) {
             nextLine();
+            continue;
         }
 
-        return htmlAccum;
+        //-------------- #TITLE --------------
+        if (line.toUpperCase().startsWith('#TITLE:')) {
+            let titleText = line.substring(7).trim();
+            htmlAccum += `<h2 class="exercise-title">${titleText}</h2>`;
+            nextLine();
+            continue;
+        }
+
+        //-------------- Exercise X: --------------
+        if (/^Exercise\s+\d+:/i.test(line)) {
+            currentExerciseIndex++;
+            exercisesMapping[currentExerciseIndex] = { questions: [] };
+
+            htmlAccum += `<div class="exercise-description">${line}</div>`;
+            nextLine();
+            continue;
+        }
+
+        //-------------- #IMG --------------
+        if (line.toUpperCase().startsWith('#IMG:')) {
+            let file = line.substring(5).trim();
+            htmlAccum += `<div class="exercise-line"><img data-imgfile="${file}" style="max-width:100%; height:auto;" alt="Image" crossorigin="anonymous"></div>`;
+            nextLine();
+            continue;
+        }
+
+        //-------------- #TABLE --------------
+        if (line.toUpperCase().startsWith('#TABLE')) {
+            let tableLines = [];
+            nextLine();
+            while (i < lines.length) {
+                let check = lines[i].trim().toUpperCase();
+                if (check.startsWith('#ENDTABLE')) {
+                    nextLine();
+                    break;
+                }
+                tableLines.push(lines[i]);
+                nextLine();
+            }
+            htmlAccum += `<table>`;
+            tableLines.forEach(row => {
+                if (!row) return;
+                let cells = row.split('|').map(x=>x.trim());
+                htmlAccum += `<tr>`;
+                cells.forEach(td => {
+                    htmlAccum += `<td>${td}</td>`;
+                });
+                htmlAccum += `</tr>`;
+            });
+            htmlAccum += `</table>`;
+            continue;
+        }
+
+        //-------------- #BOX --------------
+        if (line.toUpperCase().startsWith('#BOX')) {
+            let boxLines = [];
+            nextLine();
+            while (i < lines.length) {
+                let c = lines[i].trim().toUpperCase();
+                if (c.startsWith('#ENDBOX')) {
+                    nextLine();
+                    break;
+                }
+                boxLines.push(lines[i]);
+                nextLine();
+            }
+            let boxHTML = `<div class="info-box">`;
+            boxLines.forEach(bl => {
+                boxHTML += bl + "<br>";
+            });
+            boxHTML += `</div>`;
+            htmlAccum += boxHTML;
+            continue;
+        }
+
+        //-------------- #MULTIPLE_CHOICE --------------
+        if (line.toUpperCase().startsWith('#MULTIPLE_CHOICE:')) {
+            let questionText = line.substring(17).trim();
+            let questionIndex = questionObjects.length;
+            let options = [];
+            let corrLetter = null;
+            nextLine();
+            while (i < lines.length) {
+                let check = lines[i].trim();
+                if (check.toUpperCase().startsWith('#END_MULTIPLE_CHOICE')) {
+                    nextLine();
+                    break;
+                }
+                if (check.toUpperCase().startsWith('#CORRECT:')) {
+                    corrLetter = check.substring(9).trim();
+                    nextLine();
+                } else {
+                    options.push(lines[i]);
+                    nextLine();
+                }
+            }
+            let containerID = `multichoice_container_${questionIndex}`;
+            htmlAccum += `<div class="exercise-line"><strong>${questionText}</strong></div>`;
+            htmlAccum += `<div class="choice-container" id="${containerID}"></div>`;
+
+            questionObjects.push({
+                qtype: 'multipleChoice',
+                index: questionIndex,
+                questionText,
+                correctAnswer: (corrLetter||'').toUpperCase(),
+                options, 
+                containerDOM: null
+            });
+
+            if (currentExerciseIndex >= 0 && exercisesMapping[currentExerciseIndex]) {
+                exercisesMapping[currentExerciseIndex].questions.push(questionIndex);
+            }
+            continue;
+        }
+
+        //-------------- #TRUE_FALSE --------------
+        if (line.toUpperCase().startsWith('#TRUE_FALSE:')) {
+            let statement = line.substring(11).trim();
+            let questionIndex = questionObjects.length;
+            let correctVal = 'V';
+            nextLine();
+            while (i < lines.length) {
+                let check = lines[i].trim().toUpperCase();
+                if (check.startsWith('#END_TRUE_FALSE')) {
+                    nextLine();
+                    break;
+                }
+                if (check.startsWith('#CORRECT:')) {
+                    correctVal = lines[i].substring(9).trim();
+                    nextLine();
+                } else {
+                    nextLine();
+                }
+            }
+            let containerID = `truefalse_container_${questionIndex}`;
+            htmlAccum += `<div class="exercise-line"><strong>${statement}</strong></div>`;
+            htmlAccum += `
+              <div class="choice-container" id="${containerID}">
+              </div>
+            `;
+            questionObjects.push({
+                qtype: 'trueFalse',
+                index: questionIndex,
+                statement,
+                correctAnswer: correctVal,
+                containerDOM: null
+            });
+
+            if (currentExerciseIndex >= 0 && exercisesMapping[currentExerciseIndex]) {
+                exercisesMapping[currentExerciseIndex].questions.push(questionIndex);
+            }
+            continue;
+        }
+
+        //-------------- #MATCHING --------------
+        if (line.toUpperCase().startsWith('#MATCHING:')) {
+            let questionIndex = questionObjects.length;
+            let pairs = [];
+            nextLine();
+            while (i < lines.length) {
+                let check = lines[i].trim().toUpperCase();
+                if (check.startsWith('#END_MATCHING')) {
+                    nextLine();
+                    break;
+                }
+                if (!lines[i].trim()) {
+                    nextLine();
+                    continue;
+                }
+                if (lines[i].includes('=')) {
+                    let [left, right] = lines[i].split('=');
+                    pairs.push({
+                        leftValue: (left||'').trim(),
+                        correctValue: (right||'').trim()
+                    });
+                }
+                nextLine();
+            }
+            let containerID = `matching_container_${questionIndex}`;
+            htmlAccum += `<div class="exercise-line"><strong>Match the columns</strong></div>`;
+            htmlAccum += `<div class="choice-container" id="${containerID}"></div>`;
+
+            questionObjects.push({
+                qtype: 'matching',
+                index: questionIndex,
+                pairs, 
+                containerDOM: null
+            });
+
+            if (currentExerciseIndex >= 0 && exercisesMapping[currentExerciseIndex]) {
+                exercisesMapping[currentExerciseIndex].questions.push(questionIndex);
+            }
+            continue;
+        }
+
+        //-------------- #ORDERING --------------
+        if (line.toUpperCase().startsWith('#ORDERING:')) {
+            let questionIndex = questionObjects.length;
+            let items = [];
+            let correctPositions = [];
+            nextLine();
+
+            while (i < lines.length) {
+                let check = lines[i].trim();
+                if (check.toUpperCase().startsWith('#END_ORDERING')) {
+                    nextLine();
+                    break;
+                }
+                if (check.toUpperCase().startsWith('#CORRECT_ORDER:')) {
+                    let seq = check.substring(14).trim();
+                    correctPositions = seq.split(',').map(x => {
+                        let cleaned = x.replace(/[^\d]/g, '').trim(); 
+                        let num = parseInt(cleaned, 10);
+                        if (isNaN(num) || num <= 0) { 
+                            console.error(`Erro ao converter posição: '${x.trim()}' não é número válido.`);
+                            return -1; 
+                        }
+                        return num;
+                    });
+                    nextLine();
+                } else {
+                    if (check) items.push(check);
+                    nextLine();
+                }
+            }
+
+            let containerID = `ordering_container_${questionIndex}`;
+            htmlAccum += `<div class="exercise-line"><strong>Use numbers to arrange in correct order.</strong></div>`;
+            htmlAccum += `<div class="choice-container" id="${containerID}"></div>`;
+
+            questionObjects.push({
+                qtype: 'ordering',
+                index: questionIndex,
+                items,
+                correctPositions,
+                containerDOM: null
+            });
+
+            if (currentExerciseIndex >= 0 && exercisesMapping[currentExerciseIndex]) {
+                exercisesMapping[currentExerciseIndex].questions.push(questionIndex);
+            }
+            continue;
+        }
+
+        //-------------- [Answer: ] e [FreeText] --------------
+       if (line.includes('[Answer:') && line.includes('[FreeText]')) {
+    let [qPart, aPart] = line.split('[Answer:');
+    let correctVal = aPart.split(']')[0].trim();
+    let useTextarea = false;
+    let sizeClass = '';
+
+    let sizeMatch = qPart.match(/\[size:(.*?)\]/);
+    if (sizeMatch) {
+        let sizeVal = sizeMatch[1].trim().toLowerCase();
+        if (sizeVal === 'small') {
+            sizeClass = 'size-small';
+        } else if (sizeVal === 'medium') {
+            sizeClass = 'size-medium';
+        } else if (sizeVal === 'large') {
+            sizeClass = 'size-large';
+        } else if (sizeVal === 'huge') {
+            sizeClass = 'size-huge';
+        } else if (sizeVal === 'essay') {
+            useTextarea = true;
+        }
     }
+    
+    let cleanedQ = qPart.replace(/\[size:.*?\]/,'').trim();
+    let placeholderIndex = questionObjects.length;
+
+    // Monta a parte do input de resposta corrigida
+    htmlAccum += `<div class="exercise-line" data-question-idx="${placeholderIndex}" data-qtype="textInputWithFreeText">`;
+    if (!useTextarea) {
+        cleanedQ = cleanedQ.replace('___', `<textarea rows="1" class="answer-input ${sizeClass}"></textarea>`);
+    } else {
+        cleanedQ = cleanedQ.replace('___', `<textarea rows="4" class="answer-input" style="width:100%;"></textarea>`);
+    }
+    htmlAccum += `${cleanedQ}<span class="correct-answer-span"></span></div>`;
+
+            // Monta a parte do texto livre
+            htmlAccum += `<div class="exercise-line"><span class="free-text-span"><input type="text" class="free-text-input" /></span></div>`;
+
+            questionObjects.push({
+                qtype: 'textInput',
+                correctAnswer: correctVal,
+                userInputDOM: null,
+                correctSpanDOM: null
+            });
+
+            if (currentExerciseIndex >= 0 && exercisesMapping[currentExerciseIndex]) {
+                exercisesMapping[currentExerciseIndex].questions.push(questionObjects.length - 1);
+            }
+            nextLine();
+            continue;
+        }
+
+        if (line.includes('[FreeText]') && !line.includes('[Answer:')) {
+            let stripped = line.replace('[FreeText]','').trim();
+            htmlAccum += `<div class="exercise-line">${stripped} <span class="free-text-span"><input type="text" class="free-text-input" /></span></div>`;
+            nextLine();
+            continue;
+        }
+
+        if (line.includes('[Answer:') && !line.includes('[FreeText]')) {
+    let [qPart, aPart] = line.split('[Answer:');
+    let correctVal = aPart.replace(']','').trim();
+    let useTextarea = false;
+    let sizeClass = '';
+    
+    let sizeM = qPart.match(/\[size:(.*?)\]/);
+    if (sizeM) {
+        let sizeVal = sizeM[1].trim().toLowerCase();
+        if (sizeVal === 'small') {
+            sizeClass = 'size-small';
+        } else if (sizeVal === 'medium') {
+            sizeClass = 'size-medium';
+        } else if (sizeVal === 'large') {
+            sizeClass = 'size-large';
+        } else if (sizeVal === 'huge') {
+            sizeClass = 'size-huge';
+        } else if (sizeVal === 'essay') {
+            useTextarea = true;
+        }
+    }
+    
+    let cQ = qPart.replace(/\[size:.*?\]/,'').trim();
+    let placeIndex = questionObjects.length;
+    htmlAccum += `<div class="exercise-line" data-question-idx="${placeIndex}" data-qtype="textInputOnly">`;
+    if (!useTextarea) {
+        cQ = cQ.replace('___', `<textarea rows="1" class="answer-input ${sizeClass}"></textarea>`);
+    } else {
+        cQ = cQ.replace('___', `<textarea rows="4" class="answer-input" style="width:100%;"></textarea>`);
+    }
+    htmlAccum += `${cQ}<span class="correct-answer-span"></span></div>`;
+
+            questionObjects.push({
+                qtype: 'textInput',
+                correctAnswer: correctVal,
+                userInputDOM: null,
+                correctSpanDOM: null
+            });
+
+            if (currentExerciseIndex >= 0 && exercisesMapping[currentExerciseIndex]) {
+                exercisesMapping[currentExerciseIndex].questions.push(questionObjects.length - 1);
+            }
+            nextLine();
+            continue;
+        }
+
+        //-------------- Se não caiu em nada, é texto simples --------------
+        htmlAccum += `<div class="exercise-line">${line}</div>`;
+        nextLine();
+    }
+
+    return htmlAccum;
+}
 
     //====================================================
     //  (8) Render Questions
     //====================================================
     function renderQuestions(container) {
+        // Função para auto-redimensionamento
+        function setupAutoResize(field) {
+            const autoResize = () => {
+                /* 1) Controle de largura */
+                if (!field.classList.contains('size-large') && 
+                    !field.classList.contains('size-huge')) {
+                    field.style.width = 'auto';
+                    const desired = field.scrollWidth + 2;
+                    const max = parseFloat(getComputedStyle(field).maxWidth);
+                    field.style.width = Math.min(desired, max) + 'px';
+                }
+
+                /* 2) Controle de altura */
+                field.style.height = 'auto';
+                const newHeight = field.scrollHeight;
+                field.style.height = newHeight + 'px';
+                
+                /* 3) Scroll automático */
+                if (document.activeElement === field) {
+                    field.scrollTop = field.scrollHeight;
+                }
+            };
+
+            autoResize();
+            field.addEventListener('input', autoResize);
+            window.addEventListener('resize', autoResize);
+        }
+
         // Renderizamos cada tipo
         questionObjects.forEach((qObj) => {
 
@@ -1101,32 +1227,10 @@ if (sizeVal === 'essay') useTextarea = true;
             }
         });
 
-    // ---------- auto-resize largura + altura ----------
-// ---------- auto-resize largura + altura ----------
-container.querySelectorAll('input.answer-input, textarea.answer-input').forEach(field => {
-  const autoResize = () => {
-  /* 1) LARGURA – ajuste normal */
-  field.style.width = 'auto';
-  const desired = field.scrollWidth + 2;
-  const max = parseFloat(getComputedStyle(field).maxWidth);
-  field.style.width = Math.min(desired, max) + 'px';
-
-  /* 2) ALTURA – garante crescimento para baixo */
-  field.style.height = 'auto';
-  const newHeight = field.scrollHeight;
-  field.style.height = newHeight + 'px';
-  
-  /* 3) Rola o campo para o final (se estiver em foco) */
-  if (document.activeElement === field) {
-    field.scrollTop = field.scrollHeight;
-  }
-};
-
-  autoResize();                       // executa na renderização
-  field.addEventListener('input', autoResize);
-  window.addEventListener('resize', autoResize);     // reajusta ao redimensionar
-});
-
+        // Configura auto-resize para todos os campos de resposta
+        container.querySelectorAll('input.answer-input, textarea.answer-input').forEach(field => {
+            setupAutoResize(field);
+        });
     }
 
     //====================================================
@@ -1222,7 +1326,7 @@ container.querySelectorAll('input.answer-input, textarea.answer-input').forEach(
         windowWidth: 800,
         autoPaging: 'text', 
         html2canvas: {
-          scale: 0.6,        // Reduz ligeiramente para evitar corte na horizontal
+          scale: 0.75,        // Ajustado para 0.75 para melhor legibilidade
           useCORS: true
         },
         callback: function(pdf) {
