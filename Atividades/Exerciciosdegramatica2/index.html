@@ -250,97 +250,7 @@ textarea.answer-input {
       img {
           max-width: 100% !important;
           height: auto !important;
-          max-height: 120mm !important;   /* não “estoura” a página */
-          object-fit: contain !important;
           page-break-inside: avoid; /* Evita corte de imagem */
-      }
-
-      /* Estilos específicos para PDF */
-      .pdf-optimized {
-          font-size: 14px;
-          line-height: 1.5;
-      }
-
-      .pdf-optimized .exercise-block {
-          margin-bottom: 25px;
-          page-break-inside: avoid;
-      }
-
-      .pdf-optimized .exercise-title {
-          page-break-after: avoid;
-          margin-bottom: 15px;
-      }
-
-      .pdf-optimized .answer-line {
-          display: flex;
-          align-items: center;
-          margin: 8px 0;
-          page-break-inside: avoid;
-      }
-
-      .pdf-optimized .image-container {
-          text-align: center;
-          margin: 15px 0;
-          page-break-inside: avoid;
-      }
-
-      .pdf-optimized .answer-input {
-          border: 1px solid #000 !important;
-          min-height: 20px;
-          margin: 0 10px;
-      }
-
-      .pdf-optimized .large-answer-field {
-          border-bottom: 1px solid #000;
-          min-height: 25px;
-          width: 100%;
-          display: inline-block;
-      }
-
-      /* ===== NOVAS REGRAS PARA CONTROLE DE QUEBRAS ===== */
-      .page-break-avoid {
-          page-break-inside: avoid;
-          break-inside: avoid;
-      }
-      
-      .page-break-before {
-          page-break-before: always;
-          break-before: page;
-      }
-      
-      .exercise-container {
-          margin-bottom: 20px;
-          page-break-inside: avoid;
-          break-inside: avoid;
-      }
-      
-      @media print {
-          .no-print {
-              display: none !important;
-          }
-          
-          body {
-              padding: 0 !important;
-              margin: 0 !important;
-              font-size: 12px !important;
-              line-height: 1.4 !important;
-          }
-          
-          .container {
-              max-width: 100% !important;
-              padding: 5mm !important;
-              margin: 0 !important;
-          }
-          
-          img {
-              max-height: 100mm !important;
-              max-width: 100% !important;
-          }
-          
-          .answer-input, textarea {
-              border: 1px solid #000 !important;
-              background: transparent !important;
-          }
       }
 
       @media (max-width: 600px) {
@@ -376,19 +286,19 @@ textarea.answer-input {
 <body>
 
 <div class="container">
-    <a href="javascript:goBack()" class="back-button no-print">Back</a>
+    <a href="javascript:goBack()" class="back-button">Back</a>
     <h1>Hannah's Grammar Exercises</h1>
 
     <!-- Botão para exibir exemplos do primeiro item de cada exercício -->
-    <button id="show-examples-btn" class="no-print" onclick="showExamples()">Show Examples</button>
+    <button id="show-examples-btn" onclick="showExamples()">Show Examples</button>
 
     <div id="exercises"></div>
 
     <!-- Botão para checar TODAS as respostas -->
-    <button id="check-all-btn" class="no-print" onclick="checkAllAnswers()">Check Answers</button>
+    <button id="check-all-btn" onclick="checkAllAnswers()">Check Answers</button>
 
     <!-- Botão para gerar PDF -->
-    <button id="generate-pdf-btn" class="no-print" onclick="generatePDF()" style="display: none;">Generate PDF</button>
+    <button id="generate-pdf-btn" onclick="generatePDF()" style="display: none;">Generate PDF</button>
 </div>
 
 <!-- Modal -->
@@ -485,7 +395,7 @@ textarea.answer-input {
         try {
             if (fase === "last") {
                 const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-                await firebase.database().ref(`usuarios/${userId}/progresso/${nextUnit}`).set({ fase1: true });
+                await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
             } else if (fase === "end") {
                 const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
                 await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
@@ -838,7 +748,7 @@ function parseFileLines(lines) {
         //-------------- #IMG --------------
         if (line.toUpperCase().startsWith('#IMG:')) {
             let file = line.substring(5).trim();
-            htmlAccum += `<div class="image-container"><img data-imgfile="${file}" style="max-width:100%; height:auto;" alt="Image" crossorigin="anonymous"></div>`;
+            htmlAccum += `<div class="exercise-line"><img data-imgfile="${file}" style="max-width:100%; height:auto;" alt="Image" crossorigin="anonymous"></div>`;
             nextLine();
             continue;
         }
@@ -1362,190 +1272,67 @@ function parseFileLines(lines) {
         }
     }
 
-    // ====================================================
+    //====================================================
     //  (10) Geração de PDF
-    // ====================================================
-    async function generatePDF() {
-        try {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF({ 
-                unit: 'mm', 
-                format: 'a4',
-                compress: true 
-            });
+    //====================================================
+    function generatePDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF('p', 'pt', 'a4');
 
-            const loading = showLoadingIndicator();
-            
-            // 1. Clona e prepara o conteúdo
-            const clone = preparePDFContent();
-            
-            // 2. Aplica transformação de escala
-            clone.style.transform = "scale(0.8)";
-            clone.style.transformOrigin = "top left";
-            clone.style.width = "210mm";
-            
-            // 3. Força novas quebras de página
-            enhancePagination(clone);
+      // Clona a div.container
+      const containerOriginal = document.querySelector('.container');
+      let containerClone = containerOriginal.cloneNode(true);
 
-            // 4. Gera o PDF com margens adequadas
-            await doc.html(clone, {
-                x: 15,
-                y: 15,
-                width: 180, // 210 - 15*2
-                windowWidth: 1200,
-                autoPaging: 'text',
-                
-                pagebreak: { 
-                    mode: 'css',
-                    avoid: '.page-break-avoid',
-                    before: '.page-break-before'
-                },
-                
-                html2canvas: {
-                    scale: 0.5,
-                    useCORS: true,
-                    allowTaint: true,
-                    logging: false
-                },
-                
-                callback: (pdf) => {
-                    loading.remove();
-                    pdf.save('Grammar_Exercises.pdf');
-                }
-            });
+      // Remove botões no clone
+      let checkAllBtn = containerClone.querySelector('#check-all-btn');
+      if (checkAllBtn) checkAllBtn.remove();
+      let showExamplesBtn = containerClone.querySelector('#show-examples-btn');
+      if (showExamplesBtn) showExamplesBtn.remove();
+      let generatePdfBtn = containerClone.querySelector('#generate-pdf-btn');
+      if (generatePdfBtn) generatePdfBtn.remove();
+      let backButton = containerClone.querySelector('.back-button');
+      if (backButton) backButton.remove();
 
-        } catch (err) {
-            console.error('Erro ao gerar PDF:', err);
-            alert('Erro ao gerar PDF: ' + err.message);
-            document.querySelector('.pdf-loading')?.remove();
+      // Limpa respostas
+      let allAnswerInputs = containerClone.querySelectorAll('.answer-input');
+      allAnswerInputs.forEach(input => {
+          if (input.tagName.toLowerCase() === 'textarea') {
+              input.value = "";
+              input.textContent = "___________";
+          } else {
+              input.value = "";
+              input.setAttribute('placeholder', '___________');
+          }
+          input.classList.remove('correct', 'incorrect');
+      });
+
+      let allFreeText = containerClone.querySelectorAll('.free-text-input');
+      allFreeText.forEach(f => {
+          f.value = "";
+          f.setAttribute('placeholder', '____________');
+      });
+
+      let correctSpans = containerClone.querySelectorAll('.correct-answer-span');
+      correctSpans.forEach(span => {
+          span.style.display = 'none';
+      });
+
+      // Ajuste para tentar evitar corte horizontal
+      // e melhorar as quebras de página
+      doc.html(containerClone, {
+        x: 10,
+        y: 10,
+        width: 580,           // Um pouco mais que 560 para aproveitar mais a página, mas ainda cabendo
+        windowWidth: 800,
+        autoPaging: 'text', 
+        html2canvas: {
+          scale: 0.75,        // Ajustado para 0.75 para melhor legibilidade
+          useCORS: true
+        },
+        callback: function(pdf) {
+          pdf.save("Hannah_Grammar_Exercises.pdf");
         }
-    }
-
-    // ====================================================
-    //  Função que agrupa e controla quebras de página
-    // ====================================================
-    function enhancePagination(container) {
-        // Agrupa exercícios em contêineres indivisíveis
-        const elements = Array.from(container.children);
-        let currentContainer = null;
-        
-        elements.forEach(el => {
-            if (el.classList.contains('exercise-title') || 
-                el.classList.contains('exercise-description')) {
-                
-                if (currentContainer) {
-                    currentContainer.classList.add('page-break-avoid');
-                }
-                
-                currentContainer = document.createElement('div');
-                currentContainer.className = 'exercise-container page-break-avoid';
-                container.insertBefore(currentContainer, el);
-            }
-            
-            if (currentContainer) {
-                currentContainer.appendChild(el);
-            }
-        });
-        
-        // Insere quebras antes de elementos grandes
-        const containers = container.querySelectorAll('.exercise-container');
-        containers.forEach((cont, i) => {
-            if (i > 0) {
-                const prevHeight = containers[i-1].offsetHeight;
-                if (prevHeight > 600) { // Se > 60% da página
-                    cont.classList.add('page-break-before');
-                }
-            }
-        });
-        
-        // Protege elementos individuais
-        container.querySelectorAll('img, table').forEach(el => {
-            el.classList.add('page-break-avoid');
-        });
-    }
-
-    // ====================================================
-    //  Preparação do conteúdo para PDF
-    // ====================================================
-    function preparePDFContent() {
-        const containerOriginal = document.querySelector('.container');
-        const containerClone = containerOriginal.cloneNode(true);
-        
-        // Remove elementos interativos
-        ['#check-all-btn', '#show-examples-btn', '#generate-pdf-btn', '.back-button'].forEach(selector => {
-            const el = containerClone.querySelector(selector);
-            if (el) el.remove();
-        });
-        
-        // Processa campos de resposta
-        containerClone.querySelectorAll('.answer-input').forEach(input => {
-            if (!input.classList.contains('size-large') && 
-                !input.classList.contains('size-huge')) {
-                input.value = "";
-                input.setAttribute('placeholder', '__________');
-            } else {
-                // Substitui campos grandes por linhas
-                const line = document.createElement('div');
-                line.style.borderBottom = '1px solid #000';
-                line.style.minHeight = '20px';
-                line.style.width = '100%';
-                line.style.margin = '5px 0';
-                input.parentNode.replaceChild(line, input);
-            }
-        });
-        
-        // Remove feedbacks de correção
-        containerClone.querySelectorAll('.correct, .incorrect, .correct-answer-span').forEach(el => {
-            el.remove();
-        });
-        
-        return containerClone;
-    }
-
-    // ====================================================
-    //  Indicador de carregamento para PDF
-    // ====================================================
-    function showLoadingIndicator() {
-        // overlay de tela inteira
-        const overlay = document.createElement('div');
-        overlay.className = 'pdf-loading';
-        Object.assign(overlay.style, {
-            position: 'fixed',
-            top: '0',
-            left: '0',
-            width: '100%',
-            height: '100%',
-            background: 'rgba(0,0,0,0.45)',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: '10000'
-        });
-
-        // spinner simples
-        const spinner = document.createElement('div');
-        Object.assign(spinner.style, {
-            width: '60px',
-            height: '60px',
-            border: '8px solid #f3f3f3',
-            borderTop: '8px solid #000',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite'
-        });
-        overlay.appendChild(spinner);
-
-        // keyframes da animação
-        const styleTag = document.createElement('style');
-        styleTag.textContent = `
-            @keyframes spin {
-                0%   { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-            }`;
-        document.head.appendChild(styleTag);
-
-        // coloca na página e devolve para depois remover
-        document.body.appendChild(overlay);
-        return overlay;
+      });
     }
 
     //====================================================
