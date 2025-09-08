@@ -294,13 +294,6 @@
     border-bottom:3px solid #cfe0ff;
     margin:0 6px -2px;
   }
-.square-outline{
-  width:42px; height:42px;
-  border:6px solid var(--sq, #3b82f6); /* azul por padrão */
-  border-radius:10px;                  /* tire se quiser cantos retos */
-  background:transparent;
-  display:inline-block;
-}
 /* Quadrado padrão (já deve existir; só acrescente/ajuste transições) */
 .square-outline{
   width:42px; height:42px;
@@ -395,9 +388,23 @@
 
   // ====== Estado ======
   let questions = [];
-  let idx = 0;
-  let answered = false;
+// --- controle global de fala/áudio ---
+let isReading = false;   // indica se está lendo/tocando um item agora
+let currentAudio = null; // referência do <audio> em reprodução (se houver)
 
+function stopAllAudio(){
+  // cancela qualquer TTS em andamento
+  try { speechSynthesis.cancel(); } catch(e){}
+  // para áudio de arquivo, se estiver tocando
+  if (currentAudio){
+    try { currentAudio.pause(); currentAudio.currentTime = 0; } catch(e){}
+    currentAudio = null;
+  }
+}
+
+  let idx = 0;
+  let answered = false;   
+  
   // ====== Elementos ======
   const subtitle = document.getElementById('subtitle');
   const pill = document.getElementById('pill');
@@ -477,11 +484,16 @@ if (q.type === 'fillblank' && !/\_\_+/.test(q.prompt || '')) {
   promptEl.appendChild(line);
 }
     btnPlayPrompt.onclick = () => {
-      playPrompt(q);
-    };
+  if (isReading) return;     // não toca se já estiver lendo algo
+  playPrompt(q);             // usa o mp3 se existir, senão TTS (já tratado em playPrompt)
+};
 
-    // Botão "repetir": usa Web Speech Synthesis (fallback)
-    btnRepeat.onclick = () => speak(q.prompt);
+btnRepeat.onclick = () => {
+  if (isReading) return;     // evita “tilt” com cliques seguidos
+  stopAllAudio();            // para qualquer áudio/voz atual
+  const t = q.targetWord || q.tts || q.prompt || '';
+  speak(t);                  // fala apenas o texto (TTS)
+};
 
     // Mídia principal (imagem da pergunta opcional)
     mediaBox.innerHTML = '';
@@ -568,20 +580,19 @@ btnNext.onclick = () => {
   btn.appendChild(textWrap);
 
   btn.onclick = () => {
-    sTap.play().catch(()=>{});
-    handleAnswer(q, o, btn);
-  };
+  sTap.play().catch(()=>{});
+  speakSelectedThenCheck(q, o, btn);
+};
 
-  // Thumb pode tocar áudio da opção, se houver
-  if (o.audio) {
-    thumb.style.cursor = 'pointer';
-    thumb.title = 'Listen';
-    thumb.onclick = (e) => {
-      e.stopPropagation();
-      const a = new Audio(absPath(o.audio));
-      a.play().catch(()=>{});
-    };
-  }
+  // Clique no thumb: falar a opção e contar a tentativa (igual ao botão)
+thumb.style.cursor = 'pointer';
+thumb.title = 'Play & choose';
+thumb.onclick = (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  sTap.play().catch(()=>{});
+  speakSelectedThenCheck(q, o, btn);
+};
 
   return btn;
 }
@@ -619,13 +630,16 @@ btnNext.onclick = () => {
 
   // ====== Áudio do prompt ======
   function playPrompt(q){
-  const ttsText = q.targetWord || q.tts || q.prompt;
+  stopAllAudio();
+
+  const ttsText = q.targetWord || q.tts || q.prompt || '';
 
   if (q.promptAudio){
     const a = new Audio(absPath(q.promptAudio));
-    a.oncanplaythrough = () => a.play().catch(() => speak(ttsText));
-    a.onerror = () => speak(ttsText);
-    a.load();
+    currentAudio = a;
+    a.onended = () => { currentAudio = null; };
+    a.onerror  = () => { currentAudio = null; speak(ttsText); };
+    a.play().catch(() => { currentAudio = null; speak(ttsText); });
   } else {
     speak(ttsText);
   }
@@ -634,7 +648,7 @@ btnNext.onclick = () => {
   // ====== Fim ======
   function finish(){
     bar.style.width = '100%';
-    promptEl.textContent = '🎉 Parabéns! Você concluiu todas as perguntas!';
+    promptEl.textContent = "🎉 Congratulations! You've completed all the questions!";
     mediaBox.innerHTML = '<div style="font-size:44px">🏅</div>';
     optionsEl.innerHTML = '';
     btnNext.disabled = true;
@@ -903,6 +917,62 @@ function renderMatchQuestion(q){
 
   leftShuf.forEach(item => colL.appendChild(makeLeftBtn(item)));
   rightShuf.forEach(item => colR.appendChild(makeRightBtn(item)));
+}
+
+function speakSelectedThenCheck(q, o, btn){
+  if (answered || isReading) return;
+  isReading = true;
+
+  // desabilita opções e o "Next" durante a leitura
+  const allBtns = Array.from(document.querySelectorAll('.option'));
+  allBtns.forEach(el => el.disabled = true);
+  btnNext.disabled = true;
+  btnNext.classList.remove('ready');
+
+  const finish = () => {
+    isReading = false;
+    if (!answered) allBtns.forEach(el => el.disabled = false);
+    handleAnswer(q, o, btn); // feedback só depois de ouvir
+  };
+
+  // texto a falar se não houver áudio próprio
+  const say = (o.tts || o.label || o.value || '').toString().trim();
+
+  // para qualquer coisa tocando antes de iniciar outra
+  stopAllAudio();
+
+  if (o.audio){
+    try{
+      const a = new Audio(absPath(o.audio));
+      currentAudio = a;
+
+      let done = false;
+      const safeFinish = () => { if (!done){ done = true; currentAudio = null; finish(); } };
+
+      a.onended = safeFinish;
+      a.onerror = () => { currentAudio = null; speak(say); setTimeout(safeFinish, 600); };
+      a.play().catch(() => { currentAudio = null; speak(say); setTimeout(safeFinish, 600); });
+
+      // guarda-chuva caso eventos não disparem (autoplay bloqueado, etc.)
+      setTimeout(safeFinish, 3500);
+    }catch{
+      speak(say);
+      setTimeout(finish, 600);
+    }
+  } else {
+    try{
+      const u = new SpeechSynthesisUtterance(say || ' ');
+      u.lang = 'en-US'; u.rate = 0.95; u.pitch = 1.0;
+      u.onend   = finish;
+      u.onerror = () => setTimeout(finish, 300);
+      speechSynthesis.cancel();
+      speechSynthesis.speak(u);
+      // fallback se onend não vier
+      setTimeout(() => { if (isReading) finish(); }, 2500);
+    }catch{
+      setTimeout(finish, 300);
+    }
+  }
 }
 })();
 </script>
