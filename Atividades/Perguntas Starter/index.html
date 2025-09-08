@@ -298,53 +298,59 @@
 
   // ====== Cria um botão de opção (imagem + texto + áudio opcionais) ======
   function makeOption(q, opt){
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'option';
-    btn.setAttribute('aria-label', opt.aria || opt.label || 'opção');
+  // Normaliza: permite ["dog","cat"] ou [{label:"Dog", value:"dog"}, ...]
+  const o = (typeof opt === 'string') ? { label: opt, value: opt } : { ...opt };
 
-    const thumb = document.createElement('div');
-    thumb.className = 'thumb';
-    if(opt.image){
-      const img = new Image();
-      img.src = absPath(opt.image);
-      img.alt = opt.label || '';
-      thumb.appendChild(img);
-    } else {
-      thumb.textContent = opt.emoji || '🔤';
-    }
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'option';
+  btn.setAttribute('aria-label', o.aria || o.label || 'opção');
 
-    const textWrap = document.createElement('div');
-    const label = document.createElement('div');
-    label.className = 'label';
-    label.textContent = opt.label || '';
+  const thumb = document.createElement('div');
+  thumb.className = 'thumb';
+  if (o.image) {
+    const img = new Image();
+    img.src = absPath(o.image);
+    img.alt = o.label || '';
+    thumb.appendChild(img);
+  } else {
+    thumb.textContent = o.emoji || '🔤';
+  }
+
+  const textWrap = document.createElement('div');
+  const label = document.createElement('div');
+  label.className = 'label';
+  label.textContent = o.label || '';
+  textWrap.appendChild(label);
+
+  if (typeof o.sub === 'string' && o.sub.trim()) {
     const sub = document.createElement('div');
     sub.className = 'sub';
-    sub.textContent = opt.sub || '';
-    textWrap.appendChild(label);
-    if(opt.sub) textWrap.appendChild(sub);
-
-    btn.appendChild(thumb);
-    btn.appendChild(textWrap);
-
-    btn.onclick = () => {
-      sTap.play().catch(()=>{});
-      handleAnswer(q, opt, btn);
-    };
-
-    // Clique no thumb toca áudio da opção, se houver
-    if(opt.audio){
-      thumb.style.cursor='pointer';
-      thumb.title='Ouvir';
-      thumb.onclick = (e)=>{
-        e.stopPropagation();
-        const a = new Audio(absPath(opt.audio));
-        a.play().catch(()=>{});
-      };
-    }
-
-    return btn;
+    sub.textContent = o.sub;
+    textWrap.appendChild(sub);
   }
+
+  btn.appendChild(thumb);
+  btn.appendChild(textWrap);
+
+  btn.onclick = () => {
+    sTap.play().catch(()=>{});
+    handleAnswer(q, o, btn);
+  };
+
+  // Thumb pode tocar áudio da opção, se houver
+  if (o.audio) {
+    thumb.style.cursor = 'pointer';
+    thumb.title = 'Ouvir';
+    thumb.onclick = (e) => {
+      e.stopPropagation();
+      const a = new Audio(absPath(o.audio));
+      a.play().catch(()=>{});
+    };
+  }
+
+  return btn;
+}
 
   // ====== Lógica de resposta ======
   function handleAnswer(q, opt, btn){
