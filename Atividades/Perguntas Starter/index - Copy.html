@@ -137,20 +137,6 @@
     background:#111827; color:white; padding:10px 14px; border-radius:12px; font-size:14px; box-shadow:var(--shadow); opacity:.96;
   }
   .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;}
-.build-wrap{margin-top:8px}
-.build-tray{
-  min-height:56px; background:#eef4ff; border:2px dashed #cfe0ff; border-radius:14px;
-  padding:10px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;
-}
-.word-chip{
-  background:#fff; border:2px solid #dbe5ff; border-radius:12px; padding:8px 12px; font-weight:800;
-  box-shadow:0 2px 6px rgba(0,0,0,.05); user-select:none;
-}
-.build-actions{display:flex; gap:8px; margin-top:8px}
-.build-btn{
-  border:none; background:#e6f0ff; color:#0f3ea8; padding:8px 12px; border-radius:10px; cursor:pointer; font-weight:700;
-}
-.build-btn:active{transform:translateY(1px)}
 </style>
 </head>
 <body>
@@ -295,25 +281,20 @@
 
     // Opções
     optionsEl.innerHTML = '';
+    const shuffled = (q.shuffleOptions===false) ? q.options : shuffle([...q.options]);
+    shuffled.forEach(opt => {
+      const node = makeOption(q, opt);
+      optionsEl.appendChild(node);
+    });
 
-if (q.type === 'order') {
-  renderOrderQuestion(q);
-} else {
-  const opts = (q.shuffleOptions===false) ? q.options : shuffle([...q.options]);
-  opts.forEach(opt => {
-    const node = makeOption(q, opt);
-    optionsEl.appendChild(node);
-  });
-}
-
-// Avançar
-btnNext.onclick = () => {
-  sNext.play().catch(()=>{});
-  idx++;
-  if (idx >= questions.length) { finish(); return; }
-  renderQuestion();
-};
-}
+    // Avançar
+    btnNext.onclick = () => {
+      sNext.play().catch(()=>{});
+      idx++;
+      if(idx >= questions.length){ finish(); return; }
+      renderQuestion();
+    }
+  }
 
   // ====== Cria um botão de opção (imagem + texto + áudio opcionais) ======
   function makeOption(q, opt){
@@ -479,98 +460,6 @@ btnNext.onclick = () => {
     if(p.startsWith('/')) return p;
     return `${BASE}/${p}`.replace(/\/+/g,'/');
   }
-function renderOrderQuestion(q){
-  // Normaliza inputs
-  const words = q.options.map(w => String(w));
-  const answerSeq = (q.answer || []).map(w => String(w));
-  let built = [];
-
-  // Bandeja de construção
-  const wrap = document.createElement('div');
-  wrap.className = 'build-wrap';
-
-  const tray = document.createElement('div');
-  tray.className = 'build-tray';
-  tray.id = 'buildTray';
-  tray.setAttribute('aria-label','Sentence tray');
-
-  const actions = document.createElement('div');
-  actions.className = 'build-actions';
-  const undoBtn = document.createElement('button');
-  undoBtn.className = 'build-btn'; undoBtn.textContent = 'Undo';
-  const clearBtn = document.createElement('button');
-  clearBtn.className = 'build-btn'; clearBtn.textContent = 'Clear';
-
-  actions.appendChild(undoBtn); actions.appendChild(clearBtn);
-  wrap.appendChild(tray); wrap.appendChild(actions);
-  optionsEl.appendChild(wrap);
-
-  // Cria botões de palavras (na grade padrão)
-  const grid = document.createElement('div');
-  grid.style.display = 'grid';
-  grid.style.gridTemplateColumns = 'repeat(2,1fr)';
-  grid.style.gap = '12px';
-  optionsEl.appendChild(grid);
-
-  words.forEach(w=>{
-    const b = document.createElement('button');
-    b.type='button';
-    b.className='option';
-    b.innerHTML = `<div class="thumb">🔤</div><div class="label">${w}</div>`;
-    b.onclick = ()=>{
-      sTap.play().catch(()=>{});
-      // evita exceder contagem da resposta (opcional)
-      if (built.length >= answerSeq.length) return;
-      built.push(w);
-      drawTray();
-      checkBuilt();
-    };
-    grid.appendChild(b);
-  });
-
-  undoBtn.onclick = ()=>{
-    built.pop();
-    drawTray();
-    btnNext.disabled = true;
-    btnNext.classList.remove('ready');
-  };
-  clearBtn.onclick = ()=>{
-    built = [];
-    drawTray();
-    btnNext.disabled = true;
-    btnNext.classList.remove('ready');
-  };
-
-  function drawTray(){
-    tray.innerHTML = '';
-    built.forEach(word=>{
-      const chip = document.createElement('span');
-      chip.className='word-chip';
-      chip.textContent = word;
-      tray.appendChild(chip);
-    });
-  }
-
-  function checkBuilt(){
-    const sameLen = built.length === answerSeq.length;
-    if (!sameLen) return;
-    const ok = built.every((w,i)=> normalize(w) === normalize(answerSeq[i]));
-    if (ok){
-      confetti(18);
-      sCorrect.play().catch(()=>{});
-      speakFriendly(['Great!','Awesome!']);
-      liveEl.textContent = 'Ordem correta';
-      btnNext.disabled = false;
-      btnNext.classList.add('ready');
-      // Bloqueia toques adicionais
-      Array.from(optionsEl.querySelectorAll('.option')).forEach(el=>el.disabled=true);
-    }else{
-      sWrong.play().catch(()=>{});
-      speakFriendly(['Try again!']);
-      liveEl.textContent = 'Ordem incorreta, tente novamente';
-    }
-  }
-}
 })();
 </script>
 </body>
