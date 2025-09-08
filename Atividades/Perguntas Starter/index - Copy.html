@@ -105,25 +105,27 @@
 
   /* === Media grande da pergunta (sem cortes) === */
   .q-media{
-    width:100%;
-    aspect-ratio:16/10;
-    background:#eef4ff;
-    border:1px dashed #cfe0ff;
-    border-radius:14px;
-    display:flex;
-    align-items:center;          /* centraliza vertical */
-    justify-content:center;      /* centraliza horizontal */
-    overflow:hidden;
-  }
-  .q-media img{
-    max-width:100%;
-    max-height:100%;
-    width:auto;
-    height:auto;
-    object-fit:contain;          /* não corta */
-    padding:8px;                 /* respiro */
-    display:block;
-  }
+  width:100%;
+  aspect-ratio:16/10;
+  background:#eef4ff;
+  border:1px dashed #cfe0ff;
+  border-radius:14px;
+  padding:8px;                 /* padding vai no container, não no <img> */
+  overflow:hidden;
+  display:block;               /* flex não é necessário aqui */
+}
+.q-media img{
+  width:100%;                  /* define ambas as dimensões */
+  height:100%;
+  object-fit:contain;          /* agora o contain funciona em todo browser */
+  display:block;
+  /* nada de padding no <img> */
+}
+
+/* Fallback para Safari antigo/Android antigo que não tem aspect-ratio */
+@supports not (aspect-ratio: 16/10){
+  .q-media{ height: 220px; }   /* ajuste este valor se quiser mais/menos alto */
+}
 
   .q-controls{display:flex; gap:8px; align-items:center; margin-top:8px}
 
@@ -332,6 +334,56 @@
   from{ transform:scale(.6); opacity:0 }
   to{   transform:scale(1);  opacity:1 }
 }
+/* para “desativado” */
+.icon-btn[disabled]{ opacity:.4; pointer-events:none; }
+/* para esconder completamente */
+.is-hidden{ display:none !important; }
+/* ====== ORDER (grade de palavras) ====== */
+.build-grid{
+  display:grid;
+  gap:12px;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+}
+
+/* ====== Ajustes gerais de mobile ====== */
+@media (max-width:540px){
+
+  /* Quadro de mídia um pouco mais alto e com menos margem interna */
+  .q-media{ aspect-ratio: 4/3; padding:6px; }
+
+  /* Botões mais compactos */
+  .option{ min-height:68px; padding:12px; }
+  .option .thumb{ width:56px; height:56px; }
+  .option .label{ font-size:18px; }
+
+  /* ORDER: força 1 coluna quando a tela é estreita */
+  .build-grid{
+    grid-template-columns: 1fr;
+  }
+
+  /* MATCH: empilha colunas (esquerda em cima, direita embaixo) */
+  .match-grid{
+    grid-template-columns: 1fr;
+    gap:10px;
+  }
+  .match-col{ gap:10px; }
+}
+
+/* Telas bem baixas (ex.: smartphones pequenos em landscape):
+   limita a altura do bloco de opções e habilita scroll interno */
+@media (max-height:700px) and (max-width:540px){
+  .options{
+    max-height: 44vh;
+    overflow:auto;
+    padding-right: 2px; /* evita o conteúdo colar na borda com a barra de rolagem */
+  }
+}
+
+/* Evita rótulos quebrarem layout em telas estreitas */
+.option .label{ word-break: break-word; }
+@media (max-width:540px){
+  .q-prompt{ font-size:20px; }
+}
 </style>
 </head>
 <body>
@@ -465,6 +517,11 @@ function stopAllAudio(){
     answered = false;
     btnNext.disabled = true;
     btnNext.classList.remove('ready');
+// garantir que os botões voltem quando for uma nova pergunta
+btnPlayPrompt.disabled = false;
+btnRepeat.disabled = false;
+btnPlayPrompt.classList.remove('is-hidden');
+btnRepeat.classList.remove('is-hidden');
 
     const q = questions[idx];
     if(!q){ finish(); return; }
@@ -503,11 +560,11 @@ btnRepeat.onclick = () => {
       img.src = absPath(q.image);
       mediaBox.appendChild(img);
     } else {
-      const ph = document.createElement('div');
-      ph.textContent = '👀';
-      ph.style.fontSize = '42px';
-      mediaBox.appendChild(ph);
-    }
+  const img = new Image();
+  img.src = './hannah_pensando.png';   // como está na mesma pasta do index.html
+  img.alt = 'Hannah pensando';
+  mediaBox.appendChild(img);
+}
 
     // Opções
     optionsEl.innerHTML = '';
@@ -607,6 +664,15 @@ thumb.onclick = (e) => {
       confetti(18);
       sCorrect.play().catch(()=>{});
       speakFriendly(['Yes! Great job!','Awesome!','You did it!']);
+try {
+  mediaBox.innerHTML = '';
+  const gif = new Image();
+  gif.src = './hannah_feliz.gif';
+  gif.alt = 'Hannah comemorando';
+  gif.setAttribute('draggable','false');   // evita arrastar a imagem
+  gif.style.pointerEvents = 'none';        // evita clique “pegar” foco
+  mediaBox.appendChild(gif);
+} catch(e){}
       liveEl.textContent = 'Resposta correta';
       answered = true;
       btnNext.disabled = false;
@@ -647,16 +713,27 @@ thumb.onclick = (e) => {
 
   // ====== Fim ======
   function finish(){
-    bar.style.width = '100%';
-    promptEl.textContent = "🎉 Congratulations! You've completed all the questions!";
-    mediaBox.innerHTML = '<div style="font-size:44px">🏅</div>';
-    optionsEl.innerHTML = '';
-    btnNext.disabled = true;
-    btnNext.classList.remove('ready');
-    statusPill.textContent = `Concluído • ${questions.length}/${questions.length}`;
-    confetti(30);
-    speakFriendly(['Great! You finished!','Amazing work!']);
-  }
+  // para qualquer áudio/TTS que ainda esteja rodando
+  try { stopAllAudio(); } catch(e){}
+  try { speechSynthesis.cancel(); } catch(e){}
+  isReading = false;
+
+  bar.style.width = '100%';
+  promptEl.textContent = "🎉 Congratulations! You've completed all the questions!";
+  mediaBox.innerHTML = '<div style="font-size:44px">🏅</div>';
+  optionsEl.innerHTML = '';
+  btnNext.disabled = true;
+  btnNext.classList.remove('ready');
+  statusPill.textContent = `Concluído • ${questions.length}/${questions.length}`;
+  confetti(30);
+  speakFriendly(['Great! You finished!','Amazing work!']);
+
+  // >>> esconder e desativar os botões de áudio na tela final
+  btnPlayPrompt.disabled = true;
+  btnRepeat.disabled = true;
+  btnPlayPrompt.classList.add('is-hidden');
+  btnRepeat.classList.add('is-hidden');
+}
 
   // ====== Helpers ======
   function toast(msg){
@@ -738,12 +815,10 @@ function renderOrderQuestion(q){
   wrap.appendChild(tray); wrap.appendChild(actions);
   optionsEl.appendChild(wrap);
 
-  // Cria botões de palavras (na grade padrão)
-  const grid = document.createElement('div');
-  grid.style.display = 'grid';
-  grid.style.gridTemplateColumns = 'repeat(2,1fr)';
-  grid.style.gap = '12px';
-  optionsEl.appendChild(grid);
+  // Cria grade responsiva (classe controla as colunas via CSS)
+const grid = document.createElement('div');
+grid.className = 'build-grid';
+optionsEl.appendChild(grid);
 
   words.forEach(w=>{
     const b = document.createElement('button');
@@ -785,25 +860,40 @@ function renderOrderQuestion(q){
   }
 
   function checkBuilt(){
-    const sameLen = built.length === answerSeq.length;
-    if (!sameLen) return;
-    const ok = built.every((w,i)=> normalize(w) === normalize(answerSeq[i]));
-    if (ok){
-      confetti(18);
-      sCorrect.play().catch(()=>{});
-      speakFriendly(['Great!','Awesome!']);
-      liveEl.textContent = 'Ordem correta';
-      btnNext.disabled = false;
-      btnNext.classList.add('ready');
-      // Bloqueia toques adicionais
-      Array.from(optionsEl.querySelectorAll('.option')).forEach(el=>el.disabled=true);
-    }else{
-      sWrong.play().catch(()=>{});
-      speakFriendly(['Try again!']);
-      liveEl.textContent = 'Ordem incorreta, tente novamente';
-    }
+  const sameLen = built.length === answerSeq.length;
+  if (!sameLen) return;
+
+  const ok = built.every((w,i)=> normalize(w) === normalize(answerSeq[i]));
+  if (ok){
+    // troca o quadro grande por um GIF de comemoração
+    try {
+      mediaBox.innerHTML = '';
+      const gif = new Image();
+      gif.src = './hannah_feliz.gif';     // arquivo na MESMA pasta do index.html
+      gif.alt = 'Hannah comemorando';
+      gif.setAttribute('draggable','false');
+      gif.style.pointerEvents = 'none';
+      mediaBox.appendChild(gif);
+    } catch(e){}
+
+    confetti(18);
+    sCorrect.play().catch(()=>{});
+    speakFriendly(['Great!','Awesome!']);
+    liveEl.textContent = 'Ordem correta';
+    btnNext.disabled = false;
+    btnNext.classList.add('ready');
+    answered = true; // marca como respondido
+
+    // Bloqueia toques adicionais
+    Array.from(optionsEl.querySelectorAll('.option')).forEach(el=> el.disabled = true);
+  } else {
+    sWrong.play().catch(()=>{});
+    speakFriendly(['Try again!']);
+    liveEl.textContent = 'Ordem incorreta, tente novamente';
   }
 }
+} 
+
 function renderMatchQuestion(q){
   const sourcePairs = Array.isArray(q.pairs) ? q.pairs : [];
 
@@ -899,11 +989,31 @@ function renderMatchQuestion(q){
         selectedLeftVal = null;
 
         // terminou?
-        if (matched.size === sourcePairs.length){
-          liveEl.textContent = 'All pairs matched';
-          btnNext.disabled = false;
-          btnNext.classList.add('ready');
-        }
+if (matched.size === sourcePairs.length){
+  // troca o quadro grande por o GIF de comemoração
+  try {
+    mediaBox.innerHTML = '';
+    const gif = new Image();
+    gif.src = './hannah_feliz.gif';   // o arquivo deve estar na MESMA pasta do index.html
+    gif.alt = 'Hannah comemorando';
+    gif.setAttribute('draggable','false');
+    gif.style.pointerEvents = 'none';
+    mediaBox.appendChild(gif);
+  } catch(e){}
+
+  confetti(18);
+  sCorrect.play().catch(()=>{});
+  speakFriendly(['Great!','Awesome!']);
+  liveEl.textContent = 'All pairs matched';
+
+  // finaliza questão
+  answered = true;
+  btnNext.disabled = false;
+  btnNext.classList.add('ready');
+
+  // trava os botões restantes
+  Array.from(optionsEl.querySelectorAll('.option')).forEach(el => el.disabled = true);
+}
       } else {
         sWrong.play().catch(()=>{});
         speakFriendly(['Try again!']);
