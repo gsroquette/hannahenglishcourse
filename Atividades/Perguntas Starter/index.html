@@ -151,6 +151,10 @@
   border:none; background:#e6f0ff; color:#0f3ea8; padding:8px 12px; border-radius:10px; cursor:pointer; font-weight:700;
 }
 .build-btn:active{transform:translateY(1px)}
+.match-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px}
+.match-col{display:flex;flex-direction:column;gap:12px}
+.option.selected{outline:3px solid #60a5fa}
+.option.matched{border-color:#86efac;opacity:.65;pointer-events:none}
 </style>
 </head>
 <body>
@@ -574,6 +578,120 @@ function renderOrderQuestion(q){
       liveEl.textContent = 'Ordem incorreta, tente novamente';
     }
   }
+}
+function renderMatchQuestion(q){
+  const sourcePairs = Array.isArray(q.pairs) ? q.pairs : [];
+
+  // Normaliza itens (aceita string, {label}, {image}, {label,image,value})
+  const normItem = (side, it) => {
+    if (typeof it === 'string') return { label: it, value: it };
+    const o = {...it};
+    if (!o.value) o.value = o.label || o.image || String(Math.random());
+    return o;
+  };
+
+  const leftItems  = sourcePairs.map(p => normItem('left',  p.left));
+  const rightItems = sourcePairs.map(p => normItem('right', p.right));
+
+  const leftShuf  = shuffle([...leftItems]);
+  const rightShuf = shuffle([...rightItems]);
+
+  // Layout
+  const grid = document.createElement('div');
+  grid.className = 'match-grid';
+  const colL = document.createElement('div'); colL.className = 'match-col';
+  const colR = document.createElement('div'); colR.className = 'match-col';
+  grid.appendChild(colL); grid.appendChild(colR);
+  optionsEl.appendChild(grid);
+
+  let selectedLeftBtn = null;
+  let selectedLeftVal = null;
+  let matched = new Set(); // valores já casados
+
+  // Cria um card (texto/ícone à esquerda; imagem ou texto à direita)
+  const makeLeftBtn = (item) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'option';
+    b.dataset.value = item.value;
+
+    const thumb = document.createElement('div'); thumb.className='thumb'; thumb.textContent='🔤';
+    const label = document.createElement('div'); label.className='label'; label.textContent=item.label || item.value;
+    b.appendChild(thumb); b.appendChild(label);
+
+    b.onclick = ()=>{
+      if (b.classList.contains('matched')) return;
+      sTap.play().catch(()=>{});
+      // limpa seleção anterior
+      Array.from(colL.children).forEach(el=>el.classList.remove('selected'));
+      b.classList.add('selected');
+      selectedLeftBtn = b;
+      selectedLeftVal = item.value;
+    };
+    return b;
+  };
+
+  const makeRightBtn = (item) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'option';
+    b.dataset.value = item.value;
+
+    const thumb = document.createElement('div'); thumb.className='thumb';
+    if (item.image){
+      const img = new Image(); img.src = absPath(item.image); img.alt = item.label || '';
+      thumb.appendChild(img);
+    } else {
+      thumb.textContent = item.label ? '🔤' : '❔';
+    }
+    const label = document.createElement('div'); label.className='label';
+    label.textContent = item.label || '';
+    b.appendChild(thumb); b.appendChild(label);
+
+    b.onclick = ()=>{
+      if (b.classList.contains('matched')) return;
+      if (!selectedLeftBtn){
+        toast('Choose a word first 🙂');
+        return;
+      }
+      // tentativa de match
+      const leftVal = selectedLeftVal;
+      const rightVal = item.value;
+      const ok = normalize(leftVal) === normalize(rightVal);
+
+      if (ok){
+        sCorrect.play().catch(()=>{});
+        confetti(10);
+        speakFriendly(['Great!','Nice!']);
+
+        b.classList.add('matched');
+        selectedLeftBtn.classList.add('matched');
+        selectedLeftBtn.classList.remove('selected');
+        matched.add(leftVal);
+
+        // reset seleção
+        selectedLeftBtn = null;
+        selectedLeftVal = null;
+
+        // terminou?
+        if (matched.size === sourcePairs.length){
+          liveEl.textContent = 'All pairs matched';
+          btnNext.disabled = false;
+          btnNext.classList.add('ready');
+        }
+      } else {
+        sWrong.play().catch(()=>{});
+        speakFriendly(['Try again!']);
+        // feedback visual (shake no botão da direita)
+        b.classList.add('err');
+        setTimeout(()=>b.classList.remove('err'), 250);
+      }
+    };
+    return b;
+  };
+
+  leftShuf.forEach(item => colL.appendChild(makeLeftBtn(item)));
+  rightShuf.forEach(item => colR.appendChild(makeRightBtn(item)));
 }
 })();
 </script>
