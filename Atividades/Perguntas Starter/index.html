@@ -568,9 +568,9 @@ btnNext.onclick = () => {
   btn.appendChild(textWrap);
 
   btn.onclick = () => {
-    sTap.play().catch(()=>{});
-    handleAnswer(q, o, btn);
-  };
+  sTap.play().catch(()=>{});
+  speakSelectedThenCheck(q, o, btn);
+};
 
   // Thumb pode tocar áudio da opção, se houver
   if (o.audio) {
@@ -903,6 +903,56 @@ function renderMatchQuestion(q){
 
   leftShuf.forEach(item => colL.appendChild(makeLeftBtn(item)));
   rightShuf.forEach(item => colR.appendChild(makeRightBtn(item)));
+}
+let isReading = false;
+
+function speakSelectedThenCheck(q, o, btn){
+  if (answered || isReading) return;
+  isReading = true;
+
+  // desabilita temporariamente todas as opções enquanto fala
+  const allBtns = Array.from(document.querySelectorAll('.option'));
+  allBtns.forEach(el => el.disabled = true);
+
+  const finish = () => {
+    isReading = false;
+    // reabilita se ainda não acertou (para poder tentar outra)
+    if (!answered) allBtns.forEach(el => el.disabled = false);
+    handleAnswer(q, o, btn);
+  };
+
+  // texto a falar (se não houver áudio próprio)
+  const say = (o.tts || o.label || o.value || '').toString().trim();
+
+  if (o.audio){
+    try{
+      const a = new Audio(absPath(o.audio));
+      let done = false;
+      const safeFinish = () => { if (!done){ done = true; finish(); } };
+
+      a.onended = safeFinish;
+      a.onerror = () => { speak(say); setTimeout(safeFinish, 600); };
+      a.play().catch(()=> { speak(say); setTimeout(safeFinish, 600); });
+
+      // guarda-chuva se o evento não vier (autoplay bloqueado, etc.)
+      setTimeout(safeFinish, 3000);
+    }catch{
+      speak(say); setTimeout(finish, 600);
+    }
+  } else {
+    try{
+      const u = new SpeechSynthesisUtterance(say);
+      u.lang = 'en-US'; u.rate = 0.95; u.pitch = 1.0;
+      u.onend = finish;
+      u.onerror = () => setTimeout(finish, 300);
+      speechSynthesis.cancel();
+      speechSynthesis.speak(u);
+      // fallback se o onend não disparar
+      setTimeout(()=>{ if (isReading) finish(); }, 2500);
+    }catch{
+      setTimeout(finish, 300);
+    }
+  }
 }
 })();
 </script>
