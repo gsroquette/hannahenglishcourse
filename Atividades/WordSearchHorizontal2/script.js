@@ -53,7 +53,7 @@ async function checkNextPhaseUnlocked() {
 // Função para carregar palavras dinamicamente
 async function loadWords() {
     const { level, unit } = getParamsFromURL(); // Obtém os parâmetros da URL
-    const filePath = `../../${level}/${unit}/data1/words.txt`; // Monta o caminho do arquivo dinamicamente
+    const filePath = `../../${level}/${unit}/data2/words.txt`; // Monta o caminho do arquivo dinamicamente
 
     try {
         const response = await fetch(filePath);
