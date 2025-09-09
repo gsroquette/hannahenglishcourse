@@ -187,6 +187,13 @@
     padding:6px;
     display:block;
   }
+/* Match - card da direita só com imagem: centralizado */
+.option.img-only{
+  justify-content: center; /* centraliza conteúdo no eixo X */
+  gap: 0;                  /* sem espaço reservado para label */
+}
+.option.img-only .thumb{ margin: 0 auto; }
+.option.img-only .label{ display:none; } /* segurança */
 
   .option .label{font-size:20px; font-weight:800; letter-spacing:.2px}
   .option .sub{font-size:13px; color:var(--muted)}
@@ -996,83 +1003,88 @@ const makeLeftBtn = (item) => {
 };
 
   const makeRightBtn = (item) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'option word-only';
-    b.dataset.value = item.value;
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'option';               // base
+  b.dataset.value = item.value;
 
-    const thumb = document.createElement('div'); thumb.className='thumb';
-    if (item.image){
-      const img = new Image(); img.src = absPath(item.image); img.alt = item.label || '';
-      thumb.appendChild(img);
-    } else {
-      thumb.textContent = item.label ? '🔤' : '❔';
+  const thumb = document.createElement('div');
+  thumb.className = 'thumb';
+
+  if (item.image){
+    const img = new Image();
+    img.src = absPath(item.image);
+    img.alt = item.label || '';
+    thumb.appendChild(img);
+  } else {
+    thumb.textContent = item.label ? '🔤' : '❔';
+  }
+
+  // Só cria <label> se existir texto. Se NÃO existir, vira "img-only".
+  const hasLabel = !!(item.label && String(item.label).trim());
+  if (hasLabel){
+    const label = document.createElement('div');
+    label.className = 'label';
+    label.textContent = item.label;
+    b.appendChild(thumb);
+    b.appendChild(label);
+  } else {
+    b.classList.add('img-only');        // <-- habilita centralização no CSS
+    b.appendChild(thumb);
+  }
+
+  b.onclick = ()=>{
+    if (b.classList.contains('matched')) return;
+    if (!selectedLeftBtn){
+      toast('Choose a word first 🙂');
+      return;
     }
-    const label = document.createElement('div'); label.className='label';
-    label.textContent = item.label || '';
-    b.appendChild(thumb); b.appendChild(label);
+    const leftVal  = selectedLeftVal;
+    const rightVal = item.value;
+    const ok = normalize(leftVal) === normalize(rightVal);
 
-    b.onclick = ()=>{
-      if (b.classList.contains('matched')) return;
-      if (!selectedLeftBtn){
-        toast('Choose a word first 🙂');
-        return;
-      }
-      // tentativa de match
-      const leftVal = selectedLeftVal;
-      const rightVal = item.value;
-      const ok = normalize(leftVal) === normalize(rightVal);
+    if (ok){
+      sCorrect.play().catch(()=>{});
+      confetti(10);
+      speakFriendly(['Great!','Nice!']);
 
-      if (ok){
+      b.classList.add('matched');
+      selectedLeftBtn.classList.add('matched');
+      selectedLeftBtn.classList.remove('selected');
+      matched.add(leftVal);
+
+      selectedLeftBtn = null;
+      selectedLeftVal = null;
+
+      if (matched.size === sourcePairs.length){
+        try{
+          mediaBox.innerHTML = '';
+          const gif = new Image();
+          gif.src = './hannah_feliz.gif';
+          gif.alt = 'Hannah comemorando';
+          gif.setAttribute('draggable','false');
+          gif.style.pointerEvents = 'none';
+          mediaBox.appendChild(gif);
+        }catch(e){}
+        confetti(18);
         sCorrect.play().catch(()=>{});
-        confetti(10);
-        speakFriendly(['Great!','Nice!']);
-
-        b.classList.add('matched');
-        selectedLeftBtn.classList.add('matched');
-        selectedLeftBtn.classList.remove('selected');
-        matched.add(leftVal);
-
-        // reset seleção
-        selectedLeftBtn = null;
-        selectedLeftVal = null;
-
-        // terminou?
-if (matched.size === sourcePairs.length){
-  // troca o quadro grande por o GIF de comemoração
-  try {
-    mediaBox.innerHTML = '';
-    const gif = new Image();
-    gif.src = './hannah_feliz.gif';   // o arquivo deve estar na MESMA pasta do index.html
-    gif.alt = 'Hannah comemorando';
-    gif.setAttribute('draggable','false');
-    gif.style.pointerEvents = 'none';
-    mediaBox.appendChild(gif);
-  } catch(e){}
-
-  confetti(18);
-  sCorrect.play().catch(()=>{});
-  speakFriendly(['Great!','Awesome!']);
-  liveEl.textContent = 'All pairs matched';
-
-  // finaliza questão
-  answered = true;
-  btnNext.disabled = false;
-  btnNext.classList.add('ready');
-
-  // trava os botões restantes
-  Array.from(optionsEl.querySelectorAll('.option')).forEach(el => el.disabled = true);
-}
-      } else {
-        sWrong.play().catch(()=>{});
-        speakFriendly(['Try again!']);
-        // feedback visual (shake no botão da direita)
-        b.classList.add('err');
-        setTimeout(()=>b.classList.remove('err'), 250);
+        speakFriendly(['Great!','Awesome!']);
+        liveEl.textContent = 'All pairs matched';
+        answered = true;
+        btnNext.disabled = false;
+        btnNext.classList.add('ready');
+        Array.from(optionsEl.querySelectorAll('.option')).forEach(el => el.disabled = true);
       }
-    };
-    return b;
+    } else {
+      sWrong.play().catch(()=>{});
+      speakFriendly(['Try again!']);
+      b.classList.add('err');
+      setTimeout(()=>b.classList.remove('err'), 250);
+    }
   };
+
+  return b;
+};
 
   leftShuf.forEach(item => colL.appendChild(makeLeftBtn(item)));
   rightShuf.forEach(item => colR.appendChild(makeRightBtn(item)));
