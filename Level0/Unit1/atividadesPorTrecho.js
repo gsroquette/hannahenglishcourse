@@ -13,7 +13,7 @@ function getActivitiesByTrecho(trecho, level, unit) {
             return [
                 { id: 5, name: "QUIZ_IMAGE", path: `/Atividades/QUIZ_IMAGE/index.html?level=${level}&unit=${unit}&fase=5`, img: "../../imagens/botoes/quiz_button.png", unlocked: false },
                 { id: 6, name: "MemoryGame", path: `/Atividades/MemoryGame/index.html?level=${level}&unit=${unit}&fase=6`, img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
-                { id: 7, name: "WordSearchFacil", path: `/Atividades/WordSearchFacil/index.html?level=${level}&unit=${unit}&fase=7`, img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
+                { id: 7, name: "WordSearchFacil", path: `/Atividades/WordSearchHorizontal/index.html?level=${level}&unit=${unit}&fase=7`, img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
                 { id: 8, name: "MemoryGame2", path: `/Atividades/MemoryGame2/index.html?level=${level}&unit=${unit}&fase=8`, img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
                 { id: 9, name: "WordSearchFacil2", path: `/Atividades/WordSearchFacil2/index.html?level=${level}&unit=${unit}&fase=9`, img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
             ];
