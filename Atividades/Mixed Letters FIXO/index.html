@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hannah Mixed Letters</title>
+    <title>Hannah Mixed Letters — Syllable Mode</title>
 
     <!-- Fonte legível -->
     <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
@@ -52,7 +52,9 @@
             cursor: pointer;
         }
         .btn--pdf { background: var(--ok) }
+        .btn--mode { background: #4a5568 }
         .btn:focus-visible { outline: 3px solid var(--focus) }
+
         .activity-container { margin-top: 8px; width: 100%; max-width: 960px }
         .activity {
             display: grid;
@@ -76,6 +78,8 @@
             justify-self: center;
         }
         .word-area { display: grid; gap: 12px }
+
+        /* Linha de slots (unidades: letra ou sílaba) */
         .drop-zone {
             display: flex;
             gap: 8px;
@@ -83,8 +87,9 @@
             min-height: 64px;
         }
         .slot {
-            width: 56px;
-            height: 64px;
+            min-width: 56px;
+            min-height: 64px;
+            padding: 0 6px;
             border: 3px dashed #999;
             border-radius: 12px;
             background: #fff;
@@ -92,13 +97,17 @@
             place-items: center;
             position: relative;
         }
+        /* Slot largo quando a unidade é sílaba (melhor toque) */
+        .slot.syllable { min-width: 84px; }
+
         .slot[data-ghost]::after{
             content: attr(data-ghost);
             position: absolute;
             color: #bbb;
             font-weight: 700;
-            font-size: 1.35rem;
+            font-size: 1.15rem;
             pointer-events: none;
+            white-space: nowrap;
         }
         .tray {
             display: flex;
@@ -109,9 +118,12 @@
             border-radius: 12px;
             padding: 8px;
         }
+
+        /* Tile/letra-sílaba */
         .tile {
-            width: 56px;
-            height: 64px;
+            min-width: 56px;
+            min-height: 64px;
+            padding: 0 6px;
             border: 3px solid var(--tile-border);
             border-radius: 12px;
             background: var(--tile);
@@ -122,9 +134,12 @@
             cursor: grab;
             user-select: none;
             touch-action: none;
+            white-space: nowrap;
         }
+        .tile.syllable { min-width: 84px; font-size: 1.4rem; }
         .tile:active { cursor: grabbing }
         .tile[aria-grabbed="true"] { outline: 3px solid var(--focus) }
+
         .controls { display: flex; gap: 8px; flex-wrap: wrap }
         .pill {
             background: #fff;
@@ -135,6 +150,7 @@
             font-size: .95rem;
         }
         .pill:focus-visible { outline: 3px solid var(--focus) }
+
         .status { font-size: .95rem; color: #444 }
         .good { color: var(--ok); font-weight: 700 }
 
@@ -165,10 +181,13 @@
         @keyframes fall {
             to { transform: translateY(120vh) rotate(540deg); opacity: 0 }
         }
-        @media (max-width: 700px) {
+        @media (max-width: 820px) {
             .activity { grid-template-columns: 1fr; justify-items: center }
             .activity img { width: 140px; height: 140px }
-            .slot, .tile { width: 52px; height: 60px }
+            .slot { min-width: 52px; min-height: 60px }
+            .slot.syllable { min-width: 76px }
+            .tile { min-width: 52px; min-height: 60px }
+            .tile.syllable { min-width: 76px }
         }
     </style>
 </head>
@@ -176,6 +195,8 @@
     <div class="toolbar" aria-label="Toolbar">
         <button id="backButton" class="btn">Back</button>
         <button id="pdfButton" class="btn btn--pdf" style="display:none" onclick="generatePDF()">Generate PDF</button>
+        <button id="modeButton" class="btn btn--mode" title="Alterna entre montagem por letras ou por sílabas">Mode: Syllables</button>
+        <button id="reloadButton" class="btn" title="Recarregar atividades com modo atual">Reload</button>
     </div>
 
     <h1>Hannah Mixed Letters</h1>
@@ -247,7 +268,7 @@
     function initializeVoices() {
         const synth = window.speechSynthesis;
         const voices = synth.getVoices();
-        selectedVoice = voices.find(v => v.lang.startsWith("en-")) || voices[0];
+        selectedVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith("en")) || voices[0];
         if (!selectedVoice && !alertDisplayed) { alertDisplayed = true; alert("No English voice found. Using default voice."); }
     }
     window.speechSynthesis.onvoiceschanged = initializeVoices;
@@ -260,15 +281,32 @@
         synth.speak(u);
     }
 
-    // ================== Estado e sessão ==================
+    // ================== Estado global e sessão ==================
     const SESSION_LIMIT = 6; // limite de atividades por sessão para crianças pequenas
-    let activities = [];
+    let activities = [];        // palavras
     let completedWords = 0;
+    let syllableMap = {};       // { wordLower: [ "syll1", "syll2" ] }
+    let buildMode = "syllables"; // "letters" | "syllables" (default syllables)
+
     const sessionStatus = document.getElementById('sessionStatus');
+    const modeButton = document.getElementById('modeButton');
+    const reloadButton = document.getElementById('reloadButton');
+
+    modeButton.addEventListener('click', () => {
+        buildMode = (buildMode === "letters") ? "syllables" : "letters";
+        modeButton.textContent = "Mode: " + (buildMode === "letters" ? "Letters" : "Syllables");
+    });
+    reloadButton.addEventListener('click', () => {
+        // recarrega atividades no modo atual
+        document.getElementById('activity-container').innerHTML = "";
+        completedWords = 0;
+        updateSessionStatus();
+        loadActivities(true);
+    });
 
     document.addEventListener('DOMContentLoaded', () => {
         initializeVoices();
-        loadActivities();
+        loadActivities(false);
     });
 
     function getPhaseFromURL() {
@@ -280,13 +318,122 @@
         return { level: params.get('level'), unit: params.get('unit') };
     }
 
-    // ================== Core da atividade (Drag & Drop + GUIA) ==================
+    // ================== Carregamento de palavras e sílabas ==================
+    async function loadActivities(forceReload){
+        const { level, unit } = getLevelAndUnitFromURL();
+        try {
+            // palavras
+            const wordsPath = `../../${level}/${unit}/data1/words.txt`;
+            const resp = await fetch(wordsPath);
+            if (!resp.ok) throw new Error(`Erro ao buscar palavras. Status: ${resp.status}`);
+            const text = await resp.text();
+            let words = text.trim().split('\n').map(w => w.trim()).filter(Boolean);
+
+            // Limite de sessão
+            if (words.length > SESSION_LIMIT) words = words.slice(0, SESSION_LIMIT);
+
+            activities = words;
+
+            // tenta ler syllables.json (opcional)
+            syllableMap = {};
+            try {
+                const syllPath = `../../${level}/${unit}/data1/syllables.json`;
+                const resS = await fetch(syllPath);
+                if (resS.ok) {
+                    const data = await resS.json();
+                    // normaliza para lower
+                    for (const k in data) {
+                        if (Array.isArray(data[k])) syllableMap[k.toLowerCase()] = data[k].map(s=>String(s));
+                    }
+                }
+            } catch(e){ /* silencioso, usamos heurística depois */ }
+
+            // cria atividades
+            for (let index = 0; index < words.length; index++) {
+                const word = words[index];
+                const imageUrl = `../../${level}/${unit}/data1/imagens/imagem${index + 1}.png`;
+                createActivity(imageUrl, word);
+            }
+
+            updateSessionStatus();
+        } catch (e) {
+            console.error('Erro ao carregar palavras ou imagens:', e);
+        }
+    }
+
+    // ================== Util: gerar unidades (letras ou sílabas) ==================
+    function getUnits(word, mode){
+        if (mode === "letters") {
+            return word.toUpperCase().split('');
+        }
+        // SÍLABAS:
+        const w = word.toLowerCase();
+        if (syllableMap[w]) return syllableMap[w].map(s => s); // mantém caixa do JSON
+        // Heurística suave: divide por grupos vogais/consoantes com regra de onset
+        return heuristicSyllabify(word);
+    }
+
+    // Heurística amigável para crianças (não perfeita foneticamente, mas estável)
+    function heuristicSyllabify(word){
+        const w = word.toLowerCase();
+        const vowels = 'aeiouy';
+        // 1) separa por grupos CV aproximados
+        const parts = [];
+        let buf = '';
+        for (let i=0;i<w.length;i++){
+            const ch = w[i];
+            buf += ch;
+            const next = w[i+1] || '';
+            const isV = vowels.includes(ch);
+            const nextIsV = vowels.includes(next);
+            // break points: V + C (início provável da próxima sílaba), double consonant split
+            if (isV && next && !nextIsV) {
+                // olha 2 à frente para evitar cortar times como "make" em ma-ke
+                const next2 = w[i+2] || '';
+                const next2IsV = vowels.includes(next2);
+                if (next2 && next2IsV) {
+                    parts.push(buf);
+                    buf = '';
+                }
+            } else if (!isV && !nextIsV && next && ch !== next) {
+                // duplas consonantes diferentes → corta (bas-ket)
+                parts.push(buf);
+                buf = '';
+            }
+        }
+        if (buf) parts.push(buf);
+
+        // 2) junta pedaços muito curtos ao vizinho (ex.: 't' sozinho)
+        const merged = [];
+        for (let i=0;i<parts.length;i++){
+            const p = parts[i];
+            if (p.length === 1 && i>0) merged[merged.length-1] += p;
+            else merged.push(p);
+        }
+        // Capitalização leve para exibição nas tiles
+        return merged.map(s => s.length <= 3 ? s.toUpperCase() : s[0].toUpperCase()+s.slice(1));
+    }
+
+    // Embaralhar unidades
+    function shuffleUnits(units) {
+        const arr = units.slice();
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        // evita ficar idêntico
+        const same = arr.length === units.length && arr.every((u,idx)=>u===units[idx]);
+        if (same && arr.length > 1) [arr[0], arr[1]] = [arr[1], arr[0]];
+        return arr;
+    }
+
+    // ================== Core da atividade (Drag & Drop + GUIA + Modo) ==================
     function createActivity(imageUrl, word) {
         const container = document.getElementById('activity-container');
         const div = document.createElement('div');
         div.className = 'activity';
         div.dataset.completed = "false";
-        div.dataset.word = word; // para PDF
+        div.dataset.word = word; // para PDF e guia
 
         const img = document.createElement('img');
         img.src = imageUrl;
@@ -298,6 +445,10 @@
         area.className = 'word-area';
         div.appendChild(area);
 
+        const modeNow = buildMode; // captura o modo no momento da criação
+        const units = getUnits(word, modeNow);
+        const unitClass = (modeNow === "syllables") ? 'syllable' : '';
+
         // DROP ZONE (slots)
         const dropZone = document.createElement('div');
         dropZone.className = 'drop-zone';
@@ -306,7 +457,7 @@
         // Controles
         const revealHintBtn = document.createElement('button');
         revealHintBtn.className = 'pill';
-        revealHintBtn.textContent = 'Hint (1st letter)';
+        revealHintBtn.textContent = (modeNow === "letters") ? 'Hint (1st letter)' : 'Hint (1st block)';
 
         const resetBtn = document.createElement('button');
         resetBtn.className = 'pill';
@@ -326,23 +477,22 @@
         controls.appendChild(guideBtn);
         area.appendChild(controls);
 
-        // Bandeja de letras
+        // Bandeja de unidades
         const tray = document.createElement('div');
         tray.className = 'tray';
         area.appendChild(tray);
 
         // Cria slots
         const slots = [];
-        for (let i = 0; i < word.length; i++) {
+        for (let i = 0; i < units.length; i++) {
             const s = document.createElement('div');
-            s.className = 'slot';
+            s.className = 'slot ' + unitClass;
             s.setAttribute('aria-label', `Position ${i+1}`);
             s.setAttribute('role', 'button');
             s.tabIndex = 0;
             s.addEventListener('dragover', (e) => e.preventDefault());
             s.addEventListener('drop', (e) => handleDrop(e, s, i));
             s.addEventListener('click', () => {
-                // remover letra do slot (se houver)
                 const child = s.querySelector('.tile');
                 if (child) {
                     child.setAttribute('draggable', 'true');
@@ -350,7 +500,6 @@
                     tray.appendChild(child);
                     s.innerHTML = '';
                     s.style.borderColor = '#999';
-                    // ao liberar o slot, reaplica o ghost se guia estiver ligado
                     applyGuide();
                 }
             });
@@ -361,7 +510,7 @@
         // Lógicas dos botões
         revealHintBtn.addEventListener('click', () => {
             if (!slots[0].dataset.ghost) {
-                slots[0].dataset.ghost = word[0].toUpperCase();
+                slots[0].dataset.ghost = modelUnits()[0];
                 revealHintBtn.disabled = true;
             }
         });
@@ -373,26 +522,29 @@
             guideBtn.textContent = guideOn ? 'Hide Guide' : 'Show Guide';
             guideBtn.setAttribute('aria-pressed', String(guideOn));
             applyGuide();
-            // se guia ligado, hint fica redundante
-            revealHintBtn.disabled = guideOn;
+            revealHintBtn.disabled = guideOn; // Hint fica redundante com guia ligado
         };
 
+        function modelUnits(){
+            // o "modelo" sempre deriva do modo da atividade no momento da criação
+            return units.map(u => u.toString().toUpperCase());
+        }
+
         function applyGuide(){
+            const model = modelUnits();
             slots.forEach((s, idx) => {
                 const hasTile = !!s.querySelector('.tile');
-                if (guideOn && !hasTile) s.dataset.ghost = word[idx].toUpperCase();
+                if (guideOn && !hasTile) s.dataset.ghost = model[idx];
                 else delete s.dataset.ghost;
             });
         }
 
-        // Letras embaralhadas
-        const shuffled = shuffleWord(word);
-        const finalShuffle = (shuffled.toUpperCase() === word.toUpperCase()) ? forcedShuffle(word) : shuffled;
-
-        for (const ch of finalShuffle.toUpperCase()) {
+        // Tiles embaralhadas
+        const shuffled = shuffleUnits(modelUnits());
+        for (const block of shuffled) {
             const tile = document.createElement('div');
-            tile.className = 'tile';
-            tile.textContent = ch;
+            tile.className = 'tile ' + unitClass;
+            tile.textContent = block;
             tile.setAttribute('draggable', 'true');
             tile.setAttribute('role', 'button');
             tile.setAttribute('aria-grabbed', 'false');
@@ -400,10 +552,11 @@
 
             tile.addEventListener('dragstart', () => {
                 tile.setAttribute('aria-grabbed', 'true');
-                speak(ch);
+                // fala a unidade (letra ou sílaba)
+                speak(block);
             });
             tile.addEventListener('dragend', () => tile.setAttribute('aria-grabbed', 'false'));
-            tile.addEventListener('click', () => speak(ch)); // toque fala a letra
+            tile.addEventListener('click', () => speak(block));
 
             tray.appendChild(tile);
         }
@@ -412,20 +565,17 @@
             e.preventDefault();
             const tile = document.querySelector('.tile[aria-grabbed="true"]');
             if (!tile) return;
-            // Se o slot já tem letra, devolve ao tray
+
             if (slotEl.firstElementChild) {
                 tray.appendChild(slotEl.firstElementChild);
             }
-            // ocupa o slot
             slotEl.innerHTML = '';
             slotEl.appendChild(tile);
-            tile.setAttribute('draggable', 'false'); // evita arrasto direto do slot
+            tile.setAttribute('draggable', 'false');
             slotEl.style.borderColor = '#999';
-            // removemos o ghost deste slot (ocupado)
-            delete slotEl.dataset.ghost;
+            delete slotEl.dataset.ghost; // ocupou o slot
 
-            // atualiza guia nos demais
-            applyGuide();
+            applyGuide(); // atualiza ghosts nos demais
 
             checkAnswer();
         }
@@ -436,11 +586,13 @@
 
         function checkAnswer(){
             const ans = currentAnswer();
-            if (ans.length !== word.length) return;
+            const target = modelUnits().join('');
+            if (ans.length !== target.length) return;
 
-            if (ans.toUpperCase() === word.toUpperCase()){
+            if (ans === target){
                 // sucesso
                 celebrate(div);
+                // fala palavra inteira (conteúdo original)
                 speak(word);
                 if (div.dataset.completed === "false") {
                     div.dataset.completed = "true";
@@ -459,13 +611,18 @@
                     firebase.auth().onAuthStateChanged((user) => { if (user) updateNextPhase(user.uid); });
                 }
             } else {
-                // erro: feedback suave por posição
-                slots.forEach((s, idx) => {
+                // erro: feedback por posição
+                const model = modelUnits();
+                // Compara posição com base no comprimento do texto do slot acumulado
+                let offset = 0;
+                for (let i=0;i<slots.length;i++){
+                    const s = slots[i];
                     const t = s.querySelector('.tile');
-                    if (!t) return;
-                    const correct = word[idx].toUpperCase() === t.textContent;
+                    if (!t) { s.style.borderColor = '#999'; continue; }
+                    const correct = (t.textContent === model[i]);
                     s.style.borderColor = correct ? 'var(--ok)' : '#e53935';
-                });
+                    offset += t.textContent.length;
+                }
             }
         }
 
@@ -485,7 +642,7 @@
 
         // Aplica guia inicial e estado do Hint
         applyGuide();
-        revealHintBtn.disabled = guideOn;
+        revealHintBtn.disabled = true; // guia começa ligado → hint redundante
 
         container.appendChild(div);
     }
@@ -524,57 +681,17 @@
         } catch (error) { console.error("Erro ao atualizar o progresso da fase:", error); }
     }
 
-    // ================== Carregamento / sessão ==================
-    async function loadActivities() {
-        const { level, unit } = getLevelAndUnitFromURL();
-        try {
-            const wordsPath = `../../${level}/${unit}/data1/words.txt`;
-            const resp = await fetch(wordsPath);
-            if (!resp.ok) throw new Error(`Erro ao buscar palavras. Status: ${resp.status}`);
-            const text = await resp.text();
-            let words = text.trim().split('\n').map(w => w.trim()).filter(Boolean);
-
-            // Limite de sessão para crianças pequenas
-            if (words.length > SESSION_LIMIT) words = words.slice(0, SESSION_LIMIT);
-
-            words.forEach((word, index) => {
-                const imageUrl = `../../${level}/${unit}/data1/imagens/imagem${index + 1}.png`;
-                activities.push(word);
-                createActivity(imageUrl, word);
-            });
-
-            updateSessionStatus();
-        } catch (e) {
-            console.error('Erro ao carregar palavras ou imagens:', e);
-        }
-    }
-
+    // ================== HUD de sessão ==================
     function updateSessionStatus(){
         const a = activities.length;
         const c = completedWords;
-        sessionStatus.textContent = a ? `Activities: ${c}/${a}` : '';
+        sessionStatus.textContent = a ? `Activities: ${c}/${a} — Build by: ${buildMode === 'letters' ? 'Letters' : 'Syllables'}` : '';
         if (c === a && a > 0) {
             sessionStatus.innerHTML = `<span class="good">All done! Great job!</span>`;
         }
     }
 
-    // Embaralhador estável
-    function shuffleWord(word) {
-        const arr = word.toUpperCase().split('');
-        for (let i = arr.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [arr[i], arr[j]] = [arr[j], arr[i]];
-        }
-        return arr.join('');
-    }
-    // Força ao menos 1 troca quando shuffle sai igual
-    function forcedShuffle(word){
-        const arr = word.toUpperCase().split('');
-        if (arr.length < 2) return arr.join('');
-        [arr[0], arr[1]] = [arr[1], arr[0]];
-        return arr.join('');
-    }
-
+    // ================== Modal ==================
     function showCompletionModal() {
         document.getElementById('overlay').style.display = 'block';
         document.getElementById('completion-modal').style.display = 'block';
@@ -584,7 +701,7 @@
         document.getElementById('completion-modal').style.display = 'none';
     }
 
-    // ================== PDF (mantido, com "Guide") ==================
+    // ================== PDF (com "Guide" e info de modo) ==================
     async function generatePDF() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
@@ -596,6 +713,8 @@
             doc.text("Name: __________________________________________ Date: ____________", 50, 20);
             doc.setFontSize(16);
             doc.text("Hannah Mixed Letters", 10, 50);
+            doc.setFontSize(11);
+            doc.text(`Build mode (at print): ${buildMode === 'letters' ? 'Letters' : 'Syllables'}`, 10, 58);
         }
 
         function drawActivity(activityEl, y){
@@ -611,7 +730,6 @@
                     doc.addImage(data, 'PNG', 10, y, 24, 24);
                 } catch {}
             }
-            // guia (modelo) em cinza claro
             const wordModel = (activityEl.dataset.word || '').toUpperCase();
             if (wordModel) {
                 doc.setFontSize(10);
@@ -619,21 +737,25 @@
                 doc.text(`Guide: ${wordModel}`, 50, y + 6);
                 doc.setTextColor(0);
             }
-            // slots como linhas
+
+            // slots como linhas (conta slots pela DOM)
             const slotsCount = activityEl.querySelectorAll('.slot').length;
             let x = 50;
             doc.setFontSize(14);
             for (let i=0;i<slotsCount;i++){
-                doc.text("_____", x, y + 16);
-                x += 16;
+                // linhas maiores se estiver em sílabas
+                const line = (buildMode === 'syllables') ? "________" : "_____";
+                doc.text(line, x, y + 16);
+                x += (buildMode === 'syllables') ? 24 : 16;
             }
-            // letras embaralhadas (lado)
+
+            // unidades disponíveis (embaralhadas que estiverem na bandeja + dentro dos slots)
             const trayTiles = [...activityEl.querySelectorAll('.tray .tile')].map(t => t.textContent).join(' ');
             const filledTiles = [...activityEl.querySelectorAll('.slot .tile')].map(t => t.textContent).join(' ');
             const mixed = (trayTiles || filledTiles || '').trim();
             if (mixed) {
                 doc.setFontSize(11);
-                doc.text(`Letters (mixed): ${mixed}`, 50, y + 26);
+                doc.text(`Units (mixed): ${mixed}`, 50, y + 26);
             }
         }
 
@@ -641,9 +763,9 @@
             try { doc.addImage(logo, 'PNG', 10, 10, 30, 30); } catch {}
             header();
 
-            let y = 60;
+            let y = 66;
             document.querySelectorAll('.activity').forEach((a) => {
-                if (y > 270) { doc.addPage(); y = 20; }
+                if (y > 270) { doc.addPage(); y = 20; header(); y = 66; }
                 drawActivity(a, y);
                 y += 40;
             });
@@ -651,9 +773,9 @@
         };
         logo.onerror = function(){
             header();
-            let y = 60;
+            let y = 66;
             document.querySelectorAll('.activity').forEach((a) => {
-                if (y > 270) { doc.addPage(); y = 20; }
+                if (y > 270) { doc.addPage(); y = 20; header(); y = 66; }
                 drawActivity(a, y);
                 y += 40;
             });
