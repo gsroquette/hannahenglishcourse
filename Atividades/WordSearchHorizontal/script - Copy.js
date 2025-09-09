@@ -211,54 +211,21 @@ function handleCanvasClick(event) {
     checkWord();
 }
 
-// ---- NOVO HELPER ----
-// Verifica se a seleção atual é prefixo de alguma palavra maior que ainda pode ser continuada no GRID
-function hasExtendableLongerWordPrefix(prefix, startCell, lastCell) {
-    // candidatos que começam com o prefixo e são maiores
-    const candidates = wordsToFind.filter(w => w.length > prefix.length && w.startsWith(prefix));
-    if (candidates.length === 0) return false;
-
-    // próxima posição esperada (horizontal E->D)
-    const nextCol = lastCell.col + 1;
-    const row = startCell.row;
-
-    if (nextCol >= gridSize) return false; // não há espaço para continuar
-
-    const nextGridChar = grid[row][nextCol];
-
-    // se pelo menos um candidato tiver a próxima letra igual à letra do grid, dá para continuar
-    return candidates.some(w => w[prefix.length] === nextGridChar);
-}
-
 // Função para verificar se uma palavra foi encontrada
-// AJUSTADO: evita finalizar quando a seleção ainda pode virar uma palavra maior (ex.: "good" -> "goodbye")
+// AJUSTADO: monta a palavra pela ORDEM DE CLIQUE (sem ordenar células)
 function checkWord() {
     if (selectedCells.length === 0) return;
 
     const selectedWord = selectedCells.map(cell => grid[cell.row][cell.col]).join('');
 
-    // Se a seleção atual é exatamente uma palavra...
     if (wordsToFind.includes(selectedWord)) {
-        const startCell = selectedCells[0];
-        const lastCell = selectedCells[selectedCells.length - 1];
-
-        // ...mas também é prefixo de outra MAIOR que ainda pode continuar no grid, NÃO finalize ainda
-        if (hasExtendableLongerWordPrefix(selectedWord, startCell, lastCell)) {
-            return; // aguarda o usuário clicar a próxima letra
-        }
-
-        // caso contrário, finalize normalmente
         markWordInList(selectedWord);
         foundCells.push(...selectedCells.map(cell => ({ ...cell, word: selectedWord })));
         selectedCells = [];
         drawWordSearchGrid();
         drawSelectedCells();
         checkCompletion(); // Verifica se a fase está completa
-        return;
     }
-
-    // (Opcional) Se a seleção atual NÃO é palavra e não é prefixo de nenhuma palavra, você poderia resetar aqui.
-    // Mantive o comportamento original (não reseta automaticamente).
 }
 
 // Função para verificar se a fase está completa
