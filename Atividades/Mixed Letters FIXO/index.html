@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Hannah Mixed Letters</title>
 
-    <!-- Fonte legível e com boa distinção de formas -->
+    <!-- Fonte legível -->
     <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
 
     <style>
@@ -135,11 +135,9 @@
             font-size: .95rem;
         }
         .pill:focus-visible { outline: 3px solid var(--focus) }
-        .status {
-            font-size: .95rem;
-            color: #444;
-        }
+        .status { font-size: .95rem; color: #444 }
         .good { color: var(--ok); font-weight: 700 }
+
         /* Modal */
         #overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,.6);
@@ -157,6 +155,7 @@
             margin-top: 16px; padding: 10px 16px; font-size: 1rem; cursor: pointer;
             border: none; border-radius: 10px; background: var(--ok); color: #fff;
         }
+
         /* Confete simples */
         .confetti {
             position: fixed; pointer-events: none; z-index: 1200;
@@ -262,7 +261,7 @@
     }
 
     // ================== Estado e sessão ==================
-    const SESSION_LIMIT = 6; // limite de atividades por sessão para reduzir fadiga
+    const SESSION_LIMIT = 6; // limite de atividades por sessão para crianças pequenas
     let activities = [];
     let completedWords = 0;
     const sessionStatus = document.getElementById('sessionStatus');
@@ -281,12 +280,13 @@
         return { level: params.get('level'), unit: params.get('unit') };
     }
 
-    // ================== Core da atividade (Drag & Drop) ==================
+    // ================== Core da atividade (Drag & Drop + GUIA) ==================
     function createActivity(imageUrl, word) {
         const container = document.getElementById('activity-container');
         const div = document.createElement('div');
         div.className = 'activity';
         div.dataset.completed = "false";
+        div.dataset.word = word; // para PDF
 
         const img = document.createElement('img');
         img.src = imageUrl;
@@ -303,27 +303,27 @@
         dropZone.className = 'drop-zone';
         area.appendChild(dropZone);
 
-        // Ghost hint (primeira letra)
+        // Controles
         const revealHintBtn = document.createElement('button');
         revealHintBtn.className = 'pill';
         revealHintBtn.textContent = 'Hint (1st letter)';
-        revealHintBtn.addEventListener('click', () => {
-            if (!slots[0].dataset.ghost) {
-                slots[0].dataset.ghost = word[0].toUpperCase();
-                revealHintBtn.disabled = true;
-            }
-        });
 
-        // Reset
         const resetBtn = document.createElement('button');
         resetBtn.className = 'pill';
         resetBtn.textContent = 'Reset';
-        resetBtn.addEventListener('click', () => resetActivity());
+
+        // Guia (modelo visível) — ligado por padrão
+        const guideBtn = document.createElement('button');
+        guideBtn.className = 'pill';
+        guideBtn.textContent = 'Hide Guide';
+        guideBtn.setAttribute('aria-pressed', 'true');
+        let guideOn = true;
 
         const controls = document.createElement('div');
         controls.className = 'controls';
         controls.appendChild(revealHintBtn);
         controls.appendChild(resetBtn);
+        controls.appendChild(guideBtn);
         area.appendChild(controls);
 
         // Bandeja de letras
@@ -340,7 +340,7 @@
             s.setAttribute('role', 'button');
             s.tabIndex = 0;
             s.addEventListener('dragover', (e) => e.preventDefault());
-            s.addEventListener('drop', (e) => handleDrop(e, s));
+            s.addEventListener('drop', (e) => handleDrop(e, s, i));
             s.addEventListener('click', () => {
                 // remover letra do slot (se houver)
                 const child = s.querySelector('.tile');
@@ -349,17 +349,44 @@
                     child.setAttribute('aria-grabbed', 'false');
                     tray.appendChild(child);
                     s.innerHTML = '';
-                    // manter ghost se era a primeira letra
-                    if (i === 0 && revealHintBtn.disabled) s.dataset.ghost = word[0].toUpperCase();
+                    s.style.borderColor = '#999';
+                    // ao liberar o slot, reaplica o ghost se guia estiver ligado
+                    applyGuide();
                 }
             });
             slots.push(s);
             dropZone.appendChild(s);
         }
 
+        // Lógicas dos botões
+        revealHintBtn.addEventListener('click', () => {
+            if (!slots[0].dataset.ghost) {
+                slots[0].dataset.ghost = word[0].toUpperCase();
+                revealHintBtn.disabled = true;
+            }
+        });
+
+        resetBtn.addEventListener('click', () => resetActivity());
+
+        guideBtn.onclick = () => {
+            guideOn = !guideOn;
+            guideBtn.textContent = guideOn ? 'Hide Guide' : 'Show Guide';
+            guideBtn.setAttribute('aria-pressed', String(guideOn));
+            applyGuide();
+            // se guia ligado, hint fica redundante
+            revealHintBtn.disabled = guideOn;
+        };
+
+        function applyGuide(){
+            slots.forEach((s, idx) => {
+                const hasTile = !!s.querySelector('.tile');
+                if (guideOn && !hasTile) s.dataset.ghost = word[idx].toUpperCase();
+                else delete s.dataset.ghost;
+            });
+        }
+
         // Letras embaralhadas
         const shuffled = shuffleWord(word);
-        // Garante que não fique igual ao original
         const finalShuffle = (shuffled.toUpperCase() === word.toUpperCase()) ? forcedShuffle(word) : shuffled;
 
         for (const ch of finalShuffle.toUpperCase()) {
@@ -373,7 +400,6 @@
 
             tile.addEventListener('dragstart', () => {
                 tile.setAttribute('aria-grabbed', 'true');
-                // fala a letra ao começar a arrastar (reforço)
                 speak(ch);
             });
             tile.addEventListener('dragend', () => tile.setAttribute('aria-grabbed', 'false'));
@@ -382,7 +408,7 @@
             tray.appendChild(tile);
         }
 
-        function handleDrop(e, slotEl) {
+        function handleDrop(e, slotEl, idx) {
             e.preventDefault();
             const tile = document.querySelector('.tile[aria-grabbed="true"]');
             if (!tile) return;
@@ -392,13 +418,15 @@
             }
             // ocupa o slot
             slotEl.innerHTML = '';
-            // remover ghost se existir
-            if (slotEl.dataset.ghost) delete slotEl.dataset.ghost;
-
-            tile.setAttribute('draggable', 'false'); // evita arrasto direto do slot
             slotEl.appendChild(tile);
+            tile.setAttribute('draggable', 'false'); // evita arrasto direto do slot
+            slotEl.style.borderColor = '#999';
+            // removemos o ghost deste slot (ocupado)
+            delete slotEl.dataset.ghost;
 
-            // verifica se completou
+            // atualiza guia nos demais
+            applyGuide();
+
             checkAnswer();
         }
 
@@ -431,7 +459,7 @@
                     firebase.auth().onAuthStateChanged((user) => { if (user) updateNextPhase(user.uid); });
                 }
             } else {
-                // erro: feedback suave (cor), sem penalizar
+                // erro: feedback suave por posição
                 slots.forEach((s, idx) => {
                     const t = s.querySelector('.tile');
                     if (!t) return;
@@ -442,7 +470,7 @@
         }
 
         function resetActivity(){
-            slots.forEach((s, i) => {
+            slots.forEach((s) => {
                 const t = s.querySelector('.tile');
                 if (t) {
                     t.setAttribute('draggable','true');
@@ -451,10 +479,13 @@
                 }
                 s.innerHTML = '';
                 s.style.borderColor = '#999';
-                if (i === 0 && !revealHintBtn.disabled) delete s.dataset.ghost;
-                if (i === 0 && revealHintBtn.disabled) s.dataset.ghost = word[0].toUpperCase();
             });
+            applyGuide();
         }
+
+        // Aplica guia inicial e estado do Hint
+        applyGuide();
+        revealHintBtn.disabled = guideOn;
 
         container.appendChild(div);
     }
@@ -519,8 +550,10 @@
     }
 
     function updateSessionStatus(){
-        sessionStatus.textContent = `Activities: ${completedWords}/${activities.length}`;
-        if (completedWords === activities.length && activities.length > 0) {
+        const a = activities.length;
+        const c = completedWords;
+        sessionStatus.textContent = a ? `Activities: ${c}/${a}` : '';
+        if (c === a && a > 0) {
             sessionStatus.innerHTML = `<span class="good">All done! Great job!</span>`;
         }
     }
@@ -551,7 +584,7 @@
         document.getElementById('completion-modal').style.display = 'none';
     }
 
-    // ================== PDF (mantido, ajustado para slots) ==================
+    // ================== PDF (mantido, com "Guide") ==================
     async function generatePDF() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
@@ -568,7 +601,6 @@
         function drawActivity(activityEl, y){
             const imgEl = activityEl.querySelector('img');
             if (imgEl) {
-                // desenho simples (sem canvas pesado)
                 try {
                     const cv = document.createElement('canvas');
                     const ctx = cv.getContext('2d');
@@ -579,21 +611,29 @@
                     doc.addImage(data, 'PNG', 10, y, 24, 24);
                 } catch {}
             }
+            // guia (modelo) em cinza claro
+            const wordModel = (activityEl.dataset.word || '').toUpperCase();
+            if (wordModel) {
+                doc.setFontSize(10);
+                doc.setTextColor(170); // cinza
+                doc.text(`Guide: ${wordModel}`, 50, y + 6);
+                doc.setTextColor(0);
+            }
             // slots como linhas
             const slotsCount = activityEl.querySelectorAll('.slot').length;
             let x = 50;
             doc.setFontSize(14);
             for (let i=0;i<slotsCount;i++){
-                doc.text("_____", x, y + 10);
+                doc.text("_____", x, y + 16);
                 x += 16;
             }
-            // letras embaralhadas (impressas ao lado)
+            // letras embaralhadas (lado)
             const trayTiles = [...activityEl.querySelectorAll('.tray .tile')].map(t => t.textContent).join(' ');
             const filledTiles = [...activityEl.querySelectorAll('.slot .tile')].map(t => t.textContent).join(' ');
             const mixed = (trayTiles || filledTiles || '').trim();
             if (mixed) {
                 doc.setFontSize(11);
-                doc.text(`Letters (mixed): ${mixed}`, 50, y + 20);
+                doc.text(`Letters (mixed): ${mixed}`, 50, y + 26);
             }
         }
 
@@ -605,12 +645,18 @@
             document.querySelectorAll('.activity').forEach((a) => {
                 if (y > 270) { doc.addPage(); y = 20; }
                 drawActivity(a, y);
-                y += 36;
+                y += 40;
             });
             doc.save("Hannah_Mixed_Letters.pdf");
         };
         logo.onerror = function(){
             header();
+            let y = 60;
+            document.querySelectorAll('.activity').forEach((a) => {
+                if (y > 270) { doc.addPage(); y = 20; }
+                drawActivity(a, y);
+                y += 40;
+            });
             doc.save("Hannah_Mixed_Letters.pdf");
         };
     }
