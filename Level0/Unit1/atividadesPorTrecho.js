@@ -22,8 +22,8 @@ function getActivitiesByTrecho(trecho, level, unit) {
                 { id: 10, name: "Hannah Video", path: `/Atividades/HannahVideo/index.html?level=${level}&unit=${unit}&fase=10`, img: "../../imagens/botoes/video_button.png", unlocked: false },
                 { id: 11, name: "Missing Word", path: `/Atividades/Missing Word/index.html?level=${level}&unit=${unit}&fase=11`, img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
                 { id: 12, name: "Missing Word2", path: `/Atividades/Missing Word2/index.html?level=${level}&unit=${unit}&fase=12`, img: "../../imagens/botoes/missing_word_button.png", unlocked: false },   
-                { id: 13, name: "Mixed Letters FIXO", path: `/Atividades/Mixed Letters FIXO/index.html?level=${level}&unit=${unit}&fase=13`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
-                { id: 14, name: "Mixed Letters FIXO2", path: `/Atividades/Mixed Letters FIXO2/index.html?level=${level}&unit=${unit}&fase=14`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
+                { id: 13, name: "Mixed Letters FIXO", path: `/Atividades/Mixed Letters starter/index.html?level=${level}&unit=${unit}&fase=13`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
+                { id: 14, name: "Mixed Letters FIXO2", path: `/Atividades/Mixed Letters starter2/index.html?level=${level}&unit=${unit}&fase=14`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
             ];
         case "trecho4":
             return [
