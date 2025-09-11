@@ -28,6 +28,7 @@
             background-image: url('../../../imagens/fundo.png');
             background-repeat: repeat;
             background-size: auto;
+            -webkit-tap-highlight-color: transparent; /* Remove highlight on tap */
         }
         h1 {
             text-align: center;
@@ -91,7 +92,6 @@
             display: grid;
             place-items: center;
             position: relative;
-            transition: border-color .15s ease;
         }
         .slot[data-ghost]::after{
             content: attr(data-ghost);
@@ -122,22 +122,15 @@
             font-weight: 700;
             cursor: grab;
             user-select: none;
-            touch-action: none; /* evita rolagem durante drag por toque */
+            touch-action: none;
+            transition: transform 0.2s ease; /* Suaviza o movimento no touch */
         }
         .tile:active { cursor: grabbing }
-        .tile[aria-grabbed="true"] { outline: 3px solid var(--focus) }
-
-        /* Suporte visual ao arrasto por toque (Pointer Events) */
-        .tile.touch-dragging{
-            position: fixed;
-            z-index: 9999;
-            pointer-events: none;
-            left: 0; top: 0;
-            transform: translate3d(var(--drag-x, 0px), var(--drag-y, 0px), 0);
-            box-shadow: 0 10px 24px rgba(0,0,0,.25);
+        .tile[aria-grabbed="true"] { 
+            outline: 3px solid var(--focus);
+            transform: scale(1.1); /* Feedback visual para touch */
+            z-index: 100; /* Garante que fique acima dos outros elementos */
         }
-        .slot.drop-target{ border-color: var(--focus) }
-
         .controls { display: flex; gap: 8px; flex-wrap: wrap }
         .pill {
             background: #fff;
@@ -183,6 +176,12 @@
             .activity { grid-template-columns: 1fr; justify-items: center }
             .activity img { width: 140px; height: 140px }
             .slot, .tile { width: 52px; height: 60px }
+        }
+        
+        /* Estilo para o tile sendo arrastado no touch */
+        .tile.dragging {
+            position: fixed;
+            pointer-events: none;
         }
     </style>
 </head>
@@ -279,6 +278,9 @@
     let activities = [];
     let completedWords = 0;
     const sessionStatus = document.getElementById('sessionStatus');
+    
+    // Detectar se é dispositivo touch
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
     document.addEventListener('DOMContentLoaded', () => {
         initializeVoices();
@@ -320,12 +322,18 @@
         const revealHintBtn = document.createElement('button');
         revealHintBtn.className = 'pill';
         revealHintBtn.textContent = 'Hint (1st letter)';
-        // (handler depende de slots; definiremos após criar slots)
+        revealHintBtn.addEventListener('click', () => {
+            if (!slots[0].dataset.ghost) {
+                slots[0].dataset.ghost = word[0].toUpperCase();
+                revealHintBtn.disabled = true;
+            }
+        });
 
         // Reset
         const resetBtn = document.createElement('button');
         resetBtn.className = 'pill';
         resetBtn.textContent = 'Reset';
+        resetBtn.addEventListener('click', () => resetActivity());
 
         const controls = document.createElement('div');
         controls.className = 'controls';
@@ -338,108 +346,252 @@
         tray.className = 'tray';
         area.appendChild(tray);
 
-        // Cria slots + guard contra "tap fantasma"
+        // Cria slots
         const slots = [];
-        const dropGuard = new WeakMap(); // slot -> timestamp do último drop (para ignorar clique fantasma)
         for (let i = 0; i < word.length; i++) {
             const s = document.createElement('div');
             s.className = 'slot';
             s.setAttribute('aria-label', `Position ${i+1}`);
             s.setAttribute('role', 'button');
             s.tabIndex = 0;
-
-            // DnD nativo (mouse)
             s.addEventListener('dragover', (e) => e.preventDefault());
             s.addEventListener('drop', (e) => handleDrop(e, s));
-
-            // Clique: remover letra (com proteção a clique fantasma após drop por toque)
+            
+            // Eventos para touch nos slots
+            if (isTouchDevice) {
+                s.addEventListener('touchstart', (e) => handleTouchStart(e, s), { passive: false });
+                s.addEventListener('touchmove', (e) => handleTouchMove(e, s), { passive: false });
+                s.addEventListener('touchend', (e) => handleTouchEnd(e, s));
+                s.addEventListener('touchcancel', (e) => handleTouchCancel(e, s));
+            }
+            
             s.addEventListener('click', () => {
-                const last = dropGuard.get(s) || 0;
-                if (Date.now() - last < 250) return; // ignora toque fantasma
+                // remover letra do slot (se houver)
                 const child = s.querySelector('.tile');
                 if (child) {
                     child.setAttribute('draggable', 'true');
                     child.setAttribute('aria-grabbed', 'false');
                     tray.appendChild(child);
                     s.innerHTML = '';
+                    // manter ghost se era a primeira letra
                     if (i === 0 && revealHintBtn.disabled) s.dataset.ghost = word[0].toUpperCase();
-                    // feedback parcial
-                    slots.forEach((sl, idx) => {
-                        const t = sl.querySelector('.tile');
-                        if (!t) { sl.style.borderColor = '#999'; return; }
-                        sl.style.borderColor = (word[idx].toUpperCase() === t.textContent) ? 'var(--ok)' : '#e53935';
-                    });
                 }
             });
-
             slots.push(s);
             dropZone.appendChild(s);
         }
 
-        // Agora que temos slots, definimos o hint
-        revealHintBtn.addEventListener('click', () => {
-            if (!slots[0].dataset.ghost) {
-                slots[0].dataset.ghost = word[0].toUpperCase();
-                revealHintBtn.disabled = true;
-            }
-        });
-
-        resetBtn.addEventListener('click', () => resetActivity());
-
         // Letras embaralhadas
         const shuffled = shuffleWord(word);
+        // Garante que não fique igual ao original
         const finalShuffle = (shuffled.toUpperCase() === word.toUpperCase()) ? forcedShuffle(word) : shuffled;
 
         for (const ch of finalShuffle.toUpperCase()) {
             const tile = document.createElement('div');
             tile.className = 'tile';
             tile.textContent = ch;
-            tile.setAttribute('draggable', 'true'); // mantém mouse
+            tile.setAttribute('draggable', 'true');
             tile.setAttribute('role', 'button');
             tile.setAttribute('aria-grabbed', 'false');
             tile.tabIndex = 0;
 
-            // ====== Suporte mouse (seu original) ======
             tile.addEventListener('dragstart', () => {
                 tile.setAttribute('aria-grabbed', 'true');
+                // fala a letra ao começar a arrastar (reforço)
                 speak(ch);
             });
             tile.addEventListener('dragend', () => tile.setAttribute('aria-grabbed', 'false'));
-
-            // ====== Suporte toque (Pointer Events) ======
-            enableTouchDrag(tile, slots, tray, (slotEl) => {
-                // marca horário para bloquear clique fantasma do slot
-                dropGuard.set(slotEl, Date.now());
-                // remove ghost se existir
-                if (slotEl.dataset.ghost) delete slotEl.dataset.ghost;
-                // verifica resposta
-                checkAnswer();
-            });
-
-            // Toque/click só para falar a letra (e não propagar)
-            tile.addEventListener('click', (e) => { e.stopPropagation?.(); speak(ch); });
+            tile.addEventListener('click', () => speak(ch)); // toque fala a letra
+            
+            // Eventos para touch nas peças
+            if (isTouchDevice) {
+                tile.addEventListener('touchstart', (e) => handleTileTouchStart(e, tile), { passive: false });
+                tile.addEventListener('touchmove', (e) => handleTileTouchMove(e, tile), { passive: false });
+                tile.addEventListener('touchend', (e) => handleTileTouchEnd(e, tile));
+                tile.addEventListener('touchcancel', (e) => handleTileTouchCancel(e, tile));
+            }
 
             tray.appendChild(tile);
-        }
-
-        function dropIntoSlot(tile, slotEl) {
-            // Se o slot já tem letra, devolve ao tray
-            if (slotEl.firstElementChild) {
-                tray.appendChild(slotEl.firstElementChild);
-            }
-            // ocupa o slot (sem remover listeners do tile)
-            slotEl.innerHTML = '';
-            slotEl.appendChild(tile);
-            tile.setAttribute('draggable', 'false'); // evita arrasto nativo a partir do slot (mouse)
         }
 
         function handleDrop(e, slotEl) {
             e.preventDefault();
             const tile = document.querySelector('.tile[aria-grabbed="true"]');
             if (!tile) return;
+            // Se o slot já tem letra, devolve ao tray
+            if (slotEl.firstElementChild) {
+                tray.appendChild(slotEl.firstElementChild);
+            }
+            // ocupa o slot
+            slotEl.innerHTML = '';
+            // remover ghost se existir
             if (slotEl.dataset.ghost) delete slotEl.dataset.ghost;
-            dropIntoSlot(tile, slotEl);
+
+            tile.setAttribute('draggable', 'false'); // evita arrasto direto do slot
+            slotEl.appendChild(tile);
+
+            // verifica se completou
             checkAnswer();
+        }
+        
+        // Variáveis para controle do touch
+        let activeTile = null;
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchOffsetX = 0;
+        let touchOffsetY = 0;
+        
+        function handleTileTouchStart(e, tile) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            activeTile = tile;
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
+            
+            // Calcula o offset do toque em relação ao elemento
+            const rect = tile.getBoundingClientRect();
+            touchOffsetX = touch.clientX - rect.left;
+            touchOffsetY = touch.clientY - rect.top;
+            
+            // Prepara o tile para arrasto
+            tile.setAttribute('aria-grabbed', 'true');
+            tile.classList.add('dragging');
+            
+            // Fala a letra
+            speak(tile.textContent);
+        }
+        
+        function handleTileTouchMove(e, tile) {
+            if (!activeTile) return;
+            e.preventDefault();
+            
+            const touch = e.touches[0];
+            const currentX = touch.clientX - touchOffsetX;
+            const currentY = touch.clientY - touchOffsetY;
+            
+            // Move o tile com o dedo
+            activeTile.style.left = currentX + 'px';
+            activeTile.style.top = currentY + 'px';
+            
+            // Verifica se está sobre um slot
+            const slots = dropZone.querySelectorAll('.slot');
+            let overSlot = null;
+            
+            slots.forEach(slot => {
+                const rect = slot.getBoundingClientRect();
+                if (
+                    touch.clientX >= rect.left &&
+                    touch.clientX <= rect.right &&
+                    touch.clientY >= rect.top &&
+                    touch.clientY <= rect.bottom
+                ) {
+                    overSlot = slot;
+                    slot.style.backgroundColor = '#f0f0f0'; // Feedback visual
+                } else {
+                    slot.style.backgroundColor = '';
+                }
+            });
+        }
+        
+        function handleTileTouchEnd(e, tile) {
+            if (!activeTile) return;
+            e.preventDefault();
+            
+            const touch = e.changedTouches[0];
+            const slots = dropZone.querySelectorAll('.slot');
+            let dropped = false;
+            
+            // Verifica em qual slot foi solto
+            slots.forEach(slot => {
+                const rect = slot.getBoundingClientRect();
+                if (
+                    touch.clientX >= rect.left &&
+                    touch.clientX <= rect.right &&
+                    touch.clientY >= rect.top &&
+                    touch.clientY <= rect.bottom
+                ) {
+                    // Se o slot já tem letra, devolve ao tray
+                    if (slot.firstElementChild) {
+                        const existingTile = slot.firstElementChild;
+                        existingTile.setAttribute('draggable', 'true');
+                        existingTile.setAttribute('aria-grabbed', 'false');
+                        existingTile.classList.remove('dragging');
+                        existingTile.style.left = '';
+                        existingTile.style.top = '';
+                        tray.appendChild(existingTile);
+                    }
+                    
+                    // Coloca a letra no slot
+                    slot.innerHTML = '';
+                    // remover ghost se existir
+                    if (slot.dataset.ghost) delete slot.dataset.ghost;
+                    
+                    tile.setAttribute('draggable', 'false');
+                    slot.appendChild(tile);
+                    tile.classList.remove('dragging');
+                    tile.style.left = '';
+                    tile.style.top = '';
+                    
+                    dropped = true;
+                    checkAnswer();
+                }
+                
+                // Remove o feedback visual
+                slot.style.backgroundColor = '';
+            });
+            
+            // Se não foi solto em um slot, volta para a bandeja
+            if (!dropped) {
+                tray.appendChild(tile);
+                tile.classList.remove('dragging');
+                tile.style.left = '';
+                tile.style.top = '';
+                tile.setAttribute('aria-grabbed', 'false');
+            }
+            
+            activeTile = null;
+        }
+        
+        function handleTileTouchCancel(e, tile) {
+            if (activeTile) {
+                tile.classList.remove('dragging');
+                tile.style.left = '';
+                tile.style.top = '';
+                tile.setAttribute('aria-grabbed', 'false');
+                activeTile = null;
+            }
+        }
+        
+        // Funções para manipulação de slots via touch
+        function handleTouchStart(e, slot) {
+            // Previne o comportamento padrão para evitar scroll
+            e.preventDefault();
+        }
+        
+        function handleTouchMove(e, slot) {
+            // Previne o comportamento padrão para evitar scroll
+            e.preventDefault();
+        }
+        
+        function handleTouchEnd(e, slot) {
+            // Se há uma letra ativa sendo arrastada, trata no handleTileTouchEnd
+            if (!activeTile) {
+                // Se não há tile ativo, trata como clique para remover a letra do slot
+                const child = slot.querySelector('.tile');
+                if (child) {
+                    child.setAttribute('draggable', 'true');
+                    child.setAttribute('aria-grabbed', 'false');
+                    tray.appendChild(child);
+                    slot.innerHTML = '';
+                    // manter ghost se era a primeira letra
+                    const index = Array.from(slots).indexOf(slot);
+                    if (index === 0 && revealHintBtn.disabled) slot.dataset.ghost = word[0].toUpperCase();
+                }
+            }
+        }
+        
+        function handleTouchCancel(e, slot) {
+            // Limpa qualquer estado se necessário
         }
 
         function currentAnswer(){
@@ -448,18 +600,10 @@
 
         function checkAnswer(){
             const ans = currentAnswer();
-            if (ans.length !== word.length) {
-                // feedback parcial
-                slots.forEach((s, idx) => {
-                    const t = s.querySelector('.tile');
-                    if (!t) { s.style.borderColor = '#999'; return; }
-                    const correct = word[idx].toUpperCase() === t.textContent;
-                    s.style.borderColor = correct ? 'var(--ok)' : '#e53935';
-                });
-                return;
-            }
+            if (ans.length !== word.length) return;
 
             if (ans.toUpperCase() === word.toUpperCase()){
+                // sucesso
                 celebrate(div);
                 speak(word);
                 if (div.dataset.completed === "false") {
@@ -467,6 +611,7 @@
                     completedWords++;
                     updateSessionStatus();
                 }
+                // trava os tiles
                 slots.forEach(s => {
                     const t = s.querySelector('.tile');
                     if (t) t.setAttribute('draggable','false');
@@ -478,7 +623,7 @@
                     firebase.auth().onAuthStateChanged((user) => { if (user) updateNextPhase(user.uid); });
                 }
             } else {
-                // feedback de erro
+                // erro: feedback suave (cor), sem penalizar
                 slots.forEach((s, idx) => {
                     const t = s.querySelector('.tile');
                     if (!t) return;
@@ -494,6 +639,9 @@
                 if (t) {
                     t.setAttribute('draggable','true');
                     t.setAttribute('aria-grabbed','false');
+                    t.classList.remove('dragging');
+                    t.style.left = '';
+                    t.style.top = '';
                     tray.appendChild(t);
                 }
                 s.innerHTML = '';
@@ -501,74 +649,6 @@
                 if (i === 0 && !revealHintBtn.disabled) delete s.dataset.ghost;
                 if (i === 0 && revealHintBtn.disabled) s.dataset.ghost = word[0].toUpperCase();
             });
-        }
-
-        // --- Handler de toque (Pointer Events) que NÃO conflita com o DnD nativo ---
-        function enableTouchDrag(tile, slots, tray, onPlaced){
-            if (!window.PointerEvent) return; // navegadores antigos
-            // em mobile Safari/Chrome, só vamos agir quando pointer é touch
-            let dragging = false;
-            let currentTargetSlot = null;
-
-            function setDragPos(x, y){
-                tile.style.setProperty('--drag-x', `${x}px`);
-                tile.style.setProperty('--drag-y', `${y}px`);
-            }
-
-            const onDown = (e) => {
-                if (e.pointerType !== 'touch') return; // evita competir com mouse
-                tile.setPointerCapture(e.pointerId);
-                dragging = true;
-                tile.classList.add('touch-dragging');
-                // Fala ao iniciar
-                const ch = tile.textContent?.trim(); if (ch) speak(ch);
-                setDragPos(e.clientX, e.clientY);
-                e.preventDefault();
-            };
-
-            const onMove = (e) => {
-                if (!dragging || e.pointerType !== 'touch') return;
-                setDragPos(e.clientX, e.clientY);
-
-                const el = document.elementFromPoint(e.clientX, e.clientY);
-                const slot = el ? el.closest('.slot') : null;
-
-                if (currentTargetSlot && currentTargetSlot !== slot) {
-                    currentTargetSlot.classList.remove('drop-target');
-                }
-                if (slot) slot.classList.add('drop-target');
-                currentTargetSlot = slot;
-                e.preventDefault();
-            };
-
-            const onUp = (e) => {
-                if (e.pointerType !== 'touch') return;
-                if (currentTargetSlot) currentTargetSlot.classList.remove('drop-target');
-
-                // soltar
-                if (dragging) {
-                    const el = document.elementFromPoint(e.clientX, e.clientY);
-                    const slot = el ? el.closest('.slot') : null;
-                    tile.classList.remove('touch-dragging');
-                    tile.removeAttribute('style');
-
-                    if (slot) {
-                        dropIntoSlot(tile, slot);
-                        onPlaced(slot);
-                    }
-                    // Se não caiu em slot, simplesmente deixa como estava (no tray ou slot original).
-                }
-
-                dragging = false;
-                tile.releasePointerCapture(e.pointerId);
-                e.preventDefault();
-            };
-
-            tile.addEventListener('pointerdown', onDown);
-            tile.addEventListener('pointermove', onMove);
-            tile.addEventListener('pointerup', onUp);
-            tile.addEventListener('pointercancel', onUp);
-            tile.addEventListener('lostpointercapture', onUp);
         }
 
         container.appendChild(div);
