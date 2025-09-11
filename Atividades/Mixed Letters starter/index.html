@@ -91,6 +91,7 @@
             display: grid;
             place-items: center;
             position: relative;
+            transition: border-color .15s ease;
         }
         .slot[data-ghost]::after{
             content: attr(data-ghost);
@@ -121,10 +122,25 @@
             font-weight: 700;
             cursor: grab;
             user-select: none;
-            touch-action: none;
+            touch-action: none; /* importante para mobile */
+            transition: box-shadow .15s ease, transform .06s ease;
         }
         .tile:active { cursor: grabbing }
         .tile[aria-grabbed="true"] { outline: 3px solid var(--focus) }
+
+        /* === Suporte a toque: estilo durante arrasto por Pointer Events === */
+        .tile.dragging {
+            position: fixed;
+            z-index: 9999;
+            pointer-events: none;
+            left: 0; top: 0;
+            transform: translate3d(var(--drag-x, 0px), var(--drag-y, 0px), 0);
+            box-shadow: 0 10px 24px rgba(0,0,0,.25);
+        }
+        .slot.drop-target {
+            border-color: var(--focus);
+        }
+
         .controls { display: flex; gap: 8px; flex-wrap: wrap }
         .pill {
             background: #fff;
@@ -140,11 +156,9 @@
             color: #444;
         }
         .good { color: var(--ok); font-weight: 700 }
+
         /* Modal */
-        #overlay {
-            position: fixed; inset: 0; background: rgba(0,0,0,.6);
-            display: none; z-index: 1000;
-        }
+        #overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; z-index: 1000; }
         #completion-modal {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
             background: #fff; padding: 28px; border-radius: 16px;
@@ -281,6 +295,115 @@
         return { level: params.get('level'), unit: params.get('unit') };
     }
 
+    // ================== Utilidades de Drag por Pointer (TOUCH + MOUSE) ==================
+    // Mantém o DnD nativo para mouse, e adiciona Pointer Events para toque.
+    function setupPointerDrag(tile, tray, slots, onDropToSlot) {
+        if (!window.PointerEvent) return; // sem suporte, deixa o DnD nativo atuar
+
+        let dragging = false;
+        let startX = 0, startY = 0;
+        let offsetX = 0, offsetY = 0;
+        let currentTargetSlot = null;
+
+        const startDrag = (e) => {
+            // Apenas botão esquerdo no mouse; em toque, ok
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+            tile.setPointerCapture(e.pointerId);
+            dragging = true;
+
+            const rect = tile.getBoundingClientRect();
+            startX = e.clientX;
+            startY = e.clientY;
+            offsetX = rect.left + rect.width/2;
+            offsetY = rect.top + rect.height/2;
+
+            tile.classList.add('dragging');
+            tile.setAttribute('aria-grabbed', 'true');
+            // Fala a letra quando começa (igual ao dragstart nativo)
+            const ch = tile.textContent?.trim();
+            if (ch) speak(ch);
+
+            // Se estava dentro de um slot, ao iniciar toque, liberamos para movimentação
+            const parentSlot = tile.parentElement?.classList.contains('slot') ? tile.parentElement : null;
+            if (parentSlot) {
+                // permitir recolocar em outro slot: volta a ser draggable visualmente
+                parentSlot.innerHTML = '';
+            }
+
+            updateTilePosition(e.clientX, e.clientY);
+            e.preventDefault();
+        };
+
+        const updateTilePosition = (x, y) => {
+            // Usa CSS vars para evitar layout thrash
+            tile.style.setProperty('--drag-x', `${x}px`);
+            tile.style.setProperty('--drag-y', `${y}px`);
+        };
+
+        const moveDrag = (e) => {
+            if (!dragging) return;
+            updateTilePosition(e.clientX, e.clientY);
+
+            // Descobre qual slot está sob o dedo
+            const el = document.elementFromPoint(e.clientX, e.clientY);
+            let slot = el ? el.closest('.slot') : null;
+
+            // Atualiza highlight visual
+            if (currentTargetSlot && currentTargetSlot !== slot) {
+                currentTargetSlot.classList.remove('drop-target');
+            }
+            if (slot) {
+                slot.classList.add('drop-target');
+            }
+            currentTargetSlot = slot;
+
+            e.preventDefault();
+        };
+
+        const endDrag = (e) => {
+            if (!dragging) return;
+            dragging = false;
+
+            tile.releasePointerCapture(e.pointerId);
+            tile.classList.remove('dragging');
+            tile.removeAttribute('style'); // limpa CSS vars
+            tile.setAttribute('aria-grabbed', 'false');
+
+            // Remove highlight
+            if (currentTargetSlot) {
+                currentTargetSlot.classList.remove('drop-target');
+            }
+
+            // Se terminou sobre um slot válido, faz o drop programático
+            const el = document.elementFromPoint(e.clientX, e.clientY);
+            const slot = el ? el.closest('.slot') : null;
+
+            if (slot) {
+                // Se o slot já tem letra, devolve ao tray
+                if (slot.firstElementChild) {
+                    tray.appendChild(slot.firstElementChild);
+                }
+                // ocupa o slot
+                slot.innerHTML = '';
+                slot.appendChild(tile);
+                tile.setAttribute('draggable', 'false'); // trava arrasto nativo dentro do slot
+                onDropToSlot(slot);
+            } else {
+                // não caiu em slot: volta ao tray
+                tile.setAttribute('draggable', 'true');
+                tile.setAttribute('aria-grabbed', 'false');
+                tray.appendChild(tile);
+            }
+        };
+
+        tile.addEventListener('pointerdown', startDrag);
+        tile.addEventListener('pointermove', moveDrag);
+        tile.addEventListener('pointerup', endDrag);
+        tile.addEventListener('pointercancel', endDrag);
+        tile.addEventListener('lostpointercapture', endDrag);
+    }
+
     // ================== Core da atividade (Drag & Drop) ==================
     function createActivity(imageUrl, word) {
         const container = document.getElementById('activity-container');
@@ -307,18 +430,11 @@
         const revealHintBtn = document.createElement('button');
         revealHintBtn.className = 'pill';
         revealHintBtn.textContent = 'Hint (1st letter)';
-        revealHintBtn.addEventListener('click', () => {
-            if (!slots[0].dataset.ghost) {
-                slots[0].dataset.ghost = word[0].toUpperCase();
-                revealHintBtn.disabled = true;
-            }
-        });
 
         // Reset
         const resetBtn = document.createElement('button');
         resetBtn.className = 'pill';
         resetBtn.textContent = 'Reset';
-        resetBtn.addEventListener('click', () => resetActivity());
 
         const controls = document.createElement('div');
         controls.className = 'controls';
@@ -339,10 +455,11 @@
             s.setAttribute('aria-label', `Position ${i+1}`);
             s.setAttribute('role', 'button');
             s.tabIndex = 0;
+            // DnD nativo (mouse)
             s.addEventListener('dragover', (e) => e.preventDefault());
-            s.addEventListener('drop', (e) => handleDrop(e, s));
+            s.addEventListener('drop', (e) => handleDropNative(e, s));
+            // Click para remover letra
             s.addEventListener('click', () => {
-                // remover letra do slot (se houver)
                 const child = s.querySelector('.tile');
                 if (child) {
                     child.setAttribute('draggable', 'true');
@@ -351,38 +468,58 @@
                     s.innerHTML = '';
                     // manter ghost se era a primeira letra
                     if (i === 0 && revealHintBtn.disabled) s.dataset.ghost = word[0].toUpperCase();
+                    updateBordersFeedback(); // atualiza feedback parcial
                 }
             });
             slots.push(s);
             dropZone.appendChild(s);
         }
 
+        // Ghost hint (precisa dos slots criados)
+        revealHintBtn.addEventListener('click', () => {
+            if (!slots[0].dataset.ghost) {
+                slots[0].dataset.ghost = word[0].toUpperCase();
+                revealHintBtn.disabled = true;
+            }
+        });
+
+        resetBtn.addEventListener('click', () => resetActivity());
+
         // Letras embaralhadas
         const shuffled = shuffleWord(word);
-        // Garante que não fique igual ao original
         const finalShuffle = (shuffled.toUpperCase() === word.toUpperCase()) ? forcedShuffle(word) : shuffled;
 
         for (const ch of finalShuffle.toUpperCase()) {
             const tile = document.createElement('div');
             tile.className = 'tile';
             tile.textContent = ch;
-            tile.setAttribute('draggable', 'true');
+            tile.setAttribute('draggable', 'true'); // mantém mouse DnD
             tile.setAttribute('role', 'button');
             tile.setAttribute('aria-grabbed', 'false');
             tile.tabIndex = 0;
 
+            // DnD nativo (mouse)
             tile.addEventListener('dragstart', () => {
                 tile.setAttribute('aria-grabbed', 'true');
-                // fala a letra ao começar a arrastar (reforço)
                 speak(ch);
             });
             tile.addEventListener('dragend', () => tile.setAttribute('aria-grabbed', 'false'));
-            tile.addEventListener('click', () => speak(ch)); // toque fala a letra
+
+            // Toque: fala a letra ao tocar
+            tile.addEventListener('click', () => speak(ch));
+
+            // Pointer Events (toque e mouse) — garante mobile
+            setupPointerDrag(tile, tray, slots, (slotEl) => {
+                // callback ao soltar em slot via toque/pointer
+                // remover ghost se existir
+                if (slotEl.dataset.ghost) delete slotEl.dataset.ghost;
+                updateAfterDrop();
+            });
 
             tray.appendChild(tile);
         }
 
-        function handleDrop(e, slotEl) {
+        function handleDropNative(e, slotEl) {
             e.preventDefault();
             const tile = document.querySelector('.tile[aria-grabbed="true"]');
             if (!tile) return;
@@ -392,13 +529,14 @@
             }
             // ocupa o slot
             slotEl.innerHTML = '';
-            // remover ghost se existir
             if (slotEl.dataset.ghost) delete slotEl.dataset.ghost;
 
             tile.setAttribute('draggable', 'false'); // evita arrasto direto do slot
             slotEl.appendChild(tile);
+            updateAfterDrop();
+        }
 
-            // verifica se completou
+        function updateAfterDrop(){
             checkAnswer();
         }
 
@@ -406,8 +544,22 @@
             return slots.map(s => (s.querySelector('.tile')?.textContent || '')).join('');
         }
 
+        function updateBordersFeedback(){
+            const ans = currentAnswer();
+            for (let idx=0; idx<slots.length; idx++){
+                const s = slots[idx];
+                const t = s.querySelector('.tile');
+                if (!t) { s.style.borderColor = '#999'; continue; }
+                const correct = word[idx]?.toUpperCase() === t.textContent;
+                s.style.borderColor = correct ? 'var(--ok)' : '#e53935';
+            }
+        }
+
         function checkAnswer(){
             const ans = currentAnswer();
+            // feedback parcial enquanto monta
+            updateBordersFeedback();
+
             if (ans.length !== word.length) return;
 
             if (ans.toUpperCase() === word.toUpperCase()){
@@ -430,14 +582,6 @@
                     showCompletionModal();
                     firebase.auth().onAuthStateChanged((user) => { if (user) updateNextPhase(user.uid); });
                 }
-            } else {
-                // erro: feedback suave (cor), sem penalizar
-                slots.forEach((s, idx) => {
-                    const t = s.querySelector('.tile');
-                    if (!t) return;
-                    const correct = word[idx].toUpperCase() === t.textContent;
-                    s.style.borderColor = correct ? 'var(--ok)' : '#e53935';
-                });
             }
         }
 
@@ -519,9 +663,9 @@
     }
 
     function updateSessionStatus(){
-        sessionStatus.textContent = `Activities: ${completedWords}/${activities.length}`;
+        document.getElementById('sessionStatus').textContent = `Activities: ${completedWords}/${activities.length}`;
         if (completedWords === activities.length && activities.length > 0) {
-            sessionStatus.innerHTML = `<span class="good">All done! Great job!</span>`;
+            document.getElementById('sessionStatus').innerHTML = `<span class="good">All done! Great job!</span>`;
         }
     }
 
@@ -568,7 +712,6 @@
         function drawActivity(activityEl, y){
             const imgEl = activityEl.querySelector('img');
             if (imgEl) {
-                // desenho simples (sem canvas pesado)
                 try {
                     const cv = document.createElement('canvas');
                     const ctx = cv.getContext('2d');
@@ -579,7 +722,6 @@
                     doc.addImage(data, 'PNG', 10, y, 24, 24);
                 } catch {}
             }
-            // slots como linhas
             const slotsCount = activityEl.querySelectorAll('.slot').length;
             let x = 50;
             doc.setFontSize(14);
@@ -587,7 +729,6 @@
                 doc.text("_____", x, y + 10);
                 x += 16;
             }
-            // letras embaralhadas (impressas ao lado)
             const trayTiles = [...activityEl.querySelectorAll('.tray .tile')].map(t => t.textContent).join(' ');
             const filledTiles = [...activityEl.querySelectorAll('.slot .tile')].map(t => t.textContent).join(' ');
             const mixed = (trayTiles || filledTiles || '').trim();
