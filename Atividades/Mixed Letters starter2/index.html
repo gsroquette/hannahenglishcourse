@@ -18,6 +18,7 @@
       font-family:'Atkinson Hyperlegible',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
       margin:0; padding:16px; display:flex; flex-direction:column; align-items:center;
       background-image:url('../../../imagens/fundo.png'); background-repeat:repeat; background-size:auto;
+      -webkit-tap-highlight-color: transparent;
     }
     h1{ text-align:center; color:var(--brand); font-size:clamp(1.8rem,4vw,3rem); margin:12px 0 8px }
     .toolbar{ display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-bottom:8px }
@@ -37,7 +38,7 @@
     .drop-zone{ display:flex; gap:8px; flex-wrap:wrap; min-height:64px }
     .slot{
       min-width:56px; min-height:64px; padding:0 6px; border:3px dashed #999; border-radius:12px; background:#fff;
-      display:grid; place-items:center; position:relative;
+      display:grid; place-items:center; position:relative; transition: border-color .15s ease;
     }
     .slot.syllable{ min-width:84px }
     .slot[data-ghost]::after{
@@ -49,10 +50,24 @@
     .tile{
       min-width:56px; min-height:64px; padding:0 6px; border:3px solid var(--tile-border); border-radius:12px; background:var(--tile);
       display:grid; place-items:center; font-size:1.6rem; font-weight:700; cursor:grab; user-select:none; touch-action:none; white-space:nowrap;
+      -webkit-user-drag: none;
+      transition: transform .15s ease;
     }
     .tile.syllable{ min-width:84px; font-size:1.4rem }
     .tile:active{ cursor:grabbing }
     .tile[aria-grabbed="true"]{ outline:3px solid var(--focus) }
+
+    /* Touch drag styling */
+    .tile.dragging{
+      position:fixed;
+      z-index:9999;
+      pointer-events:none;
+      left:0; top:0;
+      transform: translate3d(var(--drag-x, 0px), var(--drag-y, 0px), 0) scale(1.06);
+      box-shadow: 0 12px 24px rgba(0,0,0,.25);
+    }
+    .slot.drop-target{ border-color: var(--focus) }
+
     .controls{ display:flex; gap:8px; flex-wrap:wrap }
     .pill{ background:#fff; border:2px solid #ddd; border-radius:999px; padding:8px 12px; cursor:pointer; font-size:.95rem }
     .pill:focus-visible{ outline:3px solid var(--focus) }
@@ -157,15 +172,14 @@
     window.speechSynthesis.onvoiceschanged = initializeVoices;
 
     function speak(text){
-  const synth = window.speechSynthesis;
-  synth.cancel();
-  if (!selectedVoice) initializeVoices();
-
-  const u = new SpeechSynthesisUtterance((text || '').toString());
-  u.voice = selectedVoice || synth.getVoices()[0];
-  u.lang  = (selectedVoice && selectedVoice.lang) ? selectedVoice.lang : 'en-US'; // <-- força EN
-  synth.speak(u);
-}
+      const synth = window.speechSynthesis;
+      synth.cancel();
+      if (!selectedVoice) initializeVoices();
+      const u = new SpeechSynthesisUtterance((text || '').toString());
+      u.voice = selectedVoice || synth.getVoices()[0];
+      u.lang  = (selectedVoice && selectedVoice.lang) ? selectedVoice.lang : 'en-US';
+      synth.speak(u);
+    }
     function speakWord(w){ speak((w||"").toLowerCase()); }
 
     // --------------- Estado global ---------------
@@ -179,6 +193,8 @@
     const sessionStatus = document.getElementById('sessionStatus');
     const modeButton = document.getElementById('modeButton');
     const reloadButton = document.getElementById('reloadButton');
+
+    const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
     modeButton.addEventListener('click', () => {
       buildMode = (buildMode === "letters") ? "syllables" : "letters";
@@ -205,7 +221,7 @@
     // --------------- Pronúncia / Syllables JSON (merge global+local) ---------------
     async function loadGlobalSyllables(){
       try{
-        const res = await fetch('/shared/syllables.json'); // ajuste o caminho se necessário
+        const res = await fetch('/shared/syllables.json');
         if (!res.ok) return {};
         return await res.json();
       } catch { return {}; }
@@ -220,14 +236,13 @@
     function mergeSyllables(globalData, localData){
       const out = { pronunciations:{}, map:{} };
 
-      // pronunciations
       if (globalData.pronunciations){
         for (const k in globalData.pronunciations)
           out.pronunciations[k.toLowerCase()] = String(globalData.pronunciations[k]);
       }
       if (localData.pronunciations){
         for (const k in localData.pronunciations)
-          out.pronunciations[k.toLowerCase()] = String(localData.pronunciations[k]); // override
+          out.pronunciations[k.toLowerCase()] = String(localData.pronunciations[k]);
       }
 
       function ingest(obj){
@@ -246,7 +261,7 @@
         }
       }
       ingest(globalData);
-      ingest(localData); // local sobrescreve global
+      ingest(localData);
       return out;
     }
     async function loadSyllableResources(level, unit){
@@ -257,7 +272,6 @@
       const localData  = await loadLocalSyllables(level, unit);
       const merged = mergeSyllables(globalData, localData);
 
-      // fallback de blocos comuns (se não vierem do JSON)
       const FALLBACK = {
         "sh":"sh","ch":"tch","th":"th","ph":"f","wh":"w","ng":"ng",
         "tion":"shun","sion":"zhun","ture":"cher","le":"l","re":"ər",
@@ -270,7 +284,6 @@
         if (!merged.pronunciations[k]) merged.pronunciations[k] = FALLBACK[k];
       });
 
-      // popula mapas
       unitPronMap = { ...merged.pronunciations };
       for (const word in merged.map){
         const { units, speak } = merged.map[word];
@@ -288,10 +301,8 @@
     async function loadActivities(){
       const { level, unit } = getLevelAndUnitFromURL();
       try{
-        // carrega recursos de sílabas/pronúncia
         await loadSyllableResources(level, unit);
 
-        // palavras
         const wordsPath = `../../${level}/${unit}/data2/words.txt`;
         const resp = await fetch(wordsPath);
         if (!resp.ok) throw new Error(`Erro ao buscar palavras. Status: ${resp.status}`);
@@ -300,7 +311,6 @@
         if (words.length > SESSION_LIMIT) words = words.slice(0, SESSION_LIMIT);
         activities = words;
 
-        // cria atividades
         for (let i=0; i<words.length; i++){
           const word = words[i];
           const imageUrl = `../../${level}/${unit}/data2/imagens/imagem${i+1}.png`;
@@ -362,7 +372,7 @@
       if (!unit) return "";
       const key = String(unit).toLowerCase().trim();
       if (unitPronMap[key]) return unitPronMap[key];
-      return key; // minúsculas já reduzem chance de soletrar
+      return key;
     }
 
     // --------------- Core da atividade (DnD + Guide + Mode) ---------------
@@ -371,7 +381,7 @@
       const div = document.createElement('div');
       div.className='activity';
       div.dataset.completed="false";
-      div.dataset.word=word; // para PDF/guia
+      div.dataset.word=word;
 
       const img=document.createElement('img');
       img.src=imageUrl; img.alt=`Image hint for ${word}`;
@@ -415,6 +425,7 @@
       tray.className='tray';
       area.appendChild(tray);
 
+      const dropGuard = new WeakMap(); // slot -> timestamp (anti tap fantasma)
       const slots=[];
       for (let i=0;i<units.length;i++){
         const s=document.createElement('div');
@@ -422,18 +433,26 @@
         s.setAttribute('aria-label',`Position ${i+1}`);
         s.setAttribute('role','button');
         s.tabIndex=0;
+
+        // Mouse DnD nativo
         s.addEventListener('dragover',(e)=>e.preventDefault());
-        s.addEventListener('drop',(e)=>handleDrop(e,s,i));
+        s.addEventListener('drop',(e)=>handleDropMouse(e,s));
+
+        // Clique para remover (com guard)
         s.addEventListener('click',()=>{
+          const last = dropGuard.get(s) || 0;
+          if (Date.now() - last < 250) return;
           const child=s.querySelector('.tile');
           if (child){
             child.setAttribute('draggable','true');
             child.setAttribute('aria-grabbed','false');
             tray.appendChild(child);
-            s.innerHTML=''; s.style.borderColor='#999';
+            while (s.firstChild) s.removeChild(s.firstChild);
+            s.style.borderColor='#999';
             applyGuide();
           }
         });
+
         slots.push(s); dropZone.appendChild(s);
       }
 
@@ -466,13 +485,14 @@
       for (const block of shuffled){
         const tile=document.createElement('div');
         tile.className='tile '+unitClass;
-        tile.textContent=block; // visual pode ficar em CAIXA ALTA
-        tile.setAttribute('draggable','true');
+        tile.textContent=block;
+        tile.setAttribute('draggable','true'); // mouse
         tile.setAttribute('role','button');
         tile.setAttribute('aria-grabbed','false');
         tile.tabIndex=0;
-        tile.dataset.say = getSpeakText(block); // salva o "falável"
+        tile.dataset.say = getSpeakText(block);
 
+        // Mouse
         tile.addEventListener('dragstart',()=>{
           tile.setAttribute('aria-grabbed','true');
           speak(tile.dataset.say);
@@ -480,19 +500,37 @@
         tile.addEventListener('dragend',()=>tile.setAttribute('aria-grabbed','false'));
         tile.addEventListener('click',()=>speak(tile.dataset.say));
 
+        // Touch (sem competir com mouse)
+        if (isTouchDevice) enableTouchDrag(tile, slots, tray, (slotEl)=>{
+          dropGuard.set(slotEl, Date.now());
+          delete slotEl.dataset.ghost;
+          checkAnswer();
+        });
+
         tray.appendChild(tile);
       }
 
-      function handleDrop(e,slotEl,idx){
+      function dropIntoSlot(tile, slotEl){
+        // se o slot já tem letra, devolve ao tray
+        if (slotEl.firstElementChild) {
+          const old = slotEl.firstElementChild;
+          old.setAttribute('draggable','true');
+          old.setAttribute('aria-grabbed','false');
+          tray.appendChild(old);
+        }
+        // limpa filhos sem destruir listeners do próprio slot
+        while (slotEl.firstChild) slotEl.removeChild(slotEl.firstChild);
+        slotEl.appendChild(tile);
+        tile.setAttribute('draggable','false'); // evita drag nativo a partir do slot
+        slotEl.style.borderColor='#999';
+      }
+
+      function handleDropMouse(e, slotEl){
         e.preventDefault();
         const tile=document.querySelector('.tile[aria-grabbed="true"]');
         if (!tile) return;
-        if (slotEl.firstElementChild){ tray.appendChild(slotEl.firstElementChild); }
-        slotEl.innerHTML=''; slotEl.appendChild(tile);
-        tile.setAttribute('draggable','false');
-        slotEl.style.borderColor='#999';
+        dropIntoSlot(tile, slotEl);
         delete slotEl.dataset.ghost;
-        applyGuide();
         checkAnswer();
       }
 
@@ -501,7 +539,16 @@
       function checkAnswer(){
         const ans=currentAnswer();
         const target=modelUnits().join('');
-        if (ans.length!==target.length) return;
+        if (ans.length!==target.length){
+          // feedback parcial
+          const model=modelUnits();
+          slots.forEach((s,idx)=>{
+            const t=s.querySelector('.tile');
+            if (!t){ s.style.borderColor='#999'; return; }
+            s.style.borderColor = (t.textContent===model[idx]) ? 'var(--ok)' : '#e53935';
+          });
+          return;
+        }
 
         if (ans===target){
           celebrate(div);
@@ -524,13 +571,13 @@
           for (let i=0;i<slots.length;i++){
             const s=slots[i]; const t=s.querySelector('.tile');
             if (!t){ s.style.borderColor='#999'; continue; }
-            const correct=(t.textContent===model[i]);
-            s.style.borderColor=correct?'var(--ok)':'#e53935';
+            s.style.borderColor=(t.textContent===model[i])?'var(--ok)':'#e53935';
           }
         }
       }
 
       function resetActivity(){
+        // devolve todas as letras ao tray e limpa estilos
         slots.forEach((s)=>{
           const t=s.querySelector('.tile');
           if (t){
@@ -538,9 +585,128 @@
             t.setAttribute('aria-grabbed','false');
             tray.appendChild(t);
           }
-          s.innerHTML=''; s.style.borderColor='#999';
+          while (s.firstChild) s.removeChild(s.firstChild);
+          s.style.borderColor='#999';
         });
         applyGuide();
+      }
+
+      // -------- Touch drag seguro (threshold + body + highlight) --------
+      function enableTouchDrag(tile, slots, tray, onPlaced){
+        let dragging = false, armed = false;
+        let startX=0, startY=0, offsetX=0, offsetY=0;
+        let originParent = null;
+        let placeholder = null;
+        let currentTargetSlot = null;
+
+        function setPos(x,y){
+          tile.style.setProperty('--drag-x', `${x - offsetX}px`);
+          tile.style.setProperty('--drag-y', `${y - offsetY}px`);
+        }
+
+        tile.addEventListener('touchstart', (e)=>{
+          if (!e.touches || e.touches.length===0) return;
+          const t = e.touches[0];
+          armed = true; dragging = false;
+          startX = t.clientX; startY = t.clientY;
+          const rect = tile.getBoundingClientRect();
+          offsetX = t.clientX - rect.left;
+          offsetY = t.clientY - rect.top;
+          originParent = tile.parentElement;
+          // não falar ainda; só quando armar o drag
+          e.preventDefault();
+        }, {passive:false});
+
+        tile.addEventListener('touchmove', (e)=>{
+          if (!e.touches || e.touches.length===0) return;
+          const t = e.touches[0];
+          const dx = t.clientX - startX;
+          const dy = t.clientY - startY;
+
+          if (armed && (Math.abs(dx) > 8 || Math.abs(dy) > 8)){
+            armed = false; dragging = true;
+
+            // placeholder ocupa o lugar original se veio de slot
+            if (originParent && originParent.classList.contains('slot')){
+              placeholder = document.createElement('div');
+              placeholder.style.width = tile.offsetWidth+'px';
+              placeholder.style.height = tile.offsetHeight+'px';
+              placeholder.style.border = '3px dashed transparent';
+              originParent.replaceChild(placeholder, tile);
+            } else {
+              // saiu da bandeja: só remove do tray
+              originParent.removeChild(tile);
+            }
+
+            // mover para body e ligar visual
+            document.body.appendChild(tile);
+            tile.classList.add('dragging');
+            tile.setAttribute('aria-grabbed','true');
+            speak(tile.dataset.say);
+          }
+
+          if (dragging){
+            setPos(t.clientX, t.clientY);
+
+            const el = document.elementFromPoint(t.clientX, t.clientY);
+            const slot = el ? el.closest('.slot') : null;
+            if (currentTargetSlot && currentTargetSlot !== slot){
+              currentTargetSlot.classList.remove('drop-target');
+            }
+            if (slot) slot.classList.add('drop-target');
+            currentTargetSlot = slot;
+          }
+
+          e.preventDefault();
+        }, {passive:false});
+
+        function endDragCommon(t){
+          if (!dragging){ armed=false; return; }
+
+          if (currentTargetSlot) currentTargetSlot.classList.remove('drop-target');
+
+          // decide destino
+          const el = document.elementFromPoint(t.clientX, t.clientY);
+          const slot = el ? el.closest('.slot') : null;
+
+          tile.classList.remove('dragging');
+          tile.removeAttribute('style');
+          tile.setAttribute('aria-grabbed','false');
+
+          if (slot){
+            dropIntoSlot(tile, slot);
+            if (placeholder && placeholder.parentElement){
+              placeholder.parentElement.removeChild(placeholder);
+            }
+            placeholder = null;
+            onPlaced(slot);
+          } else {
+            // volta para tray
+            tray.appendChild(tile);
+            if (placeholder && placeholder.parentElement){
+              placeholder.parentElement.removeChild(placeholder);
+            }
+            placeholder = null;
+          }
+
+          dragging = false;
+          armed = false;
+          currentTargetSlot = null;
+        }
+
+        tile.addEventListener('touchend', (e)=>{
+          const t = e.changedTouches && e.changedTouches[0];
+          if (!t) return;
+          endDragCommon(t);
+          e.preventDefault();
+        });
+
+        tile.addEventListener('touchcancel', (e)=>{
+          const t = e.changedTouches && e.changedTouches[0];
+          if (!t) return;
+          endDragCommon(t);
+          e.preventDefault();
+        });
       }
 
       applyGuide();
