@@ -301,42 +301,31 @@
         if (!window.PointerEvent) return; // sem suporte, deixa o DnD nativo atuar
 
         let dragging = false;
-        let startX = 0, startY = 0;
-        let offsetX = 0, offsetY = 0;
         let currentTargetSlot = null;
 
         const startDrag = (e) => {
-            // Apenas botão esquerdo no mouse; em toque, ok
             if (e.pointerType === 'mouse' && e.button !== 0) return;
 
             tile.setPointerCapture(e.pointerId);
             dragging = true;
 
             const rect = tile.getBoundingClientRect();
-            startX = e.clientX;
-            startY = e.clientY;
-            offsetX = rect.left + rect.width/2;
-            offsetY = rect.top + rect.height/2;
-
             tile.classList.add('dragging');
             tile.setAttribute('aria-grabbed', 'true');
+
             // Fala a letra quando começa (igual ao dragstart nativo)
             const ch = tile.textContent?.trim();
             if (ch) speak(ch);
 
             // Se estava dentro de um slot, ao iniciar toque, liberamos para movimentação
             const parentSlot = tile.parentElement?.classList.contains('slot') ? tile.parentElement : null;
-            if (parentSlot) {
-                // permitir recolocar em outro slot: volta a ser draggable visualmente
-                parentSlot.innerHTML = '';
-            }
+            if (parentSlot) parentSlot.innerHTML = '';
 
             updateTilePosition(e.clientX, e.clientY);
             e.preventDefault();
         };
 
         const updateTilePosition = (x, y) => {
-            // Usa CSS vars para evitar layout thrash
             tile.style.setProperty('--drag-x', `${x}px`);
             tile.style.setProperty('--drag-y', `${y}px`);
         };
@@ -345,17 +334,13 @@
             if (!dragging) return;
             updateTilePosition(e.clientX, e.clientY);
 
-            // Descobre qual slot está sob o dedo
             const el = document.elementFromPoint(e.clientX, e.clientY);
             let slot = el ? el.closest('.slot') : null;
 
-            // Atualiza highlight visual
             if (currentTargetSlot && currentTargetSlot !== slot) {
                 currentTargetSlot.classList.remove('drop-target');
             }
-            if (slot) {
-                slot.classList.add('drop-target');
-            }
+            if (slot) slot.classList.add('drop-target');
             currentTargetSlot = slot;
 
             e.preventDefault();
@@ -367,30 +352,23 @@
 
             tile.releasePointerCapture(e.pointerId);
             tile.classList.remove('dragging');
-            tile.removeAttribute('style'); // limpa CSS vars
+            tile.removeAttribute('style');
             tile.setAttribute('aria-grabbed', 'false');
 
-            // Remove highlight
-            if (currentTargetSlot) {
-                currentTargetSlot.classList.remove('drop-target');
-            }
+            if (currentTargetSlot) currentTargetSlot.classList.remove('drop-target');
 
-            // Se terminou sobre um slot válido, faz o drop programático
             const el = document.elementFromPoint(e.clientX, e.clientY);
             const slot = el ? el.closest('.slot') : null;
 
             if (slot) {
-                // Se o slot já tem letra, devolve ao tray
                 if (slot.firstElementChild) {
                     tray.appendChild(slot.firstElementChild);
                 }
-                // ocupa o slot
                 slot.innerHTML = '';
                 slot.appendChild(tile);
-                tile.setAttribute('draggable', 'false'); // trava arrasto nativo dentro do slot
+                tile.setAttribute('draggable', 'false'); // trava arrasto nativo no slot
                 onDropToSlot(slot);
             } else {
-                // não caiu em slot: volta ao tray
                 tile.setAttribute('draggable', 'true');
                 tile.setAttribute('aria-grabbed', 'false');
                 tray.appendChild(tile);
@@ -447,6 +425,9 @@
         tray.className = 'tray';
         area.appendChild(tray);
 
+        // ==== Guard contra clique fantasma após drop ====
+        const dropGuard = new WeakMap(); // slot -> timestamp do último drop
+
         // Cria slots
         const slots = [];
         for (let i = 0; i < word.length; i++) {
@@ -458,17 +439,19 @@
             // DnD nativo (mouse)
             s.addEventListener('dragover', (e) => e.preventDefault());
             s.addEventListener('drop', (e) => handleDropNative(e, s));
-            // Click para remover letra
+            // Click para remover letra (com guard)
             s.addEventListener('click', () => {
+                const last = dropGuard.get(s) || 0;
+                if (Date.now() - last < 300) return; // ignora clique fantasma pós-drop
+
                 const child = s.querySelector('.tile');
                 if (child) {
                     child.setAttribute('draggable', 'true');
                     child.setAttribute('aria-grabbed', 'false');
                     tray.appendChild(child);
                     s.innerHTML = '';
-                    // manter ghost se era a primeira letra
                     if (i === 0 && revealHintBtn.disabled) s.dataset.ghost = word[0].toUpperCase();
-                    updateBordersFeedback(); // atualiza feedback parcial
+                    updateBordersFeedback();
                 }
             });
             slots.push(s);
@@ -505,14 +488,14 @@
             });
             tile.addEventListener('dragend', () => tile.setAttribute('aria-grabbed', 'false'));
 
-            // Toque: fala a letra ao tocar
-            tile.addEventListener('click', () => speak(ch));
+            // Toque: fala a letra ao tocar + evita propagação para o slot
+            tile.addEventListener('click', (e) => { e.stopPropagation(); speak(ch); });
 
             // Pointer Events (toque e mouse) — garante mobile
             setupPointerDrag(tile, tray, slots, (slotEl) => {
                 // callback ao soltar em slot via toque/pointer
-                // remover ghost se existir
                 if (slotEl.dataset.ghost) delete slotEl.dataset.ghost;
+                dropGuard.set(slotEl, Date.now()); // marca drop para ignorar clique fantasma
                 updateAfterDrop();
             });
 
@@ -533,6 +516,10 @@
 
             tile.setAttribute('draggable', 'false'); // evita arrasto direto do slot
             slotEl.appendChild(tile);
+
+            // marca horário do drop para bloquear clique fantasma
+            dropGuard.set(slotEl, Date.now());
+
             updateAfterDrop();
         }
 
