@@ -31,9 +31,19 @@
     *{ box-sizing:border-box }
 
     header{
-      padding:10px 16px; display:flex; flex-direction:column; align-items:center; gap:6px;
+      padding:10px 16px; display:flex; flex-direction:column; align-items:center; gap:8px;
       margin:0 auto 8px; max-width:1100px;
     }
+
+    /* Back on top aligned left on wide screens */
+    .topbar{
+      width:100%; max-width:1100px; margin:0 auto; display:flex; justify-content:flex-start;
+    }
+    #back-button{
+      appearance:none; border:none; background:var(--accent); color:#fff; font-weight:800;
+      padding:10px 14px; border-radius:12px; cursor:pointer; box-shadow:var(--shadow);
+    }
+
     .title{
       margin:0; font-size:1.4rem; font-weight:900; letter-spacing:.3px;
       background:linear-gradient(90deg, #7C3AED, #9F67FF);
@@ -133,7 +143,7 @@
     }
     .tile img{ max-width:100%; max-height:100%; display:block }
 
-    /* SELECTION: thick purple + overlay + lift */
+    /* Selection: thick purple + overlay + lift */
     .tile.selected{
       outline:10px solid var(--accent);
       transform: translateY(-2px);
@@ -142,14 +152,14 @@
     .tile.selected::after{
       content:'';
       position:absolute; inset:0;
-      background: rgba(124,58,237, .24); /* translucent purple veil */
+      background: rgba(124,58,237, .24);
       pointer-events:none;
       z-index:1;
     }
 
     .ret-btn{
       position:absolute; top:6px; right:6px; width:24px; height:24px; border-radius:999px; border:1px solid #ddd; background:#fff; font-size:14px; line-height:22px; box-shadow:var(--shadow); cursor:pointer;
-      z-index:2; /* above overlay */
+      z-index:2;
     }
 
     .tile, .slot{ touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
@@ -172,6 +182,10 @@
   </style>
 </head>
 <body>
+  <div class="topbar">
+    <button id="back-button" onclick="goBack()">Back</button>
+  </div>
+
   <header>
     <h1 class="title">Hannah Sequence Game</h1>
     <div class="crumbs" id="crumbs" title="Current story level/unit">Loading…</div>
@@ -206,8 +220,33 @@
     </div>
   </div>
 
+  <!-- Firebase SDK v8 (same as your example) -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
   <script>
-    /* ---------- Utils ---------- */
+    /* ======================= Firebase Init (from your example) ======================= */
+    const firebaseConfig = {
+      apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+      authDomain: "hannahenglishcourse.firebaseapp.com",
+      databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "hannahenglishcourse",
+      storageBucket: "hannahenglishcourse.appspot.com",
+      messagingSenderId: "449818788486",
+      appId: "1:449818788486:web:8a49d3f68591e6fb3f0707"
+    };
+    firebase.initializeApp(firebaseConfig);
+
+    let currentUserId = null;
+    firebase.auth().onAuthStateChanged(function(user){
+      if(user){ currentUserId = user.uid; }
+      else { currentUserId = null; console.warn("[Auth] User not authenticated: progress will not be saved."); }
+    });
+
+    /* ======================= Game Logic ======================= */
+
+    // ---------- Utils ----------
     var qs = function(s, el){ return (el||document).querySelector(s); };
     var qsa = function(s, el){ return Array.prototype.slice.call((el||document).querySelectorAll(s)); };
     var shuffle = function(arr){ var a=arr.slice(); for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; } return a; };
@@ -221,7 +260,7 @@
       return {level:level, unit:unit, fase:fase};
     }
 
-    /* ---------- State ---------- */
+    // ---------- State ----------
     var state = {
       meta:null,
       frames:[],        // [{id, image}]
@@ -236,7 +275,7 @@
 
     function frameById(id){ return state.frames.find(function(f){ return f.id===id; }); }
 
-    /* ---------- Audio feedback ---------- */
+    // ---------- Audio feedback ----------
     var audioCtx = null;
     function ensureAudio(){ if(!audioCtx){ try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return !!audioCtx; }
     function tone(freq, durMs, type){
@@ -254,7 +293,7 @@
     function sfxWrong(){ tone(240, 140, 'sawtooth'); if(navigator.vibrate) navigator.vibrate(15); }
     function sfxWin(){ tone(660,120,'triangle'); setTimeout(function(){ tone(990,120,'triangle'); },120); setTimeout(function(){ tone(1320,150,'triangle'); },240); if(navigator.vibrate) navigator.vibrate([30,30,50]); }
 
-    /* ---------- UI helpers ---------- */
+    // ---------- UI helpers ----------
     function crumbsText(meta){
       return meta.level + ' · ' + meta.unit + (state.storyTitle ? ' — ' + state.storyTitle : '');
     }
@@ -290,9 +329,7 @@
       requestAnimationFrame(function(){ b.classList.add('show'); });
       setTimeout(function(){ if(b && b.parentNode){ b.parentNode.removeChild(b); } }, 900);
     }
-
     function highlightMiniMapById(id){
-      // id format 'fN' -> index N-1
       var idx = -1;
       if(typeof id === 'string' && id.charAt(0)==='f'){
         var n = parseInt(id.slice(1),10);
@@ -305,7 +342,7 @@
       }
     }
 
-    /* ---------- Render ---------- */
+    // ---------- Render ----------
     function renderBoard(){
       renderCrumbs();
       renderMiniMap();
@@ -328,7 +365,7 @@
         if(idPlaced){
           var fr = frameById(idPlaced);
           if(fr){
-            var tile = makeTile(fr, true); // in slot
+            var tile = makeTile(fr, true);
             slot.appendChild(tile);
           }
         }
@@ -342,7 +379,7 @@
           if(id) placeIdIntoSlot(id, parseInt(this.getAttribute('data-idx'),10));
         });
 
-        // mark correctness automatically
+        // state color
         if(idPlaced){
           if(idPlaced === state.orderIds[i]){ slot.classList.add('is-correct'); }
           else { slot.classList.add('is-wrong'); }
@@ -359,11 +396,9 @@
       }
 
       var pool = qs('#poolList'); pool.innerHTML='';
-      // desktop drop to return
       pool.addEventListener('dragover', function(e){ e.preventDefault(); });
       pool.addEventListener('drop', function(e){ e.preventDefault(); var id=e.dataTransfer.getData('text/plain'); if(id) returnToPool(id); });
 
-      // touch on empty pool area returns selected
       pool.addEventListener('pointerdown', function(e){
         if(!selectedId) return;
         if(e.target.closest('.poolTile') || e.target.closest('.tile')) return;
@@ -375,13 +410,11 @@
         var fr = frameById(id); if(!fr) return;
         var wrap = document.createElement('div');
         wrap.className='poolTile'; wrap.setAttribute('data-id', id);
-
         var tile = makeTile(fr, false);
         wrap.appendChild(tile);
         pool.appendChild(wrap);
       });
 
-      // Hint availability UI
       var btnHint = qs('#btnHint');
       btnHint.disabled = state.hintUsed;
       btnHint.textContent = state.hintUsed ? 'Hint (used)' : 'Hint';
@@ -413,7 +446,7 @@
       return t;
     }
 
-    /* ---------- Interaction ---------- */
+    // ---------- Interaction ----------
     var selectedId = null;
     function selectTile(tile){
       var id = tile.getAttribute('data-id');
@@ -440,19 +473,16 @@
       if(currentIdx === idx) return;
 
       if(currentIdx !== -1){
-        // move between slots (swap)
         var targetId = state.slots[idx];
         state.slots[idx] = id;
         state.slots[currentIdx] = targetId || null;
       } else {
-        // pool -> slot (maybe swap)
         var occupant = state.slots[idx];
         state.slots[idx] = id;
         state.poolIds = state.poolIds.filter(function(x){ return x!==id; });
         if(occupant){ state.poolIds.push(occupant); }
       }
 
-      // Immediate feedback on the slot
       var isNowCorrect = (state.orderIds[idx] === id);
       var slotEl = qs('.slot[data-idx="'+idx+'"]');
       if(slotEl){
@@ -481,15 +511,15 @@
       if(state.orderIds.length === 0) return;
       if(state.completed) return;
       state.completed = true;
+
+      // Progression -> Firebase
+      markPhaseCompleted();
+
       sfxWin();
       qs('#modalWin').classList.add('open');
-      try{
-        if(window.updateNextPhase && window.currentUserId){ window.updateNextPhase(window.currentUserId); }
-        if(window.logActivity){ window.logActivity({ type:'hannah-sequence-game', meta:state.meta }); }
-      }catch(e){}
     }
 
-    /* ---------- Controls ---------- */
+    // ---------- Controls ----------
     function doReset(){
       state.hintUsed = false;
       state.completed = false;
@@ -523,7 +553,94 @@
       checkCompletion();
     }
 
-    /* ---------- Data loading ---------- */
+    // ---------- Firebase Progression (from your example) ----------
+    function getParamsFromURL(){
+      const params = new URLSearchParams(window.location.search);
+      return { level: params.get('level'), unit: params.get('unit'), fase: params.get('fase') };
+    }
+    function getPhaseFromURL(){
+      const params = new URLSearchParams(window.location.search);
+      return params.get('fase');
+    }
+
+    function ensureUserIsAuthenticated(callback){
+      // if already have it:
+      if(currentUserId){ callback(currentUserId); return; }
+      firebase.auth().onAuthStateChanged(function(user){
+        if(user){ currentUserId = user.uid; callback(user.uid); }
+        else { console.error("[Auth] User not authenticated"); }
+      });
+    }
+
+    function markPhaseCompleted(){
+      ensureUserIsAuthenticated(updateNextPhase);
+    }
+
+    async function updateNextPhase(userId){
+      console.log("[Progress] Updating next phase…");
+      const { level, unit } = getParamsFromURL();
+      const currentPhase = getPhaseFromURL();
+      if(!level || !unit || !currentPhase){ console.warn("[Progress] Missing URL params."); return; }
+
+      const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+      try{
+        if(currentPhase === "last"){
+          const nextUnit = `Unit${parseInt(unit.replace('Unit','')) + 1}`;
+          console.log(`[Progress] Unlocking next unit: ${nextUnit}`);
+          await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
+        } else if(currentPhase === "end"){
+          const nextLevel = `Level${parseInt(level.replace('Level','')) + 1}`;
+          console.log(`[Progress] Unlocking next level: ${nextLevel}`);
+          await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+        } else {
+          const nextPhase = parseInt(currentPhase) + 1;
+          console.log(`[Progress] Unlocking next phase: fase${nextPhase}`);
+          await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
+        }
+        console.log("[Progress] Update successful.");
+      } catch(err){
+        console.error("[Progress] Error updating next phase:", err);
+      }
+    }
+
+    // ---------- Back button ----------
+    async function goBack(){
+      console.log("[Back] Click");
+      const { level, unit, fase } = getParamsFromURL();
+
+      // If not completed yet, confirm first (clear, kid-friendly)
+      if(!state.completed){
+        const leave = confirm("You haven't completed this phase yet. Do you want to go back?");
+        if(leave){ window.history.back(); }
+        return;
+      }
+
+      // If completed, just go back. (Optional: keep your example's check as fallback)
+      if(!level || !unit || !fase){ window.history.back(); return; }
+
+      firebase.auth().onAuthStateChanged(async (user)=>{
+        if(!user){ window.history.back(); return; }
+        const nextPhase = `fase${parseInt(fase)+1}`;
+        try{
+          const snapshot = await firebase.database()
+            .ref(`usuarios/${user.uid}/progresso/${level}/${unit}/${nextPhase}`)
+            .once("value");
+          if(snapshot.val() === true){
+            window.history.back();
+          } else {
+            const confirmExit = confirm("The next phase is locked. Do you still want to go back?");
+            if(confirmExit){ window.history.back(); }
+          }
+        }catch(err){
+          console.error("[Back] Firebase error:", err);
+          const confirmExit = confirm("Could not verify progress. Do you want to go back anyway?");
+          if(confirmExit){ window.history.back(); }
+        }
+      });
+    }
+
+    // ---------- Data loading ----------
     function imageExists(url){
       return new Promise(function(res){
         var img = new Image();
@@ -583,7 +700,7 @@
       return { title:title, frames:ordered };
     }
 
-    /* ---------- Bootstrap (reset on reload) ---------- */
+    // ---------- Bootstrap (reset on reload) ----------
     window.addEventListener('load', init);
     async function init(){
       state.meta = getParams();
