@@ -73,6 +73,10 @@
     .tile:active{ cursor:grabbing }
     .tile img{ max-width:100%; max-height:100%; display:block }
 
+    /* Botão de retorno para mobile/touch */
+    .tile.in-slot{ position:relative }
+    .ret-btn{ position:absolute; top:6px; right:6px; width:24px; height:24px; border-radius:999px; border:1px solid #ddd; background:#fff; font-size:14px; line-height:22px; box-shadow: var(--shadow); cursor:pointer }
+
     .hint-glow{ box-shadow:0 0 0 3px rgba(255,107,0,.35), 0 0 0 6px rgba(255,107,0,.15) !important }
 
     /* Modal */
@@ -208,18 +212,33 @@
 
     function makeTile(frame, {draggable=true, asPlaced=false}={}){
       const t = document.createElement('div');
-      t.className = 'tile';
+      t.className = 'tile' + (asPlaced ? ' in-slot' : '');
       t.setAttribute('data-id', frame.id);
-      if(draggable){ t.draggable = true; }
+
+      const isPointerFine = window.matchMedia && window.matchMedia('(pointer:fine)').matches;
+      const enableDrag = draggable && !!isPointerFine;
+      if(enableDrag){ t.draggable = true; }
 
       const img = document.createElement('img');
       img.src = frame.image;
       img.alt = 'story frame';
       t.appendChild(img);
 
-      if(draggable){ t.addEventListener('dragstart', (e)=>{ e.dataTransfer.setData('text/plain', frame.id); }); }
+      if(enableDrag){ t.addEventListener('dragstart', (e)=>{ e.dataTransfer.setData('text/plain', frame.id); }); }
+      
+      // Toque/clique seleciona a peça (touch-friendly)
       t.addEventListener('click', ()=>{ selectTile(t); });
-      if(asPlaced){ t.addEventListener('dblclick', ()=>{ returnToPool(frame.id); }); }
+
+      // Botão de retorno ao pool quando estiver em um slot (melhor em touch)
+      if(asPlaced){
+        const ret = document.createElement('button');
+        ret.className = 'ret-btn';
+        ret.type = 'button';
+        ret.title = 'Voltar ao embaralhado';
+        ret.textContent = '↩';
+        ret.addEventListener('click', (ev)=>{ ev.stopPropagation(); returnToPool(frame.id); });
+        t.appendChild(ret);
+      }
       return t;
     }
 
