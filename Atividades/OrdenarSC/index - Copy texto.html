@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Hannah Sequence Game</title>
   <style>
-    /* === Same body background as other activities === */
     body{
       font-family: Arial, sans-serif;
       text-align: center;
@@ -19,6 +18,7 @@
 
     :root{
       --accent:#7C3AED;         /* Purple highlight */
+      --accent-ring:#D6C6FF;    /* Light purple ring */
       --ok:#2e7d32;             /* Green (correct) */
       --err:#c62828;            /* Red (wrong) */
       --ink:#222;
@@ -34,7 +34,6 @@
       padding:10px 16px; display:flex; flex-direction:column; align-items:center; gap:6px;
       margin:0 auto 8px; max-width:1100px;
     }
-    /* Title with subtle gradient purple */
     .title{
       margin:0; font-size:1.4rem; font-weight:900; letter-spacing:.3px;
       background:linear-gradient(90deg, #7C3AED, #9F67FF);
@@ -47,7 +46,7 @@
 
     .wrap{ width:min(1100px, 100%); margin:0 auto 20px; display:flex; flex-direction:column; gap:12px }
 
-    /* Mini-map (1..N) — purple buttons */
+    /* Mini-map */
     .minimap{
       position:sticky; top:0; z-index:5;
       background:rgba(245,245,245,.9);
@@ -60,11 +59,12 @@
       border:2px solid var(--accent); background:var(--accent); color:#fff;
       box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center;
       font-weight:700; font-size:.85rem; cursor:pointer; user-select:none;
-      transition:transform .08s ease, box-shadow .2s ease, background .2s ease;
+      transition:transform .08s ease, box-shadow .2s ease, background .2s ease, outline .2s ease;
     }
     .dot.filled{ filter:saturate(1.2) brightness(1.05) }
     .dot:active{ transform:translateY(1px) }
-    .dot.focus{ outline:3px solid #D6C6FF }
+    .dot.focus{ outline:3px solid var(--accent-ring) }
+    .dot.sel{ box-shadow:0 0 0 4px var(--accent-ring), var(--shadow); }
 
     .controls{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap }
     .btn{
@@ -85,7 +85,7 @@
     }
     .sectionTitle{ margin:6px 0 10px; font-weight:800; text-align:left }
 
-    /* Slot card layout: row1 number + image, row2 full-width text */
+    /* Slot card: row1 number + image, row2 full text */
     .slotCard{
       display:grid;
       grid-template-columns: 44px 110px 1fr;
@@ -104,11 +104,11 @@
       grid-column:2; grid-row:1;
       width:110px; height:110px; background:#fafafa; border:3px dashed var(--slot-border); border-radius:12px;
       display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden;
-      transition:border-color .15s ease, border-width .15s ease;
+      transition:border-color .15s ease, border-width .15s ease, box-shadow .15s ease;
     }
     .slot.filled{ border-style:solid; border-color:#aaa }
-    .slot.is-correct{ border:4px solid var(--ok) }
-    .slot.is-wrong{ border:4px solid var(--err) }
+    .slot.is-correct{ border:4px solid var(--ok); box-shadow:0 0 0 2px rgba(46,125,50,.1) inset; }
+    .slot.is-wrong{ border:4px solid var(--err); box-shadow:0 0 0 2px rgba(198,40,40,.08) inset; }
 
     .slotText{
       grid-column:1 / 4; grid-row:2;
@@ -129,12 +129,27 @@
     .tile{
       background:var(--tile); border:2px solid var(--tile-border); border-radius:12px; overflow:hidden; cursor:grab; position:relative;
       display:flex; align-items:center; justify-content:center; height:100%; width:100%; user-select:none;
+      transition: box-shadow .12s ease, transform .08s ease, outline-width .08s ease;
     }
     .tile img{ max-width:100%; max-height:100%; display:block }
-    .selected{ outline:6px solid var(--accent); }  /* THICK PURPLE selection */
+
+    /* SELECTION: thick purple + overlay + lift */
+    .tile.selected{
+      outline:10px solid var(--accent);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 22px rgba(124,58,237,.28);
+    }
+    .tile.selected::after{
+      content:'';
+      position:absolute; inset:0;
+      background: rgba(124,58,237, .24); /* translucent purple veil */
+      pointer-events:none;
+      z-index:1;
+    }
 
     .ret-btn{
-      position:absolute; top:6px; right:6px; width:24px; height:24px; border-radius:999px; border:1px solid #ddd; background:#fff; font-size:14px; line-height:22px; box-shadow:var(--shadow); cursor:pointer
+      position:absolute; top:6px; right:6px; width:24px; height:24px; border-radius:999px; border:1px solid #ddd; background:#fff; font-size:14px; line-height:22px; box-shadow:var(--shadow); cursor:pointer;
+      z-index:2; /* above overlay */
     }
 
     .tile, .slot{ touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
@@ -166,7 +181,6 @@
     <div class="minimap" id="miniMap" aria-label="Sequence map"></div>
 
     <div class="controls" role="toolbar" aria-label="Controls">
-      <!-- Removed Check and Fullscreen -->
       <button class="btn ghost" id="btnReset" title="Shuffle and start over">Reset</button>
       <button class="btn primary" id="btnHint" title="Reveal the next correct slot">Hint</button>
     </div>
@@ -222,7 +236,7 @@
 
     function frameById(id){ return state.frames.find(function(f){ return f.id===id; }); }
 
-    /* ---------- Audio feedback (WebAudio tones) ---------- */
+    /* ---------- Audio feedback ---------- */
     var audioCtx = null;
     function ensureAudio(){ if(!audioCtx){ try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return !!audioCtx; }
     function tone(freq, durMs, type){
@@ -231,22 +245,23 @@
       o.type = type || 'sine'; o.frequency.value = freq;
       o.connect(g); g.connect(audioCtx.destination);
       g.gain.setValueAtTime(0.001, audioCtx.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.15, audioCtx.currentTime+0.01);
+      g.gain.exponentialRampToValueAtTime(0.16, audioCtx.currentTime+0.01);
       g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + (durMs/1000));
       o.start(); o.stop(audioCtx.currentTime + (durMs/1000));
     }
+    function sfxTick(){ tone(520, 70, 'square'); if(navigator.vibrate) navigator.vibrate(12); }
     function sfxCorrect(){ tone(880, 120, 'triangle'); setTimeout(function(){ tone(1320, 90, 'triangle'); }, 110); if(navigator.vibrate) navigator.vibrate(25); }
     function sfxWrong(){ tone(240, 140, 'sawtooth'); if(navigator.vibrate) navigator.vibrate(15); }
     function sfxWin(){ tone(660,120,'triangle'); setTimeout(function(){ tone(990,120,'triangle'); },120); setTimeout(function(){ tone(1320,150,'triangle'); },240); if(navigator.vibrate) navigator.vibrate([30,30,50]); }
 
     /* ---------- UI helpers ---------- */
     function crumbsText(meta){
-      // Show just the names (no extra labels): Level0 · Unit1
       return meta.level + ' · ' + meta.unit + (state.storyTitle ? ' — ' + state.storyTitle : '');
     }
     function renderCrumbs(){
       qs('#crumbs').textContent = crumbsText(state.meta);
     }
+
     function renderMiniMap(){
       var mm = qs('#miniMap'); mm.innerHTML = '';
       for(var i=0;i<state.orderIds.length;i++){
@@ -254,6 +269,7 @@
         var filled = !!state.slots[i];
         d.className = 'dot' + (filled?' filled':'');
         d.type='button'; d.textContent = (i+1);
+        d.setAttribute('data-idx', i);
         (function(idx, btn){
           btn.addEventListener('click', function(){
             var card = qs('[data-slot-card="'+idx+'"]');
@@ -273,6 +289,20 @@
       el.appendChild(b);
       requestAnimationFrame(function(){ b.classList.add('show'); });
       setTimeout(function(){ if(b && b.parentNode){ b.parentNode.removeChild(b); } }, 900);
+    }
+
+    function highlightMiniMapById(id){
+      // id format 'fN' -> index N-1
+      var idx = -1;
+      if(typeof id === 'string' && id.charAt(0)==='f'){
+        var n = parseInt(id.slice(1),10);
+        if(!isNaN(n)) idx = n-1;
+      }
+      qsa('#miniMap .dot').forEach(function(x){ x.classList.remove('sel'); });
+      if(idx>=0){
+        var dot = qs('#miniMap .dot[data-idx="'+idx+'"]');
+        if(dot) dot.classList.add('sel');
+      }
     }
 
     /* ---------- Render ---------- */
@@ -391,10 +421,13 @@
       selectedId = id;
       qsa('.tile').forEach(function(el){ el.classList.remove('selected'); });
       tile.classList.add('selected');
+      highlightMiniMapById(id);
+      sfxTick();
     }
     function clearSelection(){
       selectedId = null;
       qsa('.tile').forEach(function(el){ el.classList.remove('selected'); });
+      qsa('#miniMap .dot').forEach(function(x){ x.classList.remove('sel'); });
     }
 
     function handleSlotTap(e){
@@ -405,8 +438,6 @@
     function placeIdIntoSlot(id, idx){
       var currentIdx = state.slots.findIndex(function(v){ return v===id; });
       if(currentIdx === idx) return;
-
-      var wasCorrect = (currentIdx !== -1 && state.orderIds[currentIdx] === id);
 
       if(currentIdx !== -1){
         // move between slots (swap)
@@ -421,7 +452,7 @@
         if(occupant){ state.poolIds.push(occupant); }
       }
 
-      // Immediate feedback on the slot we just placed into
+      // Immediate feedback on the slot
       var isNowCorrect = (state.orderIds[idx] === id);
       var slotEl = qs('.slot[data-idx="'+idx+'"]');
       if(slotEl){
@@ -430,10 +461,7 @@
         else { slotEl.classList.add('is-wrong'); sfxWrong(); badge(slotEl, 'Try again!', false); }
       }
 
-      // Re-render to update all correctness states
       renderBoard();
-
-      // Auto-complete check
       checkCompletion();
     }
 
@@ -468,12 +496,12 @@
       var ids = state.orderIds.slice();
       state.poolIds = shuffle(ids);
       state.slots = new Array(ids.length).fill(null);
+      clearSelection();
       renderBoard();
     }
 
     function doHint(){
       if(state.hintUsed) return;
-      // first empty or incorrect
       var n = state.orderIds.length, targetIdx=-1;
       for(var i=0;i<n;i++){ if(state.slots[i] !== state.orderIds[i]){ targetIdx=i; break; } }
       if(targetIdx===-1) return;
@@ -490,7 +518,7 @@
         state.slots[targetIdx]=correctId;
       }
       state.hintUsed = true;
-      sfxCorrect(); // positive cue for hint
+      sfxCorrect();
       renderBoard();
       checkCompletion();
     }
@@ -560,14 +588,10 @@
     async function init(){
       state.meta = getParams();
 
-      // Dynamic bases
       var imgBase = '/' + state.meta.level + '/' + state.meta.unit + '/DataStory/images/';
       var txtBase = '/' + state.meta.level + '/' + state.meta.unit + '/DataStory/';
-
-      // Show crumbs as "Level0 · Unit1 — Story Title"
       qs('#crumbs').setAttribute('title', 'Images at: ' + imgBase);
 
-      // Load
       state.frames = await loadSequentialImages(imgBase, 1, 30);
       if(!state.frames.length){
         alert('No images found at ' + imgBase + ' (expected: imagem1.png, imagem2.png, ...)');
@@ -578,7 +602,7 @@
       var story = await loadStoryText(txtBase);
       if(story){ state.storyTitle = story.title; state.storyTexts = story.frames; }
 
-      // Always reset fresh on load (no persistence)
+      // Always reset fresh on load
       state.hintUsed = false;
       state.completed = false;
       state.poolIds = shuffle(state.orderIds.slice());
