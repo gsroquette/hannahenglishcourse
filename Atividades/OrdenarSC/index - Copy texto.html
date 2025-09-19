@@ -3,18 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Story Sequencer — Ordene a História</title>
-  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+  <title>Story Sequencer — Layout Vertical (Texto abaixo, largura total)</title>
   <style>
-    :root{
-      --brand:#ff6b00; --ok:#2e7d32; --warn:#c62828; --ink:#222;
-      --slot:#ffffff; --slot-border:#bbb; --tile:#fff; --tile-border:#333;
-      --shadow: 0 6px 18px rgba(0,0,0,.08);
-    }
-    *{ box-sizing:border-box }
-
-    /* === Mesmo body das outras atividades === */
-    body { 
+    /* Mesmo body das outras atividades */
+    body {
       font-family: Arial, sans-serif;
       text-align: center;
       margin-top: 50px;
@@ -25,14 +17,36 @@
       padding: 0 20px;
     }
 
+    :root{
+      --brand:#ff6b00; --ok:#2e7d32; --warn:#c62828; --ink:#222;
+      --slot:#ffffff; --slot-border:#bbb; --tile:#fff; --tile-border:#333;
+      --shadow: 0 6px 18px rgba(0,0,0,.08);
+    }
+    *{ box-sizing:border-box }
+
     header{
       padding:12px 16px; display:flex; align-items:center; gap:12px; justify-content:center;
       margin: 0 auto 8px; max-width:1100px;
     }
     header h1{ font-size:1.2rem; margin:0; font-weight:700 }
-    header .pill { padding:6px 12px; border-radius:999px; background:#fff; border:1px solid #eee; font-size:.85rem; box-shadow: var(--shadow)}
+    .pill { padding:6px 12px; border-radius:999px; background:#fff; border:1px solid #eee; font-size:.85rem; box-shadow: var(--shadow) }
 
-    .wrap{ width:min(1100px, 100%); margin:0 auto 24px; display:flex; flex-direction:column; gap:16px }
+    .wrap{ width:min(1100px, 100%); margin:0 auto 24px; display:flex; flex-direction:column; gap:12px }
+
+    /* Minimap */
+    .minimap{
+      position: sticky; top: 0; z-index: 5;
+      background: rgba(245,245,245,.9);
+      padding: 6px 8px; border-radius: 12px; border:1px solid #eee;
+      display:flex; gap:8px; overflow:auto; justify-content:center;
+      backdrop-filter: blur(2px);
+    }
+    .dot{
+      width:28px; height:28px; border-radius:999px; border:1px solid #ddd; background:#fff; box-shadow: var(--shadow);
+      display:flex; align-items:center; justify-content:center; font-size:.85rem; cursor:pointer; user-select:none;
+    }
+    .dot.filled{ border-color:#999 }
+    .dot.focus{ outline:2px solid var(--brand) }
 
     .controls{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap }
     .btn{
@@ -44,394 +58,500 @@
     .btn.ghost{ background:#fff }
     .btn.toggle[aria-pressed="true"]{ outline:2px solid var(--brand) }
 
-    .board{ display:grid; gap:16px }
-    .timeline{
-      background:#fff; border:1px dashed #ddd; padding:16px; border-radius:16px; box-shadow:var(--shadow);
-      overflow:auto; white-space:nowrap; display:flex; gap:18px; align-items:flex-start;
+    .cols{
+      display:grid; gap:14px;
+      grid-template-columns: 1fr; /* mobile empilhado */
+    }
+    @media (min-width: 900px){
+      .cols{ grid-template-columns: 1fr 1fr; align-items:start }
     }
 
-    .slotWrap{ display:inline-flex; flex-direction:column; align-items:center; gap:6px; flex:0 0 auto }
-    .slot{
-      min-width:110px; width:110px; height:110px; background:#fafafa; border:2px dashed var(--slot-border);
-      border-radius:14px; display:flex; align-items:center; justify-content:center; position:relative;
-      transition:border-color .15s ease;
-      flex:0 0 auto;
+    .timelineCol, .poolCol{
+      background:#fff; border:1px dashed #ddd; padding:12px; border-radius:16px; box-shadow:var(--shadow);
+      text-align: left;
     }
-    .slot .num{
-      position:absolute; top:6px; left:6px; font-size:.8rem; background:#0000000d; border:1px solid #00000014; padding:2px 6px; border-radius:999px;
+    .sectionTitle{ margin:6px 0 10px; font-weight:700; text-align:left }
+
+    /* Cartão do slot: grade com 3 colunas
+       col1: número (44px)
+       col2: quadrado (110px)
+       col3: faixa flexível (1fr) só para dar largura ao texto na linha de baixo
+       linha1: num | slot | (vazio)
+       linha2: texto ocupa as 3 colunas -> fica largo e legível
+    */
+    .slotCard{
+      display:grid;
+      grid-template-columns: 44px 110px 1fr;
+      grid-template-rows: auto auto;
+      gap:10px 12px;
+      align-items:center;
+      padding:12px;
+      border:1px solid #eee; border-radius:12px; background:#fff; margin-bottom:12px;
+    }
+    .slotNum{
+      grid-column: 1; grid-row: 1;
+      width:44px; height:44px; border-radius:10px; background:#fafafa; border:1px solid #ddd;
+      display:flex; align-items:center; justify-content:center; font-weight:700;
+    }
+    .slot{
+      grid-column: 2; grid-row: 1;
+      width:110px; height:110px; background:#fafafa; border:2px dashed var(--slot-border); border-radius:12px;
+      display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden;
     }
     .slot.filled{ border-style:solid; border-color:#aaa }
     .slot.correct{ outline:3px solid var(--ok) }
     .slot.wrong{ animation:shake .25s linear }
     @keyframes shake{ 0%{ transform:translateX(0) } 25%{ transform:translateX(-4px) } 50%{ transform:translateX(4px) } 75%{ transform:translateX(-2px) } 100%{ transform:translateX(0) } }
 
-    .caption{
-      width:110px; font-size:.8rem; line-height:1.1; color:#333; background:#fff; border:1px solid #eee; border-radius:10px; padding:6px 8px;
-      text-align:left; white-space:normal; pointer-events:none;
+    .slotText{
+      grid-column: 1 / 4; /* ocupa 1..3 */
+      grid-row: 2;
+      font-size:.95rem; color:#222; text-align:left;
+      white-space:normal; overflow:visible;
+      line-height: 1.3;
     }
 
-    .pool{
-      background:#fff; border:1px dashed #ddd; padding:12px; border-radius:16px; box-shadow:var(--shadow);
-      display:grid; grid-template-columns:repeat(auto-fill, minmax(94px, 1fr)); gap:12px;
+    /* Pool: lista/grade vertical rolável */
+    .poolList{
+      max-height: 55vh; overflow:auto; display:grid; grid-template-columns: repeat(auto-fill, minmax(94px, 1fr)); gap:10px;
+    }
+    @media (max-width: 480px){
+      .poolList{ grid-template-columns: repeat(3, 1fr); }
+    }
+    .poolTile{
+      height:94px; border:2px solid var(--tile-border); border-radius:12px; overflow:hidden; background:#fff; display:flex; align-items:center; justify-content:center; position:relative;
     }
 
     .tile{
       background:var(--tile); border:2px solid var(--tile-border); border-radius:12px; overflow:hidden; cursor:grab; position:relative;
-      display:flex; align-items:center; justify-content:center; height:94px; user-select:none;
+      display:flex; align-items:center; justify-content:center; height:100%; width:100%; user-select:none;
     }
-    .tile:active{ cursor:grabbing }
     .tile img{ max-width:100%; max-height:100%; display:block }
 
-    /* Botão de retorno para mobile/touch */
-    .tile.in-slot{ position:relative }
-    .ret-btn{ position:absolute; top:6px; right:6px; width:24px; height:24px; border-radius:999px; border:1px solid #ddd; background:#fff; font-size:14px; line-height:22px; box-shadow: var(--shadow); cursor:pointer }
+    .ret-btn{
+      position:absolute; top:6px; right:6px; width:24px; height:24px; border-radius:999px; border:1px solid #ddd; background:#fff; font-size:14px; line-height:22px; box-shadow: var(--shadow); cursor:pointer
+    }
 
-    /* Melhor suporte a touch */
     .tile, .slot{ touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+    .selected{ outline:3px solid var(--brand) }
 
     /* Modal */
     .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.4); z-index:50 }
     .modal.open{ display:flex }
     .card{ background:#fff; border-radius:20px; padding:20px; width:min(520px, 92vw); text-align:center; box-shadow:var(--shadow) }
     .card h2{ margin:0 0 8px }
-    .confetti{ font-size:42px; line-height:1.2 }
   </style>
 </head>
 <body>
   <header>
-    <span class="pill" id="crumbs">Level — Unit — Loading…</span>
+    <span class="pill" id="crumbs">Level — Unit — …</span>
     <h1 id="title">Story Sequencer</h1>
   </header>
 
-  <main class="wrap">
+  <div class="wrap">
+    <div class="minimap" id="miniMap" aria-label="Mapa da sequência"></div>
+
     <div class="controls" role="toolbar" aria-label="Controles">
       <button class="btn primary" id="btnCheck">Check</button>
       <button class="btn ghost" id="btnReset" title="Limpar e reembaralhar">Reset</button>
       <button class="btn ghost" id="btnHint" title="Revelar próximo slot correto">Hint</button>
-      <button class="btn toggle" id="btnText" aria-pressed="true" title="Mostrar/ocultar texto dos slots">Texto</button>
+      <button class="btn toggle" id="btnText" aria-pressed="true">Texto</button>
+      <button class="btn ghost" id="btnFull">Tela cheia</button>
     </div>
 
-    <section class="board" aria-live="polite">
-      <div>
-        <p style="margin:6px 0 8px; font-weight:700">Linha do tempo</p>
-        <div id="timeline" class="timeline" role="list" aria-label="Slots da sequência"></div>
-      </div>
-      <div>
-        <p style="margin:6px 0 8px; font-weight:700">Imagens (embaralhadas)</p>
-        <div id="pool" class="pool" aria-label="Banco de peças"></div>
-      </div>
-    </section>
-  </main>
+    <div class="cols">
+      <section class="timelineCol">
+        <p class="sectionTitle">Linha do tempo</p>
+        <div id="timelineList"></div>
+      </section>
+
+      <section class="poolCol">
+        <p class="sectionTitle">Imagens (embaralhadas)</p>
+        <div id="poolList" class="poolList"></div>
+      </section>
+    </div>
+  </div>
 
   <div id="modalWin" class="modal" role="dialog" aria-modal="true" aria-labelledby="winTitle">
     <div class="card">
-      <div class="confetti">🎉✨⭐</div>
       <h2 id="winTitle">Muito bem!</h2>
-      <p>Você colocou a história na ordem certa.</p>
+      <p>Você colocou a história na ordem correta.</p>
       <button class="btn primary" id="btnCloseWin">Continuar</button>
     </div>
   </div>
 
   <script>
-    // ===================== Utilitários =====================
-    const qs = (s, el=document) => el.querySelector(s);
-    const qsa = (s, el=document) => [...el.querySelectorAll(s)];
-    const shuffle = (arr) => {
-      const a = arr.slice();
-      for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
-      return a;
-    };
+    // ===== Utils
+    var qs = function(s, el){ return (el||document).querySelector(s); };
+    var qsa = function(s, el){ return Array.prototype.slice.call((el||document).querySelectorAll(s)); };
+    var shuffle = function(arr){ var a=arr.slice(); for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; } return a; };
 
     function getParams(){
-      const url = new URL(location.href);
-      const level = url.searchParams.get('level');
-      const unit = url.searchParams.get('unit');
-      const fase  = url.searchParams.get('fase') || 'seq';
+      var url = new URL(location.href);
+      var level = url.searchParams.get('level');
+      var unit = url.searchParams.get('unit');
+      var fase = url.searchParams.get('fase') || 'seq';
       if(!level || !unit){ alert('Missing URL params: level, unit'); }
-      return {level, unit, fase};
+      return {level:level, unit:unit, fase:fase};
     }
+    function storageKey(meta){ return 'sequencer:'+meta.level+':'+meta.unit+':'+meta.fase+':vertical'; }
 
-    function storageKey({level,unit,fase}){ return `sequencer:${level}:${unit}:${fase}`; }
-
-    // ===================== Estado global =====================
-    const state = {
-      meta:null, // {level, unit, fase}
-      frames:[], // [{id,image}]
-      orderIds:[],
-      poolIds:[],
-      slots:[],
+    // ===== Global state
+    var state = {
+      meta:null,
+      frames:[],       // [{id, image}]
+      orderIds:[],     // ['f1','f2',...]
+      poolIds:[],      // ids no pool
+      slots:[],        // ids nos slots (ou null)
       storyTitle:null,
-      storyTexts:[], // index 0..n-1 => texto do slot
+      storyTexts:[],   // texto correto por índice
       showText:true,
       stats:{ start: Date.now(), checks:0, hints:0 }
     };
 
-    function frameById(id){ return state.frames.find(f=>f.id===id); }
+    function frameById(id){ return state.frames.find(function(f){ return f.id===id; }); }
 
-    // ===================== Renderização =====================
+    // ===== Rendering
     function renderCrumbs(){
-      const {level, unit} = state.meta;
-      qs('#crumbs').textContent = `Level ${level} · Unit ${unit}`;
+      var m = state.meta;
+      qs('#crumbs').textContent = 'Level '+m.level+' · Unit '+m.unit;
       qs('#title').textContent = state.storyTitle || 'Story Sequencer';
     }
 
+    function renderMiniMap(){
+      var mm = qs('#miniMap'); mm.innerHTML = '';
+      for(var i=0;i<state.orderIds.length;i++){
+        var d = document.createElement('button');
+        d.className = 'dot'+(state.slots[i]?' filled':'');
+        d.type='button'; d.textContent = (i+1);
+        (function(idx){
+          d.addEventListener('click', function(){
+            var card = qs('[data-slot-card="'+idx+'"]');
+            if(card){ card.scrollIntoView({behavior:'smooth', block:'center'}); }
+            qsa('.dot').forEach(function(x){ x.classList.remove('focus'); });
+            d.classList.add('focus');
+            setTimeout(function(){ d.classList.remove('focus'); }, 800);
+          });
+        })(i);
+        mm.appendChild(d);
+      }
+    }
+
     function renderBoard(){
-      const timeline = qs('#timeline');
-      timeline.innerHTML = '';
-      state.slots.forEach((val, idx)=>{
-        const wrap = document.createElement('div');
-        wrap.className = 'slotWrap';
-        const slot = document.createElement('div');
-        slot.className = 'slot' + (val? ' filled':'');
-        slot.setAttribute('role','listitem');
-        slot.setAttribute('data-idx', idx);
-        slot.setAttribute('aria-label', `Slot ${idx+1}`);
-        slot.tabIndex = 0;
+      renderMiniMap();
 
-        const num = document.createElement('span');
-        num.className = 'num'; num.textContent = idx+1; slot.appendChild(num);
+      var list = qs('#timelineList'); list.innerHTML='';
+      for(var i=0;i<state.orderIds.length;i++){
+        var idPlaced = state.slots[i];
 
-        if(val){
-          const frame = frameById(val);
-          if(frame){ slot.appendChild(makeTile(frame, {draggable:true, asPlaced:true})); }
+        var card = document.createElement('div');
+        card.className = 'slotCard';
+        card.setAttribute('data-slot-card', i);
+
+        var num = document.createElement('div');
+        num.className='slotNum'; num.textContent = (i+1);
+        card.appendChild(num);
+
+        var slot = document.createElement('div');
+        slot.className='slot'+(idPlaced?' filled':'');
+        slot.setAttribute('data-idx', i);
+
+        if(idPlaced){
+          var fr = frameById(idPlaced);
+          if(fr){
+            var tile = makeTile(fr, true); // in slot
+            slot.appendChild(tile);
+          }
         }
-
-        // Click/pointer-to-place (touch friendly)
-        slot.addEventListener('click', handleSlotClick);
-        slot.addEventListener('pointerdown', handleSlotClick);
-
-        // Drag-over para desktop
-        slot.addEventListener('dragover', e=>{ e.preventDefault(); slot.style.borderColor = '#999'; });
-        slot.addEventListener('dragleave', e=>{ slot.style.borderColor = ''; });
-        slot.addEventListener('drop', (e)=>{
-          e.preventDefault(); slot.style.borderColor = '';
-          const id = e.dataTransfer.getData('text/plain');
-          if(!id) return;
-          placeIdIntoSlot(id, idx);
+        // tocar slot com peça selecionada
+        slot.addEventListener('pointerdown', handleSlotTap);
+        // desktop DnD
+        slot.addEventListener('dragover', function(e){ e.preventDefault(); });
+        slot.addEventListener('drop', function(e){
+          e.preventDefault();
+          var id = e.dataTransfer.getData('text/plain');
+          if(id) placeIdIntoSlot(id, parseInt(this.getAttribute('data-idx'),10));
         });
 
-        wrap.appendChild(slot);
+        card.appendChild(slot);
 
-        // Texto correto do passo
-        if(state.showText){
-          const cap = document.createElement('div');
-          cap.className = 'caption';
-          cap.textContent = (state.storyTexts[idx] || '').trim();
-          wrap.appendChild(cap);
-        }
+        var txt = document.createElement('div');
+        txt.className='slotText';
+        if(state.showText){ txt.textContent = (state.storyTexts[i]||''); } else { txt.textContent=''; }
+        card.appendChild(txt);
 
-        timeline.appendChild(wrap);
-      });
+        list.appendChild(card);
+      }
 
-      const pool = qs('#pool');
-      pool.innerHTML = '';
-      // Soltar no pool (desktop)
-      pool.ondragover = (e)=>{ e.preventDefault(); };
-      pool.ondrop = (e)=>{ e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); if(id) returnToPool(id); };
+      var pool = qs('#poolList'); pool.innerHTML='';
+      // desktop drop para devolver
+      pool.addEventListener('dragover', function(e){ e.preventDefault(); });
+      pool.addEventListener('drop', function(e){ e.preventDefault(); var id=e.dataTransfer.getData('text/plain'); if(id) returnToPool(id); });
 
-      // Toque no fundo do pool devolve a peça selecionada (não quando toca numa tile)
-      pool.addEventListener('pointerdown', (e)=>{
+      // toque no fundo do pool devolve a peça selecionada
+      pool.addEventListener('pointerdown', function(e){
         if(!selectedId) return;
-        if(e.target.closest('.tile')) return;
+        if(e.target.closest('.poolTile') || e.target.closest('.tile')) return; // não interferir
         returnToPool(selectedId);
-        selectedId=null;
-        qsa('.tile').forEach(el=> el.style.outline='');
+        clearSelection();
       });
 
-      state.poolIds.forEach(id=>{
-        const frame = frameById(id);
-        if(frame){ pool.appendChild(makeTile(frame, {draggable:true})); }
+      state.poolIds.forEach(function(id){
+        var fr = frameById(id); if(!fr) return;
+        var wrap = document.createElement('div');
+        wrap.className='poolTile'; wrap.setAttribute('data-id', id);
+
+        var tile = makeTile(fr, false);
+        wrap.appendChild(tile);
+        pool.appendChild(wrap);
       });
     }
 
-    function makeTile(frame, {draggable=true, asPlaced=false}={}){
-      const t = document.createElement('div');
-      t.className = 'tile' + (asPlaced ? ' in-slot' : '');
-      t.setAttribute('data-id', frame.id);
+    function makeTile(frame, inSlot){
+      var t = document.createElement('div');
+      t.className='tile'; t.setAttribute('data-id', frame.id);
 
-      const isPointerFine = window.matchMedia && window.matchMedia('(pointer:fine)').matches;
-      const enableDrag = draggable && !!isPointerFine;
-      if(enableDrag){ t.draggable = true; }
+      // DnD só em pointer:fine (desktop)
+      var enableDrag = window.matchMedia && window.matchMedia('(pointer:fine)').matches;
+      if(enableDrag){ t.draggable = true; t.addEventListener('dragstart', function(e){ e.dataTransfer.setData('text/plain', frame.id); }); }
 
-      const img = document.createElement('img');
-      img.src = frame.image;
-      img.alt = 'story frame';
-      t.appendChild(img);
+      var img = document.createElement('img'); img.src = frame.image; img.alt = 'frame'; t.appendChild(img);
 
-      if(enableDrag){ t.addEventListener('dragstart', (e)=>{ e.dataTransfer.setData('text/plain', frame.id); }); }
-      
-      // Toque/clique seleciona a peça (touch-friendly)
-      t.addEventListener('pointerdown', ()=>{ selectTile(t); });
+      // toque/click para selecionar
+      t.addEventListener('pointerdown', function(e){
+        e.stopPropagation();
+        selectTile(t);
+      });
 
-      // Botão de retorno ao pool quando estiver em um slot (melhor em touch)
-      if(asPlaced){
-        const ret = document.createElement('button');
-        ret.className = 'ret-btn';
-        ret.type = 'button';
-        ret.title = 'Voltar ao embaralhado';
-        ret.textContent = '↩';
-        ret.addEventListener('pointerdown', (ev)=>{ ev.stopPropagation(); returnToPool(frame.id); });
+      // botão ↩ no slot
+      if(inSlot){
+        var ret = document.createElement('button');
+        ret.className='ret-btn'; ret.type='button'; ret.title='Voltar ao embaralhado'; ret.textContent='↩';
+        ret.addEventListener('pointerdown', function(ev){ ev.stopPropagation(); returnToPool(frame.id); });
         t.appendChild(ret);
       }
       return t;
     }
 
-    // ===================== Seleção e colocação =====================
-    let selectedId = null; // id selecionado a partir do pool ou de um slot
+    // ===== Interação
+    var selectedId = null;
     function selectTile(tile){
-      const id = tile.getAttribute('data-id');
-      qsa('.tile').forEach(el=> el.style.outline='');
-      if(selectedId === id){ selectedId = null; return; }
-      selectedId = id; tile.style.outline = '3px solid var(--brand)';
+      var id = tile.getAttribute('data-id');
+      if(selectedId === id){ clearSelection(); return; }
+      selectedId = id;
+      qsa('.tile').forEach(function(el){ el.classList.remove('selected'); });
+      tile.classList.add('selected');
+    }
+    function clearSelection(){
+      selectedId = null;
+      qsa('.tile').forEach(function(el){ el.classList.remove('selected'); });
     }
 
-    function handleSlotClick(e){
-      const slot = e.currentTarget;
-      const idx = +slot.getAttribute('data-idx');
-      if(selectedId){
-        placeIdIntoSlot(selectedId, idx);
-        selectedId = null; qsa('.tile').forEach(el=> el.style.outline='');
-      }
+    function handleSlotTap(e){
+      var idx = parseInt(this.getAttribute('data-idx'),10);
+      if(selectedId){ placeIdIntoSlot(selectedId, idx); clearSelection(); }
     }
 
     function placeIdIntoSlot(id, idx){
-      // Se já está em outro slot, faz swap
-      const currentIdx = state.slots.findIndex(v=>v===id);
+      var currentIdx = state.slots.findIndex(function(v){ return v===id; });
       if(currentIdx === idx) return;
 
       if(currentIdx !== -1){
-        const targetId = state.slots[idx];
+        // mover entre slots (swap)
+        var targetId = state.slots[idx];
         state.slots[idx] = id;
         state.slots[currentIdx] = targetId || null;
       } else {
-        const occupant = state.slots[idx];
+        // pool -> slot (talvez swap)
+        var occupant = state.slots[idx];
         state.slots[idx] = id;
-        if(occupant){
-          state.poolIds = state.poolIds.filter(x=>x!==id);
-          state.poolIds.push(occupant);
-        } else {
-          state.poolIds = state.poolIds.filter(x=>x!==id);
-        }
+        // remove id do pool
+        state.poolIds = state.poolIds.filter(function(x){ return x!==id; });
+        if(occupant){ state.poolIds.push(occupant); }
       }
-      persistAndRerender();
+      persistAndRender();
     }
 
     function returnToPool(id){
-      const idx = state.slots.findIndex(v=>v===id);
+      var idx = state.slots.findIndex(function(v){ return v===id; });
       if(idx !== -1){
         state.slots[idx] = null;
-        if(!state.poolIds.includes(id)) state.poolIds.push(id);
-        persistAndRerender();
+        if(state.poolIds.indexOf(id)===-1) state.poolIds.push(id);
+        persistAndRender();
       }
     }
 
-    function persistAndRerender(){
-      saveState(storageKey(state.meta), { slots:state.slots, poolIds:state.poolIds, stats:state.stats, showText:state.showText });
+    function persistAndRender(){
+      saveState(storageKey(state.meta), {
+        slots:state.slots, poolIds:state.poolIds, stats:state.stats, showText:state.showText
+      });
       renderBoard();
     }
 
-    // ===================== Controles =====================
+    // ===== Controles
     function checkSequence(){
       state.stats.checks++;
-      let allCorrect = true;
-      qsa('.slot').forEach((slotEl, i)=>{
-        const id = state.slots[i];
-        slotEl.classList.remove('correct','wrong');
-        if(!id){ allCorrect = false; return; }
-        const isCorrect = id === state.orderIds[i];
-        if(isCorrect){ slotEl.classList.add('correct'); }
-        else { slotEl.classList.add('wrong'); allCorrect = false; }
-        setTimeout(()=> slotEl.classList.remove('correct','wrong'), 800);
-      });
-      if(allCorrect){ onWin(); }
+      var ok = true;
+      var cards = qsa('.slot');
+      for(var i=0;i<state.orderIds.length;i++){
+        var id = state.slots[i];
+        cards[i].classList.remove('correct','wrong');
+        if(!id){ ok=false; continue; }
+        if(id===state.orderIds[i]){ cards[i].classList.add('correct'); }
+        else { cards[i].classList.add('wrong'); ok=false; }
+      }
+      setTimeout(function(){ cards.forEach(function(c){ c.classList.remove('correct','wrong'); }); }, 800);
+      if(ok) onWin();
     }
 
     function doReset(){
-      const ids = [...state.orderIds];
+      var ids = state.orderIds.slice();
       state.poolIds = shuffle(ids);
       state.slots = new Array(ids.length).fill(null);
       state.stats = { start: Date.now(), checks:0, hints:0 };
-      persistAndRerender();
+      persistAndRender();
     }
 
     function doHint(){
-      const n = state.orderIds.length;
-      let targetIdx = -1;
-      for(let i=0;i<n;i++){
-        if(state.slots[i] !== state.orderIds[i]){ targetIdx = i; break; }
-      }
-      if(targetIdx === -1) return; // já correto
+      var n = state.orderIds.length, targetIdx=-1;
+      for(var i=0;i<n;i++){ if(state.slots[i] !== state.orderIds[i]){ targetIdx=i; break; } }
+      if(targetIdx===-1) return;
       state.stats.hints++;
-
-      const correctId = state.orderIds[targetIdx];
-      const where = state.slots.findIndex(v=>v===correctId);
-      if(where !== -1){
-        const tmp = state.slots[targetIdx];
-        state.slots[targetIdx] = correctId;
-        state.slots[where] = tmp || null;
+      var correctId = state.orderIds[targetIdx];
+      var where = state.slots.findIndex(function(v){ return v===correctId; });
+      if(where!==-1){
+        var tmp = state.slots[targetIdx];
+        state.slots[targetIdx]=correctId;
+        state.slots[where]=tmp||null;
       } else {
-        state.poolIds = state.poolIds.filter(x=>x!==correctId);
-        const occupant = state.slots[targetIdx];
-        if(occupant) state.poolIds.push(occupant);
-        state.slots[targetIdx] = correctId;
+        state.poolIds = state.poolIds.filter(function(x){ return x!==correctId; });
+        var occ = state.slots[targetIdx]; if(occ) state.poolIds.push(occ);
+        state.slots[targetIdx]=correctId;
       }
+      var slot = qs('.slot[data-idx="'+targetIdx+'"]');
+      if(slot){ slot.classList.add('correct'); setTimeout(function(){ slot.classList.remove('correct'); }, 900); }
+      persistAndRender();
+    }
 
-      const wrap = qs('#timeline').children[targetIdx];
-      if(wrap){
-        const slotEl = wrap.querySelector('.slot');
-        slotEl.classList.add('hint-glow');
-        setTimeout(()=> slotEl.classList.remove('hint-glow'), 900);
+    function toggleText(){
+      state.showText = !state.showText;
+      qs('#btnText').setAttribute('aria-pressed', String(state.showText));
+      persistAndRender();
+    }
+
+    function toggleFullscreen(){
+      var el = document.documentElement;
+      var isFs = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+      if(!isFs){
+        (el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen || function(){}) .call(el);
+      } else {
+        (document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen || function(){}) .call(document);
       }
-      persistAndRerender();
     }
 
     function onWin(){
-      const duration = Math.round((Date.now() - state.stats.start)/1000);
       qs('#modalWin').classList.add('open');
       try{
         if(window.updateNextPhase && window.currentUserId){ window.updateNextPhase(window.currentUserId); }
-        if(window.logActivity){ window.logActivity({ type:'story-sequencer', meta:state.meta, stats:{ ...state.stats, duration_s:duration } }); }
+        if(window.logActivity){ window.logActivity({ type:'story-sequencer-vertical', meta:state.meta, stats:state.stats }); }
       }catch(e){}
     }
 
-    // ===================== Storage helpers =====================
-    function saveState(key, stateObj){ try{ localStorage.setItem(key, JSON.stringify(stateObj)); }catch(e){} }
-    function loadState(key){ try{ return JSON.parse(localStorage.getItem(key) || 'null'); }catch(e){ return null } }
+    // ===== Storage
+    function saveState(key, obj){ try{ localStorage.setItem(key, JSON.stringify(obj)); }catch(e){} }
+    function loadState(key){ try{ return JSON.parse(localStorage.getItem(key) || 'null'); }catch(e){ return null; } }
 
-    // ===================== Bootstrap =====================
+    // ===== Data loading
+    function imageExists(url){
+      return new Promise(function(res){
+        var img = new Image();
+        img.onload = function(){ res(true); };
+        img.onerror = function(){ res(false); };
+        img.src = url + (url.indexOf('?')>-1?'&':'?') + 'v=' + Date.now();
+      });
+    }
+
+    async function loadSequentialImages(base, start, max){
+      var frames = [];
+      for(var i=start;i<=max;i++){
+        var url = base + 'imagem' + i + '.png';
+        /* eslint-disable no-await-in-loop */
+        var ok = await imageExists(url);
+        if(!ok){
+          if(i===start){ continue; } else { break; }
+        }
+        frames.push({ id:'f'+i, image:url });
+      }
+      return frames;
+    }
+
+    async function loadStoryText(base){
+      var names = ['images.txt','imagens.txt'];
+      for(var i=0;i<names.length;i++){
+        try{
+          var res = await fetch(base + names[i] + '?v=' + Date.now());
+          if(!res.ok) continue;
+          var raw = await res.text();
+          return parseImagesTxt(raw);
+        }catch(e){}
+      }
+      return null;
+    }
+
+    function parseImagesTxt(raw){
+      var lines = raw.split(/\r?\n/);
+      var title = null;
+      var frames = [];
+      var current = null;
+      for(var i=0;i<lines.length;i++){
+        var line = (lines[i]||'').trim();
+        if(!line) continue;
+        var mTitle = line.match(/^#title:\s*(.+)$/i);
+        if(mTitle){ title = mTitle[1].trim(); continue; }
+        var mImg = line.match(/^#(imagem|image)(\d+)$/i);
+        if(mImg){
+          var idx = parseInt(mImg[2],10) - 1;
+          current = { idx:idx, text:[] };
+          frames[idx] = current;
+          continue;
+        }
+        if(current){ current.text.push(line.replace(/^"|"$/g, '')); }
+      }
+      var ordered = [];
+      for(var j=0;j<frames.length;j++){
+        ordered[j] = frames[j] ? frames[j].text.join(' ').trim() : '';
+      }
+      return { title:title, frames:ordered };
+    }
+
+    // ===== Bootstrap
+    window.addEventListener('load', init);
     async function init(){
       state.meta = getParams();
-      const key = storageKey(state.meta);
+      var key = storageKey(state.meta);
 
-      // Bases dinâmicas (da URL)
-      const imgBase = `/${state.meta.level}/${state.meta.unit}/DataStory/images/`;
-      const txtBase = `/${state.meta.level}/${state.meta.unit}/DataStory/`;
+      var imgBase = '/' + state.meta.level + '/' + state.meta.unit + '/DataStory/images/';
+      var txtBase = '/' + state.meta.level + '/' + state.meta.unit + '/DataStory/';
       qs('#crumbs').setAttribute('title', 'Imagens em: ' + imgBase);
 
-      // Carregar imagens sequenciais
       state.frames = await loadSequentialImages(imgBase, 1, 30);
       if(!state.frames.length){
         alert('Nenhuma imagem encontrada em ' + imgBase + ' (esperado: imagem1.png, imagem2.png, ...)');
         return;
       }
-      state.orderIds = state.frames.map(f=>f.id);
+      state.orderIds = state.frames.map(function(f){ return f.id; });
 
-      // Carregar texto da história
-      const story = await loadStoryText(txtBase);
-      if(story){
-        state.storyTitle = story.title || null;
-        state.storyTexts = story.frames || [];
-      }
+      var story = await loadStoryText(txtBase);
+      if(story){ state.storyTitle = story.title; state.storyTexts = story.frames; }
 
-      // Restaurar estado
-      const saved = loadState(key);
+      var saved = loadState(key);
       if(saved && Array.isArray(saved.slots) && Array.isArray(saved.poolIds)){
         state.slots = saved.slots;
         state.poolIds = saved.poolIds;
         state.stats = saved.stats || state.stats;
-        state.showText = typeof saved.showText === 'boolean' ? saved.showText : true;
+        state.showText = (typeof saved.showText === 'boolean') ? saved.showText : true;
       } else {
-        state.poolIds = shuffle([...state.orderIds]);
+        state.poolIds = shuffle(state.orderIds.slice());
         state.slots = new Array(state.orderIds.length).fill(null);
       }
 
@@ -442,77 +562,10 @@
       qs('#btnCheck').addEventListener('click', checkSequence);
       qs('#btnReset').addEventListener('click', doReset);
       qs('#btnHint').addEventListener('click', doHint);
-      const toggleText = (e)=>{ e.preventDefault(); state.showText = !state.showText; qs('#btnText').setAttribute('aria-pressed', String(state.showText)); persistAndRerender(); };
       qs('#btnText').addEventListener('click', toggleText);
-      qs('#btnText').addEventListener('pointerdown', toggleText);
-      qs('#btnCloseWin').addEventListener('click', ()=>{ qs('#modalWin').classList.remove('open'); });
+      qs('#btnFull').addEventListener('click', toggleFullscreen);
+      qs('#btnCloseWin').addEventListener('click', function(){ qs('#modalWin').classList.remove('open'); });
     }
-
-    function imageExists(url){
-      return new Promise(res=>{
-        const img = new Image();
-        img.onload = ()=> res(true);
-        img.onerror = ()=> res(false);
-        img.src = url + (url.includes('?')?'&':'?') + 'v=' + Date.now();
-      });
-    }
-
-    async function loadSequentialImages(base, start=1, max=20){
-      const frames = [];
-      for(let i=start; i<=max; i++){
-        const url = base + `imagem${i}.png`;
-        // eslint-disable-next-line no-await-in-loop
-        const ok = await imageExists(url);
-        if(!ok){
-          if(i===start) continue; // tenta próximo se a 1 não existir
-          else break; // para no primeiro furo
-        }
-        frames.push({ id: 'f'+i, image: url });
-      }
-      return frames;
-    }
-
-    async function loadStoryText(base){
-      const candidates = ['images.txt', 'imagens.txt'];
-      for(const name of candidates){
-        try{
-          const res = await fetch(base + name + '?v=' + Date.now());
-          if(!res.ok) continue;
-          const raw = await res.text();
-          return parseImagesTxt(raw);
-        }catch(e){}
-      }
-      return null;
-    }
-
-    function parseImagesTxt(raw){
-      // Suporta: #title: ...   e blocos #imagemN ou #imageN seguidos de linhas de texto
-      const lines = raw.split(/\r?\n/);
-      let title = null;
-      const frames = [];
-      let current = null;
-      for(let i=0;i<lines.length;i++){
-        const line = lines[i].trim();
-        if(!line) continue;
-        const mTitle = line.match(/^#title:\s*(.+)$/i);
-        if(mTitle){ title = mTitle[1].trim(); continue; }
-        const mImg = line.match(/^#(imagem|image)(\d+)$/i);
-        if(mImg){
-          const idx = parseInt(mImg[2],10) - 1;
-          current = { idx, text: [] };
-          frames[idx] = current;
-          continue;
-        }
-        if(current){ current.text.push(line.replace(/^"|"$/g, '')); }
-      }
-      const ordered = [];
-      for(let i=0;i<frames.length;i++){
-        ordered[i] = frames[i] ? frames[i].text.join(' ').trim() : '';
-      }
-      return { title, frames: ordered };
-    }
-
-    window.addEventListener('load', init);
   </script>
 </body>
 </html>
