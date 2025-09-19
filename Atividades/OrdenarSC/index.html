@@ -7,12 +7,14 @@
   <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
   <style>
     :root{
-      --brand:#ff6b00; --ok:#2e7d32; --warn:#c62828; --bg:#fff9f3; --ink:#222;
+      --brand:#ff6b00; --ok:#2e7d32; --warn:#c62828; --ink:#222;
       --slot:#ffffff; --slot-border:#bbb; --tile:#fff; --tile-border:#333;
       --shadow: 0 6px 18px rgba(0,0,0,.08);
     }
     *{ box-sizing:border-box }
-    html,body { 
+
+    /* === Mantém o mesmo body das outras atividades === */
+    body { 
       font-family: Arial, sans-serif;
       text-align: center;
       margin-top: 50px;
@@ -22,16 +24,17 @@
       background-size: auto;
       padding: 0 20px;
     }
+
     header{
-      padding:12px 16px; display:flex; align-items:center; gap:12px;
-      border-bottom:1px solid #eee; background:#fff; position:sticky; top:0; z-index:10;
+      padding:12px 16px; display:flex; align-items:center; gap:12px; justify-content:center;
+      margin: 0 auto 8px; max-width:1100px;
     }
-    header h1{ font-size:1.1rem; margin:0; font-weight:700 }
-    header .pill { padding:4px 10px; border-radius:999px; background:var(--bg); border:1px solid #eee; font-size:.8rem }
+    header h1{ font-size:1.2rem; margin:0; font-weight:700 }
+    header .pill { padding:6px 12px; border-radius:999px; background:#fff; border:1px solid #eee; font-size:.85rem; box-shadow: var(--shadow)}
 
-    .wrap{ width:min(1100px, 92vw); margin:16px auto 24px; flex:1; display:flex; flex-direction:column; gap:16px }
+    .wrap{ width:min(1100px, 100%); margin:0 auto 24px; display:flex; flex-direction:column; gap:16px }
 
-    .controls{ display:flex; flex-wrap:wrap; gap:8px }
+    .controls{ display:flex; gap:10px; justify-content:center; }
     .btn{
       appearance:none; border:1px solid #ddd; background:#fff; padding:10px 14px; border-radius:12px; cursor:pointer;
       font-weight:600; box-shadow:var(--shadow); transition:.15s transform ease;
@@ -39,15 +42,14 @@
     .btn:active{ transform:translateY(1px) }
     .btn.primary{ background:var(--brand); color:#fff; border-color:transparent }
     .btn.ghost{ background:#fff }
-    .btn.toggle[aria-pressed="true"]{ outline:2px solid var(--brand) }
 
-    .board{ display:grid; gap:12px }
+    .board{ display:grid; gap:16px }
     .timeline{
-      background:#fff; border:1px dashed #ddd; padding:12px; border-radius:16px; box-shadow:var(--shadow);
+      background:#fff; border:1px dashed #ddd; padding:16px; border-radius:16px; box-shadow:var(--shadow);
       overflow:auto; white-space:nowrap; display:flex; gap:12px; align-items:flex-start;
     }
     .slot{
-      min-width:110px; width:110px; height:110px; background:var(--slot); border:2px dashed var(--slot-border);
+      min-width:110px; width:110px; height:110px; background:#fafafa; border:2px dashed var(--slot-border);
       border-radius:14px; display:flex; align-items:center; justify-content:center; position:relative;
       flex:0 0 auto; transition:border-color .15s ease;
     }
@@ -69,13 +71,9 @@
       display:flex; align-items:center; justify-content:center; height:94px; user-select:none;
     }
     .tile:active{ cursor:grabbing }
-    .tile img{ max-width:100%; max-height:100% }
-    .tile .cap{ position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,.55); color:#fff; font-size:.72rem; padding:4px 6px; display:none }
-    .tile.peek .cap{ display:block }
+    .tile img{ max-width:100%; max-height:100%; display:block }
 
     .hint-glow{ box-shadow:0 0 0 3px rgba(255,107,0,.35), 0 0 0 6px rgba(255,107,0,.15) !important }
-
-    .sr-only{ position:absolute !important; height:1px; width:1px; overflow:hidden; clip:rect(1px,1px,1px,1px); white-space:nowrap }
 
     /* Modal */
     .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.4); z-index:50 }
@@ -87,7 +85,7 @@
 </head>
 <body>
   <header>
-    <span class="pill" id="crumbs">Loading…</span>
+    <span class="pill" id="crumbs">Level — Unit — Loading…</span>
     <h1 id="title">Story Sequencer</h1>
   </header>
 
@@ -98,7 +96,7 @@
       <button class="btn ghost" id="btnHint" title="Revelar próximo slot correto">Hint</button>
     </div>
 
-    <section class="board" aria-live="polite"> aria-live="polite">
+    <section class="board" aria-live="polite">
       <div>
         <p style="margin:6px 0 8px; font-weight:700">Linha do tempo</p>
         <div id="timeline" class="timeline" role="list" aria-label="Slots da sequência"></div>
@@ -123,32 +121,22 @@
     // ===================== Utilitários =====================
     const qs = (s, el=document) => el.querySelector(s);
     const qsa = (s, el=document) => [...el.querySelectorAll(s)];
-    const shuffle = (arr) => arr.map(v=>[Math.random(), v]).sort((a,b)=>a[0]-b[0]).map(p=>p[1]);
+    const shuffle = (arr) => {
+      const a = arr.slice();
+      for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+      return a;
+    };
 
     function getParams(){
       const url = new URL(location.href);
       const level = url.searchParams.get('level');
       const unit = url.searchParams.get('unit');
       const fase  = url.searchParams.get('fase') || 'seq';
-      if(!level || !unit){
-        alert('Missing URL params: level, unit');
-      }
-      return {level, unit, story:null, fase};
+      if(!level || !unit){ alert('Missing URL params: level, unit'); }
+      return {level, unit, fase};
     }
 
-    function storageKey({level,unit,story,fase}){
-      return `sequencer:${level}:${unit}:${story}:${fase}`;
-    }
-
-    function saveState(key, state){
-      try{ localStorage.setItem(key, JSON.stringify(state)); }catch(e){}
-    }
-    function loadState(key){
-      try{ return JSON.parse(localStorage.getItem(key) || 'null'); }catch(e){ return null }
-    }
-
-    // ===================== Áudio =====================
-    // (Sem áudio/texto nesta versão)
+    function storageKey({level,unit,fase}){ return `sequencer:${level}:${unit}:${fase}`; }
 
     // ===================== Estado global =====================
     const state = {
@@ -159,6 +147,8 @@
       slots:[],
       stats:{ start: Date.now(), checks:0, hints:0 }
     };
+
+    function frameById(id){ return state.frames.find(f=>f.id===id); }
 
     // ===================== Renderização =====================
     function renderCrumbs(){
@@ -183,7 +173,7 @@
 
         if(val){
           const frame = frameById(val);
-          slot.appendChild(makeTile(frame, {draggable:false, asPlaced:true}));
+          if(frame){ slot.appendChild(makeTile(frame, {draggable:false, asPlaced:true})); }
         }
 
         // Click-to-place
@@ -207,11 +197,8 @@
       pool.innerHTML = '';
       state.poolIds.forEach(id=>{
         const frame = frameById(id);
-        const tile = makeTile(frame, {draggable:true});
-        pool.appendChild(tile);
+        if(frame){ pool.appendChild(makeTile(frame, {draggable:true})); }
       });
-
-      applyPeekMode();
     }
 
     function makeTile(frame, {draggable=true, asPlaced=false}={}){
@@ -225,12 +212,7 @@
       img.alt = 'story frame';
       t.appendChild(img);
 
-      if(draggable){
-        t.addEventListener('dragstart', (e)=>{
-          e.dataTransfer.setData('text/plain', frame.id);
-        });
-      }
-
+      if(draggable){ t.addEventListener('dragstart', (e)=>{ e.dataTransfer.setData('text/plain', frame.id); }); }
       t.addEventListener('click', ()=>{ selectTile(t); });
       if(asPlaced){ t.addEventListener('click', ()=> selectTile(t)); }
       return t;
@@ -240,7 +222,6 @@
     let selectedId = null; // id selecionado a partir do pool ou de um slot
     function selectTile(tile){
       const id = tile.getAttribute('data-id');
-      // Toggle selection visual
       qsa('.tile').forEach(el=> el.style.outline='');
       if(selectedId === id){ selectedId = null; return; }
       selectedId = id; tile.style.outline = '3px solid var(--brand)';
@@ -270,19 +251,12 @@
         const occupant = state.slots[idx];
         state.slots[idx] = id;
         if(occupant){
-          // return occupant to pool
           state.poolIds = state.poolIds.filter(x=>x!==id);
           state.poolIds.push(occupant);
         } else {
-          // remove id from pool
           state.poolIds = state.poolIds.filter(x=>x!==id);
         }
       }
-
-      // Play audio for the placed frame
-      const frame = frameById(id);
-      playAudio(frame?.audio ? resolvePath(frame.audio) : null);
-
       persistAndRerender();
     }
 
@@ -290,8 +264,6 @@
       saveState(storageKey(state.meta), { slots:state.slots, poolIds:state.poolIds, stats:state.stats });
       renderBoard();
     }
-
-    function frameById(id){ return state.frames.frames.find(f=>f.id===id); }
 
     // ===================== Controles =====================
     function checkSequence(){
@@ -318,48 +290,70 @@
     }
 
     function doHint(){
+      // Find first empty or incorrect slot
       const n = state.orderIds.length;
       let targetIdx = -1;
       for(let i=0;i<n;i++){
         if(state.slots[i] !== state.orderIds[i]){ targetIdx = i; break; }
       }
-      if(targetIdx === -1) return;
+      if(targetIdx === -1) return; // already correct
       state.stats.hints++;
+
       const correctId = state.orderIds[targetIdx];
+      // If correctId is in another slot, swap to correct position
       const where = state.slots.findIndex(v=>v===correctId);
       if(where !== -1){
         const tmp = state.slots[targetIdx];
         state.slots[targetIdx] = correctId;
         state.slots[where] = tmp || null;
       } else {
+        // move from pool
         state.poolIds = state.poolIds.filter(x=>x!==correctId);
         const occupant = state.slots[targetIdx];
         if(occupant) state.poolIds.push(occupant);
         state.slots[targetIdx] = correctId;
       }
+
+      // Visual glow on the correct slot
       const slotEl = qsa('.slot')[targetIdx];
       slotEl.classList.add('hint-glow');
       setTimeout(()=> slotEl.classList.remove('hint-glow'), 900);
+
       persistAndRerender();
     }
+
+    function onWin(){
+      const duration = Math.round((Date.now() - state.stats.start)/1000);
+      qs('#modalWin').classList.add('open');
+      try{
+        if(window.updateNextPhase && window.currentUserId){ window.updateNextPhase(window.currentUserId); }
+        if(window.logActivity){ window.logActivity({ type:'story-sequencer', meta:state.meta, stats:{ ...state.stats, duration_s:duration } }); }
+      }catch(e){}
+    }
+
+    // ===================== Storage helpers =====================
+    function saveState(key, stateObj){ try{ localStorage.setItem(key, JSON.stringify(stateObj)); }catch(e){} }
+    function loadState(key){ try{ return JSON.parse(localStorage.getItem(key) || 'null'); }catch(e){ return null } }
 
     // ===================== Bootstrap =====================
     async function init(){
       state.meta = getParams();
       const key = storageKey(state.meta);
 
-      // Tenta resolver base absoluta e relativa
+      // Base dinâmica a partir da URL
       const base = `/${state.meta.level}/${state.meta.unit}/DataStory/images/`;
       qs('#crumbs').setAttribute('title', 'Imagens em: ' + base);
 
-      // Carregar imagens sequenciais imagem1.png ... imagemN.png
-      state.frames = await loadSequentialImages(base, 1, 30); // até 30 por segurança
+      // Carrega imagens sequenciais imagem1.png ... imagemN.png
+      state.frames = await loadSequentialImages(base, 1, 30);
+      console.log('[Sequencer] Base:', base, 'Frames:', state.frames);
       if(!state.frames.length){
         alert('Nenhuma imagem encontrada em ' + base + ' (esperado: imagem1.png, imagem2.png, ...)');
         return;
       }
       state.orderIds = state.frames.map(f=>f.id);
 
+      // Restaura estado, se existir
       const saved = loadState(key);
       if(saved && Array.isArray(saved.slots) && Array.isArray(saved.poolIds)){
         state.slots = saved.slots;
@@ -373,18 +367,11 @@
       renderCrumbs();
       renderBoard();
 
+      // Controles
       qs('#btnCheck').addEventListener('click', checkSequence);
       qs('#btnReset').addEventListener('click', doReset);
       qs('#btnHint').addEventListener('click', doHint);
       qs('#btnCloseWin').addEventListener('click', ()=>{ qs('#modalWin').classList.remove('open'); });
-    }
-
-    async function probeBase(bases){
-      for(const b of bases){
-        const ok = await imageExists(b + 'imagem1.png');
-        if(ok) return b;
-      }
-      return bases[0];
     }
 
     function imageExists(url){
@@ -403,8 +390,8 @@
         // eslint-disable-next-line no-await-in-loop
         const ok = await imageExists(url);
         if(!ok){
-          if(i===start) continue; // tenta próximo (caso imagem1 não exista e comece em 2)
-          else break; // para no primeiro furo da sequência
+          if(i===start) continue; // tenta próximo se a 1 não existir
+          else break; // para no primeiro furo
         }
         frames.push({ id: 'f'+i, image: url });
       }
