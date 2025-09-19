@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Story Sequencer — Ordene a História</title>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --brand:#ff6b00; --ok:#2e7d32; --warn:#c62828; --bg:#fff9f3 url('/hannahenglishcourse/imagens/fundos/fundo-jogos.png') center/cover fixed; --ink:#222;
+      --slot:#ffffff; --slot-border:#bbb; --tile:#fff; --tile-border:#333;
+      --shadow: 0 6px 18px rgba(0,0,0,.08);
+    }
+    *{ box-sizing:border-box }
+    html,body{ height:100% }
+    body{
+      margin:0; background:var(--bg); color:var(--ink);
+      font-family:'Atkinson Hyperlegible', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      display:flex; flex-direction:column; min-height:100vh;
+    }
+    header{
+      padding:12px 16px; display:flex; align-items:center; gap:12px;
+      border-bottom:1px solid #eee; background:#fff; position:sticky; top:0; z-index:10;
+    }
+    header h1{ font-size:1.1rem; margin:0; font-weight:700 }
+    header .pill { padding:4px 10px; border-radius:999px; background:var(--bg); border:1px solid #eee; font-size:.8rem }
+
+    .wrap{ width:min(1100px, 92vw); margin:16px auto 24px; flex:1; display:flex; flex-direction:column; gap:16px }
+
+    .controls{ display:flex; flex-wrap:wrap; gap:8px }
+    .btn{
+      appearance:none; border:1px solid #ddd; background:#fff; padding:10px 14px; border-radius:12px; cursor:pointer;
+      font-weight:600; box-shadow:var(--shadow); transition:.15s transform ease;
+    }
+    .btn:active{ transform:translateY(1px) }
+    .btn.primary{ background:var(--brand); color:#fff; border-color:transparent }
+    .btn.ghost{ background:#fff }
+    .btn.toggle[aria-pressed="true"]{ outline:2px solid var(--brand) }
+
+    .board{ display:grid; gap:12px }
+    .timeline{
+      background:#fff; border:1px dashed #ddd; padding:12px; border-radius:16px; box-shadow:var(--shadow);
+      overflow:auto; white-space:nowrap; display:flex; gap:12px; align-items:flex-start;
+    }
+    .slot{
+      min-width:110px; width:110px; height:110px; background:var(--slot); border:2px dashed var(--slot-border);
+      border-radius:14px; display:flex; align-items:center; justify-content:center; position:relative;
+      flex:0 0 auto; transition:border-color .15s ease;
+    }
+    .slot .num{
+      position:absolute; top:6px; left:6px; font-size:.8rem; background:#0000000d; border:1px solid #00000014; padding:2px 6px; border-radius:999px;
+    }
+    .slot.filled{ border-style:solid; border-color:#aaa }
+    .slot.correct{ outline:3px solid var(--ok) }
+    .slot.wrong{ animation:shake .25s linear }
+    @keyframes shake{ 0%{ transform:translateX(0) } 25%{ transform:translateX(-4px) } 50%{ transform:translateX(4px) } 75%{ transform:translateX(-2px) } 100%{ transform:translateX(0) } }
+
+    .pool{
+      background:#fff; border:1px dashed #ddd; padding:12px; border-radius:16px; box-shadow:var(--shadow);
+      display:grid; grid-template-columns:repeat(auto-fill, minmax(94px, 1fr)); gap:12px;
+    }
+
+    .tile{
+      background:var(--tile); border:2px solid var(--tile-border); border-radius:12px; overflow:hidden; cursor:grab; position:relative;
+      display:flex; align-items:center; justify-content:center; height:94px; user-select:none;
+    }
+    .tile:active{ cursor:grabbing }
+    .tile img{ max-width:100%; max-height:100% }
+    .tile .cap{ position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,.55); color:#fff; font-size:.72rem; padding:4px 6px; display:none }
+    .tile.peek .cap{ display:block }
+
+    .hint-glow{ box-shadow:0 0 0 3px rgba(255,107,0,.35), 0 0 0 6px rgba(255,107,0,.15) !important }
+
+    .sr-only{ position:absolute !important; height:1px; width:1px; overflow:hidden; clip:rect(1px,1px,1px,1px); white-space:nowrap }
+
+    /* Modal */
+    .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.4); z-index:50 }
+    .modal.open{ display:flex }
+    .card{ background:#fff; border-radius:20px; padding:20px; width:min(520px, 92vw); text-align:center; box-shadow:var(--shadow) }
+    .card h2{ margin:0 0 8px }
+    .confetti{ font-size:42px; line-height:1.2 }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="pill" id="crumbs">Loading…</span>
+    <h1 id="title">Story Sequencer</h1>
+  </header>
+
+  <main class="wrap">
+    <div class="controls" role="toolbar" aria-label="Controles">
+      <button class="btn primary" id="btnCheck">Check</button>
+      <button class="btn ghost" id="btnReset" title="Limpar e reembaralhar">Reset</button>
+      <button class="btn ghost" id="btnHint" title="Revelar próximo slot correto">Hint</button>
+    </div>
+
+    <section class="board" aria-live="polite"> aria-live="polite">
+      <div>
+        <p style="margin:6px 0 8px; font-weight:700">Linha do tempo</p>
+        <div id="timeline" class="timeline" role="list" aria-label="Slots da sequência"></div>
+      </div>
+      <div>
+        <p style="margin:6px 0 8px; font-weight:700">Imagens (embaralhadas)</p>
+        <div id="pool" class="pool" aria-label="Banco de peças"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="modalWin" class="modal" role="dialog" aria-modal="true" aria-labelledby="winTitle">
+    <div class="card">
+      <div class="confetti">🎉✨⭐</div>
+      <h2 id="winTitle">Muito bem!</h2>
+      <p>Você colocou a história na ordem certa.</p>
+      <button class="btn primary" id="btnCloseWin">Continuar</button>
+    </div>
+  </div>
+
+  <script>
+    // ===================== Utilitários =====================
+    const qs = (s, el=document) => el.querySelector(s);
+    const qsa = (s, el=document) => [...el.querySelectorAll(s)];
+    const shuffle = (arr) => arr.map(v=>[Math.random(), v]).sort((a,b)=>a[0]-b[0]).map(p=>p[1]);
+
+    function getParams(){
+      const url = new URL(location.href);
+      const level = url.searchParams.get('level');
+      const unit = url.searchParams.get('unit');
+      const fase  = url.searchParams.get('fase') || 'seq';
+      if(!level || !unit){
+        alert('Missing URL params: level, unit');
+      }
+      return {level, unit, story:null, fase};
+    }
+
+    function storageKey({level,unit,story,fase}){
+      return `sequencer:${level}:${unit}:${story}:${fase}`;
+    }
+
+    function saveState(key, state){
+      try{ localStorage.setItem(key, JSON.stringify(state)); }catch(e){}
+    }
+    function loadState(key){
+      try{ return JSON.parse(localStorage.getItem(key) || 'null'); }catch(e){ return null }
+    }
+
+    // ===================== Áudio =====================
+    // (Sem áudio/texto nesta versão)
+
+    // ===================== Estado global =====================
+    const state = {
+      meta:null, // {level, unit, fase}
+      frames:[], // [{id,image}]
+      orderIds:[],
+      poolIds:[],
+      slots:[],
+      stats:{ start: Date.now(), checks:0, hints:0 }
+    };
+
+    // ===================== Renderização =====================
+    function renderCrumbs(){
+      const {level, unit} = state.meta;
+      qs('#crumbs').textContent = `Level ${level} · Unit ${unit}`;
+      qs('#title').textContent = 'Story Sequencer';
+    }
+
+    function renderBoard(){
+      const timeline = qs('#timeline');
+      timeline.innerHTML = '';
+      state.slots.forEach((val, idx)=>{
+        const slot = document.createElement('div');
+        slot.className = 'slot' + (val? ' filled':'');
+        slot.setAttribute('role','listitem');
+        slot.setAttribute('data-idx', idx);
+        slot.setAttribute('aria-label', `Slot ${idx+1}`);
+        slot.tabIndex = 0;
+
+        const num = document.createElement('span');
+        num.className = 'num'; num.textContent = idx+1; slot.appendChild(num);
+
+        if(val){
+          const frame = frameById(val);
+          slot.appendChild(makeTile(frame, {draggable:false, asPlaced:true}));
+        }
+
+        // Click-to-place
+        slot.addEventListener('click', handleSlotClick);
+        slot.addEventListener('keydown', (e)=>{ if(e.key==='Enter') handleSlotClick(e); });
+
+        // Drag-over for desktop DnD
+        slot.addEventListener('dragover', e=>{ e.preventDefault(); slot.style.borderColor = '#999'; });
+        slot.addEventListener('dragleave', e=>{ slot.style.borderColor = ''; });
+        slot.addEventListener('drop', (e)=>{
+          e.preventDefault(); slot.style.borderColor = '';
+          const id = e.dataTransfer.getData('text/plain');
+          if(!id) return;
+          placeIdIntoSlot(id, idx);
+        });
+
+        timeline.appendChild(slot);
+      });
+
+      const pool = qs('#pool');
+      pool.innerHTML = '';
+      state.poolIds.forEach(id=>{
+        const frame = frameById(id);
+        const tile = makeTile(frame, {draggable:true});
+        pool.appendChild(tile);
+      });
+
+      applyPeekMode();
+    }
+
+    function makeTile(frame, {draggable=true, asPlaced=false}={}){
+      const t = document.createElement('div');
+      t.className = 'tile';
+      t.setAttribute('data-id', frame.id);
+      if(draggable){ t.draggable = true; }
+
+      const img = document.createElement('img');
+      img.src = frame.image;
+      img.alt = 'story frame';
+      t.appendChild(img);
+
+      if(draggable){
+        t.addEventListener('dragstart', (e)=>{
+          e.dataTransfer.setData('text/plain', frame.id);
+        });
+      }
+
+      t.addEventListener('click', ()=>{ selectTile(t); });
+      if(asPlaced){ t.addEventListener('click', ()=> selectTile(t)); }
+      return t;
+    }
+
+    // ===================== Seleção e colocação =====================
+    let selectedId = null; // id selecionado a partir do pool ou de um slot
+    function selectTile(tile){
+      const id = tile.getAttribute('data-id');
+      // Toggle selection visual
+      qsa('.tile').forEach(el=> el.style.outline='');
+      if(selectedId === id){ selectedId = null; return; }
+      selectedId = id; tile.style.outline = '3px solid var(--brand)';
+    }
+
+    function handleSlotClick(e){
+      const slot = e.currentTarget;
+      const idx = +slot.getAttribute('data-idx');
+      if(selectedId){
+        placeIdIntoSlot(selectedId, idx);
+        selectedId = null; qsa('.tile').forEach(el=> el.style.outline='');
+      }
+    }
+
+    function placeIdIntoSlot(id, idx){
+      // If id is currently in another slot, swap
+      const currentIdx = state.slots.findIndex(v=>v===id);
+      if(currentIdx === idx) return;
+
+      if(currentIdx !== -1){
+        // Moving from one slot to another
+        const targetId = state.slots[idx];
+        state.slots[idx] = id;
+        state.slots[currentIdx] = targetId || null;
+      } else {
+        // From pool to slot (maybe swapping with occupant)
+        const occupant = state.slots[idx];
+        state.slots[idx] = id;
+        if(occupant){
+          // return occupant to pool
+          state.poolIds = state.poolIds.filter(x=>x!==id);
+          state.poolIds.push(occupant);
+        } else {
+          // remove id from pool
+          state.poolIds = state.poolIds.filter(x=>x!==id);
+        }
+      }
+
+      // Play audio for the placed frame
+      const frame = frameById(id);
+      playAudio(frame?.audio ? resolvePath(frame.audio) : null);
+
+      persistAndRerender();
+    }
+
+    function persistAndRerender(){
+      saveState(storageKey(state.meta), { slots:state.slots, poolIds:state.poolIds, stats:state.stats });
+      renderBoard();
+    }
+
+    function frameById(id){ return state.frames.frames.find(f=>f.id===id); }
+
+    // ===================== Controles =====================
+    function checkSequence(){
+      state.stats.checks++;
+      let allCorrect = true;
+      qsa('.slot').forEach((slotEl, i)=>{
+        const id = state.slots[i];
+        slotEl.classList.remove('correct','wrong');
+        if(!id){ allCorrect = false; return; }
+        const isCorrect = id === state.orderIds[i];
+        if(isCorrect){ slotEl.classList.add('correct'); }
+        else { slotEl.classList.add('wrong'); allCorrect = false; }
+        setTimeout(()=> slotEl.classList.remove('correct','wrong'), 800);
+      });
+      if(allCorrect){ onWin(); }
+    }
+
+    function doReset(){
+      const ids = [...state.orderIds];
+      state.poolIds = shuffle(ids);
+      state.slots = new Array(ids.length).fill(null);
+      state.stats = { start: Date.now(), checks:0, hints:0 };
+      persistAndRerender();
+    }
+
+    function doHint(){
+      const n = state.orderIds.length;
+      let targetIdx = -1;
+      for(let i=0;i<n;i++){
+        if(state.slots[i] !== state.orderIds[i]){ targetIdx = i; break; }
+      }
+      if(targetIdx === -1) return;
+      state.stats.hints++;
+      const correctId = state.orderIds[targetIdx];
+      const where = state.slots.findIndex(v=>v===correctId);
+      if(where !== -1){
+        const tmp = state.slots[targetIdx];
+        state.slots[targetIdx] = correctId;
+        state.slots[where] = tmp || null;
+      } else {
+        state.poolIds = state.poolIds.filter(x=>x!==correctId);
+        const occupant = state.slots[targetIdx];
+        if(occupant) state.poolIds.push(occupant);
+        state.slots[targetIdx] = correctId;
+      }
+      const slotEl = qsa('.slot')[targetIdx];
+      slotEl.classList.add('hint-glow');
+      setTimeout(()=> slotEl.classList.remove('hint-glow'), 900);
+      persistAndRerender();
+    }
+
+    // ===================== Bootstrap =====================
+    async function init(){
+      state.meta = getParams();
+      const key = storageKey(state.meta);
+
+      // Tenta resolver base absoluta e relativa
+      const absBase = `/hannahenglishcourse/${state.meta.level}/${state.meta.unit}/DataStory/images/`;
+      const relBase = `../../${state.meta.level}/${state.meta.unit}/DataStory/images/`;
+      const base = await probeBase([absBase, relBase]);
+
+      // Carregar imagens sequenciais imagem1.png ... imagemN.png
+      state.frames = await loadSequentialImages(base, 1, 30); // até 30 por segurança
+      if(!state.frames.length){
+        alert('Nenhuma imagem encontrada em ' + base + ' (esperado: imagem1.png, imagem2.png, ...)');
+        return;
+      }
+      state.orderIds = state.frames.map(f=>f.id);
+
+      const saved = loadState(key);
+      if(saved && Array.isArray(saved.slots) && Array.isArray(saved.poolIds)){
+        state.slots = saved.slots;
+        state.poolIds = saved.poolIds;
+        state.stats = saved.stats || state.stats;
+      } else {
+        state.poolIds = shuffle([...state.orderIds]);
+        state.slots = new Array(state.orderIds.length).fill(null);
+      }
+
+      renderCrumbs();
+      renderBoard();
+
+      qs('#btnCheck').addEventListener('click', checkSequence);
+      qs('#btnReset').addEventListener('click', doReset);
+      qs('#btnHint').addEventListener('click', doHint);
+      qs('#btnCloseWin').addEventListener('click', ()=>{ qs('#modalWin').classList.remove('open'); });
+    }
+
+    async function probeBase(bases){
+      for(const b of bases){
+        const ok = await imageExists(b + 'imagem1.png');
+        if(ok) return b;
+      }
+      return bases[0];
+    }
+
+    function imageExists(url){
+      return new Promise(res=>{
+        const img = new Image();
+        img.onload = ()=> res(true);
+        img.onerror = ()=> res(false);
+        img.src = url + (url.includes('?')?'&':'?') + 'v=' + Date.now();
+      });
+    }
+
+    async function loadSequentialImages(base, start=1, max=20){
+      const frames = [];
+      for(let i=start; i<=max; i++){
+        const url = base + `imagem${i}.png`;
+        // eslint-disable-next-line no-await-in-loop
+        const ok = await imageExists(url);
+        if(!ok){
+          if(i===start) continue; // tenta próximo (caso imagem1 não exista e comece em 2)
+          else break; // para no primeiro furo da sequência
+        }
+        frames.push({ id: 'f'+i, image: url });
+      }
+      return frames;
+    }
+
+    window.addEventListener('load', init);
+  </script>
+</body>
+</html>
