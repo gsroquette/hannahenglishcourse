@@ -13,7 +13,7 @@
     }
     *{ box-sizing:border-box }
 
-    /* === Mantém o mesmo body das outras atividades === */
+    /* === Mesmo body das outras atividades === */
     body { 
       font-family: Arial, sans-serif;
       text-align: center;
@@ -34,7 +34,7 @@
 
     .wrap{ width:min(1100px, 100%); margin:0 auto 24px; display:flex; flex-direction:column; gap:16px }
 
-    .controls{ display:flex; gap:10px; justify-content:center; }
+    .controls{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap }
     .btn{
       appearance:none; border:1px solid #ddd; background:#fff; padding:10px 14px; border-radius:12px; cursor:pointer;
       font-weight:600; box-shadow:var(--shadow); transition:.15s transform ease;
@@ -42,16 +42,20 @@
     .btn:active{ transform:translateY(1px) }
     .btn.primary{ background:var(--brand); color:#fff; border-color:transparent }
     .btn.ghost{ background:#fff }
+    .btn.toggle[aria-pressed="true"]{ outline:2px solid var(--brand) }
 
     .board{ display:grid; gap:16px }
     .timeline{
       background:#fff; border:1px dashed #ddd; padding:16px; border-radius:16px; box-shadow:var(--shadow);
-      overflow:auto; white-space:nowrap; display:flex; gap:12px; align-items:flex-start;
+      overflow:auto; white-space:nowrap; display:flex; gap:18px; align-items:flex-start;
     }
+
+    .slotWrap{ display:inline-flex; flex-direction:column; align-items:center; gap:6px; flex:0 0 auto }
     .slot{
       min-width:110px; width:110px; height:110px; background:#fafafa; border:2px dashed var(--slot-border);
       border-radius:14px; display:flex; align-items:center; justify-content:center; position:relative;
-      flex:0 0 auto; transition:border-color .15s ease;
+      transition:border-color .15s ease;
+      flex:0 0 auto;
     }
     .slot .num{
       position:absolute; top:6px; left:6px; font-size:.8rem; background:#0000000d; border:1px solid #00000014; padding:2px 6px; border-radius:999px;
@@ -60,6 +64,11 @@
     .slot.correct{ outline:3px solid var(--ok) }
     .slot.wrong{ animation:shake .25s linear }
     @keyframes shake{ 0%{ transform:translateX(0) } 25%{ transform:translateX(-4px) } 50%{ transform:translateX(4px) } 75%{ transform:translateX(-2px) } 100%{ transform:translateX(0) } }
+
+    .caption{
+      width:110px; font-size:.8rem; line-height:1.1; color:#333; background:#fff; border:1px solid #eee; border-radius:10px; padding:6px 8px;
+      text-align:left; white-space:normal; pointer-events:none;
+    }
 
     .pool{
       background:#fff; border:1px dashed #ddd; padding:12px; border-radius:16px; box-shadow:var(--shadow);
@@ -99,6 +108,7 @@
       <button class="btn primary" id="btnCheck">Check</button>
       <button class="btn ghost" id="btnReset" title="Limpar e reembaralhar">Reset</button>
       <button class="btn ghost" id="btnHint" title="Revelar próximo slot correto">Hint</button>
+      <button class="btn toggle" id="btnText" aria-pressed="true" title="Mostrar/ocultar texto dos slots">Texto</button>
     </div>
 
     <section class="board" aria-live="polite">
@@ -150,6 +160,9 @@
       orderIds:[],
       poolIds:[],
       slots:[],
+      storyTitle:null,
+      storyTexts:[], // index 0..n-1 => texto do slot
+      showText:true,
       stats:{ start: Date.now(), checks:0, hints:0 }
     };
 
@@ -159,13 +172,15 @@
     function renderCrumbs(){
       const {level, unit} = state.meta;
       qs('#crumbs').textContent = `Level ${level} · Unit ${unit}`;
-      qs('#title').textContent = 'Story Sequencer';
+      qs('#title').textContent = state.storyTitle || 'Story Sequencer';
     }
 
     function renderBoard(){
       const timeline = qs('#timeline');
       timeline.innerHTML = '';
       state.slots.forEach((val, idx)=>{
+        const wrap = document.createElement('div');
+        wrap.className = 'slotWrap';
         const slot = document.createElement('div');
         slot.className = 'slot' + (val? ' filled':'');
         slot.setAttribute('role','listitem');
@@ -185,7 +200,7 @@
         slot.addEventListener('click', handleSlotClick);
         slot.addEventListener('pointerdown', handleSlotClick);
 
-        // Drag-over for desktop DnD
+        // Drag-over para desktop
         slot.addEventListener('dragover', e=>{ e.preventDefault(); slot.style.borderColor = '#999'; });
         slot.addEventListener('dragleave', e=>{ slot.style.borderColor = ''; });
         slot.addEventListener('drop', (e)=>{
@@ -195,16 +210,26 @@
           placeIdIntoSlot(id, idx);
         });
 
-        timeline.appendChild(slot);
+        wrap.appendChild(slot);
+
+        // Texto correto do passo
+        if(state.showText){
+          const cap = document.createElement('div');
+          cap.className = 'caption';
+          cap.textContent = (state.storyTexts[idx] || '').trim();
+          wrap.appendChild(cap);
+        }
+
+        timeline.appendChild(wrap);
       });
 
       const pool = qs('#pool');
       pool.innerHTML = '';
-      // Permite soltar uma peça no pool para devolvê-la (desktop)
+      // Soltar no pool (desktop)
       pool.ondragover = (e)=>{ e.preventDefault(); };
       pool.ondrop = (e)=>{ e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); if(id) returnToPool(id); };
 
-      // Clique/Toque no fundo do pool devolve a peça selecionada (não quando toca numa tile)
+      // Toque no fundo do pool devolve a peça selecionada (não quando toca numa tile)
       pool.addEventListener('pointerdown', (e)=>{
         if(!selectedId) return;
         if(e.target.closest('.tile')) return;
@@ -270,17 +295,15 @@
     }
 
     function placeIdIntoSlot(id, idx){
-      // If id is currently in another slot, swap
+      // Se já está em outro slot, faz swap
       const currentIdx = state.slots.findIndex(v=>v===id);
       if(currentIdx === idx) return;
 
       if(currentIdx !== -1){
-        // Moving from one slot to another
         const targetId = state.slots[idx];
         state.slots[idx] = id;
         state.slots[currentIdx] = targetId || null;
       } else {
-        // From pool to slot (maybe swapping with occupant)
         const occupant = state.slots[idx];
         state.slots[idx] = id;
         if(occupant){
@@ -303,7 +326,7 @@
     }
 
     function persistAndRerender(){
-      saveState(storageKey(state.meta), { slots:state.slots, poolIds:state.poolIds, stats:state.stats });
+      saveState(storageKey(state.meta), { slots:state.slots, poolIds:state.poolIds, stats:state.stats, showText:state.showText });
       renderBoard();
     }
 
@@ -332,37 +355,33 @@
     }
 
     function doHint(){
-      // Find first empty or incorrect slot
       const n = state.orderIds.length;
       let targetIdx = -1;
       for(let i=0;i<n;i++){
         if(state.slots[i] !== state.orderIds[i]){ targetIdx = i; break; }
       }
-      if(targetIdx === -1) return; // already correct
+      if(targetIdx === -1) return; // já correto
       state.stats.hints++;
 
       const correctId = state.orderIds[targetIdx];
-      // If correctId is in another slot, swap to correct position
       const where = state.slots.findIndex(v=>v===correctId);
       if(where !== -1){
         const tmp = state.slots[targetIdx];
         state.slots[targetIdx] = correctId;
         state.slots[where] = tmp || null;
       } else {
-        // move from pool
         state.poolIds = state.poolIds.filter(x=>x!==correctId);
         const occupant = state.slots[targetIdx];
         if(occupant) state.poolIds.push(occupant);
         state.slots[targetIdx] = correctId;
       }
 
-      // Visual glow on the correct slot
-      const slotEl = qsa('.slot')[targetIdx];
-      if(slotEl){
+      const wrap = qs('#timeline').children[targetIdx];
+      if(wrap){
+        const slotEl = wrap.querySelector('.slot');
         slotEl.classList.add('hint-glow');
         setTimeout(()=> slotEl.classList.remove('hint-glow'), 900);
       }
-
       persistAndRerender();
     }
 
@@ -384,25 +403,33 @@
       state.meta = getParams();
       const key = storageKey(state.meta);
 
-      // Base dinâmica a partir da URL
-      const base = `/${state.meta.level}/${state.meta.unit}/DataStory/images/`;
-      qs('#crumbs').setAttribute('title', 'Imagens em: ' + base);
+      // Bases dinâmicas (da URL)
+      const imgBase = `/${state.meta.level}/${state.meta.unit}/DataStory/images/`;
+      const txtBase = `/${state.meta.level}/${state.meta.unit}/DataStory/`;
+      qs('#crumbs').setAttribute('title', 'Imagens em: ' + imgBase);
 
-      // Carrega imagens sequenciais imagem1.png ... imagemN.png
-      state.frames = await loadSequentialImages(base, 1, 30);
-      console.log('[Sequencer] Base:', base, 'Frames:', state.frames);
+      // Carregar imagens sequenciais
+      state.frames = await loadSequentialImages(imgBase, 1, 30);
       if(!state.frames.length){
-        alert('Nenhuma imagem encontrada em ' + base + ' (esperado: imagem1.png, imagem2.png, ...)');
+        alert('Nenhuma imagem encontrada em ' + imgBase + ' (esperado: imagem1.png, imagem2.png, ...)');
         return;
       }
       state.orderIds = state.frames.map(f=>f.id);
 
-      // Restaura estado, se existir
+      // Carregar texto da história
+      const story = await loadStoryText(txtBase);
+      if(story){
+        state.storyTitle = story.title || null;
+        state.storyTexts = story.frames || [];
+      }
+
+      // Restaurar estado
       const saved = loadState(key);
       if(saved && Array.isArray(saved.slots) && Array.isArray(saved.poolIds)){
         state.slots = saved.slots;
         state.poolIds = saved.poolIds;
         state.stats = saved.stats || state.stats;
+        state.showText = typeof saved.showText === 'boolean' ? saved.showText : true;
       } else {
         state.poolIds = shuffle([...state.orderIds]);
         state.slots = new Array(state.orderIds.length).fill(null);
@@ -415,6 +442,9 @@
       qs('#btnCheck').addEventListener('click', checkSequence);
       qs('#btnReset').addEventListener('click', doReset);
       qs('#btnHint').addEventListener('click', doHint);
+      const toggleText = (e)=>{ e.preventDefault(); state.showText = !state.showText; qs('#btnText').setAttribute('aria-pressed', String(state.showText)); persistAndRerender(); };
+      qs('#btnText').addEventListener('click', toggleText);
+      qs('#btnText').addEventListener('pointerdown', toggleText);
       qs('#btnCloseWin').addEventListener('click', ()=>{ qs('#modalWin').classList.remove('open'); });
     }
 
@@ -440,6 +470,46 @@
         frames.push({ id: 'f'+i, image: url });
       }
       return frames;
+    }
+
+    async function loadStoryText(base){
+      const candidates = ['images.txt', 'imagens.txt'];
+      for(const name of candidates){
+        try{
+          const res = await fetch(base + name + '?v=' + Date.now());
+          if(!res.ok) continue;
+          const raw = await res.text();
+          return parseImagesTxt(raw);
+        }catch(e){}
+      }
+      return null;
+    }
+
+    function parseImagesTxt(raw){
+      // Suporta: #title: ...   e blocos #imagemN ou #imageN seguidos de linhas de texto
+      const lines = raw.split(/\r?\n/);
+      let title = null;
+      const frames = [];
+      let current = null;
+      for(let i=0;i<lines.length;i++){
+        const line = lines[i].trim();
+        if(!line) continue;
+        const mTitle = line.match(/^#title:\s*(.+)$/i);
+        if(mTitle){ title = mTitle[1].trim(); continue; }
+        const mImg = line.match(/^#(imagem|image)(\d+)$/i);
+        if(mImg){
+          const idx = parseInt(mImg[2],10) - 1;
+          current = { idx, text: [] };
+          frames[idx] = current;
+          continue;
+        }
+        if(current){ current.text.push(line.replace(/^"|"$/g, '')); }
+      }
+      const ordered = [];
+      for(let i=0;i<frames.length;i++){
+        ordered[i] = frames[i] ? frames[i].text.join(' ').trim() : '';
+      }
+      return { title, frames: ordered };
     }
 
     window.addEventListener('load', init);
