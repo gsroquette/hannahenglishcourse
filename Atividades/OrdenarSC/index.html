@@ -173,7 +173,7 @@
 
         if(val){
           const frame = frameById(val);
-          if(frame){ slot.appendChild(makeTile(frame, {draggable:false, asPlaced:true})); }
+          if(frame){ slot.appendChild(makeTile(frame, {draggable:true, asPlaced:true})); }
         }
 
         // Click-to-place
@@ -195,6 +195,11 @@
 
       const pool = qs('#pool');
       pool.innerHTML = '';
+      // Permite soltar uma peça no pool para devolvê-la
+      pool.ondragover = (e)=>{ e.preventDefault(); };
+      pool.ondrop = (e)=>{ e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); if(id) returnToPool(id); };
+      // Clique no pool com uma peça selecionada retorna a peça
+      pool.addEventListener('click', ()=>{ if(selectedId){ returnToPool(selectedId); selectedId=null; qsa('.tile').forEach(el=> el.style.outline=''); } });
       state.poolIds.forEach(id=>{
         const frame = frameById(id);
         if(frame){ pool.appendChild(makeTile(frame, {draggable:true})); }
@@ -214,7 +219,7 @@
 
       if(draggable){ t.addEventListener('dragstart', (e)=>{ e.dataTransfer.setData('text/plain', frame.id); }); }
       t.addEventListener('click', ()=>{ selectTile(t); });
-      if(asPlaced){ t.addEventListener('click', ()=> selectTile(t)); }
+      if(asPlaced){ t.addEventListener('dblclick', ()=>{ returnToPool(frame.id); }); }
       return t;
     }
 
@@ -258,6 +263,15 @@
         }
       }
       persistAndRerender();
+    }
+
+    function returnToPool(id){
+      const idx = state.slots.findIndex(v=>v===id);
+      if(idx !== -1){
+        state.slots[idx] = null;
+        if(!state.poolIds.includes(id)) state.poolIds.push(id);
+        persistAndRerender();
+      }
     }
 
     function persistAndRerender(){
