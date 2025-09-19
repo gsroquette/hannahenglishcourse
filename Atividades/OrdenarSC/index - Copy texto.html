@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Story Sequencer — Ordene a História</title>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --brand:#ff6b00; --ok:#2e7d32; --warn:#c62828; --ink:#222;
+      --slot:#ffffff; --slot-border:#bbb; --tile:#fff; --tile-border:#333;
+      --shadow: 0 6px 18px rgba(0,0,0,.08);
+    }
+    *{ box-sizing:border-box }
+
+    /* === Mesmo body das outras atividades === */
+    body { 
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin-top: 50px;
+      background-color: #f5f5f5;
+      background-image: url('../../../imagens/fundo.png');
+      background-repeat: repeat;
+      background-size: auto;
+      padding: 0 20px;
+    }
+
+    header{
+      padding:12px 16px; display:flex; align-items:center; gap:12px; justify-content:center;
+      margin: 0 auto 8px; max-width:1100px;
+    }
+    header h1{ font-size:1.2rem; margin:0; font-weight:700 }
+    header .pill { padding:6px 12px; border-radius:999px; background:#fff; border:1px solid #eee; font-size:.85rem; box-shadow: var(--shadow)}
+
+    .wrap{ width:min(1100px, 100%); margin:0 auto 24px; display:flex; flex-direction:column; gap:16px }
+
+    .controls{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap }
+    .btn{
+      appearance:none; border:1px solid #ddd; background:#fff; padding:10px 14px; border-radius:12px; cursor:pointer;
+      font-weight:600; box-shadow:var(--shadow); transition:.15s transform ease;
+    }
+    .btn:active{ transform:translateY(1px) }
+    .btn.primary{ background:var(--brand); color:#fff; border-color:transparent }
+    .btn.ghost{ background:#fff }
+    .btn.toggle[aria-pressed="true"]{ outline:2px solid var(--brand) }
+
+    .board{ display:grid; gap:16px }
+    .timeline{
+      background:#fff; border:1px dashed #ddd; padding:16px; border-radius:16px; box-shadow:var(--shadow);
+      overflow:auto; white-space:nowrap; display:flex; gap:18px; align-items:flex-start;
+    }
+
+    .slotWrap{ display:inline-flex; flex-direction:column; align-items:center; gap:6px; flex:0 0 auto }
+    .slot{
+      min-width:110px; width:110px; height:110px; background:#fafafa; border:2px dashed var(--slot-border);
+      border-radius:14px; display:flex; align-items:center; justify-content:center; position:relative;
+      transition:border-color .15s ease;
+      flex:0 0 auto;
+    }
+    .slot .num{
+      position:absolute; top:6px; left:6px; font-size:.8rem; background:#0000000d; border:1px solid #00000014; padding:2px 6px; border-radius:999px;
+    }
+    .slot.filled{ border-style:solid; border-color:#aaa }
+    .slot.correct{ outline:3px solid var(--ok) }
+    .slot.wrong{ animation:shake .25s linear }
+    @keyframes shake{ 0%{ transform:translateX(0) } 25%{ transform:translateX(-4px) } 50%{ transform:translateX(4px) } 75%{ transform:translateX(-2px) } 100%{ transform:translateX(0) } }
+
+    .caption{
+      width:110px; font-size:.8rem; line-height:1.1; color:#333; background:#fff; border:1px solid #eee; border-radius:10px; padding:6px 8px;
+      text-align:left; white-space:normal; pointer-events:none;
+    }
+
+    .pool{
+      background:#fff; border:1px dashed #ddd; padding:12px; border-radius:16px; box-shadow:var(--shadow);
+      display:grid; grid-template-columns:repeat(auto-fill, minmax(94px, 1fr)); gap:12px;
+    }
+
+    .tile{
+      background:var(--tile); border:2px solid var(--tile-border); border-radius:12px; overflow:hidden; cursor:grab; position:relative;
+      display:flex; align-items:center; justify-content:center; height:94px; user-select:none;
+    }
+    .tile:active{ cursor:grabbing }
+    .tile img{ max-width:100%; max-height:100%; display:block }
+
+    /* Botão de retorno para mobile/touch */
+    .tile.in-slot{ position:relative }
+    .ret-btn{ position:absolute; top:6px; right:6px; width:24px; height:24px; border-radius:999px; border:1px solid #ddd; background:#fff; font-size:14px; line-height:22px; box-shadow: var(--shadow); cursor:pointer }
+
+    /* Melhor suporte a touch */
+    .tile, .slot{ touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+
+    /* Modal */
+    .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.4); z-index:50 }
+    .modal.open{ display:flex }
+    .card{ background:#fff; border-radius:20px; padding:20px; width:min(520px, 92vw); text-align:center; box-shadow:var(--shadow) }
+    .card h2{ margin:0 0 8px }
+    .confetti{ font-size:42px; line-height:1.2 }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="pill" id="crumbs">Level — Unit — Loading…</span>
+    <h1 id="title">Story Sequencer</h1>
+  </header>
+
+  <main class="wrap">
+    <div class="controls" role="toolbar" aria-label="Controles">
+      <button class="btn primary" id="btnCheck">Check</button>
+      <button class="btn ghost" id="btnReset" title="Limpar e reembaralhar">Reset</button>
+      <button class="btn ghost" id="btnHint" title="Revelar próximo slot correto">Hint</button>
+      <button class="btn toggle" id="btnText" aria-pressed="true" title="Mostrar/ocultar texto dos slots">Texto</button>
+    </div>
+
+    <section class="board" aria-live="polite">
+      <div>
+        <p style="margin:6px 0 8px; font-weight:700">Linha do tempo</p>
+        <div id="timeline" class="timeline" role="list" aria-label="Slots da sequência"></div>
+      </div>
+      <div>
+        <p style="margin:6px 0 8px; font-weight:700">Imagens (embaralhadas)</p>
+        <div id="pool" class="pool" aria-label="Banco de peças"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="modalWin" class="modal" role="dialog" aria-modal="true" aria-labelledby="winTitle">
+    <div class="card">
+      <div class="confetti">🎉✨⭐</div>
+      <h2 id="winTitle">Muito bem!</h2>
+      <p>Você colocou a história na ordem certa.</p>
+      <button class="btn primary" id="btnCloseWin">Continuar</button>
+    </div>
+  </div>
+
+  <script>
+    // ===================== Utilitários =====================
+    const qs = (s, el=document) => el.querySelector(s);
+    const qsa = (s, el=document) => [...el.querySelectorAll(s)];
+    const shuffle = (arr) => {
+      const a = arr.slice();
+      for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+      return a;
+    };
+
+    function getParams(){
+      const url = new URL(location.href);
+      const level = url.searchParams.get('level');
+      const unit = url.searchParams.get('unit');
+      const fase  = url.searchParams.get('fase') || 'seq';
+      if(!level || !unit){ alert('Missing URL params: level, unit'); }
+      return {level, unit, fase};
+    }
+
+    function storageKey({level,unit,fase}){ return `sequencer:${level}:${unit}:${fase}`; }
+
+    // ===================== Estado global =====================
+    const state = {
+      meta:null, // {level, unit, fase}
+      frames:[], // [{id,image}]
+      orderIds:[],
+      poolIds:[],
+      slots:[],
+      storyTitle:null,
+      storyTexts:[], // index 0..n-1 => texto do slot
+      showText:true,
+      stats:{ start: Date.now(), checks:0, hints:0 }
+    };
+
+    function frameById(id){ return state.frames.find(f=>f.id===id); }
+
+    // ===================== Renderização =====================
+    function renderCrumbs(){
+      const {level, unit} = state.meta;
+      qs('#crumbs').textContent = `Level ${level} · Unit ${unit}`;
+      qs('#title').textContent = state.storyTitle || 'Story Sequencer';
+    }
+
+    function renderBoard(){
+      const timeline = qs('#timeline');
+      timeline.innerHTML = '';
+      state.slots.forEach((val, idx)=>{
+        const wrap = document.createElement('div');
+        wrap.className = 'slotWrap';
+        const slot = document.createElement('div');
+        slot.className = 'slot' + (val? ' filled':'');
+        slot.setAttribute('role','listitem');
+        slot.setAttribute('data-idx', idx);
+        slot.setAttribute('aria-label', `Slot ${idx+1}`);
+        slot.tabIndex = 0;
+
+        const num = document.createElement('span');
+        num.className = 'num'; num.textContent = idx+1; slot.appendChild(num);
+
+        if(val){
+          const frame = frameById(val);
+          if(frame){ slot.appendChild(makeTile(frame, {draggable:true, asPlaced:true})); }
+        }
+
+        // Click/pointer-to-place (touch friendly)
+        slot.addEventListener('click', handleSlotClick);
+        slot.addEventListener('pointerdown', handleSlotClick);
+
+        // Drag-over para desktop
+        slot.addEventListener('dragover', e=>{ e.preventDefault(); slot.style.borderColor = '#999'; });
+        slot.addEventListener('dragleave', e=>{ slot.style.borderColor = ''; });
+        slot.addEventListener('drop', (e)=>{
+          e.preventDefault(); slot.style.borderColor = '';
+          const id = e.dataTransfer.getData('text/plain');
+          if(!id) return;
+          placeIdIntoSlot(id, idx);
+        });
+
+        wrap.appendChild(slot);
+
+        // Texto correto do passo
+        if(state.showText){
+          const cap = document.createElement('div');
+          cap.className = 'caption';
+          cap.textContent = (state.storyTexts[idx] || '').trim();
+          wrap.appendChild(cap);
+        }
+
+        timeline.appendChild(wrap);
+      });
+
+      const pool = qs('#pool');
+      pool.innerHTML = '';
+      // Soltar no pool (desktop)
+      pool.ondragover = (e)=>{ e.preventDefault(); };
+      pool.ondrop = (e)=>{ e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); if(id) returnToPool(id); };
+
+      // Toque no fundo do pool devolve a peça selecionada (não quando toca numa tile)
+      pool.addEventListener('pointerdown', (e)=>{
+        if(!selectedId) return;
+        if(e.target.closest('.tile')) return;
+        returnToPool(selectedId);
+        selectedId=null;
+        qsa('.tile').forEach(el=> el.style.outline='');
+      });
+
+      state.poolIds.forEach(id=>{
+        const frame = frameById(id);
+        if(frame){ pool.appendChild(makeTile(frame, {draggable:true})); }
+      });
+    }
+
+    function makeTile(frame, {draggable=true, asPlaced=false}={}){
+      const t = document.createElement('div');
+      t.className = 'tile' + (asPlaced ? ' in-slot' : '');
+      t.setAttribute('data-id', frame.id);
+
+      const isPointerFine = window.matchMedia && window.matchMedia('(pointer:fine)').matches;
+      const enableDrag = draggable && !!isPointerFine;
+      if(enableDrag){ t.draggable = true; }
+
+      const img = document.createElement('img');
+      img.src = frame.image;
+      img.alt = 'story frame';
+      t.appendChild(img);
+
+      if(enableDrag){ t.addEventListener('dragstart', (e)=>{ e.dataTransfer.setData('text/plain', frame.id); }); }
+      
+      // Toque/clique seleciona a peça (touch-friendly)
+      t.addEventListener('pointerdown', ()=>{ selectTile(t); });
+
+      // Botão de retorno ao pool quando estiver em um slot (melhor em touch)
+      if(asPlaced){
+        const ret = document.createElement('button');
+        ret.className = 'ret-btn';
+        ret.type = 'button';
+        ret.title = 'Voltar ao embaralhado';
+        ret.textContent = '↩';
+        ret.addEventListener('pointerdown', (ev)=>{ ev.stopPropagation(); returnToPool(frame.id); });
+        t.appendChild(ret);
+      }
+      return t;
+    }
+
+    // ===================== Seleção e colocação =====================
+    let selectedId = null; // id selecionado a partir do pool ou de um slot
+    function selectTile(tile){
+      const id = tile.getAttribute('data-id');
+      qsa('.tile').forEach(el=> el.style.outline='');
+      if(selectedId === id){ selectedId = null; return; }
+      selectedId = id; tile.style.outline = '3px solid var(--brand)';
+    }
+
+    function handleSlotClick(e){
+      const slot = e.currentTarget;
+      const idx = +slot.getAttribute('data-idx');
+      if(selectedId){
+        placeIdIntoSlot(selectedId, idx);
+        selectedId = null; qsa('.tile').forEach(el=> el.style.outline='');
+      }
+    }
+
+    function placeIdIntoSlot(id, idx){
+      // Se já está em outro slot, faz swap
+      const currentIdx = state.slots.findIndex(v=>v===id);
+      if(currentIdx === idx) return;
+
+      if(currentIdx !== -1){
+        const targetId = state.slots[idx];
+        state.slots[idx] = id;
+        state.slots[currentIdx] = targetId || null;
+      } else {
+        const occupant = state.slots[idx];
+        state.slots[idx] = id;
+        if(occupant){
+          state.poolIds = state.poolIds.filter(x=>x!==id);
+          state.poolIds.push(occupant);
+        } else {
+          state.poolIds = state.poolIds.filter(x=>x!==id);
+        }
+      }
+      persistAndRerender();
+    }
+
+    function returnToPool(id){
+      const idx = state.slots.findIndex(v=>v===id);
+      if(idx !== -1){
+        state.slots[idx] = null;
+        if(!state.poolIds.includes(id)) state.poolIds.push(id);
+        persistAndRerender();
+      }
+    }
+
+    function persistAndRerender(){
+      saveState(storageKey(state.meta), { slots:state.slots, poolIds:state.poolIds, stats:state.stats, showText:state.showText });
+      renderBoard();
+    }
+
+    // ===================== Controles =====================
+    function checkSequence(){
+      state.stats.checks++;
+      let allCorrect = true;
+      qsa('.slot').forEach((slotEl, i)=>{
+        const id = state.slots[i];
+        slotEl.classList.remove('correct','wrong');
+        if(!id){ allCorrect = false; return; }
+        const isCorrect = id === state.orderIds[i];
+        if(isCorrect){ slotEl.classList.add('correct'); }
+        else { slotEl.classList.add('wrong'); allCorrect = false; }
+        setTimeout(()=> slotEl.classList.remove('correct','wrong'), 800);
+      });
+      if(allCorrect){ onWin(); }
+    }
+
+    function doReset(){
+      const ids = [...state.orderIds];
+      state.poolIds = shuffle(ids);
+      state.slots = new Array(ids.length).fill(null);
+      state.stats = { start: Date.now(), checks:0, hints:0 };
+      persistAndRerender();
+    }
+
+    function doHint(){
+      const n = state.orderIds.length;
+      let targetIdx = -1;
+      for(let i=0;i<n;i++){
+        if(state.slots[i] !== state.orderIds[i]){ targetIdx = i; break; }
+      }
+      if(targetIdx === -1) return; // já correto
+      state.stats.hints++;
+
+      const correctId = state.orderIds[targetIdx];
+      const where = state.slots.findIndex(v=>v===correctId);
+      if(where !== -1){
+        const tmp = state.slots[targetIdx];
+        state.slots[targetIdx] = correctId;
+        state.slots[where] = tmp || null;
+      } else {
+        state.poolIds = state.poolIds.filter(x=>x!==correctId);
+        const occupant = state.slots[targetIdx];
+        if(occupant) state.poolIds.push(occupant);
+        state.slots[targetIdx] = correctId;
+      }
+
+      const wrap = qs('#timeline').children[targetIdx];
+      if(wrap){
+        const slotEl = wrap.querySelector('.slot');
+        slotEl.classList.add('hint-glow');
+        setTimeout(()=> slotEl.classList.remove('hint-glow'), 900);
+      }
+      persistAndRerender();
+    }
+
+    function onWin(){
+      const duration = Math.round((Date.now() - state.stats.start)/1000);
+      qs('#modalWin').classList.add('open');
+      try{
+        if(window.updateNextPhase && window.currentUserId){ window.updateNextPhase(window.currentUserId); }
+        if(window.logActivity){ window.logActivity({ type:'story-sequencer', meta:state.meta, stats:{ ...state.stats, duration_s:duration } }); }
+      }catch(e){}
+    }
+
+    // ===================== Storage helpers =====================
+    function saveState(key, stateObj){ try{ localStorage.setItem(key, JSON.stringify(stateObj)); }catch(e){} }
+    function loadState(key){ try{ return JSON.parse(localStorage.getItem(key) || 'null'); }catch(e){ return null } }
+
+    // ===================== Bootstrap =====================
+    async function init(){
+      state.meta = getParams();
+      const key = storageKey(state.meta);
+
+      // Bases dinâmicas (da URL)
+      const imgBase = `/${state.meta.level}/${state.meta.unit}/DataStory/images/`;
+      const txtBase = `/${state.meta.level}/${state.meta.unit}/DataStory/`;
+      qs('#crumbs').setAttribute('title', 'Imagens em: ' + imgBase);
+
+      // Carregar imagens sequenciais
+      state.frames = await loadSequentialImages(imgBase, 1, 30);
+      if(!state.frames.length){
+        alert('Nenhuma imagem encontrada em ' + imgBase + ' (esperado: imagem1.png, imagem2.png, ...)');
+        return;
+      }
+      state.orderIds = state.frames.map(f=>f.id);
+
+      // Carregar texto da história
+      const story = await loadStoryText(txtBase);
+      if(story){
+        state.storyTitle = story.title || null;
+        state.storyTexts = story.frames || [];
+      }
+
+      // Restaurar estado
+      const saved = loadState(key);
+      if(saved && Array.isArray(saved.slots) && Array.isArray(saved.poolIds)){
+        state.slots = saved.slots;
+        state.poolIds = saved.poolIds;
+        state.stats = saved.stats || state.stats;
+        state.showText = typeof saved.showText === 'boolean' ? saved.showText : true;
+      } else {
+        state.poolIds = shuffle([...state.orderIds]);
+        state.slots = new Array(state.orderIds.length).fill(null);
+      }
+
+      renderCrumbs();
+      renderBoard();
+
+      // Controles
+      qs('#btnCheck').addEventListener('click', checkSequence);
+      qs('#btnReset').addEventListener('click', doReset);
+      qs('#btnHint').addEventListener('click', doHint);
+      const toggleText = (e)=>{ e.preventDefault(); state.showText = !state.showText; qs('#btnText').setAttribute('aria-pressed', String(state.showText)); persistAndRerender(); };
+      qs('#btnText').addEventListener('click', toggleText);
+      qs('#btnText').addEventListener('pointerdown', toggleText);
+      qs('#btnCloseWin').addEventListener('click', ()=>{ qs('#modalWin').classList.remove('open'); });
+    }
+
+    function imageExists(url){
+      return new Promise(res=>{
+        const img = new Image();
+        img.onload = ()=> res(true);
+        img.onerror = ()=> res(false);
+        img.src = url + (url.includes('?')?'&':'?') + 'v=' + Date.now();
+      });
+    }
+
+    async function loadSequentialImages(base, start=1, max=20){
+      const frames = [];
+      for(let i=start; i<=max; i++){
+        const url = base + `imagem${i}.png`;
+        // eslint-disable-next-line no-await-in-loop
+        const ok = await imageExists(url);
+        if(!ok){
+          if(i===start) continue; // tenta próximo se a 1 não existir
+          else break; // para no primeiro furo
+        }
+        frames.push({ id: 'f'+i, image: url });
+      }
+      return frames;
+    }
+
+    async function loadStoryText(base){
+      const candidates = ['images.txt', 'imagens.txt'];
+      for(const name of candidates){
+        try{
+          const res = await fetch(base + name + '?v=' + Date.now());
+          if(!res.ok) continue;
+          const raw = await res.text();
+          return parseImagesTxt(raw);
+        }catch(e){}
+      }
+      return null;
+    }
+
+    function parseImagesTxt(raw){
+      // Suporta: #title: ...   e blocos #imagemN ou #imageN seguidos de linhas de texto
+      const lines = raw.split(/\r?\n/);
+      let title = null;
+      const frames = [];
+      let current = null;
+      for(let i=0;i<lines.length;i++){
+        const line = lines[i].trim();
+        if(!line) continue;
+        const mTitle = line.match(/^#title:\s*(.+)$/i);
+        if(mTitle){ title = mTitle[1].trim(); continue; }
+        const mImg = line.match(/^#(imagem|image)(\d+)$/i);
+        if(mImg){
+          const idx = parseInt(mImg[2],10) - 1;
+          current = { idx, text: [] };
+          frames[idx] = current;
+          continue;
+        }
+        if(current){ current.text.push(line.replace(/^"|"$/g, '')); }
+      }
+      const ordered = [];
+      for(let i=0;i<frames.length;i++){
+        ordered[i] = frames[i] ? frames[i].text.join(' ').trim() : '';
+      }
+      return { title, frames: ordered };
+    }
+
+    window.addEventListener('load', init);
+  </script>
+</body>
+</html>
