@@ -77,7 +77,8 @@
     .tile.in-slot{ position:relative }
     .ret-btn{ position:absolute; top:6px; right:6px; width:24px; height:24px; border-radius:999px; border:1px solid #ddd; background:#fff; font-size:14px; line-height:22px; box-shadow: var(--shadow); cursor:pointer }
 
-    .hint-glow{ box-shadow:0 0 0 3px rgba(255,107,0,.35), 0 0 0 6px rgba(255,107,0,.15) !important }
+    /* Melhor suporte a touch */
+    .tile, .slot{ touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 
     /* Modal */
     .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.4); z-index:50 }
@@ -85,8 +86,6 @@
     .card{ background:#fff; border-radius:20px; padding:20px; width:min(520px, 92vw); text-align:center; box-shadow:var(--shadow) }
     .card h2{ margin:0 0 8px }
     .confetti{ font-size:42px; line-height:1.2 }
-      /* Melhor suporte a touch */
-    .tile, .slot{ touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   </style>
 </head>
 <body>
@@ -142,7 +141,7 @@
       return {level, unit, fase};
     }
 
-    function storageKey({level,unit,fase}){ return `sequencer:${level}:${unit}:${fase}`; }
+    function storageKey({level,unit,fase}){ return \`sequencer:\${level}:\${unit}:\${fase}\`; }
 
     // ===================== Estado global =====================
     const state = {
@@ -159,7 +158,7 @@
     // ===================== Renderização =====================
     function renderCrumbs(){
       const {level, unit} = state.meta;
-      qs('#crumbs').textContent = `Level ${level} · Unit ${unit}`;
+      qs('#crumbs').textContent = \`Level \${level} · Unit \${unit}\`;
       qs('#title').textContent = 'Story Sequencer';
     }
 
@@ -171,7 +170,7 @@
         slot.className = 'slot' + (val? ' filled':'');
         slot.setAttribute('role','listitem');
         slot.setAttribute('data-idx', idx);
-        slot.setAttribute('aria-label', `Slot ${idx+1}`);
+        slot.setAttribute('aria-label', \`Slot \${idx+1}\`);
         slot.tabIndex = 0;
 
         const num = document.createElement('span');
@@ -182,10 +181,9 @@
           if(frame){ slot.appendChild(makeTile(frame, {draggable:true, asPlaced:true})); }
         }
 
-        // Click-to-place
+        // Click/pointer-to-place (touch friendly)
         slot.addEventListener('click', handleSlotClick);
         slot.addEventListener('pointerdown', handleSlotClick);
-        slot.addEventListener('keydown', (e)=>{ if(e.key==='Enter') handleSlotClick(e); });
 
         // Drag-over for desktop DnD
         slot.addEventListener('dragover', e=>{ e.preventDefault(); slot.style.borderColor = '#999'; });
@@ -202,18 +200,19 @@
 
       const pool = qs('#pool');
       pool.innerHTML = '';
-      // Permite soltar uma peça no pool para devolvê-la
+      // Permite soltar uma peça no pool para devolvê-la (desktop)
       pool.ondragover = (e)=>{ e.preventDefault(); };
       pool.ondrop = (e)=>{ e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); if(id) returnToPool(id); };
-      // Clique no pool com uma peça selecionada retorna a peça
+
+      // Clique/Toque no fundo do pool devolve a peça selecionada (não quando toca numa tile)
       pool.addEventListener('pointerdown', (e)=>{
-        // Só retorna ao pool se o toque for no FUNDO do pool (não em cima de uma tile)
         if(!selectedId) return;
-        if(e.target.closest('.tile')) return; // não interferir ao selecionar uma peça do pool
+        if(e.target.closest('.tile')) return;
         returnToPool(selectedId);
         selectedId=null;
         qsa('.tile').forEach(el=> el.style.outline='');
-      }); selectedId=null; qsa('.tile').forEach(el=> el.style.outline=''); } });
+      });
+
       state.poolIds.forEach(id=>{
         const frame = frameById(id);
         if(frame){ pool.appendChild(makeTile(frame, {draggable:true})); }
@@ -359,8 +358,10 @@
 
       // Visual glow on the correct slot
       const slotEl = qsa('.slot')[targetIdx];
-      slotEl.classList.add('hint-glow');
-      setTimeout(()=> slotEl.classList.remove('hint-glow'), 900);
+      if(slotEl){
+        slotEl.classList.add('hint-glow');
+        setTimeout(()=> slotEl.classList.remove('hint-glow'), 900);
+      }
 
       persistAndRerender();
     }
