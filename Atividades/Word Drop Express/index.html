@@ -1,131 +1,108 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Word Drop Express</title>
-  <link rel="manifest" href="manifest.json">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body {
-      width: 100vw; height: 100vh;
-      background: url('../../../imagens/fundo.png') repeat;
-      font-family: "Times New Roman", Times, serif;
-    }
-    html, body, #game-container { -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Word Drop Express</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100vw;height:100vh;background:url('../../../imagens/fundo.png') repeat;font-family:"Times New Roman",Times,serif}
+  html,body,#game-container{-webkit-user-select:none;user-select:none;touch-action:manipulation}
 
-    :root{
-      /* altura do rodapé de texto dentro do slot */
-      --label-h: clamp(24px, 3.5vh, 40px);
-      /* margem interna do slot para casar com a arte do vagão (ajuste fino) */
-      --slotInset: clamp(4px, 1.2vw, 16px);
-    }
+  :root{
+    /* altura fixa do rótulo + margem da janela do vagão (ajuste fino) */
+    --labelH: clamp(22px,3.4vh,36px);
+    --windowInset: clamp(6px,1.2vw,16px);
+  }
 
-    #rotate-overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,.85); color:#fff;
-      display:none; justify-content:center; align-items:center; text-align:center; padding:1rem; z-index:3000;
-    }
-    #rotate-overlay p{ font-size:1.3rem; line-height:1.5; }
+  #game-container{position:relative;width:100%;height:100%;overflow:hidden}
 
-    #game-container{ position:relative; width:100%; height:100%; overflow:hidden; }
+  /* Trem “pista” mínima só para posicionar a faixa de vagões */
+  #train{
+    position:absolute;left:0;bottom:0;width:100%;
+    height:24vh; /* faixa ocupada pelos vagões */
+    display:grid;
+    grid-template-columns: repeat(var(--num-wagons),1fr);
+    align-items:end;
+    gap: clamp(6px,1vw,14px);
+    padding: 0 clamp(10px,2vw,24px) clamp(8px,1.2vw,18px);
+    z-index:100;
+  }
 
-    /* ===== Trem como IMAGEM DE FUNDO ===== */
-    #train{
-      position:absolute; left:0; bottom:0;
-      width:100%; height: 26vh;                /* um pouco mais alto p/ arte */
-      background: url('../../../imagens/train.png') no-repeat center bottom;
-      background-size: contain;                /* trem se ajusta à largura */
-      z-index:100;
-      display:grid;                            /* grid para posicionar os slots */
-      grid-template-columns: repeat(var(--num-wagons), 1fr);
-      align-items: end;                        /* slots encostam no “chão” do vagão */
-      gap: 0;                                  /* sem lacunas entre colunas */
-      padding: 0 clamp(10px, 2vw, 24px);       /* lateral caso a arte tenha margens */
-    }
+  /* Cada vagão é um SLOT com fundo wagon.png (interior transparente) */
+  .wagon{
+    position:relative;
+    height: 86%;                 /* altura do vagão dentro da faixa */
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-end;
+    background: url('wagon.png') no-repeat center/contain;
+    /* cria uma “janela” interna onde colocamos a imagem e o texto */
+    padding:
+      calc(var(--windowInset))            /* topo */
+      calc(var(--windowInset))            /* direita */
+      calc(var(--windowInset) + var(--labelH))  /* base: reserva para o rótulo */
+      calc(var(--windowInset));           /* esquerda */
+  }
 
-    /* ===== Slot do VAGÃO (área de drop) ===== */
-    .wagon{
-      position:relative;
-      height: 70%;                             /* altura do slot dentro do vagão */
-      margin: 0 var(--slotInset) calc(var(--slotInset) + 6px);  /* casando com janelas */
-      padding: var(--slotInset) var(--slotInset) var(--label-h);
-      display:flex; align-items:center; justify-content:center;
-      overflow:hidden; z-index:101;
+  /* Área da imagem dentro da janela do vagão */
+  .slot-img{
+    position:absolute;
+    top: var(--windowInset);
+    left: var(--windowInset);
+    right: var(--windowInset);
+    bottom: calc(var(--windowInset) + var(--labelH));
+    display:flex; align-items:center; justify-content:center;
+    overflow:hidden;
+  }
+  .slot-img img.paired{
+    max-width:100%; max-height:100%;
+    width:auto; height:auto; object-fit:contain; display:block; pointer-events:none;
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,.12));
+  }
 
-      /* estética sutil para feedback visual (quase invisível) */
-      outline: 2px dashed rgba(255,255,255,0.0);  /* deixe 0.15 se quiser ver os slots */
-      outline-offset: -4px;
-      border-radius: 10px;
-      backdrop-filter: blur(0px);
-    }
+  /* Rótulo SEMPRE visível na base da janela */
+  .word{
+    position:absolute; left: var(--windowInset); right: var(--windowInset);
+    bottom: var(--windowInset);
+    height: calc(var(--labelH) - 6px);
+    display:flex; align-items:center; justify-content:center;
+    text-transform:uppercase; text-align:center; font-weight:700;
+    color:#1f2d3a; font-size: clamp(12px, calc((100vw / var(--num-wagons))*0.18), 22px);
+    background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.85));
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 8px; box-shadow:0 2px 6px rgba(0,0,0,.08);
+    pointer-events:none;
+  }
 
-    /* Imagem correta dentro do slot */
-    .wagon img.paired{
-      max-height: calc(100% - var(--label-h) - var(--slotInset));
-      max-width: calc(100% - 2*var(--slotInset));
-      height:auto; width:auto; object-fit:contain; display:block; pointer-events:none;
-      filter: drop-shadow(0 2px 2px rgba(0,0,0,.15));
-    }
+  .wagon.correct{animation:glow .8s ease-out forwards}
+  @keyframes glow{
+    0%{box-shadow:0 0 6px rgba(46,204,113,.35) inset}
+    50%{box-shadow:0 0 18px rgba(46,204,113,.65) inset}
+    100%{box-shadow:0 0 6px rgba(46,204,113,.35) inset}
+  }
 
-    /* Faixa de texto SEMPRE visível na base do slot */
-    .wagon .word{
-      position:absolute; left:var(--slotInset); right:var(--slotInset); bottom: var(--slotInset);
-      height: calc(var(--label-h) - 6px);
-      display:flex; align-items:center; justify-content:center;
-      padding: 3px 6px;
-      text-align:center; text-transform:uppercase;
-      color:#1f2d3a; font-weight:700;
-      font-size: clamp(12px, calc((100vw / var(--num-wagons)) * 0.18), 22px);
-      background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.85));
-      border: 1px solid rgba(0,0,0,0.06);
-      border-radius: 8px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-      pointer-events:none;
-    }
+  /* Balões */
+  .balloon{
+    position:absolute; width:clamp(50px,10vw,100px); height:clamp(60px,12vw,120px);
+    background:url('balloon.png') no-repeat center/contain; cursor:pointer; z-index:200; transition:transform .2s ease;
+  }
+  .balloon:hover{transform:scale(1.1)}
+  .balloon img{
+    position:absolute; top:calc(90% + 0px); left:50%; transform:translateX(-50%);
+    width:clamp(40px,8vw,80px); height:clamp(40px,8vw,80px); object-fit:contain; pointer-events:none; z-index:201;
+  }
 
-    .wagon.correct{ animation: glow .8s ease-out forwards; }
-    @keyframes glow{
-      0% { box-shadow:0 0 6px rgba(46,204,113,.35) inset, 0 0 0 rgba(0,0,0,0) }
-      50%{ box-shadow:0 0 18px rgba(46,204,113,.65) inset, 0 0 10px rgba(46,204,113,.4) }
-      100%{box-shadow:0 0 6px rgba(46,204,113,.35) inset, 0 0 0 rgba(0,0,0,0)}
-    }
+  /* Feedback / Restart */
+  #feedback{position:absolute;top:45%;left:50%;transform:translate(-50%,-50%);background:rgba(231,76,60,.9);color:#fff;padding:15px 25px;border-radius:8px;font-size:1.2em;display:none;z-index:250}
+  #restart-button{position:absolute;top:10px;right:10px;padding:6px 12px;background:#2980b9;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:.9em;z-index:260;box-shadow:0 4px 8px rgba(0,0,0,.2)}
+  #restart-button:hover{background:#1c5980}
 
-    /* ===== Balões ===== */
-    .balloon{
-      position:absolute;
-      width: clamp(50px, 10vw, 100px);
-      height: clamp(60px, 12vw, 120px);
-      background:url('balloon.png') no-repeat center/contain;
-      cursor:pointer; transition:transform .2s ease; z-index:200;
-    }
-    .balloon:hover{ transform:scale(1.1); }
-    .balloon img{
-      position:absolute; top:calc(90% + 0px); left:50%; transform:translateX(-50%);
-      width: clamp(40px, 8vw, 80px); height: clamp(40px, 8vw, 80px);
-      object-fit:contain; pointer-events:none; z-index:201;
-    }
+  .falling{position:absolute;width:clamp(40px,8vw,80px);height:clamp(40px,8vw,80px);object-fit:contain;pointer-events:none;z-index:150}
 
-    /* ===== Feedback erro ===== */
-    #feedback{
-      position:absolute; top:45%; left:50%; transform:translate(-50%,-50%);
-      background:rgba(231,76,60,.9); color:#fff; padding:15px 25px; border-radius:8px; font-size:1.2em;
-      display:none; z-index:250;
-    }
-
-    /* ===== Botão Restart ===== */
-    #restart-button{
-      position:absolute; top:10px; right:10px; padding:6px 12px;
-      background:#2980b9; color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:.9em; z-index:260;
-      box-shadow:0 4px 8px rgba(0,0,0,.2); transition:background-color .3s ease;
-    }
-    #restart-button:hover{ background:#1c5980; }
-
-    /* ===== Imagens em queda ===== */
-    .falling{
-      position:absolute; width: clamp(40px, 8vw, 80px); height: clamp(40px, 8vw, 80px);
-      object-fit:contain; pointer-events:none; z-index:150;
-    }
-  </style>
+  /* Overlay de rotação (mantido) */
+  #rotate-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);color:#fff;display:none;justify-content:center;align-items:center;text-align:center;padding:1rem;z-index:3000}
+  #rotate-overlay p{font-size:1.3rem;line-height:1.5}
+</style>
 </head>
 <body>
   <div id="rotate-overlay"><p>Please rotate your device to Landscape mode to play.</p></div>
@@ -133,8 +110,6 @@
   <div id="game-container">
     <button id="restart-button" onclick="restartGame()">Restart</button>
     <div id="feedback">Try Again!</div>
-
-    <!-- O trem é a IMAGEM de fundo; os slots (vagões) são as colunas do grid -->
     <div id="train"></div>
   </div>
 
@@ -144,241 +119,143 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
   <script>
-    /* ===== Firebase ===== */
-    const firebaseConfig = {
-      apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
-      authDomain: "hannahenglishcourse.firebaseapp.com",
-      databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "hannahenglishcourse",
-      storageBucket: "hannahenglishcourse.appspot.com",
-      messagingSenderId: "449818788486",
-      appId: "1:449818788486:web:8a49d3f68591e6fb3f0707"
-    };
-    firebase.initializeApp(firebaseConfig);
+    /* Firebase */
+    const firebaseConfig={apiKey:"AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",authDomain:"hannahenglishcourse.firebaseapp.com",databaseURL:"https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",projectId:"hannahenglishcourse",storageBucket:"hannahenglishcourse.appspot.com",messagingSenderId:"449818788486",appId:"1:449818788486:web:8a49d3f68591e6fb3f0707"};firebase.initializeApp(firebaseConfig);
 
-    /* ===== DOM refs ===== */
-    const gameContainer = document.getElementById('game-container');
-    const trainElement  = document.getElementById('train');
-    const feedbackEl    = document.getElementById('feedback');
-    const overlay       = document.getElementById('rotate-overlay');
-
+    const gameContainer=document.getElementById('game-container');
+    const train=document.getElementById('train');
+    const feedback=document.getElementById('feedback');
     let wordsList=[], imagesList=[], numWagons=0, correctCount=0;
-    const balloonsArray=[];
+    const balloons=[];
 
-    function tryLockLandscape(){
-      const isStandalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-      if(!isStandalone) return;
-      function lockNow(){ if(screen.orientation?.lock) screen.orientation.lock('landscape').catch(()=>{}); }
-      const rfs = document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen;
-      (document.fullscreenElement || document.webkitFullscreenElement) ? lockNow()
-        : rfs ? rfs.call(document.documentElement).then(lockNow).catch(lockNow) : lockNow();
-    }
-    tryLockLandscape();
+    function checkOrientation(){ const stand=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true; const ov=document.getElementById('rotate-overlay'); if(stand&&screen.orientation?.type){ov.style.display=screen.orientation.type.startsWith('portrait')?'flex':'none';return} ov.style.display=(innerHeight>innerWidth)?'flex':'none'}
+    addEventListener('resize',()=>{checkOrientation();});
+    addEventListener('orientationchange',()=>{checkOrientation();});
+    addEventListener('load',()=>{checkOrientation(); loadCardsData(init);});
 
-    function checkOrientation(){
-      const isStandalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-      if(isStandalone && screen.orientation?.type){
-        overlay.style.display = screen.orientation.type.startsWith('portrait') ? 'flex' : 'none'; return;
-      }
-      overlay.style.display = (innerHeight > innerWidth) ? 'flex' : 'none';
-    }
-    addEventListener('resize', ()=>{ checkOrientation(); resizeTrain(); });
-    addEventListener('orientationchange', ()=>{ checkOrientation(); resizeTrain(); });
-    addEventListener('load', ()=>{ checkOrientation(); loadCardsData(initWordDropGame); });
+    function getParams(){ const p=new URLSearchParams(location.search); return {level:p.get('level'), unit:p.get('unit'), fase:p.get('fase')}; }
+    function preload(src){return new Promise((res,rej)=>{const im=new Image();im.onload=res;im.onerror=rej;im.src=src;});}
 
-    function getParamsFromURL(){ const p=new URLSearchParams(location.search); return { level:p.get('level'), unit:p.get('unit'), fase:p.get('fase') }; }
-
-    function preload(src){ return new Promise((res,rej)=>{ const im=new Image(); im.onload=res; im.onerror=rej; im.src=src; }); }
-
-    function loadCardsData(callback){
-      const {level,unit}=getParamsFromURL();
-      if(!level||!unit){ console.error("Parâmetros 'level' e 'unit' são obrigatórios na URL."); return; }
-
+    function loadCardsData(cb){
+      const {level,unit}=getParams(); if(!level||!unit){console.error("Parâmetros 'level' e 'unit' são obrigatórios na URL."); return;}
       const wordsPath=`../../${level}/${unit}/data1/words.txt`;
       const imagePathTemplate=`../../${level}/${unit}/data1/imagens/imagem`;
-
-      fetch(wordsPath)
-        .then(r=>{ if(!r.ok) throw new Error(`Erro ao carregar ${wordsPath}`); return r.text(); })
-        .then(text=>{
-          wordsList = text.split('\n').map(w=>w.trim()).filter(Boolean);
-          numWagons = wordsList.length;
-          imagesList = wordsList.map((word,i)=>({ src:`${imagePathTemplate}${i+1}.png`, pair:`pair${i+1}`, word }));
-          // fundo do trem + balão + pares
-          return Promise.all([
-            preload('../../../imagens/train.png'),
-            preload('balloon.png'),
-            ...imagesList.map(x=>preload(x.src))
-          ]);
-        })
-        .then(()=>callback())
-        .catch(err=>console.error('Erro ao carregar dados/imagens:', err));
+      fetch(wordsPath).then(r=>{if(!r.ok)throw new Error('Erro ao carregar '+wordsPath);return r.text();})
+      .then(t=>{
+        wordsList=t.split('\n').map(s=>s.trim()).filter(Boolean);
+        numWagons=wordsList.length;
+        imagesList=wordsList.map((w,i)=>({src:`${imagePathTemplate}${i+1}.png`,pair:`pair${i+1}`,word:w}));
+        return Promise.all([preload('wagon.png'), preload('balloon.png'), ...imagesList.map(x=>preload(x.src))]);
+      })
+      .then(()=>cb())
+      .catch(e=>console.error(e));
     }
 
-    function initWordDropGame(){
-      correctCount=0; trainElement.innerHTML=''; removeAllBalloons(); balloonsArray.length=0;
-      trainElement.style.setProperty('--num-wagons', numWagons);
+    function init(){
+      correctCount=0; train.innerHTML=''; balloons.length=0;
+      train.style.setProperty('--num-wagons', numWagons);
 
-      // cria os SLOTS (um por coluna do grid)
-      for(let i=0;i<numWagons;i++){
-        const slot=document.createElement('div');
-        slot.className='wagon';
-        slot.dataset.pair=`pair${i+1}`;
+      // cria slots (vagões independentes)
+      wordsList.forEach((word,i)=>{
+        const slot=document.createElement('div'); slot.className='wagon'; slot.dataset.pair=`pair${i+1}`;
 
-        const wordDiv=document.createElement('div');
-        wordDiv.className='word';
-        wordDiv.textContent=wordsList[i];
+        const imgBox=document.createElement('div'); imgBox.className='slot-img';
+        const label=document.createElement('div'); label.className='word'; label.textContent=word;
 
-        slot.appendChild(wordDiv);
-        trainElement.appendChild(slot);
-      }
+        slot.appendChild(imgBox); slot.appendChild(label); train.appendChild(slot);
+      });
 
-      resizeTrain();
+      // cria balões
       imagesList.forEach(obj=>createBalloon(obj));
       requestAnimationFrame(animateBalloons);
     }
 
-    function resizeTrain(){
-      trainElement.style.height = (innerHeight*0.26) + 'px';   // casa a altura com a arte
+    function createBalloon(obj){
+      const b=document.createElement('div'); b.className='balloon'; b.dataset.pair=obj.pair; gameContainer.appendChild(b);
+      const r=b.getBoundingClientRect(); const w=r.width; const top=innerHeight*0.05; const x=Math.floor(Math.random()*(innerWidth-w-20))+10;
+      b.style.top=top+'px'; b.style.left=x+'px';
+      const img=document.createElement('img'); img.src=obj.src; b.appendChild(img);
+      b.addEventListener('click',()=>popBalloon(b,obj));
+      b._float={speedX:rand(0.03,0.07), dir:Math.random()<0.5?-1:1, amp:rand(10,30), freq:rand(0.002,0.005), phase:Math.random()*Math.PI*2, base:top, w:w, last:null};
+      balloons.push(b);
+    }
+    function rand(a,b){return a+Math.random()*(b-a);}
+
+    function popBalloon(b,obj){
+      const s=b.getBoundingClientRect(); b.remove();
+      const idx=balloons.indexOf(b); if(idx!==-1) balloons.splice(idx,1);
+      const f=document.createElement('img'); f.src=obj.src; f.className='falling'; gameContainer.appendChild(f);
+      const r=f.getBoundingClientRect(); f.style.left=(s.left+(s.width-r.width)/2)+'px'; f.style.top=s.top+'px'; f.dataset.pair=obj.pair;
+      animateFall(f);
     }
 
-    function removeAllBalloons(){ gameContainer.querySelectorAll('.balloon').forEach(b=>b.remove()); }
-    function getRandomBetween(min,max){ return min + Math.random()*(max-min); }
-
-    function createBalloon(imgObj){
-      const balloon=document.createElement('div');
-      balloon.className='balloon';
-      balloon.dataset.pair=imgObj.pair;
-      gameContainer.appendChild(balloon);
-
-      const r=balloon.getBoundingClientRect();
-      const w=r.width, top=innerHeight*0.05;
-      const x=Math.floor(Math.random()*(innerWidth - w - 20)) + 10;
-      balloon.style.top=top+'px'; balloon.style.left=x+'px';
-
-      const tag=document.createElement('img');
-      tag.src=imgObj.src; balloon.appendChild(tag);
-
-      balloon.addEventListener('click', ()=>popBalloon(balloon, imgObj));
-
-      balloon._floatProps={
-        speedX:getRandomBetween(0.03,0.07),
-        direction: Math.random()<0.5 ? -1 : 1,
-        amplitudeY:getRandomBetween(10,30),
-        frequencyY:getRandomBetween(0.002,0.005),
-        phaseY: Math.random()*2*Math.PI,
-        topBase:top, width:w, lastTimestamp:null
-      };
-      balloonsArray.push(balloon);
-    }
-
-    function popBalloon(balloonElem,imgObj){
-      const start=balloonElem.getBoundingClientRect();
-      balloonElem.remove();
-      const idx=balloonsArray.indexOf(balloonElem);
-      if(idx!==-1) balloonsArray.splice(idx,1);
-
-      const falling=document.createElement('img');
-      falling.src=imgObj.src; falling.className='falling'; gameContainer.appendChild(falling);
-
-      const r=falling.getBoundingClientRect();
-      falling.style.left=(start.left + (start.width - r.width)/2) + 'px';
-      falling.style.top = start.top + 'px';
-      falling.dataset.pair=imgObj.pair;
-      requestAnimationFrame(ts=>animateFall(falling, ts));
-    }
-
-    function animateFall(img, ts0){
-      const SPEED = Math.max(250, innerHeight*0.45);
-      let lastTs=ts0;
+    function animateFall(el){
+      const SPEED=Math.max(250,innerHeight*0.45); let last=null;
       function step(ts){
-        const dt=(ts-lastTs)/1000; lastTs=ts;
-        const top=parseFloat(img.style.top)||0;
-        img.style.top=(top + SPEED*dt)+'px';
-
-        const trainRect=trainElement.getBoundingClientRect();
-        const imgRect=img.getBoundingClientRect();
-
-        if(imgRect.bottom >= trainRect.top){
-          // identifica em qual coluna (slot) caiu pelo centro X
-          const centerX = imgRect.left + imgRect.width/2;
-          const slots = [...trainElement.querySelectorAll('.wagon')];
-          const landed = slots.find(s=>{ const r=s.getBoundingClientRect(); return centerX>=r.left && centerX<=r.right; });
-
-          if(landed){
-            if(landed.dataset.pair===img.dataset.pair) handleCorrectDrop(landed,img);
-            else handleWrongDrop(img);
-          } else handleWrongDrop(img);
+        if(last==null) last=ts; const dt=(ts-last)/1000; last=ts;
+        el.style.top=(parseFloat(el.style.top||'0')+SPEED*dt)+'px';
+        const trainRect=train.getBoundingClientRect(); const ir=el.getBoundingClientRect();
+        if(ir.bottom>=trainRect.top){
+          const cx=ir.left+ir.width/2; const slots=[...train.querySelectorAll('.wagon')];
+          const landed=slots.find(s=>{const r=s.getBoundingClientRect(); return cx>=r.left && cx<=r.right;});
+          if(landed){ landed.dataset.pair===el.dataset.pair ? correctDrop(landed,el) : wrongDrop(el); }
+          else wrongDrop(el);
           return;
         }
-        if(imgRect.top > innerHeight){ handleWrongDrop(img); return; }
+        if(ir.top>innerHeight){ wrongDrop(el); return; }
         requestAnimationFrame(step);
       }
       requestAnimationFrame(step);
     }
 
-    function handleCorrectDrop(slot, imgFalling){
-      imgFalling.remove();
-      const paired=document.createElement('img');
-      paired.src=imgFalling.src; paired.className='paired';
-
-      const wordDiv=slot.querySelector('.word');
-      if(wordDiv) slot.insertBefore(paired, wordDiv); else slot.appendChild(paired);
-
+    function correctDrop(slot, fallingImg){
+      fallingImg.remove();
+      const box=slot.querySelector('.slot-img');
+      const paired=document.createElement('img'); paired.src=fallingImg.src; paired.className='paired';
+      box.innerHTML=''; box.appendChild(paired);
       slot.classList.add('correct');
-      if(++correctCount===numWagons){ alert("Congratulations! You completed this phase."); updateNextPhaseAuth(); }
+      if(++correctCount===numWagons){ alert('Congratulations! You completed this phase.'); updateNextPhaseAuth(); }
     }
 
     let fbTimer=null;
-    function showFeedback(){ feedbackEl.style.display='block'; clearTimeout(fbTimer); fbTimer=setTimeout(()=>{ feedbackEl.style.display='none'; }, 800); }
-    function handleWrongDrop(img){ showFeedback(); const p=img.dataset.pair; img.remove(); const obj=imagesList.find(o=>o.pair===p); if(obj) createBalloon(obj); }
+    function showFeedback(){ feedback.style.display='block'; clearTimeout(fbTimer); fbTimer=setTimeout(()=>feedback.style.display='none',800); }
+    function wrongDrop(el){ showFeedback(); const p=el.dataset.pair; el.remove(); const obj=imagesList.find(x=>x.pair===p); if(obj) createBalloon(obj); }
 
+    /* ====== progresso (igual antes, simplificado) ====== */
     function updateNextPhaseAuth(){
-      const user=firebase.auth().currentUser;
-      if(user){ updateNextPhase(user.uid); return; }
-      const unsub=firebase.auth().onAuthStateChanged(u=>{ if(u) updateNextPhase(u.uid); unsub&&unsub(); });
+      const u=firebase.auth().currentUser;
+      if(u){ updateNextPhase(u.uid); return; }
+      const unsub=firebase.auth().onAuthStateChanged(x=>{ if(x) updateNextPhase(x.uid); unsub&&unsub(); });
     }
-    async function updateNextPhase(userId){
-      const params=new URLSearchParams(location.search);
-      const fase=params.get('fase'); const level=params.get('level'); const unit=params.get('unit');
-      const dbRef=firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+    async function updateNextPhase(uid){
+      const q=new URLSearchParams(location.search); const fase=q.get('fase'); const level=q.get('level'); const unit=q.get('unit');
+      const db=firebase.database().ref(`usuarios/${uid}/progresso/${level}/${unit}`);
       try{
         if(fase==="last"){
           const nextUnit=`Unit${parseInt(unit.replace('Unit',''))+1}`;
-          await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({fase1:true});
+          await firebase.database().ref(`usuarios/${uid}/progresso/${level}/${nextUnit}`).set({fase1:true});
         }else if(fase==="end"){
           const nextLevel=`Level${parseInt(level.replace('Level',''))+1}`;
-          await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({fase1:true});
+          await firebase.database().ref(`usuarios/${uid}/progresso/${nextLevel}/Unit1`).set({fase1:true});
         }else{
-          const nextPhase=parseInt(fase)+1;
-          await dbRef.update({[`fase${fase}`]:true, [`fase${nextPhase}`]:true});
+          const next=parseInt(fase)+1;
+          await db.update({[`fase${fase}`]:true,[`fase${next}`]:true});
         }
-      }catch(e){ console.error('Error updating next phase:', e); }
-    }
-
-    function restartGame(){
-      correctCount=0;
-      removeAllBalloons(); balloonsArray.length=0;
-      gameContainer.querySelectorAll('.falling').forEach(i=>i.remove());
-      trainElement.querySelectorAll('img.paired').forEach(i=>i.remove());
-      trainElement.querySelectorAll('.wagon').forEach(w=>w.classList.remove('correct'));
-      initWordDropGame();
+      }catch(e){console.error(e);}
     }
 
     function animateBalloons(ts){
-      for(const b of balloonsArray){
-        const p=b._floatProps; if(!p.lastTimestamp) p.lastTimestamp=ts;
-        const delta=ts - p.lastTimestamp; p.lastTimestamp=ts;
-
-        let left=parseFloat(b.style.left);
-        left += p.speedX * p.direction * delta;
-        if(left > innerWidth) left = -p.width;
-        if(left < -p.width) left = innerWidth;
-
-        const top = p.topBase + p.amplitudeY * Math.sin(p.phaseY + p.frequencyY * ts);
+      for(const b of balloons){
+        const p=b._float; if(!p.last) p.last=ts; const d=ts-p.last; p.last=ts;
+        let left=parseFloat(b.style.left); left += p.speedX*p.dir*d;
+        if(left>innerWidth) left=-p.w; if(left<-p.w) left=innerWidth;
+        const top=p.base + p.amp*Math.sin(p.phase + p.freq*ts);
         b.style.left=left+'px'; b.style.top=top+'px';
       }
       requestAnimationFrame(animateBalloons);
     }
+
+    function restartGame(){ correctCount=0; gameContainer.querySelectorAll('.falling').forEach(i=>i.remove()); train.querySelectorAll('.slot-img').forEach(b=>b.innerHTML=''); train.querySelectorAll('.wagon').forEach(w=>w.classList.remove('correct')); }
   </script>
 </body>
 </html>
