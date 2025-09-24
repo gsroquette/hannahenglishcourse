@@ -6,7 +6,7 @@
 <title>Word Drop Express</title>
 <link rel="manifest" href="manifest.json">
 <style>
-  /* ===== Globais ===== */
+  /* ===== Base ===== */
   *{margin:0;padding:0;box-sizing:border-box}
   html,body{
     width:100vw;height:100vh;
@@ -14,47 +14,42 @@
     font-family:"Times New Roman",Times,serif;
   }
   html,body,#game-container{-webkit-user-select:none;user-select:none;touch-action:manipulation}
+  #game-container{position:relative;width:100%;height:100%;overflow:hidden}
 
   /* =================== CONTROLES RÁPIDOS ===================
-     - --wagonScale        => tamanho do PNG do vagão (moldura)
-     - --pairedImgScale    => tamanho da imagem que cai (dentro do vagão)
-     - --imgSafePad        => margem de segurança da imagem interna
-     - --liftVH            => sobe/baixa o vagão dentro da faixa
-     - --wheelPadVH        => distância do texto às rodas (menor = texto mais baixo)
+     - --wagonScale       => tamanho do PNG do vagão (moldura)
+     - --pairedImgScale   => tamanho da imagem que cai (dentro do vagão)
+     - --imgSafePad       => margem de segurança da imagem interna
+     - --liftVH           => sobe/baixa o vagão dentro da faixa
+     - --wheelPadVH       => espaço acima das rodas (para a janela)
+     - --labelBelowVH     => quão abaixo das rodas vai o rótulo (texto)
      - --trainH / --wagonFactor => altura total da faixa e do slot
-     ======================================================== */
+  ========================================================== */
   :root{
-    /* Altura da FAIXA onde ficam os vagões (em vh numérico) */
-    --trainH: 44;
+    --trainH: 44;                 /* altura da faixa do trem (vh) */
+    --wagonFactor: 0.86;          /* altura do slot relativa à faixa */
+    --wagonScale: 1.12;           /* escala do PNG do vagão (moldura) */
+    --liftVH: 3.2;                /* quanto o vagão sobe dentro da faixa */
 
-    /* ESCALA do PNG do vagão (moldura) */
-    --wagonScale: 1.12;                /* ↑ maior */
+    --windowInset: clamp(10px, 1.2vw, 18px); /* margem interna da janela */
+    --wheelPadVH: 2.0;            /* espaço acima das rodas (janela) */
 
-    /* ESCALA da imagem que cai (dentro do vagão) */
-    --pairedImgScale: 0.70;            /* ↓ menor pra não cobrir a moldura */
+    --pairedImgScale: 0.70;       /* imagem dentro do vagão menor */
+    --imgSafePad: clamp(14px, 1.6vw, 22px); /* folga da imagem interna */
 
-    /* Folga extra pra imagem interna não encostar na moldura */
-    --imgSafePad: clamp(14px, 1.6vw, 22px);
+    --labelH: clamp(22px, 3.4vh, 38px); /* altura visual do rótulo */
+    --labelBelowVH: 2.6;          /* rótulo ABAIXO das rodas (vh) */
 
-    /* Slot e posicionamento */
-    --wagonFactor: 0.86;               /* ↓ slot mais baixo = alinha com a moldura */
-    --liftVH: 3.2;                     /* ↑ sobe o vagão dentro da faixa */
-    --labelH: clamp(22px, 3.4vh, 38px);/* altura do rótulo (texto) */
-    --windowInset: clamp(10px, 1.2vw, 18px); /* margem da janela do vagão */
-    --wheelPadVH: 2.0;                 /* TEXTO MAIS BAIXO (perto das rodas) */
-
-    /* Espaçamentos laterais/entre colunas */
     --colGap: clamp(10px, 1.4vw, 20px);
     --sidePad: clamp(12px, 2vw, 26px);
   }
 
+  /* Overlay de orientação */
   #rotate-overlay{
     position:fixed;inset:0;background:rgba(0,0,0,.85);color:#fff;
     display:none;justify-content:center;align-items:center;text-align:center;padding:1rem;z-index:3000
   }
   #rotate-overlay p{font-size:1.3rem;line-height:1.5}
-
-  #game-container{position:relative;width:100%;height:100%;overflow:hidden}
 
   /* ===== Faixa do trem (grid dos slots) ===== */
   #train{
@@ -64,62 +59,59 @@
     grid-template-columns: repeat(var(--num-wagons), 1fr);
     align-items:end;
     gap: var(--colGap);
-    padding: 0 var(--sidePad) clamp(10px,1.4vw,20px);
+    /* padding-bottom inclui espaço pro rótulo que fica FORA do vagão */
+    padding: 0 var(--sidePad) calc(clamp(10px,1.4vw,20px) + var(--labelBelowVH) * 1vh + 6px);
     z-index:100;
   }
 
-  /* ===== Cada vagão (slot) =====
-     Moldura do vagão é o background. A “janela” (slot-img) alinha com a moldura. */
+  /* ===== Cada vagão (slot) ===== */
   .wagon{
     position:relative;
     height: calc(var(--trainH) * var(--wagonFactor) * 1vh);
-
-    /* VAGÃO IMAGEM (moldura) — tamanho controlado por --wagonScale */
+    /* Moldura do vagão (wagon.png) */
     background-image: url('wagon.png');
     background-repeat: no-repeat;
     background-position: center bottom;
     background-size: calc(100% * var(--wagonScale)) auto;
 
-    /* Janela útil do vagão:
-       topo/lados: windowInset
-       base: windowInset + labelH + wheelPad (rodas)  */
+    /* Janela útil do vagão (SEM reservar espaço pro rótulo) */
     padding:
       var(--windowInset)
       var(--windowInset)
-      calc(var(--windowInset) + var(--labelH) + (var(--wheelPadVH) * 1vh))
+      calc(var(--windowInset) + (var(--wheelPadVH) * 1vh))
       var(--windowInset);
 
-    /* Sobe o vagão para dar respiro do “chão” */
     transform: translateY(calc(-1 * var(--liftVH) * 1vh));
+    overflow: visible; /* permite o rótulo “sair” para baixo */
   }
 
-  /* Área da IMAGEM dentro da janela (agora ancorada NO FUNDO do vagão) */
+  /* Área da imagem (ancorada no assoalho do vagão) */
   .slot-img{
     position:absolute;
     top: var(--windowInset);
     left: var(--windowInset);
     right: var(--windowInset);
-    bottom: calc(var(--windowInset) + var(--labelH) + (var(--wheelPadVH) * 1vh));
+    bottom: calc(var(--windowInset) + (var(--wheelPadVH) * 1vh));
     display:flex;
-    align-items:flex-end;   /* <— encosta a imagem no “assoalho” do vagão */
+    align-items:flex-end;   /* encosta a imagem no fundo do vagão */
     justify-content:center;
     overflow:hidden;
   }
   .slot-img img.paired{
-    /* Limites com SAFE PAD + ESCALA da imagem interna */
     max-width:  calc((100% - var(--imgSafePad)*2) * var(--pairedImgScale));
     max-height: calc((100% - var(--imgSafePad)*2) * var(--pairedImgScale));
     width:auto;height:auto;object-fit:contain;display:block;pointer-events:none;
     filter: drop-shadow(0 2px 2px rgba(0,0,0,.12));
   }
 
-  /* Texto sempre visível, BAIXO (perto das rodas) */
+  /* ===== Rótulo ABAIXO das rodas ===== */
   .word{
     position:absolute;
-    left: var(--windowInset);
+    left:  var(--windowInset);
     right: var(--windowInset);
-    bottom: calc(var(--windowInset) + (var(--wheelPadVH) * 1vh) - 2px);
+    bottom: calc(-1 * var(--labelBelowVH) * 1vh); /* fora do vagão */
     height: calc(var(--labelH) - 6px);
+
     display:flex;align-items:center;justify-content:center;
     text-transform:uppercase;text-align:center;font-weight:700;
     color:#1f2d3a;
@@ -128,6 +120,7 @@
     border: 1px solid rgba(0,0,0,0.06);
     border-radius: 10px; box-shadow:0 2px 6px rgba(0,0,0,.08);
     pointer-events:none;
+    z-index: 2;
   }
 
   .wagon.correct{animation:glow .8s ease-out forwards}
@@ -162,7 +155,7 @@
   }
   #restart-button:hover{background:#1c5980}
 
-  /* ===== Imagem durante a QUEDA — MENOR ===== */
+  /* ===== Imagem durante a QUEDA — menor ===== */
   .falling{
     position:absolute;
     width:  clamp(28px, 5.5vw, 52px);
@@ -177,8 +170,6 @@
   <div id="game-container">
     <button id="restart-button" onclick="restartGame()">Restart</button>
     <div id="feedback">Try Again!</div>
-
-    <!-- Os slots (vagões) serão gerados aqui -->
     <div id="train"></div>
   </div>
 
@@ -189,7 +180,15 @@
 
   <script>
     /* ===== Firebase ===== */
-    const firebaseConfig={apiKey:"AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",authDomain:"hannahenglishcourse.firebaseapp.com",databaseURL:"https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",projectId:"hannahenglishcourse",storageBucket:"hannahenglishcourse.appspot.com",messagingSenderId:"449818788486",appId:"1:449818788486:web:8a49d3f68591e6fb3f0707"};
+    const firebaseConfig={
+      apiKey:"AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+      authDomain:"hannahenglishcourse.firebaseapp.com",
+      databaseURL:"https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId:"hannahenglishcourse",
+      storageBucket:"hannahenglishcourse.appspot.com",
+      messagingSenderId:"449818788486",
+      appId:"1:449818788486:web:8a49d3f68591e6fb3f0707"
+    };
     firebase.initializeApp(firebaseConfig);
 
     const gameContainer=document.getElementById('game-container');
@@ -200,7 +199,7 @@
     let wordsList=[], imagesList=[], numWagons=0, correctCount=0;
     const balloons=[];
 
-    /* ===== Orientation overlay ===== */
+    /* ===== Orientação ===== */
     function checkOrientation(){
       const stand=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
       if(stand && screen.orientation?.type){
@@ -217,9 +216,10 @@
     function preload(src){ return new Promise((res,rej)=>{ const im=new Image(); im.onload=res; im.onerror=rej; im.src=src; }); }
     function rand(a,b){ return a + Math.random()*(b-a); }
 
-    /* ===== Data load ===== */
+    /* ===== Carrega dados ===== */
     function loadCardsData(cb){
-      const {level,unit}=getParams(); if(!level||!unit){console.error("Parâmetros 'level' e 'unit' são obrigatórios na URL."); return;}
+      const {level,unit}=getParams();
+      if(!level||!unit){console.error("Parâmetros 'level' e 'unit' são obrigatórios na URL."); return;}
       const wordsPath=`../../${level}/${unit}/data1/words.txt`;
       const imagePathTemplate=`../../${level}/${unit}/data1/imagens/imagem`;
 
@@ -234,7 +234,7 @@
         .catch(e=>console.error(e));
     }
 
-    /* ===== Init ===== */
+    /* ===== Inicia jogo ===== */
     function init(){
       correctCount=0; train.innerHTML=''; balloons.length=0;
       train.style.setProperty('--num-wagons', numWagons);
@@ -242,16 +242,12 @@
       // cria slots (vagões)
       wordsList.forEach((word,i)=>{
         const slot=document.createElement('div'); slot.className='wagon'; slot.dataset.pair=`pair${i+1}`;
-
         const imgBox=document.createElement('div'); imgBox.className='slot-img';
         const label=document.createElement('div'); label.className='word'; label.textContent=word;
-
-        slot.appendChild(imgBox);
-        slot.appendChild(label);
-        train.appendChild(slot);
+        slot.appendChild(imgBox); slot.appendChild(label); train.appendChild(slot);
       });
 
-      // balões
+      // cria balões
       imagesList.forEach(obj=>createBalloon(obj));
       requestAnimationFrame(animateBalloons);
     }
@@ -339,7 +335,7 @@
       }catch(e){console.error(e);}
     }
 
-    /* ===== Animação dos balões ===== */
+    /* ===== Animação de flutuação dos balões ===== */
     function animateBalloons(ts){
       for(const b of balloons){
         const p=b._float; if(!p.last) p.last=ts;
