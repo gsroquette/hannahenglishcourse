@@ -34,7 +34,7 @@ function getActivitiesByTrecho(trecho, level, unit) {
             ];
         case "trecho5":
             return [
-                { id: 19, name: "GrammarDialogo", path: `/Atividades/GrammarDialogo/index.html?level=${level}&unit=${unit}&fase=19`, img: "../../imagens/botoes/conversation_button.png", unlocked: false },
+                { id: 19, name: "GrammarStarterDialogo", path: `/Atividades/GrammarStarterDialogo/index.html?level=${level}&unit=${unit}&fase=19`, img: "../../imagens/botoes/conversation_button.png", unlocked: false },
                 { id: 20, name: "QUIZ_IMAGE2", path: `/Atividades/QUIZ_IMAGE2/index.html?level=${level}&unit=${unit}&fase=20`, img: "../../imagens/botoes/quiz_button.png", unlocked: false },
                 { id: 21, name: "Diálogo", path: `/Atividades/Dialogo/index.html?level=${level}&unit=${unit}&fase=21`, img: "../../imagens/botoes/dialogo_button.png", unlocked: false },
             ];
