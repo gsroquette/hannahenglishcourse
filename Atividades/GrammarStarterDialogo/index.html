@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Indefinite Articles - The Creation Story</title>
+
+<style>
+  /* -------- estilos mantidos (sem coisas de exercícios) -------- */
+  body{
+    font-family:Arial, sans-serif;background:#f4f4f4;margin:0;padding:20px;line-height:1.6;
+    background-image:url('../../../imagens/fundo.png');background-repeat:repeat;
+  }
+  .container{
+    max-width:800px;margin:auto;background:#fff;padding:20px;border-radius:8px;
+    box-shadow:0 0 10px rgba(0,0,0,.1);position:relative;
+  }
+  .back-button{
+    background:#007bff;color:#fff;padding:10px 15px;border-radius:5px;text-decoration:none;font-size:1rem;
+    cursor:pointer;margin-bottom:15px;
+  }
+  .back-button:hover{background:#0056b3;}
+  .page-title{font-size:2rem;font-weight:bold;text-align:center;color:#2c3e50;margin-top:20px;}
+  .subtitle{font-size:1.3rem;font-weight:bold;text-transform:uppercase;text-align:left;margin:10px 0;}
+  h1{text-align:center;color:#333;font-size:2rem;margin-top:70px;}
+  h2{background:#28a745;color:#fff;padding:10px;border-radius:4px;font-size:1.5rem;text-align:center;}
+  .section{background:#d4edda;margin-bottom:20px;padding:20px;border-radius:5px;}
+  .section p{margin:0;padding:10px 0;font-size:1.2rem;}
+  .image-container{display:flex;justify-content:center;margin-bottom:20px;}
+  .image-container img{max-width:100%;height:auto;border-radius:8px;}
+  .button-container{display:flex;justify-content:center;margin-top:20px;flex-wrap:wrap;}
+  .button-container button{background:transparent;border:none;margin:5px;cursor:pointer;}
+  .button-container img{max-width:100px;max-height:100px;border-radius:8px;transition:.3s;}
+  .button-container img:hover{transform:scale(1.1);}
+  .grammar-table{width:100%;border-collapse:collapse;margin:15px 0;}
+  .grammar-table th,.grammar-table td{border:1px solid #ccc;padding:8px;text-align:left;}
+  .grammar-table th{background:#28a745;color:#fff;}
+  .grammar-table td{background:#fff;}
+
+  /* Botões principais */
+  .btn{
+    display:block;width:100%;padding:15px;text-align:center;text-decoration:none;border-radius:5px;
+    cursor:pointer;font-size:1.2rem;border:none;
+  }
+  /* PDF: inicialmente oculto — só professor verá */
+  #btn-pdf{ display:none; background:#218838;color:#fff; margin-top:20px; }
+  #btn-pdf:hover{ background:#1e7e34; }
+
+  /* Finalizar lição */
+  .btn-finish{ background:#343a40;color:#fff; margin-top:12px; }
+  .btn-finish:hover{ background:#23272b; }
+</style>
+</head>
+
+<body style="visibility:hidden">
+<!-- ============ MODAL ============ -->
+<div id="completionModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;
+     background:rgba(0,0,0,.5);z-index:9999;">
+  <div style="background:#fff;padding:20px;border-radius:8px;max-width:420px;margin:100px auto;text-align:center;">
+    <h2>Lesson completed!</h2>
+    <p>Great job — the next phase is now unlocked.</p>
+    <button onclick="closeModal()" style="padding:10px 16px;border:none;border-radius:6px;background:#28a745;color:#fff;cursor:pointer;">OK</button>
+  </div>
+</div>
+
+<!-- ============ CONTEÚDO ============ -->
+<div class="container">
+  <div style="margin-bottom:15px;"><a href="javascript:history.back()" class="back-button">Back</a></div>
+  <h1 id="title"></h1>
+
+  <div class="image-container"><img id="main-image" src="image.png" alt="Example Image"></div>
+
+  <div class="button-container"></div>
+  <div id="content"></div>
+
+  <!-- PDF só para professor -->
+  <button id="btn-pdf" class="btn" onclick="generatePDF()">Download as PDF</button>
+  <!-- Botão de concluir lição (libera próxima fase) -->
+  <button id="finish-lesson-btn" class="btn btn-finish">I’m ready — finish this lesson</button>
+</div>
+
+<!-- ============ SCRIPTS ============ -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- AutoTable p/ tabelas bonitas no PDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<script>
+/* ---------- Firebase ---------- */
+firebase.initializeApp({
+  apiKey:"AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+  authDomain:"hannahenglishcourse.firebaseapp.com",
+  databaseURL:"https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:"hannahenglishcourse",
+  storageBucket:"hannahenglishcourse.appspot.com",
+  messagingSenderId:"449818788486",
+  appId:"1:449818788486:web:8a49d3f68591e6fb3f0707",
+  measurementId:"G-07VVJG9LRS"
+});
+
+/* ---------- Helpers ---------- */
+const qs = new URLSearchParams(location.search);
+const getLevelAndUnitFromURL = () => ({ level: qs.get('level'), unit: qs.get('unit') });
+const getPhaseFromURL = () => qs.get('fase') || '1'; // default fase1
+
+/* ---------- Inicialização ---------- */
+function initializeAppContent(){
+  loadTextFile();
+  setupBackButton();
+  updateImagePath();
+  loadProfessorButtons();
+  setupFinishButton();
+}
+
+/* ---------- Carregar texto e montar HTML (sem exercícios) ---------- */
+function loadTextFile() {
+  const { level, unit } = getLevelAndUnitFromURL();
+  const filePath = `../../${level}/${unit}/DataGrammarDialogo/texto.txt`;
+
+  fetch(filePath)
+    .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); })
+    .then(text => {
+      const content = document.getElementById('content');
+      let html = '';
+      let sectionOpen = false;
+      let inTable = false;
+      let isHeaderRow = true;
+      let skipExercises = false;
+
+      const closeTable = () => {
+        if (inTable) {
+          html += isHeaderRow ? '</table>' : '</tbody></table>';
+          inTable = false;
+          isHeaderRow = true;
+        }
+      };
+
+      const closeSection = () => {
+        closeTable();
+        if (sectionOpen) { html += '</div>'; sectionOpen = false; }
+      };
+
+      text.split('\n').forEach(raw => {
+        if (skipExercises) return;
+        const line = raw.trim();
+        if (!line) return;
+
+        // Título
+        if (line.startsWith('Title: ')) {
+          document.getElementById('title').innerText = line.replace('Title: ', '');
+          document.getElementById('title').classList.add('page-title');
+          return;
+        }
+
+        // Nova seção
+        if (line.startsWith('# ')) {
+          const sectionTitle = line.slice(2).trim();
+          if (/^(exercises?|exerc[íi]cios?|practice)\b/i.test(sectionTitle)) {
+            closeSection(); skipExercises = true; return;
+          }
+          closeSection();
+          html += `<div class="section"><h2>${sectionTitle}</h2>`; sectionOpen = true; return;
+        }
+
+        // Subtítulo
+        if (line.startsWith('## ')) {
+          html += `<h3 class="subtitle">${line.slice(3).toUpperCase()}</h3>`; return;
+        }
+
+        // Imagem inline — renderizada no HTML; no PDF é tratada separadamente
+        if (line.startsWith('#IMG:')) {
+          const img = line.split(':')[1].trim();
+          const base = filePath.substring(0, filePath.lastIndexOf('/'));
+          html += `<img src="${base}/${img}"
+                        onerror="this.onerror=null;this.src='${base}/../${img}'"
+                        alt="${img}"
+                        style="max-width:100%;display:block;margin:20px auto;border-radius:8px;">`;
+          return;
+        }
+
+        // Tabela
+        if (line.toLowerCase() === 'tablestart') {
+          html += '<table class="grammar-table">';
+          inTable = true; isHeaderRow = true; return;
+        }
+        if (line.toLowerCase() === 'tableend') { closeTable(); return; }
+        if (inTable) {
+          const cols = line.split('|').map(c => c.trim());
+          if (isHeaderRow) {
+            html += `<thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>`;
+            isHeaderRow = false;
+          } else {
+            html += `<tr>${cols.map(c => `<td>${c}</td>`).join('')}</tr>`;
+          }
+          return;
+        }
+
+        // Linhas de exercícios — descartar
+        if (/\[Answer:.*?\]/i.test(line)) return;
+
+        // Parágrafos
+        const formatted = line
+          .replace(/\*\*\*(.*?)\*\*\*/g, '<b><i>$1</i></b>')
+          .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+          .replace(/\*(.*?)\*/g, '<i>$1</i>');
+        html += `<p>${formatted}</p>`;
+      });
+
+      closeSection();
+      content.innerHTML = html;
+    })
+    .catch(console.error);
+}
+
+/* ---------- PDF (sem exercícios) com tabelas e imagens ---------- */
+async function toDataURL(url){
+  const res = await fetch(url, { cache: 'no-store' });
+  if(!res.ok) throw new Error(`Falha ao carregar imagem: ${url}`);
+  const blob = await res.blob();
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.readAsDataURL(blob);
+  });
+}
+
+/** Adiciona imagem centralizada; se scaleFactor for informado, aplica (ex.: 0.25 = 1/4 do tamanho). */
+async function addImageFitted(doc, dataURL, margin, cursorY, { center=true, scaleFactor=1 } = {}){
+  const img = new Image();
+  img.src = dataURL;
+  await img.decode();
+
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const maxW  = pageW - margin * 2;
+  const maxH  = pageH - margin * 2;
+
+  let w = img.naturalWidth;
+  let h = img.naturalHeight;
+
+  // encaixe proporcional dentro da área útil
+  const fitScale = Math.min(maxW / w, maxH / h, 1);
+  w *= fitScale * scaleFactor;
+  h *= fitScale * scaleFactor;
+
+  if (cursorY + h > pageH - margin) {
+    doc.addPage();
+    cursorY = margin;
+  }
+
+  const x = center ? (pageW - w)/2 : margin;
+  const format = dataURL.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+  doc.addImage(dataURL, format, x, cursorY, w, h);
+  return cursorY + h + 12;
+}
+
+async function generatePDF(){
+  const { level, unit } = getLevelAndUnitFromURL();
+  const filePath = `../../${level}/${unit}/DataGrammarDialogo/texto.txt`;
+  const baseDir  = filePath.substring(0, filePath.lastIndexOf('/')); // .../DataGrammarDialogo
+
+  const data = await fetch(filePath).then(r => r.text());
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const margin = 40;
+  let cursorY = margin;
+
+  /* ===== Cabeçalho: logo pequeno + texto "Hannah English Course" ao lado ===== */
+  try{
+    const logoURL = 'Logo.png';
+    const logoData = await toDataURL(logoURL);
+
+    // Desenha logo com altura pequena (ex.: 28pt), preservando proporção, alinhado à esquerda
+    const tmpImg = new Image();
+    tmpImg.src = logoData;
+    await tmpImg.decode();
+    const targetH = 28;
+    const ratio = tmpImg.naturalWidth / tmpImg.naturalHeight;
+    const targetW = targetH * ratio;
+
+    const format = logoData.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+    doc.addImage(logoData, format, margin, cursorY, targetW, targetH);
+
+    // Texto ao lado do logo
+    const textX = margin + targetW + 10;
+    const textY = cursorY + targetH * 0.8; // alinhamento visual
+    doc.setFont('helvetica','bold'); doc.setFontSize(16);
+    doc.text('Hannah English Course', textX, textY);
+
+    // avança o cursor para abaixo do cabeçalho
+    cursorY += targetH + 16;
+  }catch(_e){
+    // se não houver logo, apenas escreve o texto no topo
+    doc.setFont('helvetica','bold'); doc.setFontSize(16);
+    doc.text('Hannah English Course', margin, cursorY);
+    cursorY += 28;
+  }
+
+  const addTitle = (txt) => {
+    doc.setFont('helvetica','bold'); doc.setFontSize(18);
+    const lines = doc.splitTextToSize(txt, pageW - 2*margin);
+    lines.forEach(line => { doc.text(line, margin, cursorY); cursorY += 24; });
+    cursorY += 8;
+  };
+
+  const addSection = (txt) => {
+    doc.setFillColor(40,167,69);
+    doc.setTextColor(255,255,255);
+    doc.setFont('helvetica','bold'); doc.setFontSize(14);
+    const h = 26;
+    doc.rect(margin, cursorY - 16, pageW - 2*margin, h, 'F');
+    doc.text(txt, margin + 10, cursorY + 2);
+    cursorY += h + 8;
+    doc.setTextColor(0,0,0);
+  };
+
+  const addParagraph = (txt) => {
+    doc.setFont('helvetica','normal'); doc.setFontSize(12);
+    const lines = doc.splitTextToSize(txt, pageW - 2*margin);
+    for (const line of lines){
+      if (cursorY > pageH - margin){ doc.addPage(); cursorY = margin; }
+      doc.text(line, margin, cursorY); cursorY += 16;
+    }
+    cursorY += 4;
+    if (cursorY > pageH - margin){ doc.addPage(); cursorY = margin; }
+  };
+
+  // Estado de parsing
+  let skipping = false;             // após "Exercises/Exercícios/Practice"
+  let inTable = false;
+  let tableRows = [];
+  let titlePrinted = false;
+
+  const flushTable = () => {
+    if (!inTable || tableRows.length === 0) return;
+    const headers = tableRows[0].map(h => ({ content: h, styles:{ halign:'left', fillColor:[40,167,69], textColor:[255,255,255] } }));
+    const body = tableRows.slice(1).map(r => r.map(c => ({ content: c })));
+    doc.autoTable({
+      head: [headers],
+      body,
+      startY: cursorY,
+      theme: 'grid',
+      styles: { font: 'helvetica', fontSize: 11, cellPadding: 6, lineWidth: 0.1 },
+      headStyles: { fillColor: [40,167,69], textColor: [255,255,255], halign: 'left' },
+      margin: { left: margin, right: margin }
+    });
+    cursorY = doc.lastAutoTable.finalY + 16;
+    inTable = false;
+    tableRows = [];
+  };
+
+  // Imagem principal (da página) deve sair também reduzida (1/4) e centralizada
+  try{
+    const mainImgEl = document.getElementById('main-image');
+    if (mainImgEl && mainImgEl.src) {
+      const mainData = await toDataURL(mainImgEl.src);
+      cursorY = await addImageFitted(doc, mainData, margin, cursorY, { center:true, scaleFactor:0.25 });
+    }
+  }catch(_e){/* se falhar, ignora */}
+
+  // Processar com suporte a imagens do conteúdo
+  const lines = data.split('\n');
+  for (const raw of lines){
+    if (skipping) break;
+    const l = raw.trim();
+    if (!l) continue;
+
+    // pular exercícios
+    if (/^\#\s*(exercises?|exerc[íi]cios?|practice)\b/i.test(l)) { flushTable(); skipping = true; break; }
+    if (/\[Answer:.*?\]/i.test(l)) continue;
+
+    // Título
+    if (l.startsWith('Title: ')) {
+      flushTable();
+      addTitle(l.replace('Title: ', ''));
+      titlePrinted = true;
+      continue;
+    }
+
+    // Seção
+    if (l.startsWith('# ')) {
+      flushTable();
+      addSection(l.slice(2).trim());
+      continue;
+    }
+
+    // Subtítulo
+    if (l.startsWith('## ')) {
+      flushTable();
+      addParagraph(l.slice(3).toUpperCase());
+      continue;
+    }
+
+    // Imagem inline #IMG:arquivo.png|...
+    if (l.startsWith('#IMG:')) {
+      flushTable();
+      const after = l.substring(5).trim();
+      const [imgName] = after.split('|').map(s => s.trim());
+      let url1 = `${baseDir}/${imgName}`;
+      let url2 = `${baseDir}/../${imgName}`;
+      try{
+        const dataURL = await toDataURL(url1).then(x=>x).catch(async ()=> await toDataURL(url2));
+        // imagens do conteúdo: sempre 1/4 do tamanho e centralizadas
+        cursorY = await addImageFitted(doc, dataURL, margin, cursorY, { center:true, scaleFactor:0.25 });
+      }catch(_e){
+        // ignora falha de imagem
+      }
+      continue;
+    }
+
+    // Tabela
+    if (l.toLowerCase() === 'tablestart') { flushTable(); inTable = true; tableRows = []; continue; }
+    if (l.toLowerCase() === 'tableend')   { flushTable(); continue; }
+    if (inTable) {
+      tableRows.push(l.split('|').map(c => c.trim()));
+      continue;
+    }
+
+    // Parágrafo (remove marcações **, *, ***)
+    const t = l.replace(/\*\*\*(.*?)\*\*\*/g, '$1')
+               .replace(/\*\*(.*?)\*\*/g, '$1')
+               .replace(/\*(.*?)\*/g, '$1');
+    addParagraph(t);
+  }
+
+  flushTable();
+
+  // fallback: título genérico se não houve Title:
+  if (!titlePrinted){
+    doc.setFont('helvetica','bold'); doc.setFontSize(16);
+    doc.text('Grammar Lesson', margin, margin);
+  }
+
+  doc.save('grammar_lesson_creation.pdf');
+}
+
+/* ---------- Progresso (acionado pelo botão "finish lesson") ---------- */
+async function updateNextPhase(userId){
+  const phase = getPhaseFromURL();
+  const { level, unit } = getLevelAndUnitFromURL();
+  const dbRoot = firebase.database().ref(`usuarios/${userId}/progresso`);
+
+  try{
+    if(phase === 'last'){
+      const nextUnit = `Unit${parseInt(unit.replace('Unit',''))+1}`;
+      await dbRoot.child(`${level}/${nextUnit}`).set({fase1:true});
+    }else if(phase === 'end'){
+      const nextLevel = `Level${parseInt(level.replace('Level',''))+1}`;
+      await dbRoot.child(`${nextLevel}/Unit1`).set({fase1:true});
+    }else{
+      const nextPhase = `fase${parseInt(phase)+1}`;
+      await dbRoot.child(`${level}/${unit}`).update({[`fase${phase}`]:true,[nextPhase]:true});
+    }
+    console.log('✅ Progresso atualizado.');
+  }catch(e){ console.error('Erro ao atualizar progresso:', e); }
+}
+
+/* ---------- Mostrar PDF só para professor ---------- */
+function revealPdfForTeachersOnly(uid){
+  // Ajuste os caminhos se seu "role" estiver salvo em outro lugar
+  const refs = [
+    firebase.database().ref(`usuarios/${uid}/role`),
+    firebase.database().ref(`usuarios/${uid}/perfil/tipo`)
+  ];
+
+  // Tenta ler na ordem; se qualquer um retornar "teacher"/"professor", exibe
+  Promise.any(refs.map(r => r.get()))
+    .then(ss => {
+      const role = (ss && ss.val && ss.val()) || '';
+      const r = String(role).toLowerCase();
+      if (r === 'teacher' || r === 'professor') {
+        document.getElementById('btn-pdf').style.display = 'block';
+      }
+    })
+    .catch(()=>{/* sem papel => permanece oculto */});
+}
+
+/* ---------- Navegação e outros auxiliares ---------- */
+const setupBackButton = () =>
+  document.querySelector('.back-button').onclick = e => { e.preventDefault(); history.back(); };
+
+function loadProfessorButtons(){
+  const c = document.querySelector('.button-container');
+  const { level, unit } = getLevelAndUnitFromURL();
+  for(let i=1;i<=10;i++){
+    const img=new Image(); img.src=`professores/professor${i}.png`; img.alt=`Professor ${i}`;
+    img.onload=()=>{
+      const b=document.createElement('button'); b.appendChild(img);
+      b.onclick=()=>{
+        const path=`../../${level}/${unit}/DataGrammarDialogo/aulas/aula${i}/lesson.txt`;
+        location.href=`../../../Atividades/Aulas_traduzidas/index.html?lessonPath=${encodeURIComponent(path)}&level=${level}&unit=${unit}`;
+      };
+      c.appendChild(b);
+    };
+  }
+}
+
+function updateImagePath(){
+  const { level, unit } = getLevelAndUnitFromURL();
+  const p = `../../${level}/${unit}/DataGrammarDialogo/image.png`;
+  fetch(p).then(r => { document.getElementById('main-image').src = r.ok ? p : 'default-image.png'; });
+}
+
+function setupFinishButton(){
+  const btn = document.getElementById('finish-lesson-btn');
+  btn.addEventListener('click', ()=>{
+    firebase.auth().onAuthStateChanged(u=>{
+      if(u && u.uid){
+        updateNextPhase(u.uid)
+          .then(showCompletionMessage)
+          .catch(()=>showCompletionMessage()); // não travar UX se der erro
+      }else{
+        location.href='https://hannahenglishcourse.netlify.app/formulario/login';
+      }
+    });
+  });
+}
+
+function closeModal(){ document.getElementById('completionModal').style.display='none'; }
+function showCompletionMessage(){ document.getElementById('completionModal').style.display='block'; }
+
+/* ---------- Boot ---------- */
+window.addEventListener('load', ()=>{
+  firebase.auth().onAuthStateChanged(u=>{
+    if(u && u.uid){
+      document.body.style.visibility='visible';
+      initializeAppContent();
+      revealPdfForTeachersOnly(u.uid); // <— PDF só para professor
+    }else{
+      location.href='https://hannahenglishcourse.netlify.app/formulario/login';
+    }
+  });
+});
+</script>
+</body>
+</html>
