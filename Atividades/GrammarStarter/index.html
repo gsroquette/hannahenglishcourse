@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Indefinite Articles - The Creation Story</title>
+
+<style>
+  /* -------- estilos originais (excluídos os de exercícios) -------- */
+  body{
+    font-family:Arial, sans-serif;background:#f4f4f4;margin:0;padding:20px;line-height:1.6;
+    background-image:url('../../../imagens/fundo.png');background-repeat:repeat;
+  }
+  .container{
+    max-width:800px;margin:auto;background:#fff;padding:20px;border-radius:8px;
+    box-shadow:0 0 10px rgba(0,0,0,.1);position:relative;
+  }
+  .back-button{
+    background:#007bff;color:#fff;padding:10px 15px;border-radius:5px;text-decoration:none;font-size:1rem;
+    cursor:pointer;margin-bottom:15px;
+  }
+  .back-button:hover{background:#0056b3;}
+  .page-title{font-size:2rem;font-weight:bold;text-align:center;color:#2c3e50;margin-top:20px;}
+  .subtitle{font-size:1.3rem;font-weight:bold;text-transform:uppercase;text-align:left;margin:10px 0;}
+  h1{text-align:center;color:#333;font-size:2rem;margin-top:70px;}
+  h2{background:#28a745;color:#fff;padding:10px;border-radius:4px;font-size:1.5rem;text-align:center;}
+  .section{background:#d4edda;margin-bottom:20px;padding:20px;border-radius:5px;}
+  .section p{margin:0;padding:10px 0;font-size:1.2rem;}
+  .btn-download{
+    display:block;width:100%;padding:15px;background:#218838;color:#fff;text-align:center;text-decoration:none;
+    border-radius:5px;margin-top:20px;cursor:pointer;font-size:1.2rem;border:none;
+  }
+  .btn-download:hover{background:#1e7e34;}
+  .image-container{display:flex;justify-content:center;margin-bottom:20px;}
+  .image-container img{max-width:100%;height:auto;border-radius:8px;}
+  .button-container{display:flex;justify-content:center;margin-top:20px;flex-wrap:wrap;}
+  .button-container button{background:transparent;border:none;margin:5px;cursor:pointer;}
+  .button-container img{max-width:100px;max-height:100px;border-radius:8px;transition:.3s;}
+  .button-container img:hover{transform:scale(1.1);}
+  .grammar-table{width:100%;border-collapse:collapse;margin:15px 0;}
+  .grammar-table th,.grammar-table td{border:1px solid #ccc;padding:8px;text-align:left;}
+  .grammar-table th{background:#28a745;color:#fff;}
+  .grammar-table td{background:#fff;}
+
+  /* Botão de finalizar lição */
+  .btn-finish{
+    display:block;width:100%;padding:15px;background:#343a40;color:#fff;text-align:center;text-decoration:none;
+    border-radius:5px;margin-top:12px;cursor:pointer;font-size:1.2rem;border:none;
+  }
+  .btn-finish:hover{background:#23272b;}
+</style>
+</head>
+
+<body style="visibility:hidden">
+<!-- ============ MODAL ============ -->
+<div id="completionModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;
+     background:rgba(0,0,0,.5);z-index:9999;">
+  <div style="background:#fff;padding:20px;border-radius:8px;max-width:420px;margin:100px auto;text-align:center;">
+    <h2>Lesson completed!</h2>
+    <p>Great job — the next phase is now unlocked.</p>
+    <button onclick="closeModal()" style="padding:10px 16px;border:none;border-radius:6px;background:#28a745;color:#fff;cursor:pointer;">OK</button>
+  </div>
+</div>
+
+<!-- ============ CONTEÚDO ============ -->
+<div class="container">
+  <div style="margin-bottom:15px;"><a href="javascript:history.back()" class="back-button">Back</a></div>
+  <h1 id="title"></h1>
+
+  <div class="image-container"><img id="main-image" src="image.png" alt="Example Image"></div>
+
+  <div class="button-container"></div>
+  <div id="content"></div>
+
+  <button class="btn-download" onclick="generatePDF()">Download as PDF</button>
+  <button id="finish-lesson-btn" class="btn-finish">I’m ready — finish this lesson</button>
+</div>
+
+<!-- ============ SCRIPTS ============ -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<script>
+/* ---------- Firebase ---------- */
+firebase.initializeApp({
+  apiKey:"AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+  authDomain:"hannahenglishcourse.firebaseapp.com",
+  databaseURL:"https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:"hannahenglishcourse",
+  storageBucket:"hannahenglishcourse.appspot.com",
+  messagingSenderId:"449818788486",
+  appId:"1:449818788486:web:8a49d3f68591e6fb3f0707",
+  measurementId:"G-07VVJG9LRS"
+});
+
+/* ---------- Helpers ---------- */
+const getLevelAndUnitFromURL = () => ({
+  level: new URLSearchParams(location.search).get('level'),
+  unit:  new URLSearchParams(location.search).get('unit')
+});
+const getPhaseFromURL = () => new URLSearchParams(location.search).get('fase') || '1'; /* default fase1 */
+
+/* ---------- Conteúdo ---------- */
+function initializeAppContent(){
+  loadTextFile();
+  setupBackButton();
+  updateImagePath();
+  loadProfessorButtons();
+  setupFinishButton();
+}
+
+function loadTextFile() {
+  const { level, unit } = getLevelAndUnitFromURL();
+  const filePath = `../../${level}/${unit}/DataGrammar/texto.txt`;
+
+  fetch(filePath)
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.text();
+    })
+    .then(text => {
+      const content = document.getElementById('content');
+      let html = '';
+      let sectionOpen = false;
+      let inTable = false;
+      let isHeaderRow = true;
+
+      // flag para parar quando começar "Exercises/Exercícios/Practice"
+      let skipExercises = false;
+
+      const closeTable = () => {
+        if (inTable) {
+          html += isHeaderRow ? '</table>' : '</tbody></table>';
+          inTable = false;
+          isHeaderRow = true;
+        }
+      };
+
+      const closeSection = () => {
+        closeTable();
+        if (sectionOpen) {
+          html += '</div>';
+          sectionOpen = false;
+        }
+      };
+
+      text.split('\n').forEach(raw => {
+        if (skipExercises) return;                 // ignora tudo após a seção de exercícios
+
+        const line = raw.trim();
+        if (!line) return;
+
+        /* ---------- TÍTULO DA PÁGINA ---------- */
+        if (line.startsWith('Title: ')) {
+          document.getElementById('title').innerText = line.replace('Title: ', '');
+          document.getElementById('title').classList.add('page-title');
+          return;
+        }
+
+        /* ---------- NOVA SEÇÃO (# ) ---------- */
+        if (line.startsWith('# ')) {
+          const sectionTitle = line.slice(2).trim();
+
+          // Seção de exercícios? ativa o skip e não renderiza
+          if (/^(exercises?|exerc[íi]cios?|practice)\b/i.test(sectionTitle)) {
+            closeSection();
+            skipExercises = true;
+            return;
+          }
+
+          closeSection();
+          html += `<div class="section"><h2>${sectionTitle}</h2>`;
+          sectionOpen = true;
+          return;
+        }
+
+        /* ---------- SUBTÍTULO (## ) ---------- */
+        if (line.startsWith('## ')) {
+          html += `<h3 class="subtitle">${line.slice(3).toUpperCase()}</h3>`;
+          return;
+        }
+
+        /* ---------- IMAGEM INLINE ---------- */
+        if (line.startsWith('#IMG:')) {
+          const img = line.split(':')[1].trim();
+          const base = filePath.substring(0, filePath.lastIndexOf('/'));
+          html += `<img src="${base}/${img}"
+                        onerror="this.onerror=null;this.src='${base}/../${img}'"
+                        alt="${img}"
+                        style="max-width:100%;display:block;margin:20px auto;border-radius:8px;">`;
+          return;
+        }
+
+        /* ---------- TABELA ---------- */
+        if (line.toLowerCase() === 'tablestart') {
+          html += '<table class="grammar-table">';
+          inTable = true;
+          isHeaderRow = true;
+          return;
+        }
+
+        if (line.toLowerCase() === 'tableend') {
+          closeTable();
+          return;
+        }
+
+        if (inTable) {
+          const cols = line.split('|').map(c => c.trim());
+          if (isHeaderRow) {
+            html += `<thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>`;
+            isHeaderRow = false;
+          } else {
+            html += `<tr>${cols.map(c => `<td>${c}</td>`).join('')}</tr>`;
+          }
+          return;
+        }
+
+        /* ---------- LINHAS TIPO EXERCÍCIO (descartadas) ---------- */
+        if (/\[Answer:.*?\]/i.test(line)) {
+          return;
+        }
+
+        /* ---------- PARÁGRAFOS COM MARCAÇÃO ---------- */
+        const formatted = line
+          .replace(/\*\*\*(.*?)\*\*\*/g, '<b><i>$1</i></b>')
+          .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+          .replace(/\*(.*?)\*/g, '<i>$1</i>');
+        html += `<p>${formatted}</p>`;
+      });
+
+      /* ---------- FECHA QUALQUER SEÇÃO/TABELA PENDENTE ---------- */
+      closeSection();
+
+      content.innerHTML = html;
+    })
+    .catch(console.error);
+}
+
+/* ---------- Progresso (acionado pelo botão "finish lesson") ---------- */
+async function updateNextPhase(userId){
+  const phase = getPhaseFromURL();
+  const { level, unit } = getLevelAndUnitFromURL();
+  const dbRoot = firebase.database().ref(`usuarios/${userId}/progresso`);
+
+  try{
+    if(phase === 'last'){
+      const nextUnit = `Unit${parseInt(unit.replace('Unit',''))+1}`;
+      await dbRoot.child(`${level}/${nextUnit}`).set({fase1:true});
+    }else if(phase === 'end'){
+      const nextLevel = `Level${parseInt(level.replace('Level',''))+1}`;
+      await dbRoot.child(`${nextLevel}/Unit1`).set({fase1:true});
+    }else{
+      const nextPhase = `fase${parseInt(phase)+1}`;
+      await dbRoot.child(`${level}/${unit}`).update({[`fase${phase}`]:true,[nextPhase]:true});
+    }
+    console.log('✅ Progresso atualizado.');
+  }catch(e){console.error('Erro ao atualizar progresso:', e);}
+}
+
+/* ---------- PDF (sem exercícios) ---------- */
+function generatePDF(){
+  const {level,unit}=getLevelAndUnitFromURL();
+  fetch(`../../${level}/${unit}/DataGrammar/texto.txt`)
+    .then(r=>r.text())
+    .then(data=>{
+      const {jsPDF}=window.jspdf;const doc=new jsPDF();let y=20,m=20,max=170;
+
+      // Cabeçalho simples com logo (opcional, se existir)
+      try{ doc.addImage('Logo.png','PNG',90,y,30,30); y+=40; }catch(e){ /* ignora se não houver logo */ }
+
+      let skipping = false;
+      data.split('\n').forEach(raw=>{
+        if (skipping) return;
+        const l = raw.trim();
+
+        // Pula completamente a seção de exercícios e quaisquer linhas com [Answer:]
+        if (/^\#\s*(exercises?|exerc[íi]cios?|practice)\b/i.test(l)) { skipping = true; return; }
+        if (/\[Answer:.*?\]/i.test(l)) return;
+
+        const t = l.replace(/\[Answer:.*?\]/gi,'');
+        doc.setFontSize(l.startsWith('Title: ')?16:12);
+        const lines = doc.splitTextToSize(t,max);
+        lines.forEach(line=>{
+          doc.text(line,m,y); y+=8;
+          if (y > doc.internal.pageSize.height - m) { doc.addPage(); y = m; }
+        });
+        y+=2;
+        if (y > doc.internal.pageSize.height - m) { doc.addPage(); y = m; }
+      });
+
+      doc.save('grammar_lesson_creation.pdf');
+    })
+    .catch(console.error);
+}
+
+/* ---------- Auxiliares UI ---------- */
+const setupBackButton = () =>
+  document.querySelector('.back-button').onclick = e => { e.preventDefault(); history.back(); };
+
+function loadProfessorButtons(){
+  const c=document.querySelector('.button-container');
+  const {level,unit}=getLevelAndUnitFromURL();
+  for(let i=1;i<=10;i++){
+    const img=new Image();img.src=`professores/professor${i}.png`;img.alt=`Professor ${i}`;
+    img.onload=()=>{
+      const b=document.createElement('button');b.appendChild(img);
+      b.onclick=()=>{
+        const path=`../../${level}/${unit}/DataGrammar/aulas/aula${i}/lesson.txt`;
+        location.href=`../../../Atividades/Aulas_traduzidas/index.html?lessonPath=${encodeURIComponent(path)}&level=${level}&unit=${unit}`;
+      };
+      c.appendChild(b);
+    };
+  }
+}
+
+function updateImagePath(){
+  const {level,unit}=getLevelAndUnitFromURL(), p=`../../${level}/${unit}/DataGrammar/image.png`;
+  fetch(p).then(r=>{ document.getElementById('main-image').src = r.ok ? p : 'default-image.png'; });
+}
+
+function setupFinishButton(){
+  const btn = document.getElementById('finish-lesson-btn');
+  btn.addEventListener('click', ()=>{
+    firebase.auth().onAuthStateChanged(u=>{
+      if(u && u.uid){
+        // Libera próxima fase e mostra modal
+        updateNextPhase(u.uid).then(()=>{
+          showCompletionMessage();
+        }).catch(()=>{
+          // Mesmo em erro de rede, mostra modal para não travar a UX; log permanece no console
+          showCompletionMessage();
+        });
+      }else{
+        // Se não autenticado, redireciona para login
+        location.href='https://hannahenglishcourse.netlify.app/formulario/login';
+      }
+    });
+  });
+}
+
+function closeModal(){ document.getElementById('completionModal').style.display='none'; }
+function showCompletionMessage(){ document.getElementById('completionModal').style.display='block'; }
+
+/* ---------- Boot ---------- */
+window.addEventListener('load', ()=>{
+  firebase.auth().onAuthStateChanged(u=>{
+    if(u && u.uid){
+      document.body.style.visibility='visible';
+      initializeAppContent();
+    }else{
+      location.href='https://hannahenglishcourse.netlify.app/formulario/login';
+    }
+  });
+});
+</script>
+</body>
+</html>
