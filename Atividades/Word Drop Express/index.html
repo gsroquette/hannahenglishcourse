@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -15,31 +15,37 @@
   }
   html,body,#game-container{-webkit-user-select:none;user-select:none;touch-action:manipulation}
 
+  /* =================== CONTROLES RÁPIDOS ===================
+     - --wagonScale        => tamanho do PNG do vagão (moldura)
+     - --pairedImgScale    => tamanho da imagem que cai (dentro do vagão)
+     - --imgSafePad        => margem de segurança da imagem interna
+     - --liftVH            => sobe/baixa o vagão dentro da faixa
+     - --wheelPadVH        => distancia o texto das rodas (menor = texto mais baixo)
+     - --trainH / --wagonFactor => altura total da faixa e do slot
+  ========================================================== */
   :root{
-    /* ===== CONTROLES QUE VOCÊ VAI USAR ===== */
     /* Altura da FAIXA onde ficam os vagões (em vh numérico) */
     --trainH: 48;
 
-    /* Escala do PNG do vagão dentro do slot (0.70–1.10).
-       ↑ AUMENTE para deixar o VAGÃO IMAGEM maior/menor sem mexer no container */
-    --wagonScale: 1;
+    /* ESCALA do PNG do vagão (moldura) */
+    --wagonScale: 1.15;           /* ↑ deixa o vagão MAIOR sem mexer no container */
 
-    /* Escala da imagem que cai dentro do vagão (0.70–1.00).
-       ↑ DIMINUA se a imagem interna estiver cobrindo a moldura */
-    --pairedImgScale: 0.88;
+    /* ESCALA da imagem que cai (dentro do vagão) */
+    --pairedImgScale: 0.70;        /* ↓ menor pra não cobrir a moldura */
 
-    /* Margem de segurança extra da imagem interna (px/vw) */
-    --imgSafePad: clamp(10px, 1.2vw, 18px);
+    /* Folga extra pra imagem interna não encostar na moldura */
+    --imgSafePad: clamp(14px, 1.8vw, 24px);
 
-    /* ===== Outras reservas/ajustes ===== */
-    --wagonFactor: 0.96;                 /* altura do slot relativa à faixa */
-    --liftVH: 0.2;                       /* sobe levemente o slot (em vh) */
+    /* Slot e posicionamento */
+    --wagonFactor: 1.00;           /* slot ocupa 100% da faixa */
+    --liftVH: 4.2;                 /* sobe BEM o vagão dentro da faixa */
     --labelH: clamp(22px, 3.6vh, 40px);  /* altura do rótulo (texto) */
-    --windowInset: clamp(12px, 1.4vw, 22px); /* margem da janela do vagão */
-    --wheelPadVH: 2;                   /* espaço acima das rodas (vh) */
+    --windowInset: clamp(10px, 1.2vw, 18px); /* margem da janela do vagão */
+    --wheelPadVH: 2.0;             /* TEXTO MAIS BAIXO (menor = mais perto das rodas) */
 
-    --colGap: clamp(8px, 1vw, 16px);
-    --sidePad: clamp(10px, 1.6vw, 22px);
+    /* Espaçamentos laterais/entre colunas */
+    --colGap: clamp(10px, 1.4vw, 20px);
+    --sidePad: clamp(12px, 2vw, 26px);
   }
 
   #rotate-overlay{
@@ -62,12 +68,13 @@
     z-index:100;
   }
 
-  /* ===== Cada vagão (slot) ===== */
+  /* ===== Cada vagão (slot) =====
+     O PNG do vagão é o fundo; a “janela” é a área útil. */
   .wagon{
     position:relative;
     height: calc(var(--trainH) * var(--wagonFactor) * 1vh);
 
-    /* O PNG do vagão é o FUNDO; controlamos o tamanho pelo --wagonScale */
+    /* VAGÃO IMAGEM (moldura) — tamanho controlado por --wagonScale */
     background-image: url('wagon.png');
     background-repeat: no-repeat;
     background-position: center bottom;
@@ -75,13 +82,14 @@
 
     /* Janela útil do vagão:
        topo/lados: windowInset
-       base: windowInset + labelH + wheelPad (rodas) */
+       base: windowInset + labelH + wheelPad (rodas)  */
     padding:
       var(--windowInset)
       var(--windowInset)
       calc(var(--windowInset) + var(--labelH) + (var(--wheelPadVH) * 1vh))
       var(--windowInset);
 
+    /* Sobe o vagão para dar respiro a partir do “chão” */
     transform: translateY(calc(-1 * var(--liftVH) * 1vh));
   }
 
@@ -103,7 +111,7 @@
     filter: drop-shadow(0 2px 2px rgba(0,0,0,.12));
   }
 
-  /* Texto sempre visível, acima das rodas */
+  /* Texto sempre visível, agora MAIS BAIXO (perto das rodas) */
   .word{
     position:absolute;
     left: var(--windowInset);
@@ -152,7 +160,13 @@
   }
   #restart-button:hover{background:#1c5980}
 
-  .falling{position:absolute;width:clamp(44px,8.5vw,88px);height:clamp(44px,8.5vw,88px);object-fit:contain;pointer-events:none;z-index:150}
+  /* ===== Imagem durante a QUEDA — BEM MENOR ===== */
+  .falling{
+    position:absolute;
+    width:  clamp(28px, 5.5vw, 52px);
+    height: clamp(28px, 5.5vw, 52px);
+    object-fit:contain; pointer-events:none; z-index:150;
+  }
 </style>
 </head>
 <body>
@@ -161,6 +175,8 @@
   <div id="game-container">
     <button id="restart-button" onclick="restartGame()">Restart</button>
     <div id="feedback">Try Again!</div>
+
+    <!-- Os slots (vagões) serão gerados aqui -->
     <div id="train"></div>
   </div>
 
@@ -224,9 +240,13 @@
       // cria slots (vagões)
       wordsList.forEach((word,i)=>{
         const slot=document.createElement('div'); slot.className='wagon'; slot.dataset.pair=`pair${i+1}`;
+
         const imgBox=document.createElement('div'); imgBox.className='slot-img';
         const label=document.createElement('div'); label.className='word'; label.textContent=word;
-        slot.appendChild(imgBox); slot.appendChild(label); train.appendChild(slot);
+
+        slot.appendChild(imgBox);
+        slot.appendChild(label);
+        train.appendChild(slot);
       });
 
       // balões
