@@ -16,22 +16,23 @@
   html,body,#game-container{-webkit-user-select:none;user-select:none;touch-action:manipulation}
 
   :root{
-    /* Altura da faixa do trem (onde ficam os vagões) */
-    --trainH: 30vh;
+    /* Altura da FAIXA do trem em vh (número) */
+    --trainH: 34;            /* ↑ aumente para vagões maiores (ex: 40, 44) */
 
-    /* Altura do rótulo (texto) e margens internas da “janela” do vagão */
-    --labelH: clamp(22px,3.4vh,36px);
-    --windowInset: clamp(6px,1.2vw,16px);
+    /* Proporção da altura do VAGÃO vs. faixa (0–1) */
+    --wagonFactor: 0.96;     /* ↑ deixa o vagão mais alto dentro da faixa */
 
-    /* Faixa reservada para as rodas dentro do PNG do vagão */
-    --wheelPad: clamp(10px, 2.4vh, 24px);
+    /* “Lift” (quanto o vagão sobe visualmente), em vh */
+    --liftVH: 2.4;           /* ↑ sobe o vagão para as rodas não encostarem no texto */
 
-    /* Levantar visualmente os vagões (sem mudar o drop target) */
-    --lift: clamp(4px, 1.2vh, 16px);
+    /* Reservas internas */
+    --labelH: clamp(22px, 3.6vh, 40px);  /* altura da faixa do texto */
+    --windowInset: clamp(8px, 1.4vw, 18px); /* margem da janela do vagão */
+    --wheelPadVH: 3.2;       /* espaço extra acima das rodas, em vh */
 
-    /* Largura mínima “mental” de cada coluna em telas grandes (só estética) */
-    --colGap: clamp(6px,1vw,16px);
-    --sidePad: clamp(10px,2vw,24px);
+    /* Espaçamentos laterais/entre colunas */
+    --colGap: clamp(10px, 1.4vw, 22px);
+    --sidePad: clamp(14px, 2.4vw, 28px);
   }
 
   #rotate-overlay{
@@ -45,41 +46,39 @@
   /* ===== Faixa do trem (grid dos slots) ===== */
   #train{
     position:absolute;left:0;bottom:0;width:100%;
-    height: var(--trainH);
+    height: calc(var(--trainH) * 1vh);
     display:grid;
-    grid-template-columns: repeat(var(--num-wagons), 1fr); /* 1 coluna por palavra */
+    grid-template-columns: repeat(var(--num-wagons), 1fr);
     align-items:end;
     gap: var(--colGap);
-    padding: 0 var(--sidePad) clamp(8px,1.2vw,18px);
+    padding: 0 var(--sidePad) clamp(10px,1.4vw,20px);
     z-index:100;
   }
 
-  /* ===== Cada vagão (slot) =====
-     PNG do vagão é o fundo. Interior (janela) é transparente.  */
+  /* ===== Cada vagão (slot) ===== */
   .wagon{
     position:relative;
-    height: 92%;                            /* vagão maior */
+    height: calc(var(--trainH) * var(--wagonFactor) * 1vh);
     background:url('wagon.png') no-repeat center/contain;
-    /* Janela interna do vagão (padding delimita a “área útil”):
-       - em cima/lados: windowInset
-       - embaixo: windowInset + labelH + wheelPad (rótulo + rodas) */
+
+    /* Janela útil do vagão */
     padding:
       var(--windowInset)
       var(--windowInset)
-      calc(var(--windowInset) + var(--labelH) + var(--wheelPad))
+      calc(var(--windowInset) + var(--labelH) + (var(--wheelPadVH) * 1vh))
       var(--windowInset);
 
-    /* Erguer um pouco o vagão para as rodas não ficarem tão embaixo */
-    transform: translateY(calc(-1 * var(--lift)));
+    /* Sobe o vagão para afastar rodas do texto */
+    transform: translateY(calc(-1 * var(--liftVH) * 1vh));
   }
 
-  /* Área para a IMAGEM dentro da janela do vagão */
+  /* Área da imagem dentro da janela */
   .slot-img{
     position:absolute;
     top: var(--windowInset);
     left: var(--windowInset);
     right: var(--windowInset);
-    bottom: calc(var(--windowInset) + var(--labelH) + var(--wheelPad));
+    bottom: calc(var(--windowInset) + var(--labelH) + (var(--wheelPadVH) * 1vh));
     display:flex;align-items:center;justify-content:center;
     overflow:hidden;
   }
@@ -89,20 +88,20 @@
     filter: drop-shadow(0 2px 2px rgba(0,0,0,.12));
   }
 
-  /* RÓTULO: sempre visível, agora acima das rodas */
+  /* Texto sempre visível, acima das rodas */
   .word{
     position:absolute;
     left: var(--windowInset);
     right: var(--windowInset);
-    bottom: calc(var(--windowInset) + var(--wheelPad) - 2px);
+    bottom: calc(var(--windowInset) + (var(--wheelPadVH) * 1vh) - 2px);
     height: calc(var(--labelH) - 6px);
     display:flex;align-items:center;justify-content:center;
     text-transform:uppercase;text-align:center;font-weight:700;
     color:#1f2d3a;
-    font-size: clamp(12px, calc((100vw / var(--num-wagons))*0.18), 22px);
+    font-size: clamp(14px, calc((100vw / var(--num-wagons))*0.20), 26px);
     background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,0.88));
     border: 1px solid rgba(0,0,0,0.06);
-    border-radius: 8px; box-shadow:0 2px 6px rgba(0,0,0,.08);
+    border-radius: 10px; box-shadow:0 2px 6px rgba(0,0,0,.08);
     pointer-events:none;
   }
 
@@ -116,15 +115,15 @@
   /* ===== Balões ===== */
   .balloon{
     position:absolute;
-    width:clamp(50px,10vw,100px);
-    height:clamp(60px,12vw,120px);
+    width:clamp(56px, 10.5vw, 112px);
+    height:clamp(68px, 12.5vw, 130px);
     background:url('balloon.png') no-repeat center/contain;
     cursor:pointer;transition:transform .2s ease;z-index:200;
   }
   .balloon:hover{transform:scale(1.1)}
   .balloon img{
     position:absolute;top:calc(90% + 0px);left:50%;transform:translateX(-50%);
-    width:clamp(40px,8vw,80px);height:clamp(40px,8vw,80px);object-fit:contain;pointer-events:none;z-index:201
+    width:clamp(44px,8.5vw,88px);height:clamp(44px,8.5vw,88px);object-fit:contain;pointer-events:none;z-index:201
   }
 
   /* ===== Feedback / Botão ===== */
@@ -138,7 +137,7 @@
   }
   #restart-button:hover{background:#1c5980}
 
-  .falling{position:absolute;width:clamp(40px,8vw,80px);height:clamp(40px,8vw,80px);object-fit:contain;pointer-events:none;z-index:150}
+  .falling{position:absolute;width:clamp(44px,8.5vw,88px);height:clamp(44px,8.5vw,88px);object-fit:contain;pointer-events:none;z-index:150}
 </style>
 </head>
 <body>
