@@ -170,7 +170,7 @@ function loadTextFile() {
           html += `<h3 class="subtitle">${line.slice(3).toUpperCase()}</h3>`; return;
         }
 
-        // Imagem inline — renderizamos no HTML; para PDF vamos ignorar
+        // Imagem inline — renderizada no HTML; no PDF é tratada separadamente
         if (line.startsWith('#IMG:')) {
           const img = line.split(':')[1].trim();
           const base = filePath.substring(0, filePath.lastIndexOf('/'));
@@ -215,138 +215,198 @@ function loadTextFile() {
     .catch(console.error);
 }
 
-/* ---------- PDF (sem exercícios) com jsPDF-AutoTable ---------- */
-function generatePDF(){
-  const {level,unit} = getLevelAndUnitFromURL();
+/* ---------- PDF (sem exercícios) com tabelas e imagens ---------- */
+async function toDataURL(url){
+  const res = await fetch(url, { cache: 'no-store' });
+  if(!res.ok) throw new Error(`Falha ao carregar imagem: ${url}`);
+  const blob = await res.blob();
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function addImageFitted(doc, dataURL, margin, cursorY){
+  const img = new Image();
+  img.src = dataURL;
+  await img.decode();
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const maxW  = pageW - margin * 2;
+  const maxH  = pageH - margin * 2;
+
+  let w = img.naturalWidth;
+  let h = img.naturalHeight;
+  const scale = Math.min(maxW / w, maxH / h, 1);
+  w *= scale; h *= scale;
+
+  if (cursorY + h > pageH - margin) {
+    doc.addPage();
+    cursorY = margin;
+  }
+
+  const format = dataURL.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+  doc.addImage(dataURL, format, margin, cursorY, w, h);
+  return cursorY + h + 12;
+}
+
+async function generatePDF(){
+  const { level, unit } = getLevelAndUnitFromURL();
   const filePath = `../../${level}/${unit}/DataGrammar/texto.txt`;
+  const baseDir  = filePath.substring(0, filePath.lastIndexOf('/')); // .../DataGrammar
 
-  fetch(filePath)
-    .then(r => r.text())
-    .then(data => {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const margin = 40;
-      let cursorY = margin;
+  const data = await fetch(filePath).then(r => r.text());
 
-      const addTitle = (txt) => {
-        doc.setFont('helvetica','bold'); doc.setFontSize(18);
-        const lines = doc.splitTextToSize(txt, pageWidth - 2*margin);
-        lines.forEach(line => { doc.text(line, margin, cursorY); cursorY += 24; });
-        cursorY += 8;
-      };
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const margin = 40;
+  let cursorY = margin;
 
-      const addSection = (txt) => {
-        doc.setFillColor(40,167,69); // verde do site (aprox.)
-        doc.setTextColor(255,255,255);
-        doc.setFont('helvetica','bold'); doc.setFontSize(14);
-        const h = 26;
-        doc.rect(margin, cursorY - 16, pageWidth - 2*margin, h, 'F');
-        doc.text(txt, margin + 10, cursorY + 2);
-        cursorY += h + 8;
-        doc.setTextColor(0,0,0);
-      };
+  // Cabeçalho opcional com logo (se existir)
+  try{
+    const logoURL = 'Logo.png';
+    const logoData = await toDataURL(logoURL);
+    cursorY = await addImageFitted(doc, logoData, margin, cursorY);
+  }catch(_e){/* sem logo, segue */}
 
-      const addParagraph = (txt) => {
-        doc.setFont('helvetica','normal'); doc.setFontSize(12);
-        const lines = doc.splitTextToSize(txt, pageWidth - 2*margin);
-        lines.forEach(line => { doc.text(line, margin, cursorY); cursorY += 16; });
-        cursorY += 4;
-        if (cursorY > doc.internal.pageSize.getHeight() - margin) {
-          doc.addPage(); cursorY = margin;
-        }
-      };
+  // Tenta incluir a imagem principal exibida na página (#main-image)
+  try{
+    const mainImgEl = document.getElementById('main-image');
+    if (mainImgEl && mainImgEl.src) {
+      const mainData = await toDataURL(mainImgEl.src);
+      cursorY = await addImageFitted(doc, mainData, margin, cursorY);
+    }
+  }catch(_e){/* se falhar, ignora */}
 
-      // Parse do texto para montar seções, parágrafos e tabelas
-      let skipping = false;
-      let inTable = false;
-      let tableRows = [];
-      let titlePrinted = false;
+  const addTitle = (txt) => {
+    doc.setFont('helvetica','bold'); doc.setFontSize(18);
+    const lines = doc.splitTextToSize(txt, pageW - 2*margin);
+    lines.forEach(line => { doc.text(line, margin, cursorY); cursorY += 24; });
+    cursorY += 8;
+  };
 
-      const flushTable = () => {
-        if (!inTable || tableRows.length === 0) return;
-        // Primeira linha é header
-        const headers = tableRows[0].map(h => ({ content: h, styles:{ halign:'left', fillColor:[40,167,69], textColor:[255,255,255] } }));
-        const body = tableRows.slice(1).map(r => r.map(c => ({ content: c })));
+  const addSection = (txt) => {
+    doc.setFillColor(40,167,69);
+    doc.setTextColor(255,255,255);
+    doc.setFont('helvetica','bold'); doc.setFontSize(14);
+    const h = 26;
+    doc.rect(margin, cursorY - 16, pageW - 2*margin, h, 'F');
+    doc.text(txt, margin + 10, cursorY + 2);
+    cursorY += h + 8;
+    doc.setTextColor(0,0,0);
+  };
 
-        doc.autoTable({
-          head: [headers],
-          body,
-          startY: cursorY,
-          theme: 'grid',
-          styles: { font: 'helvetica', fontSize: 11, cellPadding: 6, lineWidth: 0.1 },
-          headStyles: { fillColor: [40,167,69], textColor: [255,255,255], halign: 'left' },
-          margin: { left: margin, right: margin }
-        });
-        cursorY = doc.lastAutoTable.finalY + 16;
-        inTable = false;
-        tableRows = [];
-      };
+  const addParagraph = (txt) => {
+    doc.setFont('helvetica','normal'); doc.setFontSize(12);
+    const lines = doc.splitTextToSize(txt, pageW - 2*margin);
+    for (const line of lines){
+      if (cursorY > pageH - margin){ doc.addPage(); cursorY = margin; }
+      doc.text(line, margin, cursorY); cursorY += 16;
+    }
+    cursorY += 4;
+    if (cursorY > pageH - margin){ doc.addPage(); cursorY = margin; }
+  };
 
-      data.split('\n').forEach(raw => {
-        if (skipping) return;
-        const l = raw.trim();
-        if (!l) return;
+  // Estado de parsing
+  let skipping = false;             // após "Exercises/Exercícios/Practice"
+  let inTable = false;
+  let tableRows = [];
+  let titlePrinted = false;
 
-        // Pula a seção de exercícios e linhas com [Answer:]
-        if (/^\#\s*(exercises?|exerc[íi]cios?|practice)\b/i.test(l)) { flushTable(); skipping = true; return; }
-        if (/\[Answer:.*?\]/i.test(l)) return;
+  const flushTable = () => {
+    if (!inTable || tableRows.length === 0) return;
+    const headers = tableRows[0].map(h => ({ content: h, styles:{ halign:'left', fillColor:[40,167,69], textColor:[255,255,255] } }));
+    const body = tableRows.slice(1).map(r => r.map(c => ({ content: c })));
+    doc.autoTable({
+      head: [headers],
+      body,
+      startY: cursorY,
+      theme: 'grid',
+      styles: { font: 'helvetica', fontSize: 11, cellPadding: 6, lineWidth: 0.1 },
+      headStyles: { fillColor: [40,167,69], textColor: [255,255,255], halign: 'left' },
+      margin: { left: margin, right: margin }
+    });
+    cursorY = doc.lastAutoTable.finalY + 16;
+    inTable = false;
+    tableRows = [];
+  };
 
-        // Título
-        if (l.startsWith('Title: ')) {
-          flushTable();
-          addTitle(l.replace('Title: ', ''));
-          titlePrinted = true;
-          return;
-        }
+  // Processar com suporte a imagens
+  const lines = data.split('\n');
+  for (const raw of lines){
+    if (skipping) break;
+    const l = raw.trim();
+    if (!l) continue;
 
-        // Seção
-        if (l.startsWith('# ')) {
-          flushTable();
-          addSection(l.slice(2).trim());
-          return;
-        }
+    // pular exercícios
+    if (/^\#\s*(exercises?|exerc[íi]cios?|practice)\b/i.test(l)) { flushTable(); skipping = true; break; }
+    if (/\[Answer:.*?\]/i.test(l)) continue;
 
-        // Subtítulo -> trata como parágrafo em CAPS
-        if (l.startsWith('## ')) {
-          flushTable();
-          addParagraph(l.slice(3).toUpperCase());
-          return;
-        }
-
-        // Imagem inline -> ignorar no PDF (caminho relativo costuma falhar); se quiser, podemos suportar depois
-        if (l.startsWith('#IMG:')) { return; }
-
-        // Tabela
-        if (l.toLowerCase() === 'tablestart') {
-          flushTable();
-          inTable = true; tableRows = []; return;
-        }
-        if (l.toLowerCase() === 'tableend') { flushTable(); return; }
-        if (inTable) {
-          const cols = l.split('|').map(c => c.trim());
-          tableRows.push(cols);
-          return;
-        }
-
-        // Parágrafo
-        const t = l.replace(/\*\*\*(.*?)\*\*\*/g, '$1')
-                   .replace(/\*\*(.*?)\*\*/g, '$1')
-                   .replace(/\*(.*?)\*/g, '$1');
-        addParagraph(t);
-      });
-
+    // Título
+    if (l.startsWith('Title: ')) {
       flushTable();
+      addTitle(l.replace('Title: ', ''));
+      titlePrinted = true;
+      continue;
+    }
 
-      // Se não houve título, adiciona um genérico
-      if (!titlePrinted) {
-        doc.setFont('helvetica','bold'); doc.setFontSize(16);
-        doc.text('Grammar Lesson', margin, margin);
+    // Seção
+    if (l.startsWith('# ')) {
+      flushTable();
+      addSection(l.slice(2).trim());
+      continue;
+    }
+
+    // Subtítulo
+    if (l.startsWith('## ')) {
+      flushTable();
+      addParagraph(l.slice(3).toUpperCase());
+      continue;
+    }
+
+    // Imagem inline #IMG:arquivo.png|larguraOpcional
+    if (l.startsWith('#IMG:')) {
+      flushTable();
+      const after = l.substring(5).trim();
+      const [imgName] = after.split('|').map(s => s.trim());
+      let url1 = `${baseDir}/${imgName}`;
+      let url2 = `${baseDir}/../${imgName}`;
+      try{
+        const dataURL = await toDataURL(url1).then(x=>x).catch(async ()=> await toDataURL(url2));
+        cursorY = await addImageFitted(doc, dataURL, margin, cursorY);
+      }catch(_e){
+        // se falhar, apenas ignora esta imagem
       }
+      continue;
+    }
 
-      doc.save('grammar_lesson_creation.pdf');
-    })
-    .catch(console.error);
+    // Tabela
+    if (l.toLowerCase() === 'tablestart') { flushTable(); inTable = true; tableRows = []; continue; }
+    if (l.toLowerCase() === 'tableend')   { flushTable(); continue; }
+    if (inTable) {
+      tableRows.push(l.split('|').map(c => c.trim()));
+      continue;
+    }
+
+    // Parágrafo (remove marcações **, *, ***)
+    const t = l.replace(/\*\*\*(.*?)\*\*\*/g, '$1')
+               .replace(/\*\*(.*?)\*\*/g, '$1')
+               .replace(/\*(.*?)\*/g, '$1');
+    addParagraph(t);
+  }
+
+  flushTable();
+
+  // fallback: título genérico se não houve Title:
+  if (!titlePrinted){
+    doc.setFont('helvetica','bold'); doc.setFontSize(16);
+    doc.text('Grammar Lesson', margin, margin);
+  }
+
+  doc.save('grammar_lesson_creation.pdf');
 }
 
 /* ---------- Progresso (acionado pelo botão "finish lesson") ---------- */
