@@ -6,209 +6,145 @@
   <title>Word Drop Express</title>
   <link rel="manifest" href="manifest.json">
   <style>
-    /* ===========================================
-       ESTILIZAÇÃO GERAL
-       =========================================== */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
-      width: 100vw;
-      height: 100vh;
+      width: 100vw; height: 100vh;
       background: url('../../../imagens/fundo.png') repeat;
-      position: relative;
       font-family: "Times New Roman", Times, serif;
     }
-    html, body, #game-container {
-      -webkit-user-select: none;
-      user-select: none;
-      touch-action: manipulation;
+    html, body, #game-container { -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+
+    :root{
+      /* altura do rodapé de texto dentro do slot */
+      --label-h: clamp(24px, 3.5vh, 40px);
+      /* margem interna do slot para casar com a arte do vagão (ajuste fino) */
+      --slotInset: clamp(4px, 1.2vw, 16px);
     }
 
-    /* ===========================================
-       OVERLAY “ROTATE TO LANDSCAPE”
-       =========================================== */
     #rotate-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.85);
-      color: #fff;
-      display: none;
-      justify-content: center;
-      align-items: center;
-      text-align: center;
-      padding: 1rem;
-      z-index: 3000;
+      position: fixed; inset: 0; background: rgba(0,0,0,.85); color:#fff;
+      display:none; justify-content:center; align-items:center; text-align:center; padding:1rem; z-index:3000;
     }
-    #rotate-overlay p {
-      font-size: 1.3rem;
-      line-height: 1.5;
+    #rotate-overlay p{ font-size:1.3rem; line-height:1.5; }
+
+    #game-container{ position:relative; width:100%; height:100%; overflow:hidden; }
+
+    /* ===== Trem como IMAGEM DE FUNDO ===== */
+    #train{
+      position:absolute; left:0; bottom:0;
+      width:100%; height: 26vh;                /* um pouco mais alto p/ arte */
+      background: url('../../../imagens/train.png') no-repeat center bottom;
+      background-size: contain;                /* trem se ajusta à largura */
+      z-index:100;
+      display:grid;                            /* grid para posicionar os slots */
+      grid-template-columns: repeat(var(--num-wagons), 1fr);
+      align-items: end;                        /* slots encostam no “chão” do vagão */
+      gap: 0;                                  /* sem lacunas entre colunas */
+      padding: 0 clamp(10px, 2vw, 24px);       /* lateral caso a arte tenha margens */
     }
 
-    /* ===========================================
-       CONTÊINER PRINCIPAL
-       =========================================== */
-    #game-container {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      overflow: hidden; /* sem scroll interno */
+    /* ===== Slot do VAGÃO (área de drop) ===== */
+    .wagon{
+      position:relative;
+      height: 70%;                             /* altura do slot dentro do vagão */
+      margin: 0 var(--slotInset) calc(var(--slotInset) + 6px);  /* casando com janelas */
+      padding: var(--slotInset) var(--slotInset) var(--label-h);
+      display:flex; align-items:center; justify-content:center;
+      overflow:hidden; z-index:101;
+
+      /* estética sutil para feedback visual (quase invisível) */
+      outline: 2px dashed rgba(255,255,255,0.0);  /* deixe 0.15 se quiser ver os slots */
+      outline-offset: -4px;
+      border-radius: 10px;
+      backdrop-filter: blur(0px);
     }
 
-    /* ===========================================
-       TREM E VAGÕES (sempre visíveis na base)
-       =========================================== */
-    #train {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      height: 20vh;
-      background: #2c3e50; /* “trilho” */
-      display: flex;
-      align-items: flex-end;
-      justify-content: space-around;
-      padding: 10px 10px 12px;
-      z-index: 100;
-      gap: 8px;
+    /* Imagem correta dentro do slot */
+    .wagon img.paired{
+      max-height: calc(100% - var(--label-h) - var(--slotInset));
+      max-width: calc(100% - 2*var(--slotInset));
+      height:auto; width:auto; object-fit:contain; display:block; pointer-events:none;
+      filter: drop-shadow(0 2px 2px rgba(0,0,0,.15));
     }
-    .wagon {
-      position: relative;
-      width: calc(100% / var(--num-wagons));
-      height: 80%;
-      background: #ecf0f1;
-      border: 3px solid #34495e;
+
+    /* Faixa de texto SEMPRE visível na base do slot */
+    .wagon .word{
+      position:absolute; left:var(--slotInset); right:var(--slotInset); bottom: var(--slotInset);
+      height: calc(var(--label-h) - 6px);
+      display:flex; align-items:center; justify-content:center;
+      padding: 3px 6px;
+      text-align:center; text-transform:uppercase;
+      color:#1f2d3a; font-weight:700;
+      font-size: clamp(12px, calc((100vw / var(--num-wagons)) * 0.18), 22px);
+      background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.85));
+      border: 1px solid rgba(0,0,0,0.06);
       border-radius: 8px;
-      display: flex;
-      flex-direction: column;        /* <- imagem em cima, texto embaixo */
-      align-items: center;
-      justify-content: flex-start;   /* texto abaixo da imagem */
-      gap: 6px;
-      padding: 6px 4px 8px;
-      z-index: 101;
-      overflow: hidden;
-    }
-    .wagon .word {
-      font-size: clamp(12px, calc((100vw / var(--num-wagons)) * 0.18), 24px);
-      line-height: 1.1;
-      color: #2c3e50;
-      text-transform: uppercase;
-      text-align: center;
-      word-break: break-word;
-      overflow-wrap: break-word;
-    }
-    /* Imagem que fica DENTRO do vagão após acerto */
-    .wagon img.paired {
-      width: clamp(40px, 8vw, 80px);
-      height: clamp(40px, 8vw, 80px);
-      object-fit: contain;
-      pointer-events: none;
-    }
-    .wagon.correct { animation: glow 0.8s ease-out forwards; }
-    @keyframes glow {
-      0%   { box-shadow: 0 0 5px rgba(46, 204, 113, 0.5); }
-      50%  { box-shadow: 0 0 20px rgba(46, 204, 113, 1); }
-      100% { box-shadow: 0 0 5px rgba(46, 204, 113, 0.5); }
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+      pointer-events:none;
     }
 
-    /* ===========================================
-       BALÕES + IMAGENS
-       =========================================== */
-    .balloon {
-      position: absolute;
+    .wagon.correct{ animation: glow .8s ease-out forwards; }
+    @keyframes glow{
+      0% { box-shadow:0 0 6px rgba(46,204,113,.35) inset, 0 0 0 rgba(0,0,0,0) }
+      50%{ box-shadow:0 0 18px rgba(46,204,113,.65) inset, 0 0 10px rgba(46,204,113,.4) }
+      100%{box-shadow:0 0 6px rgba(46,204,113,.35) inset, 0 0 0 rgba(0,0,0,0)}
+    }
+
+    /* ===== Balões ===== */
+    .balloon{
+      position:absolute;
       width: clamp(50px, 10vw, 100px);
       height: clamp(60px, 12vw, 120px);
-      background: url('balloon.png') no-repeat center center;
-      background-size: contain;
-      cursor: pointer;
-      transition: transform 0.2s ease;
-      z-index: 200;
+      background:url('balloon.png') no-repeat center/contain;
+      cursor:pointer; transition:transform .2s ease; z-index:200;
     }
-    .balloon:hover { transform: scale(1.1); }
-    .balloon img {
-      position: absolute;
-      top: calc(90% + 0px);
-      left: 50%;
-      transform: translateX(-50%);
-      width: clamp(40px, 8vw, 80px);
-      height: clamp(40px, 8vw, 80px);
-      object-fit: contain;
-      pointer-events: none;
-      z-index: 201;
+    .balloon:hover{ transform:scale(1.1); }
+    .balloon img{
+      position:absolute; top:calc(90% + 0px); left:50%; transform:translateX(-50%);
+      width: clamp(40px, 8vw, 80px); height: clamp(40px, 8vw, 80px);
+      object-fit:contain; pointer-events:none; z-index:201;
     }
 
-    /* ===========================================
-       FEEDBACK DE ERRO “Try Again!”
-       =========================================== */
-    #feedback {
-      position: absolute;
-      top: 45%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(231, 76, 60, 0.9);
-      color: white;
-      padding: 15px 25px;
-      border-radius: 8px;
-      font-size: 1.2em;
-      display: none;
-      z-index: 250;
+    /* ===== Feedback erro ===== */
+    #feedback{
+      position:absolute; top:45%; left:50%; transform:translate(-50%,-50%);
+      background:rgba(231,76,60,.9); color:#fff; padding:15px 25px; border-radius:8px; font-size:1.2em;
+      display:none; z-index:250;
     }
 
-    /* ===========================================
-       BOTÃO DE REINICIAR
-       =========================================== */
-    #restart-button {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      padding: 5px 10px;
-      background-color: #2980b9;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 0.8em;
-      z-index: 210; /* acima de vagões */
-      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-      transition: background-color 0.3s ease;
+    /* ===== Botão Restart ===== */
+    #restart-button{
+      position:absolute; top:10px; right:10px; padding:6px 12px;
+      background:#2980b9; color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:.9em; z-index:260;
+      box-shadow:0 4px 8px rgba(0,0,0,.2); transition:background-color .3s ease;
     }
-    #restart-button:hover { background-color: #1c5980; }
+    #restart-button:hover{ background:#1c5980; }
 
-    /* ===========================================
-       IMAGENS “FALLING”
-       =========================================== */
-    .falling {
-      position: absolute;
-      width: clamp(40px, 8vw, 80px);
-      height: clamp(40px, 8vw, 80px);
-      object-fit: contain;
-      pointer-events: none;
-      z-index: 150;
+    /* ===== Imagens em queda ===== */
+    .falling{
+      position:absolute; width: clamp(40px, 8vw, 80px); height: clamp(40px, 8vw, 80px);
+      object-fit:contain; pointer-events:none; z-index:150;
     }
   </style>
 </head>
 <body>
-  <!-- Overlay para orientar Landscape -->
-  <div id="rotate-overlay">
-    <p>Please rotate your device to Landscape mode to play.</p>
-  </div>
+  <div id="rotate-overlay"><p>Please rotate your device to Landscape mode to play.</p></div>
 
   <div id="game-container">
-    <!-- Botão para reiniciar a fase -->
     <button id="restart-button" onclick="restartGame()">Restart</button>
-
-    <!-- Feedback de erro -->
     <div id="feedback">Try Again!</div>
 
-    <!-- Trem e vagões -->
+    <!-- O trem é a IMAGEM de fundo; os slots (vagões) são as colunas do grid -->
     <div id="train"></div>
   </div>
 
-  <!-- Firebase SDK -->
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
   <script>
-    // ===== CONFIGURAÇÃO DO FIREBASE =====
+    /* ===== Firebase ===== */
     const firebaseConfig = {
       apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
       authDomain: "hannahenglishcourse.firebaseapp.com",
@@ -220,453 +156,226 @@
     };
     firebase.initializeApp(firebaseConfig);
 
-    // =================== DOM ===================
-    const gameContainer   = document.getElementById('game-container');
-    const trainElement    = document.getElementById('train');
-    const feedbackElement = document.getElementById('feedback');
-    const overlay         = document.getElementById('rotate-overlay');
+    /* ===== DOM refs ===== */
+    const gameContainer = document.getElementById('game-container');
+    const trainElement  = document.getElementById('train');
+    const feedbackEl    = document.getElementById('feedback');
+    const overlay       = document.getElementById('rotate-overlay');
 
-    let wordsList    = [];
-    let imagesList   = [];
-    let numWagons    = 0;
-    let correctCount = 0;
+    let wordsList=[], imagesList=[], numWagons=0, correctCount=0;
+    const balloonsArray=[];
 
-    // Guarda todos os balões existentes (para animar)
-    const balloonsArray = [];
-
-    /* ===========================================
-       0) ORIENTATION LOCK (melhor esforço no PWA)
-       =========================================== */
-    function tryLockLandscape() {
-      const isStandalone = window.matchMedia('(display-mode: standalone)').matches
-                        || window.navigator.standalone === true;
-      if (!isStandalone) return;
-
-      function lockNow() {
-        if (screen.orientation && screen.orientation.lock) {
-          screen.orientation.lock('landscape').catch(err => {
-            console.warn('Não foi possível travar em landscape:', err);
-          });
-        }
-      }
-
-      if (document.fullscreenElement || document.webkitFullscreenElement) {
-        lockNow();
-      } else {
-        const rfs = document.documentElement.requestFullscreen 
-                  || document.documentElement.webkitRequestFullscreen;
-        if (rfs) {
-          rfs.call(document.documentElement)
-            .then(lockNow)
-            .catch(err => {
-              console.warn('Erro ao entrar em fullscreen para lock:', err);
-              lockNow();
-            });
-        } else {
-          lockNow();
-        }
-      }
+    function tryLockLandscape(){
+      const isStandalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+      if(!isStandalone) return;
+      function lockNow(){ if(screen.orientation?.lock) screen.orientation.lock('landscape').catch(()=>{}); }
+      const rfs = document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen;
+      (document.fullscreenElement || document.webkitFullscreenElement) ? lockNow()
+        : rfs ? rfs.call(document.documentElement).then(lockNow).catch(lockNow) : lockNow();
     }
     tryLockLandscape();
 
-    /* ===========================================
-       1) DETECTAR ORIENTAÇÃO E OVERLAY
-       =========================================== */
-    function checkOrientation() {
-      const isStandalone = window.matchMedia('(display-mode: standalone)').matches
-                        || window.navigator.standalone === true;
-
-      if (isStandalone && screen.orientation && screen.orientation.type) {
-        overlay.style.display = screen.orientation.type.startsWith('portrait') ? 'flex' : 'none';
-        return;
+    function checkOrientation(){
+      const isStandalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+      if(isStandalone && screen.orientation?.type){
+        overlay.style.display = screen.orientation.type.startsWith('portrait') ? 'flex' : 'none'; return;
       }
-      // Fallback navegador normal
-      overlay.style.display = (window.innerHeight > window.innerWidth) ? 'flex' : 'none';
+      overlay.style.display = (innerHeight > innerWidth) ? 'flex' : 'none';
     }
+    addEventListener('resize', ()=>{ checkOrientation(); resizeTrain(); });
+    addEventListener('orientationchange', ()=>{ checkOrientation(); resizeTrain(); });
+    addEventListener('load', ()=>{ checkOrientation(); loadCardsData(initWordDropGame); });
 
-    window.addEventListener('resize', () => { checkOrientation(); resizeTrain(); });
-    window.addEventListener('orientationchange', () => { checkOrientation(); resizeTrain(); });
-    window.addEventListener('load', () => {
-      checkOrientation();
-      // Carrega os dados após verificar orientação
-      loadCardsData(initWordDropGame);
-    });
+    function getParamsFromURL(){ const p=new URLSearchParams(location.search); return { level:p.get('level'), unit:p.get('unit'), fase:p.get('fase') }; }
 
-    /* ===========================================
-       2) PARÂMETROS DA URL
-       =========================================== */
-    function getParamsFromURL() {
-      const params = new URLSearchParams(window.location.search);
-      return {
-        level: params.get('level'),
-        unit:  params.get('unit'),
-        fase:  params.get('fase'),
-      };
-    }
+    function preload(src){ return new Promise((res,rej)=>{ const im=new Image(); im.onload=res; im.onerror=rej; im.src=src; }); }
 
-    /* ===========================================
-       3) PRÉ-CARREGAR IMAGENS E DADOS
-       =========================================== */
-    function preload(src) {
-      return new Promise((resolve, reject) => {
-        const im = new Image();
-        im.onload = resolve;
-        im.onerror = reject;
-        im.src = src;
-      });
-    }
+    function loadCardsData(callback){
+      const {level,unit}=getParamsFromURL();
+      if(!level||!unit){ console.error("Parâmetros 'level' e 'unit' são obrigatórios na URL."); return; }
 
-    function loadCardsData(callback) {
-      const { level, unit } = getParamsFromURL();
-      if (!level || !unit) {
-        console.error("Parâmetros 'level' e 'unit' são obrigatórios na URL.");
-        return;
-      }
-
-      const wordsPath         = `../../${level}/${unit}/data1/words.txt`;
-      const imagePathTemplate = `../../${level}/${unit}/data1/imagens/imagem`;
+      const wordsPath=`../../${level}/${unit}/data1/words.txt`;
+      const imagePathTemplate=`../../${level}/${unit}/data1/imagens/imagem`;
 
       fetch(wordsPath)
-        .then(r => {
-          if (!r.ok) throw new Error(`Erro ao carregar ${wordsPath}`);
-          return r.text();
-        })
-        .then(text => {
-          // normaliza e remove linhas vazias
-          wordsList = text.split('\n').map(w => w.trim()).filter(Boolean);
+        .then(r=>{ if(!r.ok) throw new Error(`Erro ao carregar ${wordsPath}`); return r.text(); })
+        .then(text=>{
+          wordsList = text.split('\n').map(w=>w.trim()).filter(Boolean);
           numWagons = wordsList.length;
-
-          imagesList = wordsList.map((word, i) => ({
-            src:  `${imagePathTemplate}${i + 1}.png`,
-            pair: `pair${i + 1}`,
-            word
-          }));
-
-          // pré-carrega balloon + todas as imagens
-          const all = [preload('balloon.png'), ...imagesList.map(x => preload(x.src))];
-          return Promise.all(all);
+          imagesList = wordsList.map((word,i)=>({ src:`${imagePathTemplate}${i+1}.png`, pair:`pair${i+1}`, word }));
+          // fundo do trem + balão + pares
+          return Promise.all([
+            preload('../../../imagens/train.png'),
+            preload('balloon.png'),
+            ...imagesList.map(x=>preload(x.src))
+          ]);
         })
-        .then(() => callback())
-        .catch(err => console.error('Erro ao carregar dados/imagens:', err));
+        .then(()=>callback())
+        .catch(err=>console.error('Erro ao carregar dados/imagens:', err));
     }
 
-    /* ===========================================
-       4) INICIALIZAÇÃO DO JOGO
-       =========================================== */
-    function initWordDropGame() {
-      correctCount = 0;
-      trainElement.innerHTML = '';
-      removeAllBalloons();
-      balloonsArray.length = 0;
-
-      // Define quantos vagões
+    function initWordDropGame(){
+      correctCount=0; trainElement.innerHTML=''; removeAllBalloons(); balloonsArray.length=0;
       trainElement.style.setProperty('--num-wagons', numWagons);
 
-      // 4.1) Vagões com a palavra (texto aparece SEMPRE)
-      wordsList.forEach((word, index) => {
-        const wagon = document.createElement('div');
-        wagon.classList.add('wagon');
-        wagon.dataset.pair = `pair${index + 1}`;
+      // cria os SLOTS (um por coluna do grid)
+      for(let i=0;i<numWagons;i++){
+        const slot=document.createElement('div');
+        slot.className='wagon';
+        slot.dataset.pair=`pair${i+1}`;
 
-        // A imagem correta (quando acertar) será inserida ANTES do texto
-        const wordDiv = document.createElement('div');
-        wordDiv.classList.add('word');
-        wordDiv.textContent = word;
+        const wordDiv=document.createElement('div');
+        wordDiv.className='word';
+        wordDiv.textContent=wordsList[i];
 
-        wagon.appendChild(wordDiv);
-        trainElement.appendChild(wagon);
-      });
+        slot.appendChild(wordDiv);
+        trainElement.appendChild(slot);
+      }
 
-      // Ajusta o trem ao tamanho atual
       resizeTrain();
-
-      // 4.2) Gera balões
-      imagesList.forEach(imgObj => createBalloon(imgObj));
-
-      // Inicia animação dos balões
+      imagesList.forEach(obj=>createBalloon(obj));
       requestAnimationFrame(animateBalloons);
     }
 
-    /* ===========================================
-       5) REMOVER TODOS OS BALÕES DO DOM
-       =========================================== */
-    function removeAllBalloons() {
-      const existing = gameContainer.querySelectorAll('.balloon');
-      existing.forEach(b => b.remove());
+    function resizeTrain(){
+      trainElement.style.height = (innerHeight*0.26) + 'px';   // casa a altura com a arte
     }
 
-    /* ===========================================
-       6) REDIMENSIONAR O TREM
-       =========================================== */
-    function resizeTrain() {
-      trainElement.style.width  = '100%';
-      trainElement.style.height = (window.innerHeight * 0.20) + 'px';
-    }
+    function removeAllBalloons(){ gameContainer.querySelectorAll('.balloon').forEach(b=>b.remove()); }
+    function getRandomBetween(min,max){ return min + Math.random()*(max-min); }
 
-    /* ===========================================
-       7) CRIAR UM BALÃO
-       =========================================== */
-    function getRandomBetween(min, max) { return min + Math.random() * (max - min); }
-
-    function createBalloon(imgObj) {
-      const balloon = document.createElement('div');
-      balloon.classList.add('balloon');
-      balloon.dataset.pair = imgObj.pair;
-      balloon.dataset.word = imgObj.word;
+    function createBalloon(imgObj){
+      const balloon=document.createElement('div');
+      balloon.className='balloon';
+      balloon.dataset.pair=imgObj.pair;
       gameContainer.appendChild(balloon);
 
-      const balloonRect = balloon.getBoundingClientRect();
-      const balloonW    = balloonRect.width;
-      const initialTop  = window.innerHeight * 0.05; // 5% do topo
-      const screenW     = window.innerWidth;
-      const randomX     = Math.floor(Math.random() * (screenW - balloonW - 20)) + 10;
-      balloon.style.top  = initialTop + 'px';
-      balloon.style.left = randomX + 'px';
+      const r=balloon.getBoundingClientRect();
+      const w=r.width, top=innerHeight*0.05;
+      const x=Math.floor(Math.random()*(innerWidth - w - 20)) + 10;
+      balloon.style.top=top+'px'; balloon.style.left=x+'px';
 
-      // imagem pendurada
-      const imgTag = document.createElement('img');
-      imgTag.src = imgObj.src;
-      balloon.appendChild(imgTag);
+      const tag=document.createElement('img');
+      tag.src=imgObj.src; balloon.appendChild(tag);
 
-      // clique → estoura e inicia queda
-      balloon.addEventListener('click', () => popBalloon(balloon, imgObj));
+      balloon.addEventListener('click', ()=>popBalloon(balloon, imgObj));
 
-      // propriedades de flutuação
-      const speedX    = getRandomBetween(0.03, 0.07);
-      const direction = Math.random() < 0.5 ? -1 : 1;
-      const ampY      = getRandomBetween(10, 30);
-      const freqY     = getRandomBetween(0.002, 0.005);
-      const phaseX    = Math.random() * 2 * Math.PI;
-      const phaseY    = Math.random() * 2 * Math.PI;
-
-      balloon._floatProps = {
-        speedX, direction, amplitudeY: ampY, frequencyY: freqY,
-        phaseX, phaseY, startLeft: randomX, topBase: initialTop,
-        width: balloonW, lastTimestamp: null
+      balloon._floatProps={
+        speedX:getRandomBetween(0.03,0.07),
+        direction: Math.random()<0.5 ? -1 : 1,
+        amplitudeY:getRandomBetween(10,30),
+        frequencyY:getRandomBetween(0.002,0.005),
+        phaseY: Math.random()*2*Math.PI,
+        topBase:top, width:w, lastTimestamp:null
       };
-
       balloonsArray.push(balloon);
     }
 
-    /* ===========================================
-       8) ESTOURAR O BALÃO → QUEDA
-       =========================================== */
-    function popBalloon(balloonElem, imgObj) {
-      const startRect = balloonElem.getBoundingClientRect();
+    function popBalloon(balloonElem,imgObj){
+      const start=balloonElem.getBoundingClientRect();
       balloonElem.remove();
-      const idx = balloonsArray.indexOf(balloonElem);
-      if (idx !== -1) balloonsArray.splice(idx, 1);
+      const idx=balloonsArray.indexOf(balloonElem);
+      if(idx!==-1) balloonsArray.splice(idx,1);
 
-      const fallingImg = document.createElement('img');
-      fallingImg.src = imgObj.src;
-      fallingImg.classList.add('falling');
-      gameContainer.appendChild(fallingImg);
+      const falling=document.createElement('img');
+      falling.src=imgObj.src; falling.className='falling'; gameContainer.appendChild(falling);
 
-      const imgRect = fallingImg.getBoundingClientRect();
-      fallingImg.style.left = (startRect.left + (startRect.width - imgRect.width) / 2) + 'px';
-      fallingImg.style.top  = startRect.top + 'px';
-      fallingImg.dataset.pair = imgObj.pair;
-      fallingImg.dataset.word = imgObj.word;
-
-      animateFall(fallingImg);
+      const r=falling.getBoundingClientRect();
+      falling.style.left=(start.left + (start.width - r.width)/2) + 'px';
+      falling.style.top = start.top + 'px';
+      falling.dataset.pair=imgObj.pair;
+      requestAnimationFrame(ts=>animateFall(falling, ts));
     }
 
-    /* ===========================================
-       9) ANIMAÇÃO DA QUEDA (delta-time)
-       =========================================== */
-    function animateFall(imgElement) {
-      const SPEED_PX_PER_SEC = Math.max(250, window.innerHeight * 0.45);
-      let lastTs = null;
+    function animateFall(img, ts0){
+      const SPEED = Math.max(250, innerHeight*0.45);
+      let lastTs=ts0;
+      function step(ts){
+        const dt=(ts-lastTs)/1000; lastTs=ts;
+        const top=parseFloat(img.style.top)||0;
+        img.style.top=(top + SPEED*dt)+'px';
 
-      function step(ts) {
-        if (lastTs == null) lastTs = ts;
-        const dt = (ts - lastTs) / 1000; // s
-        lastTs = ts;
+        const trainRect=trainElement.getBoundingClientRect();
+        const imgRect=img.getBoundingClientRect();
 
-        const currTop = parseFloat(imgElement.style.top);
-        const nextTop = currTop + SPEED_PX_PER_SEC * dt;
-        imgElement.style.top = nextTop + 'px';
+        if(imgRect.bottom >= trainRect.top){
+          // identifica em qual coluna (slot) caiu pelo centro X
+          const centerX = imgRect.left + imgRect.width/2;
+          const slots = [...trainElement.querySelectorAll('.wagon')];
+          const landed = slots.find(s=>{ const r=s.getBoundingClientRect(); return centerX>=r.left && centerX<=r.right; });
 
-        const trainRect = trainElement.getBoundingClientRect();
-        const imgRect   = imgElement.getBoundingClientRect();
-
-        if (imgRect.bottom >= trainRect.top) {
-          // Descobre em qual vagão o centro X pousou
-          const centerX = imgRect.left + imgRect.width / 2;
-          const wagons  = Array.from(document.querySelectorAll('.wagon'));
-          const landedWagon = wagons.find(w => {
-            const r = w.getBoundingClientRect();
-            return centerX >= r.left && centerX <= r.right;
-          });
-
-          if (landedWagon) {
-            if (landedWagon.dataset.pair === imgElement.dataset.pair) {
-              handleCorrectDrop(landedWagon, imgElement);
-            } else {
-              handleWrongDrop(imgElement);
-            }
-          } else {
-            handleWrongDrop(imgElement);
-          }
-          return; // encerra animação
-        }
-
-        // Saiu totalmente da tela? erro
-        if (imgRect.top > window.innerHeight) {
-          handleWrongDrop(imgElement);
+          if(landed){
+            if(landed.dataset.pair===img.dataset.pair) handleCorrectDrop(landed,img);
+            else handleWrongDrop(img);
+          } else handleWrongDrop(img);
           return;
         }
-
+        if(imgRect.top > innerHeight){ handleWrongDrop(img); return; }
         requestAnimationFrame(step);
       }
       requestAnimationFrame(step);
     }
 
-    /* ===========================================
-       10) ACERTO: encaixa a imagem DENTRO do vagão
-            e mantém o TEXTO abaixo visível
-       =========================================== */
-    function handleCorrectDrop(wagonElem, imgElement) {
-      // Remove a imagem "falling" da tela
-      imgElement.remove();
+    function handleCorrectDrop(slot, imgFalling){
+      imgFalling.remove();
+      const paired=document.createElement('img');
+      paired.src=imgFalling.src; paired.className='paired';
 
-      // Cria (ou reaproveita) a imagem do par dentro do vagão
-      const pairedImg = document.createElement('img');
-      pairedImg.src = imgElement.src;
-      pairedImg.classList.add('paired');
+      const wordDiv=slot.querySelector('.word');
+      if(wordDiv) slot.insertBefore(paired, wordDiv); else slot.appendChild(paired);
 
-      // Garante a ordem: IMAGEM em cima, TEXTO embaixo
-      const wordDiv = wagonElem.querySelector('.word');
-      if (wordDiv) {
-        wagonElem.insertBefore(pairedImg, wordDiv);
-      } else {
-        wagonElem.appendChild(pairedImg);
-      }
-
-      wagonElem.classList.add('correct');
-      correctCount++;
-      if (correctCount === numWagons) {
-        showCompletionModal();
-        updateNextPhaseAuth();
-      }
+      slot.classList.add('correct');
+      if(++correctCount===numWagons){ alert("Congratulations! You completed this phase."); updateNextPhaseAuth(); }
     }
 
-    /* ===========================================
-       11) ERRO: feedback e restaura balão
-       =========================================== */
-    let feedbackTimer = null;
-    function showFeedback() {
-      feedbackElement.style.display = 'block';
-      clearTimeout(feedbackTimer);
-      feedbackTimer = setTimeout(() => {
-        feedbackElement.style.display = 'none';
-      }, 800);
+    let fbTimer=null;
+    function showFeedback(){ feedbackEl.style.display='block'; clearTimeout(fbTimer); fbTimer=setTimeout(()=>{ feedbackEl.style.display='none'; }, 800); }
+    function handleWrongDrop(img){ showFeedback(); const p=img.dataset.pair; img.remove(); const obj=imagesList.find(o=>o.pair===p); if(obj) createBalloon(obj); }
+
+    function updateNextPhaseAuth(){
+      const user=firebase.auth().currentUser;
+      if(user){ updateNextPhase(user.uid); return; }
+      const unsub=firebase.auth().onAuthStateChanged(u=>{ if(u) updateNextPhase(u.uid); unsub&&unsub(); });
     }
-
-    function handleWrongDrop(imgElement) {
-      showFeedback();
-      const pair = imgElement.dataset.pair;
-      imgElement.remove();
-
-      const imgObj = imagesList.find(obj => obj.pair === pair);
-      if (imgObj) createBalloon(imgObj);
-    }
-
-    /* ===========================================
-       12) MODAL DE CONCLUSÃO
-       =========================================== */
-    function showCompletionModal() {
-      alert("Congratulations! You completed this phase.");
-    }
-
-    /* ===========================================
-       13) ATUALIZAR PRÓXIMA FASE (auth one-shot)
-       =========================================== */
-    function updateNextPhaseAuth() {
-      const user = firebase.auth().currentUser;
-      if (user) { updateNextPhase(user.uid); return; }
-      const unsub = firebase.auth().onAuthStateChanged(u => {
-        if (u) updateNextPhase(u.uid);
-        unsub && unsub();
-      });
-    }
-
-    async function updateNextPhase(userId) {
-      console.log("Updating next phase...");
-      const currentPhase = getPhaseFromURL();
-      const { level, unit } = getParamsFromURL();
-      const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-
-      try {
-        if (currentPhase === "last") {
-          const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-          await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
-        } else if (currentPhase === "end") {
-          const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
-          await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
-        } else {
-          const nextPhase = parseInt(currentPhase) + 1;
-          await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
+    async function updateNextPhase(userId){
+      const params=new URLSearchParams(location.search);
+      const fase=params.get('fase'); const level=params.get('level'); const unit=params.get('unit');
+      const dbRef=firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+      try{
+        if(fase==="last"){
+          const nextUnit=`Unit${parseInt(unit.replace('Unit',''))+1}`;
+          await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({fase1:true});
+        }else if(fase==="end"){
+          const nextLevel=`Level${parseInt(level.replace('Level',''))+1}`;
+          await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({fase1:true});
+        }else{
+          const nextPhase=parseInt(fase)+1;
+          await dbRef.update({[`fase${fase}`]:true, [`fase${nextPhase}`]:true});
         }
-        console.log("Update successful.");
-      } catch (error) {
-        console.error("Error updating next phase:", error);
-      }
+      }catch(e){ console.error('Error updating next phase:', e); }
     }
 
-    function getPhaseFromURL() {
-      const params = new URLSearchParams(window.location.search);
-      return params.get('fase');
-    }
-
-    /* ===========================================
-       14) REINICIAR O JOGO
-       =========================================== */
-    function restartGame() {
-      correctCount = 0;
-      removeAllBalloons();
-      balloonsArray.length = 0;
-
-      // Remove imagens “falling”
-      const fallingImgs = gameContainer.querySelectorAll('.falling');
-      fallingImgs.forEach(img => img.remove());
-
-      // Remove imagens emparelhadas dentro dos vagões
-      const imgsInWagons = trainElement.querySelectorAll('img.paired');
-      imgsInWagons.forEach(img => img.remove());
-
-      // Remove classe de acerto
-      const allWagons = trainElement.querySelectorAll('.wagon');
-      allWagons.forEach(w => w.classList.remove('correct'));
-
-      // Recria tudo
+    function restartGame(){
+      correctCount=0;
+      removeAllBalloons(); balloonsArray.length=0;
+      gameContainer.querySelectorAll('.falling').forEach(i=>i.remove());
+      trainElement.querySelectorAll('img.paired').forEach(i=>i.remove());
+      trainElement.querySelectorAll('.wagon').forEach(w=>w.classList.remove('correct'));
       initWordDropGame();
     }
 
-    /* ===========================================
-       15) ANIMAÇÃO DOS BALÕES
-       =========================================== */
-    function animateBalloons(timestamp) {
-      for (let balloon of balloonsArray) {
-        const p = balloon._floatProps;
-        if (!p.lastTimestamp) p.lastTimestamp = timestamp;
-        const delta = timestamp - p.lastTimestamp;
-        p.lastTimestamp = timestamp;
+    function animateBalloons(ts){
+      for(const b of balloonsArray){
+        const p=b._floatProps; if(!p.lastTimestamp) p.lastTimestamp=ts;
+        const delta=ts - p.lastTimestamp; p.lastTimestamp=ts;
 
-        // Horizontal
-        let currLeft = parseFloat(balloon.style.left);
-        const moveX  = p.speedX * p.direction * delta;
-        let newLeft  = currLeft + moveX;
+        let left=parseFloat(b.style.left);
+        left += p.speedX * p.direction * delta;
+        if(left > innerWidth) left = -p.width;
+        if(left < -p.width) left = innerWidth;
 
-        if (newLeft > window.innerWidth) newLeft = -p.width;
-        if (newLeft < -p.width) newLeft = window.innerWidth;
-
-        // Vertical (senoide)
-        const oscY   = p.amplitudeY * Math.sin(p.phaseY + p.frequencyY * timestamp);
-        const newTop = p.topBase + oscY;
-
-        balloon.style.left = newLeft + 'px';
-        balloon.style.top  = newTop + 'px';
+        const top = p.topBase + p.amplitudeY * Math.sin(p.phaseY + p.frequencyY * ts);
+        b.style.left=left+'px'; b.style.top=top+'px';
       }
       requestAnimationFrame(animateBalloons);
     }
