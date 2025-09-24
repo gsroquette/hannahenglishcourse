@@ -7,8 +7,9 @@ function getActivitiesByTrecho(trecho, level, unit) {
                 { id: 1, name: "StoryCards", path: `/Atividades/StoryCards/index.html?level=${level}&unit=${unit}&fase=1`, img: "../../imagens/botoes/storycards_button.png", unlocked: false },
                 { id: 2, name: "Flashcards", path: `/Atividades/Flashcards/index.html?level=${level}&unit=${unit}&fase=2`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
                 { id: 3, name: "Flashcards2", path: `/Atividades/Flashcards2/index.html?level=${level}&unit=${unit}&fase=3`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
-                { id: 4, name: "Word Drop Express", path: `/Atividades/word%20drop%20express/index.html?level=${level}&unit=${unit}&fase=4`, img: "../../imagens/botoes/ballonGame.png", unlocked: false },     
-                { id: 5, name: "Perguntas Starter", path: `/Atividades/perguntas%20starter/index.html?level=${level}&unit=${unit}&fase=5`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
+                { id: 4, name: "Word Drop Express", path: `/Atividades/word%20drop%20express/index.html?level=${level}&unit=${unit}&fase=4`, img: "../../imagens/botoes/ballonGame.png", unlocked: false }, 
+                { id: 5, name: "OrdenarSC", path: `/Atividades/ordenarsc/index.html?level=${level}&unit=${unit}&fase=5`, img: "../../imagens/botoes/hannah_sequence_game.png", unlocked: false },         
+                { id: 6, name: "Perguntas Starter", path: `/Atividades/perguntas%20starter/index.html?level=${level}&unit=${unit}&fase=6`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
             ];
         case "trecho2":
             return [
