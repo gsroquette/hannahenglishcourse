@@ -27,7 +27,7 @@ function getActivitiesByTrecho(trecho, level, unit) {
             ];
         case "trecho4":
             return [
-                { id: 15, name: "Grammar", path: `/Atividades/Grammar/index.html?level=${level}&unit=${unit}&fase=15`, img: "../../imagens/botoes/grammar_button.png", unlocked: false },
+                { id: 15, name: "GrammarStarter", path: `/Atividades/GrammarStarter/index.html?level=${level}&unit=${unit}&fase=15`, img: "../../imagens/botoes/grammar_button.png", unlocked: false },
                 { id: 16, name: "Exerciciosdegramatica", path: `/Atividades/Exerciciosdegramatica/index.html?level=${level}&unit=${unit}&fase=16`, img: "../../imagens/botoes/exercises_button.png", unlocked: false },
                 { id: 17, name: "Speak", path: `/Atividades/Speak/index.html?level=${level}&unit=${unit}&fase=17`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
                 { id: 18, name: "Speak2", path: `/Atividades/Speak2/index.html?level=${level}&unit=${unit}&fase=18`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
