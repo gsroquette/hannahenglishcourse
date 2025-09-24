@@ -227,10 +227,12 @@ async function toDataURL(url){
   });
 }
 
-async function addImageFitted(doc, dataURL, margin, cursorY){
+/** Adiciona imagem centralizada; se scaleFactor for informado, aplica (ex.: 0.25 = 1/4 do tamanho). */
+async function addImageFitted(doc, dataURL, margin, cursorY, { center=true, scaleFactor=1 } = {}){
   const img = new Image();
   img.src = dataURL;
   await img.decode();
+
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
   const maxW  = pageW - margin * 2;
@@ -238,16 +240,20 @@ async function addImageFitted(doc, dataURL, margin, cursorY){
 
   let w = img.naturalWidth;
   let h = img.naturalHeight;
-  const scale = Math.min(maxW / w, maxH / h, 1);
-  w *= scale; h *= scale;
+
+  // encaixe proporcional dentro da área útil
+  const fitScale = Math.min(maxW / w, maxH / h, 1);
+  w *= fitScale * scaleFactor;
+  h *= fitScale * scaleFactor;
 
   if (cursorY + h > pageH - margin) {
     doc.addPage();
     cursorY = margin;
   }
 
+  const x = center ? (pageW - w)/2 : margin;
   const format = dataURL.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-  doc.addImage(dataURL, format, margin, cursorY, w, h);
+  doc.addImage(dataURL, format, x, cursorY, w, h);
   return cursorY + h + 12;
 }
 
@@ -265,21 +271,36 @@ async function generatePDF(){
   const margin = 40;
   let cursorY = margin;
 
-  // Cabeçalho opcional com logo (se existir)
+  /* ===== Cabeçalho: logo pequeno + texto "Hannah English Course" ao lado ===== */
   try{
     const logoURL = 'Logo.png';
     const logoData = await toDataURL(logoURL);
-    cursorY = await addImageFitted(doc, logoData, margin, cursorY);
-  }catch(_e){/* sem logo, segue */}
 
-  // Tenta incluir a imagem principal exibida na página (#main-image)
-  try{
-    const mainImgEl = document.getElementById('main-image');
-    if (mainImgEl && mainImgEl.src) {
-      const mainData = await toDataURL(mainImgEl.src);
-      cursorY = await addImageFitted(doc, mainData, margin, cursorY);
-    }
-  }catch(_e){/* se falhar, ignora */}
+    // Desenha logo com altura pequena (ex.: 28pt), preservando proporção, alinhado à esquerda
+    const tmpImg = new Image();
+    tmpImg.src = logoData;
+    await tmpImg.decode();
+    const targetH = 28;
+    const ratio = tmpImg.naturalWidth / tmpImg.naturalHeight;
+    const targetW = targetH * ratio;
+
+    const format = logoData.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+    doc.addImage(logoData, format, margin, cursorY, targetW, targetH);
+
+    // Texto ao lado do logo
+    const textX = margin + targetW + 10;
+    const textY = cursorY + targetH * 0.8; // alinhamento visual
+    doc.setFont('helvetica','bold'); doc.setFontSize(16);
+    doc.text('Hannah English Course', textX, textY);
+
+    // avança o cursor para abaixo do cabeçalho
+    cursorY += targetH + 16;
+  }catch(_e){
+    // se não houver logo, apenas escreve o texto no topo
+    doc.setFont('helvetica','bold'); doc.setFontSize(16);
+    doc.text('Hannah English Course', margin, cursorY);
+    cursorY += 28;
+  }
 
   const addTitle = (txt) => {
     doc.setFont('helvetica','bold'); doc.setFontSize(18);
@@ -334,7 +355,16 @@ async function generatePDF(){
     tableRows = [];
   };
 
-  // Processar com suporte a imagens
+  // Imagem principal (da página) deve sair também reduzida (1/4) e centralizada
+  try{
+    const mainImgEl = document.getElementById('main-image');
+    if (mainImgEl && mainImgEl.src) {
+      const mainData = await toDataURL(mainImgEl.src);
+      cursorY = await addImageFitted(doc, mainData, margin, cursorY, { center:true, scaleFactor:0.25 });
+    }
+  }catch(_e){/* se falhar, ignora */}
+
+  // Processar com suporte a imagens do conteúdo
   const lines = data.split('\n');
   for (const raw of lines){
     if (skipping) break;
@@ -367,7 +397,7 @@ async function generatePDF(){
       continue;
     }
 
-    // Imagem inline #IMG:arquivo.png|larguraOpcional
+    // Imagem inline #IMG:arquivo.png|...
     if (l.startsWith('#IMG:')) {
       flushTable();
       const after = l.substring(5).trim();
@@ -376,9 +406,10 @@ async function generatePDF(){
       let url2 = `${baseDir}/../${imgName}`;
       try{
         const dataURL = await toDataURL(url1).then(x=>x).catch(async ()=> await toDataURL(url2));
-        cursorY = await addImageFitted(doc, dataURL, margin, cursorY);
+        // imagens do conteúdo: sempre 1/4 do tamanho e centralizadas
+        cursorY = await addImageFitted(doc, dataURL, margin, cursorY, { center:true, scaleFactor:0.25 });
       }catch(_e){
-        // se falhar, apenas ignora esta imagem
+        // ignora falha de imagem
       }
       continue;
     }
