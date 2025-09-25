@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Word Drop Express</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  /* ===== Base ===== */
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{
+    width:100vw;height:100vh;
+    background:url('../../../imagens/fundo.png') repeat;
+    font-family:"Times New Roman",Times,serif;
+  }
+  html,body,#game-container{-webkit-user-select:none;user-select:none;touch-action:manipulation}
+  #game-container{position:relative;width:100%;height:100%;overflow:hidden}
+
+  /* =================== CONTROLES RÁPIDOS ===================
+     - --wagonScale       => tamanho do PNG do vagão (moldura)
+     - --pairedImgScale   => tamanho da imagem que cai (dentro do vagão)
+     - --imgSafePad       => margem de segurança da imagem interna
+     - --pairedImgLift    => “sobe” a imagem dentro da janela
+     - --liftVH           => sobe/baixa o vagão dentro da faixa
+     - --wheelPadVH       => espaço acima das rodas (para a janela)
+     - --labelBelowVH     => quão abaixo das rodas vai o rótulo (texto)
+     - --trainH / --wagonFactor => altura total da faixa e do slot
+  ========================================================== */
+  :root{
+    --trainH: 44;                 /* altura da faixa do trem (vh) */
+    --wagonFactor: 0.86;          /* altura do slot relativa à faixa */
+    --wagonScale: 1.12;           /* escala do PNG do vagão (moldura) */
+    --liftVH: 3.2;                /* quanto o vagão sobe dentro da faixa */
+
+    --windowInset: clamp(10px, 1.2vw, 18px); /* margem interna da janela */
+    --wheelPadVH: 2.0;            /* espaço acima das rodas (janela) */
+
+    --pairedImgScale: 0.68;       /* imagem ocupa mais a janela */
+    --pairedImgLift: -50%;          /* levanta um pouco a imagem */
+    --imgSafePad: clamp(16px, 2vw, 26px); /* folga da imagem interna */
+
+    --labelH: clamp(22px, 3.4vh, 38px); /* altura visual do rótulo */
+    --labelBelowVH: 3.4;          /* rótulo ABAIXO das rodas (vh) */
+
+    --colGap: clamp(10px, 1.4vw, 20px);
+    --sidePad: clamp(12px, 2vw, 26px);
+  }
+
+  /* Overlay de orientação */
+  #rotate-overlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.85);color:#fff;
+    display:none;justify-content:center;align-items:center;text-align:center;padding:1rem;z-index:3000
+  }
+  #rotate-overlay p{font-size:1.3rem;line-height:1.5}
+
+  /* ===== Faixa do trem (grid dos slots) ===== */
+  #train{
+    position:absolute;left:0;bottom:0;width:100%;
+    height: calc(var(--trainH) * 1vh);
+    display:grid;
+    grid-template-columns: repeat(var(--num-wagons), 1fr);
+    align-items:end;
+    gap: var(--colGap);
+    /* padding-bottom inclui espaço pro rótulo que fica FORA do vagão */
+    padding: 0 var(--sidePad) calc(clamp(10px,1.4vw,20px) + var(--labelBelowVH) * 1vh + 6px);
+    z-index:100;
+  }
+
+  /* ===== Cada vagão (slot) ===== */
+  .wagon{
+    position:relative;
+    height: calc(var(--trainH) * var(--wagonFactor) * 1vh);
+    /* Moldura do vagão (wagon.png) */
+    background-image: url('wagon.png');
+    background-repeat: no-repeat;
+    background-position: center bottom;
+    background-size: calc(100% * var(--wagonScale)) auto;
+
+    /* Janela útil do vagão (SEM reservar espaço pro rótulo) */
+    padding:
+      var(--windowInset)
+      var(--windowInset)
+      calc(var(--windowInset) + (var(--wheelPadVH) * 1vh))
+      var(--windowInset);
+
+    transform: translateY(calc(-1 * var(--liftVH) * 1vh));
+    overflow: visible; /* permite o rótulo “sair” para baixo */
+  }
+
+  /* ===== Área da imagem (centralizada e um pouco mais alta) ===== */
+  .slot-img{
+    position:absolute;
+    top:    calc(var(--windowInset) + 4px);
+    left:   var(--windowInset);
+    right:  var(--windowInset);
+    bottom: calc(var(--windowInset) + (var(--wheelPadVH) * 1vh) + 10px);
+    display:flex;
+    align-items:center;          /* centraliza verticalmente */
+    justify-content:center;      /* centraliza horizontalmente */
+    overflow:hidden;
+  }
+
+  /* Imagem emparelhada dentro do vagão */
+  .slot-img img.paired{
+    max-width:  calc((100% - var(--imgSafePad)*2) * var(--pairedImgScale));
+    max-height: calc((100% - var(--imgSafePad)*2) * var(--pairedImgScale));
+    width:auto;height:auto;object-fit:contain;display:block;pointer-events:none;
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,.12));
+    transform: translateY(calc(-1 * var(--pairedImgLift))); /* sobe ligeiro */
+  }
+
+  /* ===== Rótulo ABAIXO das rodas ===== */
+  .word{
+    position:absolute;
+    left:  var(--windowInset);
+    right: var(--windowInset);
+    bottom: calc(-1 * var(--labelBelowVH) * 1vh); /* fora do vagão */
+    height: calc(var(--labelH) - 6px);
+
+    display:flex;align-items:center;justify-content:center;
+    text-transform:uppercase;text-align:center;font-weight:700;
+    color:#1f2d3a;
+    font-size: clamp(14px, calc((100vw / var(--num-wagons))*0.20), 26px);
+    background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,0.88));
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 10px; box-shadow:0 2px 6px rgba(0,0,0,.08);
+    pointer-events:none;
+    z-index: 2;
+  }
+
+  .wagon.correct{
+  animation: none !important;
+  box-shadow: none !important;
+}
+
+
+  /* ===== Balões ===== */
+  .balloon{
+    position:absolute;
+    width:clamp(56px, 10.5vw, 112px);
+    height:clamp(68px, 12.5vw, 130px);
+    background:url('balloon.png') no-repeat center/contain;
+    cursor:pointer;transition:transform .2s ease;z-index:200;
+  }
+  .balloon:hover{transform:scale(1.1)}
+  .balloon img{
+    position:absolute;top:calc(90% + 0px);left:50%;transform:translateX(-50%);
+    width:clamp(44px,8.5vw,88px);height:clamp(44px,8.5vw,88px);object-fit:contain;pointer-events:none;z-index:201
+  }
+
+  /* ===== Feedback / Botão ===== */
+  #feedback{
+    position:absolute;top:45%;left:50%;transform:translate(-50%,-50%);
+    background:rgba(231,76,60,.9);color:#fff;padding:15px 25px;border-radius:8px;font-size:1.2em;display:none;z-index:250
+  }
+  #restart-button{
+    position:absolute;top:10px;right:10px;padding:6px 12px;background:#2980b9;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:.9em;z-index:260;
+    box-shadow:0 4px 8px rgba(0,0,0,.2);transition:background-color .3s ease
+  }
+  #restart-button:hover{background:#1c5980}
+
+  /* ===== Imagem durante a QUEDA — menor ===== */
+  .falling{
+    position:absolute;
+    width:  clamp(28px, 5.5vw, 52px);
+    height: clamp(28px, 5.5vw, 52px);
+    object-fit:contain; pointer-events:none; z-index:150;
+  }
+</style>
+</head>
+<body>
+  <div id="rotate-overlay"><p>Please rotate your device to Landscape mode to play.</p></div>
+
+  <div id="game-container">
+    <button id="restart-button" onclick="restartGame()">Restart</button>
+    <div id="feedback">Try Again!</div>
+    <div id="train"></div>
+  </div>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+  <script>
+    /* ===== Firebase ===== */
+    const firebaseConfig={
+      apiKey:"AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+      authDomain:"hannahenglishcourse.firebaseapp.com",
+      databaseURL:"https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId:"hannahenglishcourse",
+      storageBucket:"hannahenglishcourse.appspot.com",
+      messagingSenderId:"449818788486",
+      appId:"1:449818788486:web:8a49d3f68591e6fb3f0707"
+    };
+    firebase.initializeApp(firebaseConfig);
+
+    const gameContainer=document.getElementById('game-container');
+    const train=document.getElementById('train');
+    const feedback=document.getElementById('feedback');
+    const overlay=document.getElementById('rotate-overlay');
+
+    let wordsList=[], imagesList=[], numWagons=0, correctCount=0;
+    const balloons=[];
+
+    /* ===== Orientação ===== */
+    function checkOrientation(){
+      const stand=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+      if(stand && screen.orientation?.type){
+        overlay.style.display = screen.orientation.type.startsWith('portrait') ? 'flex' : 'none'; return;
+      }
+      overlay.style.display = (innerHeight > innerWidth) ? 'flex' : 'none';
+    }
+    addEventListener('resize',checkOrientation);
+    addEventListener('orientationchange',checkOrientation);
+    addEventListener('load',()=>{ checkOrientation(); loadCardsData(init); });
+
+    /* ===== Helpers ===== */
+    function getParams(){ const p=new URLSearchParams(location.search); return {level:p.get('level'),unit:p.get('unit'),fase:p.get('fase')}; }
+    function preload(src){ return new Promise((res,rej)=>{ const im=new Image(); im.onload=res; im.onerror=rej; im.src=src; }); }
+    function rand(a,b){ return a + Math.random()*(b-a); }
+
+    /* ===== Carrega dados ===== */
+    function loadCardsData(cb){
+      const {level,unit}=getParams();
+      if(!level||!unit){console.error("Parâmetros 'level' e 'unit' são obrigatórios na URL."); return;}
+      const wordsPath=`../../${level}/${unit}/data1/words.txt`;
+      const imagePathTemplate=`../../${level}/${unit}/data1/imagens/imagem`;
+
+      fetch(wordsPath).then(r=>{if(!r.ok)throw new Error('Erro ao carregar '+wordsPath);return r.text();})
+        .then(t=>{
+          wordsList = t.split('\n').map(s=>s.trim()).filter(Boolean);
+          numWagons = wordsList.length;
+          imagesList = wordsList.map((w,i)=>({src:`${imagePathTemplate}${i+1}.png`,pair:`pair${i+1}`,word:w}));
+          return Promise.all([preload('wagon.png'), preload('balloon.png'), ...imagesList.map(x=>preload(x.src))]);
+        })
+        .then(()=>cb())
+        .catch(e=>console.error(e));
+    }
+
+    /* ===== Inicia jogo ===== */
+    function init(){
+      correctCount=0; train.innerHTML=''; balloons.length=0;
+      train.style.setProperty('--num-wagons', numWagons);
+
+      // cria slots (vagões)
+      wordsList.forEach((word,i)=>{
+        const slot=document.createElement('div'); slot.className='wagon'; slot.dataset.pair=`pair${i+1}`;
+        const imgBox=document.createElement('div'); imgBox.className='slot-img';
+        const label=document.createElement('div'); label.className='word'; label.textContent=word;
+        slot.appendChild(imgBox); slot.appendChild(label); train.appendChild(slot);
+      });
+
+      // cria balões
+      imagesList.forEach(obj=>createBalloon(obj));
+      requestAnimationFrame(animateBalloons);
+    }
+
+    /* ===== Balões ===== */
+    function createBalloon(obj){
+      const b=document.createElement('div'); b.className='balloon'; b.dataset.pair=obj.pair; gameContainer.appendChild(b);
+      const r=b.getBoundingClientRect(); const w=r.width; const top=innerHeight*0.05; const x=Math.floor(Math.random()*(innerWidth-w-20))+10;
+      b.style.top=top+'px'; b.style.left=x+'px';
+      const img=document.createElement('img'); img.src=obj.src; b.appendChild(img);
+      b.addEventListener('click',()=>popBalloon(b,obj));
+      b._float={speedX:rand(0.03,0.07),dir:Math.random()<0.5?-1:1,amp:rand(10,30),freq:rand(0.002,0.005),phase:Math.random()*Math.PI*2,base:top,w:w,last:null};
+      balloons.push(b);
+    }
+
+    function popBalloon(b,obj){
+      const s=b.getBoundingClientRect(); b.remove();
+      const idx=balloons.indexOf(b); if(idx!==-1) balloons.splice(idx,1);
+      const f=document.createElement('img'); f.src=obj.src; f.className='falling'; gameContainer.appendChild(f);
+      const r=f.getBoundingClientRect();
+      f.style.left=(s.left + (s.width - r.width)/2) + 'px';
+      f.style.top = s.top + 'px';
+      f.dataset.pair=obj.pair;
+      animateFall(f);
+    }
+
+    function animateFall(el){
+      const SPEED=Math.max(250, innerHeight*0.45); let last=null;
+      function step(ts){
+        if(last==null) last=ts; const dt=(ts-last)/1000; last=ts;
+        el.style.top=(parseFloat(el.style.top||'0') + SPEED*dt) + 'px';
+        const trainRect=train.getBoundingClientRect(); const ir=el.getBoundingClientRect();
+
+        if(ir.bottom >= trainRect.top){
+          const cx=ir.left + ir.width/2;
+          const slots=[...train.querySelectorAll('.wagon')];
+          const landed=slots.find(s=>{ const r=s.getBoundingClientRect(); return cx>=r.left && cx<=r.right; });
+          if(landed){
+            if(landed.dataset.pair===el.dataset.pair) correctDrop(landed, el);
+            else wrongDrop(el);
+          } else wrongDrop(el);
+          return;
+        }
+        if(ir.top > innerHeight){ wrongDrop(el); return; }
+        requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+
+    function correctDrop(slot, fallingImg){
+      fallingImg.remove();
+      const box=slot.querySelector('.slot-img');
+      const paired=document.createElement('img'); paired.src=fallingImg.src; paired.className='paired';
+      box.innerHTML=''; box.appendChild(paired);
+      slot.classList.add('correct');
+      if(++correctCount===numWagons){ alert('Congratulations! You completed this phase.'); updateNextPhaseAuth(); }
+    }
+
+    /* ===== Erro / feedback ===== */
+    let fbTimer=null;
+    function showFeedback(){ feedback.style.display='block'; clearTimeout(fbTimer); fbTimer=setTimeout(()=>feedback.style.display='none',800); }
+    function wrongDrop(el){ showFeedback(); const p=el.dataset.pair; el.remove(); const obj=imagesList.find(x=>x.pair===p); if(obj) createBalloon(obj); }
+
+    /* ===== Progresso ===== */
+    function updateNextPhaseAuth(){
+      const u=firebase.auth().currentUser;
+      if(u){ updateNextPhase(u.uid); return; }
+      const unsub=firebase.auth().onAuthStateChanged(x=>{ if(x) updateNextPhase(x.uid); unsub&&unsub(); });
+    }
+    async function updateNextPhase(uid){
+      const q=new URLSearchParams(location.search);
+      const fase=q.get('fase'), level=q.get('level'), unit=q.get('unit');
+      const db=firebase.database().ref(`usuarios/${uid}/progresso/${level}/${unit}`);
+      try{
+        if(fase==="last"){
+          const nextUnit=`Unit${parseInt(unit.replace('Unit',''))+1}`;
+          await firebase.database().ref(`usuarios/${uid}/progresso/${level}/${nextUnit}`).set({fase1:true});
+        }else if(fase==="end"){
+          const nextLevel=`Level${parseInt(level.replace('Level',''))+1}`;
+          await firebase.database().ref(`usuarios/${uid}/progresso/${nextLevel}/Unit1`).set({fase1:true});
+        }else{
+          const next=parseInt(fase)+1;
+          await db.update({[`fase${fase}`]:true,[`fase${next}`]:true});
+        }
+      }catch(e){console.error(e);}
+    }
+
+    /* ===== Animação de flutuação dos balões ===== */
+    function animateBalloons(ts){
+      for(const b of balloons){
+        const p=b._float; if(!p.last) p.last=ts;
+        const d=ts - p.last; p.last=ts;
+        let left=parseFloat(b.style.left);
+        left += p.speedX * p.dir * d;
+        if(left > innerWidth) left = -p.w;
+        if(left < -p.w) left = innerWidth;
+        const top = p.base + p.amp * Math.sin(p.phase + p.freq * ts);
+        b.style.left=left+'px'; b.style.top=top+'px';
+      }
+      requestAnimationFrame(animateBalloons);
+    }
+
+    /* ===== Restart ===== */
+    function restartGame(){
+      correctCount=0;
+      gameContainer.querySelectorAll('.falling').forEach(i=>i.remove());
+      train.querySelectorAll('.slot-img').forEach(b=>b.innerHTML='');
+      train.querySelectorAll('.wagon').forEach(w=>w.classList.remove('correct'));
+    }
+  </script>
+</body>
+</html>
