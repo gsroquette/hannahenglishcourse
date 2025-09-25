@@ -17,10 +17,10 @@
     }
 
     :root{
-      --accent:#7C3AED;         /* Purple highlight */
-      --accent-ring:#D6C6FF;    /* Light purple ring */
-      --ok:#2e7d32;             /* Green (correct) */
-      --err:#c62828;            /* Red (wrong) */
+      --accent:#7C3AED;
+      --accent-ring:#D6C6FF;
+      --ok:#2e7d32;
+      --err:#c62828;
       --ink:#222;
       --slot:#ffffff;
       --slot-border:#bbb;
@@ -35,7 +35,6 @@
       margin:0 auto 8px; max-width:1100px;
     }
 
-    /* Back on top aligned left on wide screens */
     .topbar{
       width:100%; max-width:1100px; margin:0 auto; display:flex; justify-content:flex-start;
     }
@@ -56,7 +55,6 @@
 
     .wrap{ width:min(1100px, 100%); margin:0 auto 20px; display:flex; flex-direction:column; gap:12px }
 
-    /* Mini-map */
     .minimap{
       position:sticky; top:0; z-index:5;
       background:rgba(245,245,245,.9);
@@ -95,7 +93,6 @@
     }
     .sectionTitle{ margin:6px 0 10px; font-weight:800; text-align:left }
 
-    /* Slot card: row1 number + image, row2 full text */
     .slotCard{
       display:grid;
       grid-template-columns: 44px 110px 1fr;
@@ -143,7 +140,6 @@
     }
     .tile img{ max-width:100%; max-height:100%; display:block }
 
-    /* Selection: thick purple + overlay + lift */
     .tile.selected{
       outline:10px solid var(--accent);
       transform: translateY(-2px);
@@ -164,7 +160,6 @@
 
     .tile, .slot{ touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 
-    /* Micro feedback badges */
     .badge{
       position:absolute; bottom:-8px; right:-8px; background:#fff; border:2px solid #eee; border-radius:999px; padding:4px 8px; font-weight:800;
       box-shadow:var(--shadow); transform:scale(.9); opacity:0; pointer-events:none;
@@ -174,14 +169,38 @@
     .badge.ok{ border-color:var(--ok); color:var(--ok) }
     .badge.err{ border-color:var(--err); color:var(--err) }
 
-    /* Modal win */
     .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.4); z-index:50 }
     .modal.open{ display:flex }
     .card{ background:#fff; border-radius:20px; padding:20px; width:min(520px, 92vw); text-align:center; box-shadow:var(--shadow) }
     .card h2{ margin:0 0 8px }
+
+    /* ===== Loading Overlay + Spinner ===== */
+    .loading-overlay{
+      position:fixed; inset:0; background:rgba(255,255,255,.9);
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      z-index:1000;
+    }
+    .spinner{
+      width:54px; height:54px; border-radius:50%;
+      border:6px solid #eae5ff; border-top-color:#7C3AED;
+      animation:spin 0.9s linear infinite;
+      box-shadow:var(--shadow);
+    }
+    @keyframes spin{ to { transform: rotate(360deg); } }
+    .loading-text{ margin-top:14px; font-weight:800; color:#4b4b4b }
+    .sr-only{
+      position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+    }
   </style>
 </head>
 <body>
+  <!-- Loading overlay -->
+  <div id="loading" class="loading-overlay" aria-live="polite" aria-busy="true">
+    <div class="spinner" role="status" aria-label="Loading"></div>
+    <div class="loading-text">Loading resources…</div>
+    <span class="sr-only" id="loadingStatus">Preparing images and text…</span>
+  </div>
+
   <div class="topbar">
     <button id="back-button" onclick="goBack()">Back</button>
   </div>
@@ -191,7 +210,7 @@
     <div class="crumbs" id="crumbs" title="Current story level/unit">Loading…</div>
   </header>
 
-  <div class="wrap">
+  <div class="wrap" aria-busy="true">
     <div class="minimap" id="miniMap" aria-label="Sequence map"></div>
 
     <div class="controls" role="toolbar" aria-label="Controls">
@@ -220,13 +239,13 @@
     </div>
   </div>
 
-  <!-- Firebase SDK v8 (same as your example) -->
-  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+  <!-- Firebase SDK v8 -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js" defer></script>
 
   <script>
-    /* ======================= Firebase Init (from your example) ======================= */
+    /* ======================= Firebase Init ======================= */
     const firebaseConfig = {
       apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
       authDomain: "hannahenglishcourse.firebaseapp.com",
@@ -269,8 +288,8 @@
       slots:[],         // ids in slots (or null)
       storyTitle:null,
       storyTexts:[],    // text per step
-      hintUsed:false,   // only one per session
-      completed:false   // completed once
+      hintUsed:false,
+      completed:false
     };
 
     function frameById(id){ return state.frames.find(function(f){ return f.id===id; }); }
@@ -306,7 +325,7 @@
       for(var i=0;i<state.orderIds.length;i++){
         var d = document.createElement('button');
         var filled = !!state.slots[i];
-        d.className = 'dot' + (filled?' filled':'');
+        d.className = 'dot' + (filled?' filled':'' );
         d.type='button'; d.textContent = (i+1);
         d.setAttribute('data-idx', i);
         (function(idx, btn){
@@ -359,7 +378,7 @@
         card.appendChild(num);
 
         var slot = document.createElement('div');
-        slot.className='slot' + (idPlaced?' filled':'');
+        slot.className='slot' + (idPlaced?' filled':'' );
         slot.setAttribute('data-idx', i);
 
         if(idPlaced){
@@ -430,7 +449,12 @@
         t.addEventListener('dragstart', function(e){ e.dataTransfer.setData('text/plain', frame.id); });
       }
 
-      var img = document.createElement('img'); img.src = frame.image; img.alt = 'frame'; t.appendChild(img);
+      var img = document.createElement('img');
+      img.src = frame.image;
+      img.alt = 'frame';
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      t.appendChild(img);
 
       t.addEventListener('pointerdown', function(e){
         e.stopPropagation();
@@ -553,7 +577,7 @@
       checkCompletion();
     }
 
-    // ---------- Firebase Progression (from your example) ----------
+    // ---------- Firebase Progression ----------
     function getParamsFromURL(){
       const params = new URLSearchParams(window.location.search);
       return { level: params.get('level'), unit: params.get('unit'), fase: params.get('fase') };
@@ -564,7 +588,6 @@
     }
 
     function ensureUserIsAuthenticated(callback){
-      // if already have it:
       if(currentUserId){ callback(currentUserId); return; }
       firebase.auth().onAuthStateChanged(function(user){
         if(user){ currentUserId = user.uid; callback(user.uid); }
@@ -604,76 +627,54 @@
       }
     }
 
-    // ---------- Back button ----------
-    async function goBack(){
-      console.log("[Back] Click");
-      const { level, unit, fase } = getParamsFromURL();
-
-      // If not completed yet, confirm first (clear, kid-friendly)
-      if(!state.completed){
-        const leave = confirm("You haven't completed this phase yet. Do you want to go back?");
-        if(leave){ window.history.back(); }
-        return;
-      }
-
-      // If completed, just go back. (Optional: keep your example's check as fallback)
-      if(!level || !unit || !fase){ window.history.back(); return; }
-
-      firebase.auth().onAuthStateChanged(async (user)=>{
-        if(!user){ window.history.back(); return; }
-        const nextPhase = `fase${parseInt(fase)+1}`;
-        try{
-          const snapshot = await firebase.database()
-            .ref(`usuarios/${user.uid}/progresso/${level}/${unit}/${nextPhase}`)
-            .once("value");
-          if(snapshot.val() === true){
-            window.history.back();
-          } else {
-            const confirmExit = confirm("The next phase is locked. Do you still want to go back?");
-            if(confirmExit){ window.history.back(); }
-          }
-        }catch(err){
-          console.error("[Back] Firebase error:", err);
-          const confirmExit = confirm("Could not verify progress. Do you want to go back anyway?");
-          if(confirmExit){ window.history.back(); }
-        }
+    // ---------- Data loading (FAST + PARALLEL) ----------
+    function preloadImage(url){
+      return new Promise(function(resolve){
+        const img = new Image();
+        img.onload = function(){ resolve({url, ok:true}); };
+        img.onerror = function(){ resolve({url, ok:false}); };
+        img.src = url; // sem cache-buster
       });
     }
 
-    // ---------- Data loading ----------
-    function imageExists(url){
-      return new Promise(function(res){
-        var img = new Image();
-        img.onload = function(){ res(true); };
-        img.onerror = function(){ res(false); };
-        img.src = url + (url.indexOf('?')>-1?'&':'?') + 'v=' + Date.now();
-      });
-    }
-    async function loadSequentialImages(base, start, max){
-      var frames = [];
-      for(var i=start;i<=max;i++){
-        var url = base + 'imagem' + i + '.png';
-        /* eslint-disable no-await-in-loop */
-        var ok = await imageExists(url);
-        if(!ok){
-          if(i===start){ continue; } else { break; }
+    // Carrega em paralelo imagem1..imagem30 e mantém apenas a sequência contínua a partir de 1
+    async function loadSequentialImagesParallel(base, start, max){
+      const urls = [];
+      for(let i=start;i<=max;i++){ urls.push({i, url: base + 'imagem' + i + '.png'}); }
+      const results = await Promise.all(urls.map(u => preloadImage(u.url)));
+      const okByIndex = new Map();
+      results.forEach((res, idx) => { okByIndex.set(idx+start, res.ok); });
+
+      // mantém contínuo desde o 1 (para parar no primeiro buraco)
+      const frames = [];
+      for(let i=start;i<=max;i++){
+        if(okByIndex.get(i)){
+          frames.push({ id:'f'+i, image: base + 'imagem' + i + '.png' });
+        } else {
+          // para no primeiro furo depois que já achou pelo menos uma
+          if(i===start){ continue; }
+          break;
         }
-        frames.push({ id:'f'+i, image:url });
       }
       return frames;
     }
+
     async function loadStoryText(base){
-      var names = ['images.txt','imagens.txt'];
-      for(var i=0;i<names.length;i++){
+      // permite nocache=1 na URL para desenvolvimento
+      const nocache = new URL(location.href).searchParams.get('nocache') === '1';
+      const cacheBuster = nocache ? ('?v=' + Date.now()) : '';
+      const names = ['images.txt','imagens.txt'];
+      for(let i=0;i<names.length;i++){
         try{
-          var res = await fetch(base + names[i] + '?v=' + Date.now());
+          const res = await fetch(base + names[i] + cacheBuster);
           if(!res.ok) continue;
-          var raw = await res.text();
+          const raw = await res.text();
           return parseImagesTxt(raw);
         }catch(e){}
       }
       return null;
     }
+
     function parseImagesTxt(raw){
       var lines = raw.split(/\r?\n/);
       var title = null;
@@ -700,37 +701,88 @@
       return { title:title, frames:ordered };
     }
 
-    // ---------- Bootstrap (reset on reload) ----------
-    window.addEventListener('load', init);
-    async function init(){
-      state.meta = getParams();
+    // ---------- Back button ----------
+    async function goBack(){
+      console.log("[Back] Click");
+      const { level, unit, fase } = getParamsFromURL();
 
-      var imgBase = '/' + state.meta.level + '/' + state.meta.unit + '/DataStory/images/';
-      var txtBase = '/' + state.meta.level + '/' + state.meta.unit + '/DataStory/';
-      qs('#crumbs').setAttribute('title', 'Images at: ' + imgBase);
-
-      state.frames = await loadSequentialImages(imgBase, 1, 30);
-      if(!state.frames.length){
-        alert('No images found at ' + imgBase + ' (expected: imagem1.png, imagem2.png, ...)');
+      if(!state.completed){
+        const leave = confirm("You haven't completed this phase yet. Do you want to go back?");
+        if(leave){ window.history.back(); }
         return;
       }
-      state.orderIds = state.frames.map(function(f){ return f.id; });
 
-      var story = await loadStoryText(txtBase);
-      if(story){ state.storyTitle = story.title; state.storyTexts = story.frames; }
+      if(!level || !unit || !fase){ window.history.back(); return; }
 
-      // Always reset fresh on load
-      state.hintUsed = false;
-      state.completed = false;
-      state.poolIds = shuffle(state.orderIds.slice());
-      state.slots = new Array(state.orderIds.length).fill(null);
+      firebase.auth().onAuthStateChanged(async (user)=>{
+        if(!user){ window.history.back(); return; }
+        const nextPhase = `fase${parseInt(fase)+1}`;
+        try{
+          const snapshot = await firebase.database()
+            .ref(`usuarios/${user.uid}/progresso/${level}/${unit}/${nextPhase}`)
+            .once("value");
+          if(snapshot.val() === true){
+            window.history.back();
+          } else {
+            const confirmExit = confirm("The next phase is locked. Do you still want to go back?");
+            if(confirmExit){ window.history.back(); }
+          }
+        }catch(err){
+          console.error("[Back] Firebase error:", err);
+          const confirmExit = confirm("Could not verify progress. Do you want to go back anyway?");
+          if(confirmExit){ window.history.back(); }
+        }
+      });
+    }
 
-      renderBoard();
+    // ---------- Bootstrap ----------
+    window.addEventListener('load', init);
 
-      // Controls
-      qs('#btnReset').addEventListener('click', doReset);
-      qs('#btnHint').addEventListener('click', doHint);
-      qs('#btnCloseWin').addEventListener('click', function(){ qs('#modalWin').classList.remove('open'); });
+    async function init(){
+      // mostra spinner
+      const loader = qs('#loading');
+      const wrap = qs('.wrap');
+      wrap.setAttribute('aria-busy','true');
+      loader.style.display = 'flex';
+
+      try{
+        state.meta = getParams();
+
+        var imgBase = '/' + state.meta.level + '/' + state.meta.unit + '/DataStory/images/';
+        var txtBase = '/' + state.meta.level + '/' + state.meta.unit + '/DataStory/';
+        qs('#crumbs').setAttribute('title', 'Images at: ' + imgBase);
+
+        // Carregamento paralelo de imagens
+        qs('#loadingStatus').textContent = 'Loading images…';
+        state.frames = await loadSequentialImagesParallel(imgBase, 1, 30);
+        if(!state.frames.length){
+          alert('No images found at ' + imgBase + ' (expected: imagem1.png, imagem2.png, ...)');
+          return;
+        }
+        state.orderIds = state.frames.map(function(f){ return f.id; });
+
+        // Texto
+        qs('#loadingStatus').textContent = 'Loading text…';
+        var story = await loadStoryText(txtBase);
+        if(story){ state.storyTitle = story.title; state.storyTexts = story.frames; }
+
+        // Estado inicial
+        state.hintUsed = false;
+        state.completed = false;
+        state.poolIds = shuffle(state.orderIds.slice());
+        state.slots = new Array(state.orderIds.length).fill(null);
+
+        renderBoard();
+
+        // Controles
+        qs('#btnReset').addEventListener('click', doReset);
+        qs('#btnHint').addEventListener('click', doHint);
+        qs('#btnCloseWin').addEventListener('click', function(){ qs('#modalWin').classList.remove('open'); });
+      } finally {
+        // esconde spinner
+        wrap.setAttribute('aria-busy','false');
+        loader.style.display = 'none';
+      }
     }
   </script>
 </body>
