@@ -17,14 +17,9 @@
   #game-container{position:relative;width:100%;height:100%;overflow:hidden}
 
   /* =================== CONTROLES RÁPIDOS ===================
-     - --wagonScale        => tamanho do PNG do vagão (moldura)
-     - --pairedImgScale    => tamanho da imagem que cai (dentro do vagão)
-     - --imgSafePad        => margem de segurança da imagem interna
-     - --pairedImgLift     => “sobe/desce” a imagem dentro da janela (negativo sobe, positivo desce)
-     - --liftVH            => sobe/baixa o vagão dentro da faixa
-     - --wheelPadVH        => espaço acima das rodas (para a janela)
-     - --labelBelowVH      => quão abaixo das rodas vai o rótulo (texto)
-     - --trainH / --wagonFactor => altura total da faixa e do slot
+     DURAÇÕES DA ANIMAÇÃO (ajuste aqui):
+     --locoDur   => duração da locomotiva cruzando (s)
+     --departDur => duração do trem indo embora (s)
   ========================================================== */
   :root{
     --trainH: 44;
@@ -36,8 +31,7 @@
     --wheelPadVH: 2.0;
 
     --pairedImgScale: 0.68;
-    /* Você disse que -50% foi o que posicionou certo em todos — mantendo. */
-    --pairedImgLift: -50%;
+    --pairedImgLift: -50%;                        /* sua regulagem */
     --imgSafePad: clamp(16px, 2vw, 26px);
 
     --labelH: clamp(22px, 3.4vh, 38px);
@@ -45,6 +39,10 @@
 
     --colGap: clamp(10px, 1.4vw, 20px);
     --sidePad: clamp(12px, 2vw, 26px);
+
+    /* <<< VELOCIDADE >>> */
+    --locoDur: 2.8s;     /* mais lento que antes (aumente/diminua) */
+    --departDur: 1.8s;   /* partida dos vagões */
   }
 
   /* Overlay de orientação */
@@ -84,17 +82,14 @@
     overflow: visible;
   }
 
-  /* ===== Área da imagem (centralizada) ===== */
+  /* ===== Área da imagem ===== */
   .slot-img{
     position:absolute;
     top:    calc(var(--windowInset) + 4px);
     left:   var(--windowInset);
     right:  var(--windowInset);
     bottom: calc(var(--windowInset) + (var(--wheelPadVH) * 1vh) + 10px);
-    display:flex;
-    align-items:center;          
-    justify-content:center;      
-    overflow:hidden;
+    display:flex; align-items:center; justify-content:center; overflow:hidden;
   }
 
   .slot-img img.paired{
@@ -102,16 +97,13 @@
     max-height: calc((100% - var(--imgSafePad)*2) * var(--pairedImgScale));
     width:auto;height:auto;object-fit:contain;display:block;pointer-events:none;
     filter: drop-shadow(0 2px 2px rgba(0,0,0,.12));
-    transform: translateY(calc(-1 * var(--pairedImgLift))); /* negativo sobe / positivo desce, mantendo sua lógica */
+    transform: translateY(calc(-1 * var(--pairedImgLift)));
   }
 
   /* ===== Rótulo ===== */
   .word{
-    position:absolute;
-    left:  var(--windowInset);
-    right: var(--windowInset);
-    bottom: calc(-1 * var(--labelBelowVH) * 1vh);
-    height: calc(var(--labelH) - 6px);
+    position:absolute; left:var(--windowInset); right:var(--windowInset);
+    bottom: calc(-1 * var(--labelBelowVH) * 1vh); height: calc(var(--labelH) - 6px);
     display:flex;align-items:center;justify-content:center;
     text-transform:uppercase;text-align:center;font-weight:700;
     color:#1f2d3a;
@@ -119,11 +111,10 @@
     background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,0.88));
     border: 1px solid rgba(0,0,0,0.06);
     border-radius: 10px; box-shadow:0 2px 6px rgba(0,0,0,.08);
-    pointer-events:none;
-    z-index: 2;
+    pointer-events:none; z-index: 2;
   }
 
-  /* Tirando o brilho verde */
+  /* Sem brilho verde */
   .wagon.correct{ animation: none !important; box-shadow: none !important; }
 
   /* ===== Balões ===== */
@@ -158,27 +149,27 @@
     object-fit:contain; pointer-events:none; z-index:150;
   }
 
-  /* ===== Locomotiva e Partida do Trem ===== */
+  /* ===== Locomotiva e Partida ===== */
   .locomotive{
     position:absolute;
-    bottom: calc(var(--labelBelowVH) * 1vh + 6px); /* mesma “linha” dos vagões */
-    left: -30vw; /* começa fora da esquerda (será ajustado via transform) */
+    bottom: calc(var(--labelBelowVH) * 1vh + 6px);
+    left: -30vw;
     width: clamp(120px, 18vw, 240px);
     height: clamp(80px, 12vw, 160px);
     background: url('locomotive.png') no-repeat center/contain;
     z-index:190; pointer-events:none; display:flex; align-items:center; justify-content:center;
-    transform: translateX(110vw);  /* começa fora à direita */
+    transform: translateX(110vw);
     will-change: transform;
   }
   .locomotive .fallback-emoji{font-size:clamp(40px,6vw,72px);line-height:1}
-  .locomotive.run{ animation: loco-pass 1.8s linear forwards; }
+  .locomotive.run{ animation: loco-pass var(--locoDur) linear forwards; }
 
   @keyframes loco-pass{
     from{ transform: translateX(110vw); }
     to  { transform: translateX(-120vw); }
   }
 
-  #train.depart{ animation: train-depart 1.2s ease-in forwards; }
+  #train.depart{ animation: train-depart var(--departDur) ease-in forwards; }
   @keyframes train-depart{
     to{ transform: translateX(-120vw); opacity:0.98; }
   }
@@ -211,7 +202,7 @@
 
   @keyframes pop-in{
     from{ transform:scale(.9); opacity:0; }
-    to{ transform:scale(1); opacity:1; }
+    to  { transform:scale(1); opacity:1; }
   }
 </style>
 </head>
@@ -260,6 +251,65 @@
 
     let wordsList=[], imagesList=[], numWagons=0, correctCount=0;
     const balloons=[];
+
+    /* ===== Audio (apito) ===== */
+    let audioCtx=null, audioPrimed=false;
+    const SOUND_ENABLED = true;     // mude para false se não quiser som
+    const WHISTLE_VOL = 0.5;        // volume 0.0–1.0
+
+    function primeAudio(){
+      if(!SOUND_ENABLED) return;
+      if(!audioCtx){
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if(!Ctx) return;
+        audioCtx = new Ctx();
+      }
+      if(audioCtx.state === 'suspended') audioCtx.resume();
+      audioPrimed = true;
+    }
+    // desbloqueia o áudio no primeiro clique/toque
+    window.addEventListener('pointerdown', primeAudio, { once:true });
+    window.addEventListener('keydown', primeAudio, { once:true });
+
+    function playWhistle(totalMs){
+      if(!SOUND_ENABLED || !audioCtx || !audioPrimed) return () => {};
+      const dur = Math.max(0.3, totalMs/1000);
+      const now = audioCtx.currentTime;
+
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(WHISTLE_VOL, now + 0.05);
+      gain.gain.linearRampToValueAtTime(WHISTLE_VOL*0.85, now + dur - 0.08);
+      gain.gain.linearRampToValueAtTime(0, now + dur);
+
+      const osc = audioCtx.createOscillator();
+      osc.type = 'sine';
+      // curva de frequência "apito"
+      osc.frequency.setValueAtTime(900, now);
+      osc.frequency.linearRampToValueAtTime(1600, now + dur*0.45);
+      osc.frequency.linearRampToValueAtTime(1100, now + dur);
+
+      // vibrato leve
+      const lfo = audioCtx.createOscillator();
+      lfo.frequency.value = 6;
+      const lfoGain = audioCtx.createGain();
+      lfoGain.gain.value = 20;
+      lfo.connect(lfoGain);
+      lfoGain.connect(osc.frequency);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.start(now);
+      lfo.start(now);
+      osc.stop(now + dur);
+      lfo.stop(now + dur);
+
+      return () => {
+        try{ osc.stop(); lfo.stop(); }catch(e){}
+        osc.disconnect(); lfo.disconnect(); gain.disconnect();
+      };
+    }
 
     /* ===== Orientação ===== */
     function checkOrientation(){
@@ -367,7 +417,6 @@
       slot.classList.add('correct');
 
       if(++correctCount===numWagons){
-        // Quando terminar tudo, roda a animação do trem indo embora
         runDepartureSequence();
       }
     }
@@ -377,9 +426,23 @@
     function showFeedback(){ feedback.style.display='block'; clearTimeout(fbTimer); fbTimer=setTimeout(()=>feedback.style.display='none',800); }
     function wrongDrop(el){ showFeedback(); const p=el.dataset.pair; el.remove(); const obj=imagesList.find(x=>x.pair===p); if(obj) createBalloon(obj); }
 
+    /* Utilitário: pegar ms de uma var CSS (ex.: "1.8s") */
+    function msFromCssVar(name){
+      const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      if(!v) return 0;
+      if(v.endsWith('ms')) return parseFloat(v);
+      if(v.endsWith('s'))  return parseFloat(v)*1000;
+      return parseFloat(v)||0;
+    }
+
     /* ===== Sequência de Partida do Trem ===== */
     function runDepartureSequence(){
       document.body.classList.add('animating');
+
+      // duração total p/ som
+      const locoMs   = msFromCssVar('--locoDur');
+      const departMs = msFromCssVar('--departDur');
+      const stopWhistle = playWhistle(locoMs + departMs);
 
       // 1) Locomotiva cruza
       const loco=document.createElement('div');
@@ -394,10 +457,10 @@
         // 2) Depois que a locomotiva sai, os vagões partem
         train.classList.add('depart');
         train.addEventListener('animationend', ()=>{
-          // 3) Mostra painel de parabéns e libera próxima fase
+          // 3) Parabéns + progresso
+          try{ stopWhistle && stopWhistle(); }catch(e){}
           showCongrats();
           updateNextPhaseAuth();
-          // Limpa locomotiva (já fora de cena)
           loco.remove();
           document.body.classList.remove('animating');
         }, {once:true});
