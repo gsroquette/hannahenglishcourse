@@ -239,33 +239,16 @@
     </div>
   </div>
 
-  <!-- Firebase SDK v8 -->
+  <!-- Firebase SDK v8 (defer para garantir ordem e disponibilidade antes do script principal) -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js" defer></script>
 
   <script>
-    /* ======================= Firebase Init ======================= */
-    const firebaseConfig = {
-      apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
-      authDomain: "hannahenglishcourse.firebaseapp.com",
-      databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "hannahenglishcourse",
-      storageBucket: "hannahenglishcourse.appspot.com",
-      messagingSenderId: "449818788486",
-      appId: "1:449818788486:web:8a49d3f68591e6fb3f0707"
-    };
-    firebase.initializeApp(firebaseConfig);
+    // ======= BOOTSTRAP: inicializa assim que o HTML estiver pronto, sem esperar as imagens do fundo =======
+    document.addEventListener('DOMContentLoaded', init);
 
-    let currentUserId = null;
-    firebase.auth().onAuthStateChanged(function(user){
-      if(user){ currentUserId = user.uid; }
-      else { currentUserId = null; console.warn("[Auth] User not authenticated: progress will not be saved."); }
-    });
-
-    /* ======================= Game Logic ======================= */
-
-    // ---------- Utils ----------
+    // ---------- Utils básicos ----------
     var qs = function(s, el){ return (el||document).querySelector(s); };
     var qsa = function(s, el){ return Array.prototype.slice.call((el||document).querySelectorAll(s)); };
     var shuffle = function(arr){ var a=arr.slice(); for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; } return a; };
@@ -278,8 +261,16 @@
       if(!level || !unit){ alert('Missing URL params: level, unit'); }
       return {level:level, unit:unit, fase:fase};
     }
+    function getParamsFromURL(){
+      const params = new URLSearchParams(window.location.search);
+      return { level: params.get('level'), unit: params.get('unit'), fase: params.get('fase') };
+    }
+    function getPhaseFromURL(){
+      const params = new URLSearchParams(window.location.search);
+      return params.get('fase');
+    }
 
-    // ---------- State ----------
+    // ---------- Estado ----------
     var state = {
       meta:null,
       frames:[],        // [{id, image}]
@@ -291,10 +282,9 @@
       hintUsed:false,
       completed:false
     };
-
     function frameById(id){ return state.frames.find(function(f){ return f.id===id; }); }
 
-    // ---------- Audio feedback ----------
+    // ---------- Áudio ----------
     var audioCtx = null;
     function ensureAudio(){ if(!audioCtx){ try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return !!audioCtx; }
     function tone(freq, durMs, type){
@@ -319,7 +309,6 @@
     function renderCrumbs(){
       qs('#crumbs').textContent = crumbsText(state.meta);
     }
-
     function renderMiniMap(){
       var mm = qs('#miniMap'); mm.innerHTML = '';
       for(var i=0;i<state.orderIds.length;i++){
@@ -470,7 +459,7 @@
       return t;
     }
 
-    // ---------- Interaction ----------
+    // ---------- Interação ----------
     var selectedId = null;
     function selectTile(tile){
       var id = tile.getAttribute('data-id');
@@ -486,12 +475,10 @@
       qsa('.tile').forEach(function(el){ el.classList.remove('selected'); });
       qsa('#miniMap .dot').forEach(function(x){ x.classList.remove('sel'); });
     }
-
     function handleSlotTap(e){
       var idx = parseInt(this.getAttribute('data-idx'),10);
       if(selectedId){ placeIdIntoSlot(selectedId, idx); clearSelection(); }
     }
-
     function placeIdIntoSlot(id, idx){
       var currentIdx = state.slots.findIndex(function(v){ return v===id; });
       if(currentIdx === idx) return;
@@ -518,7 +505,6 @@
       renderBoard();
       checkCompletion();
     }
-
     function returnToPool(id){
       var idx = state.slots.findIndex(function(v){ return v===id; });
       if(idx !== -1){
@@ -527,7 +513,6 @@
         renderBoard();
       }
     }
-
     function checkCompletion(){
       for(var i=0;i<state.orderIds.length;i++){
         if(state.slots[i] !== state.orderIds[i]) return;
@@ -543,7 +528,7 @@
       qs('#modalWin').classList.add('open');
     }
 
-    // ---------- Controls ----------
+    // ---------- Controles ----------
     function doReset(){
       state.hintUsed = false;
       state.completed = false;
@@ -553,7 +538,6 @@
       clearSelection();
       renderBoard();
     }
-
     function doHint(){
       if(state.hintUsed) return;
       var n = state.orderIds.length, targetIdx=-1;
@@ -578,15 +562,7 @@
     }
 
     // ---------- Firebase Progression ----------
-    function getParamsFromURL(){
-      const params = new URLSearchParams(window.location.search);
-      return { level: params.get('level'), unit: params.get('unit'), fase: params.get('fase') };
-    }
-    function getPhaseFromURL(){
-      const params = new URLSearchParams(window.location.search);
-      return params.get('fase');
-    }
-
+    let currentUserId = null;
     function ensureUserIsAuthenticated(callback){
       if(currentUserId){ callback(currentUserId); return; }
       firebase.auth().onAuthStateChanged(function(user){
@@ -594,19 +570,13 @@
         else { console.error("[Auth] User not authenticated"); }
       });
     }
-
-    function markPhaseCompleted(){
-      ensureUserIsAuthenticated(updateNextPhase);
-    }
-
+    function markPhaseCompleted(){ ensureUserIsAuthenticated(updateNextPhase); }
     async function updateNextPhase(userId){
       console.log("[Progress] Updating next phase…");
       const { level, unit } = getParamsFromURL();
       const currentPhase = getPhaseFromURL();
       if(!level || !unit || !currentPhase){ console.warn("[Progress] Missing URL params."); return; }
-
       const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-
       try{
         if(currentPhase === "last"){
           const nextUnit = `Unit${parseInt(unit.replace('Unit','')) + 1}`;
@@ -627,17 +597,15 @@
       }
     }
 
-    // ---------- Data loading (FAST + PARALLEL) ----------
+    // ---------- Loader helpers ----------
     function preloadImage(url){
       return new Promise(function(resolve){
         const img = new Image();
         img.onload = function(){ resolve({url, ok:true}); };
         img.onerror = function(){ resolve({url, ok:false}); };
-        img.src = url; // sem cache-buster
+        img.src = url; // sem cache-buster para permitir cache do navegador
       });
     }
-
-    // Carrega em paralelo imagem1..imagem30 e mantém apenas a sequência contínua a partir de 1
     async function loadSequentialImagesParallel(base, start, max){
       const urls = [];
       for(let i=start;i<=max;i++){ urls.push({i, url: base + 'imagem' + i + '.png'}); }
@@ -645,22 +613,18 @@
       const okByIndex = new Map();
       results.forEach((res, idx) => { okByIndex.set(idx+start, res.ok); });
 
-      // mantém contínuo desde o 1 (para parar no primeiro buraco)
       const frames = [];
       for(let i=start;i<=max;i++){
         if(okByIndex.get(i)){
           frames.push({ id:'f'+i, image: base + 'imagem' + i + '.png' });
         } else {
-          // para no primeiro furo depois que já achou pelo menos uma
           if(i===start){ continue; }
           break;
         }
       }
       return frames;
     }
-
     async function loadStoryText(base){
-      // permite nocache=1 na URL para desenvolvimento
       const nocache = new URL(location.href).searchParams.get('nocache') === '1';
       const cacheBuster = nocache ? ('?v=' + Date.now()) : '';
       const names = ['images.txt','imagens.txt'];
@@ -674,7 +638,6 @@
       }
       return null;
     }
-
     function parseImagesTxt(raw){
       var lines = raw.split(/\r?\n/);
       var title = null;
@@ -734,26 +697,61 @@
         }
       });
     }
+    window.goBack = goBack; // expõe para o botão
 
-    // ---------- Bootstrap ----------
-    window.addEventListener('load', init);
-
+    // ---------- INIT ----------
     async function init(){
-      // mostra spinner
       const loader = qs('#loading');
       const wrap = qs('.wrap');
+      const statusEl = qs('#loadingStatus');
+
+      // Failsafe: não deixa o usuário preso no overlay
+      const loaderTimeout = setTimeout(() => {
+        loader.style.display = 'none';
+        wrap.setAttribute('aria-busy','false');
+        console.error('[Loader] Timeout ao carregar. Verifique caminhos de imagens e Firebase.');
+        alert('Estamos com dificuldade para carregar os recursos. Verifique sua conexão ou tente novamente.');
+      }, 15000);
+
       wrap.setAttribute('aria-busy','true');
       loader.style.display = 'flex';
 
       try{
-        state.meta = getParams();
+        // Aguarda a lib do Firebase (carregada com defer) estar disponível
+        if(!window.firebase){
+          // pequena espera ativa (máx. 1s)
+          const start = performance.now();
+          while(!window.firebase && performance.now() - start < 1000){ await new Promise(r => setTimeout(r, 20)); }
+        }
+        if(!window.firebase){
+          throw new Error('Firebase library not loaded.');
+        }
 
+        // Inicializa Firebase aqui dentro
+        const firebaseConfig = {
+          apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+          authDomain: "hannahenglishcourse.firebaseapp.com",
+          databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
+          projectId: "hannahenglishcourse",
+          storageBucket: "hannahenglishcourse.appspot.com",
+          messagingSenderId: "449818788486",
+          appId: "1:449818788486:web:8a49d3f68591e6fb3f0707"
+        };
+        if(!firebase.apps.length){ firebase.initializeApp(firebaseConfig); }
+
+        firebase.auth().onAuthStateChanged(function(user){
+          if(user){ currentUserId = user.uid; }
+          else { currentUserId = null; console.warn("[Auth] User not authenticated: progress will not be saved."); }
+        });
+
+        // Params e bases
+        state.meta = getParams();
         var imgBase = '/' + state.meta.level + '/' + state.meta.unit + '/DataStory/images/';
         var txtBase = '/' + state.meta.level + '/' + state.meta.unit + '/DataStory/';
         qs('#crumbs').setAttribute('title', 'Images at: ' + imgBase);
 
-        // Carregamento paralelo de imagens
-        qs('#loadingStatus').textContent = 'Loading images…';
+        // Carrega imagens (paralelo)
+        statusEl.textContent = 'Loading images…';
         state.frames = await loadSequentialImagesParallel(imgBase, 1, 30);
         if(!state.frames.length){
           alert('No images found at ' + imgBase + ' (expected: imagem1.png, imagem2.png, ...)');
@@ -761,12 +759,12 @@
         }
         state.orderIds = state.frames.map(function(f){ return f.id; });
 
-        // Texto
-        qs('#loadingStatus').textContent = 'Loading text…';
+        // Carrega textos
+        statusEl.textContent = 'Loading text…';
         var story = await loadStoryText(txtBase);
         if(story){ state.storyTitle = story.title; state.storyTexts = story.frames; }
 
-        // Estado inicial
+        // Estado inicial e render
         state.hintUsed = false;
         state.completed = false;
         state.poolIds = shuffle(state.orderIds.slice());
@@ -778,7 +776,12 @@
         qs('#btnReset').addEventListener('click', doReset);
         qs('#btnHint').addEventListener('click', doHint);
         qs('#btnCloseWin').addEventListener('click', function(){ qs('#modalWin').classList.remove('open'); });
+
+      } catch (err){
+        console.error('[Init] Error:', err);
+        alert('Erro ao iniciar a atividade: ' + (err && err.message ? err.message : err));
       } finally {
+        clearTimeout(loaderTimeout);
         // esconde spinner
         wrap.setAttribute('aria-busy','false');
         loader.style.display = 'none';
