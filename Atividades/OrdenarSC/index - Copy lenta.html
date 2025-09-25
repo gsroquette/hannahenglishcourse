@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Hannah Sequence Game</title>
+  <style>
+    body{
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin-top: 50px;
+      background-color:#f5f5f5;
+      background-image:url('../../../imagens/fundo.png');
+      background-repeat:repeat;
+      background-size:auto;
+      padding:0 20px;
+    }
+
+    :root{
+      --accent:#7C3AED;         /* Purple highlight */
+      --accent-ring:#D6C6FF;    /* Light purple ring */
+      --ok:#2e7d32;             /* Green (correct) */
+      --err:#c62828;            /* Red (wrong) */
+      --ink:#222;
+      --slot:#ffffff;
+      --slot-border:#bbb;
+      --tile:#fff;
+      --tile-border:#333;
+      --shadow:0 6px 18px rgba(0,0,0,.08);
+    }
+    *{ box-sizing:border-box }
+
+    header{
+      padding:10px 16px; display:flex; flex-direction:column; align-items:center; gap:8px;
+      margin:0 auto 8px; max-width:1100px;
+    }
+
+    /* Back on top aligned left on wide screens */
+    .topbar{
+      width:100%; max-width:1100px; margin:0 auto; display:flex; justify-content:flex-start;
+    }
+    #back-button{
+      appearance:none; border:none; background:var(--accent); color:#fff; font-weight:800;
+      padding:10px 14px; border-radius:12px; cursor:pointer; box-shadow:var(--shadow);
+    }
+
+    .title{
+      margin:0; font-size:1.4rem; font-weight:900; letter-spacing:.3px;
+      background:linear-gradient(90deg, #7C3AED, #9F67FF);
+      -webkit-background-clip:text; background-clip:text; color:transparent;
+      text-transform:uppercase;
+    }
+    .crumbs{
+      padding:6px 12px; border-radius:999px; background:#fff; border:1px solid #eee; font-size:.9rem; box-shadow:var(--shadow)
+    }
+
+    .wrap{ width:min(1100px, 100%); margin:0 auto 20px; display:flex; flex-direction:column; gap:12px }
+
+    /* Mini-map */
+    .minimap{
+      position:sticky; top:0; z-index:5;
+      background:rgba(245,245,245,.9);
+      padding:6px 8px; border-radius:12px; border:1px solid #eee;
+      display:flex; gap:8px; overflow:auto; justify-content:center;
+      backdrop-filter:blur(2px);
+    }
+    .dot{
+      width:30px; height:30px; border-radius:999px;
+      border:2px solid var(--accent); background:var(--accent); color:#fff;
+      box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center;
+      font-weight:700; font-size:.85rem; cursor:pointer; user-select:none;
+      transition:transform .08s ease, box-shadow .2s ease, background .2s ease, outline .2s ease;
+    }
+    .dot.filled{ filter:saturate(1.2) brightness(1.05) }
+    .dot:active{ transform:translateY(1px) }
+    .dot.focus{ outline:3px solid var(--accent-ring) }
+    .dot.sel{ box-shadow:0 0 0 4px var(--accent-ring), var(--shadow); }
+
+    .controls{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap }
+    .btn{
+      appearance:none; border:1px solid #ddd; background:#fff; padding:10px 14px; border-radius:12px; cursor:pointer;
+      font-weight:700; box-shadow:var(--shadow); transition:.15s transform ease;
+    }
+    .btn:active{ transform:translateY(1px) }
+    .btn.primary{ background:var(--accent); color:#fff; border-color:transparent }
+    .btn.ghost{ background:#fff }
+    .btn:disabled{ opacity:.45; cursor:not-allowed }
+
+    .cols{ display:grid; gap:14px; grid-template-columns:1fr; }
+    @media (min-width: 900px){ .cols{ grid-template-columns: 1fr 1fr; align-items:start } }
+
+    .timelineCol, .poolCol{
+      background:#fff; border:1px dashed #ddd; padding:12px; border-radius:16px; box-shadow:var(--shadow);
+      text-align:left;
+    }
+    .sectionTitle{ margin:6px 0 10px; font-weight:800; text-align:left }
+
+    /* Slot card: row1 number + image, row2 full text */
+    .slotCard{
+      display:grid;
+      grid-template-columns: 44px 110px 1fr;
+      grid-template-rows: auto auto;
+      gap:10px 12px;
+      align-items:center;
+      padding:12px;
+      border:1px solid #eee; border-radius:12px; background:#fff; margin-bottom:12px;
+    }
+    .slotNum{
+      grid-column:1; grid-row:1;
+      width:44px; height:44px; border-radius:10px; background:#fafafa; border:2px solid var(--accent);
+      color:var(--accent); display:flex; align-items:center; justify-content:center; font-weight:900;
+    }
+    .slot{
+      grid-column:2; grid-row:1;
+      width:110px; height:110px; background:#fafafa; border:3px dashed var(--slot-border); border-radius:12px;
+      display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden;
+      transition:border-color .15s ease, border-width .15s ease, box-shadow .15s ease;
+    }
+    .slot.filled{ border-style:solid; border-color:#aaa }
+    .slot.is-correct{ border:4px solid var(--ok); box-shadow:0 0 0 2px rgba(46,125,50,.1) inset; }
+    .slot.is-wrong{ border:4px solid var(--err); box-shadow:0 0 0 2px rgba(198,40,40,.08) inset; }
+
+    .slotText{
+      grid-column:1 / 4; grid-row:2;
+      font-size:1rem; color:#222; text-align:left; white-space:normal; overflow:visible; line-height:1.35;
+    }
+
+    .poolList{
+      max-height:55vh; overflow:auto; display:grid; grid-template-columns: repeat(auto-fill, minmax(94px, 1fr)); gap:10px;
+    }
+    @media (max-width: 480px){ .poolList{ grid-template-columns: repeat(3, 1fr); } }
+
+    .poolTile{
+      height:94px; border:2px solid var(--tile-border); border-radius:12px; overflow:hidden; background:#fff;
+      display:flex; align-items:center; justify-content:center; position:relative;
+      transition:border-color .15s ease, transform .05s ease;
+    }
+
+    .tile{
+      background:var(--tile); border:2px solid var(--tile-border); border-radius:12px; overflow:hidden; cursor:grab; position:relative;
+      display:flex; align-items:center; justify-content:center; height:100%; width:100%; user-select:none;
+      transition: box-shadow .12s ease, transform .08s ease, outline-width .08s ease;
+    }
+    .tile img{ max-width:100%; max-height:100%; display:block }
+
+    /* Selection: thick purple + overlay + lift */
+    .tile.selected{
+      outline:10px solid var(--accent);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 22px rgba(124,58,237,.28);
+    }
+    .tile.selected::after{
+      content:'';
+      position:absolute; inset:0;
+      background: rgba(124,58,237, .24);
+      pointer-events:none;
+      z-index:1;
+    }
+
+    .ret-btn{
+      position:absolute; top:6px; right:6px; width:24px; height:24px; border-radius:999px; border:1px solid #ddd; background:#fff; font-size:14px; line-height:22px; box-shadow:var(--shadow); cursor:pointer;
+      z-index:2;
+    }
+
+    .tile, .slot{ touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+
+    /* Micro feedback badges */
+    .badge{
+      position:absolute; bottom:-8px; right:-8px; background:#fff; border:2px solid #eee; border-radius:999px; padding:4px 8px; font-weight:800;
+      box-shadow:var(--shadow); transform:scale(.9); opacity:0; pointer-events:none;
+      transition:transform .12s ease, opacity .12s ease;
+    }
+    .badge.show{ transform:scale(1); opacity:1 }
+    .badge.ok{ border-color:var(--ok); color:var(--ok) }
+    .badge.err{ border-color:var(--err); color:var(--err) }
+
+    /* Modal win */
+    .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.4); z-index:50 }
+    .modal.open{ display:flex }
+    .card{ background:#fff; border-radius:20px; padding:20px; width:min(520px, 92vw); text-align:center; box-shadow:var(--shadow) }
+    .card h2{ margin:0 0 8px }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <button id="back-button" onclick="goBack()">Back</button>
+  </div>
+
+  <header>
+    <h1 class="title">Hannah Sequence Game</h1>
+    <div class="crumbs" id="crumbs" title="Current story level/unit">Loading…</div>
+  </header>
+
+  <div class="wrap">
+    <div class="minimap" id="miniMap" aria-label="Sequence map"></div>
+
+    <div class="controls" role="toolbar" aria-label="Controls">
+      <button class="btn ghost" id="btnReset" title="Shuffle and start over">Reset</button>
+      <button class="btn primary" id="btnHint" title="Reveal the next correct slot">Hint</button>
+    </div>
+
+    <div class="cols">
+      <section class="timelineCol">
+        <p class="sectionTitle">Timeline</p>
+        <div id="timelineList"></div>
+      </section>
+
+      <section class="poolCol">
+        <p class="sectionTitle">Shuffled Images</p>
+        <div id="poolList" class="poolList"></div>
+      </section>
+    </div>
+  </div>
+
+  <div id="modalWin" class="modal" role="dialog" aria-modal="true" aria-labelledby="winTitle">
+    <div class="card">
+      <h2 id="winTitle">Great job!</h2>
+      <p>You completed the story in the correct order.</p>
+      <button class="btn primary" id="btnCloseWin">Continue</button>
+    </div>
+  </div>
+
+  <!-- Firebase SDK v8 (same as your example) -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+  <script>
+    /* ======================= Firebase Init (from your example) ======================= */
+    const firebaseConfig = {
+      apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+      authDomain: "hannahenglishcourse.firebaseapp.com",
+      databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "hannahenglishcourse",
+      storageBucket: "hannahenglishcourse.appspot.com",
+      messagingSenderId: "449818788486",
+      appId: "1:449818788486:web:8a49d3f68591e6fb3f0707"
+    };
+    firebase.initializeApp(firebaseConfig);
+
+    let currentUserId = null;
+    firebase.auth().onAuthStateChanged(function(user){
+      if(user){ currentUserId = user.uid; }
+      else { currentUserId = null; console.warn("[Auth] User not authenticated: progress will not be saved."); }
+    });
+
+    /* ======================= Game Logic ======================= */
+
+    // ---------- Utils ----------
+    var qs = function(s, el){ return (el||document).querySelector(s); };
+    var qsa = function(s, el){ return Array.prototype.slice.call((el||document).querySelectorAll(s)); };
+    var shuffle = function(arr){ var a=arr.slice(); for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; } return a; };
+
+    function getParams(){
+      var url = new URL(location.href);
+      var level = url.searchParams.get('level');
+      var unit = url.searchParams.get('unit');
+      var fase = url.searchParams.get('fase') || 'seq';
+      if(!level || !unit){ alert('Missing URL params: level, unit'); }
+      return {level:level, unit:unit, fase:fase};
+    }
+
+    // ---------- State ----------
+    var state = {
+      meta:null,
+      frames:[],        // [{id, image}]
+      orderIds:[],      // ['f1','f2',...]
+      poolIds:[],       // ids in pool
+      slots:[],         // ids in slots (or null)
+      storyTitle:null,
+      storyTexts:[],    // text per step
+      hintUsed:false,   // only one per session
+      completed:false   // completed once
+    };
+
+    function frameById(id){ return state.frames.find(function(f){ return f.id===id; }); }
+
+    // ---------- Audio feedback ----------
+    var audioCtx = null;
+    function ensureAudio(){ if(!audioCtx){ try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return !!audioCtx; }
+    function tone(freq, durMs, type){
+      if(!ensureAudio()) return;
+      var o = audioCtx.createOscillator(); var g = audioCtx.createGain();
+      o.type = type || 'sine'; o.frequency.value = freq;
+      o.connect(g); g.connect(audioCtx.destination);
+      g.gain.setValueAtTime(0.001, audioCtx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.16, audioCtx.currentTime+0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + (durMs/1000));
+      o.start(); o.stop(audioCtx.currentTime + (durMs/1000));
+    }
+    function sfxTick(){ tone(520, 70, 'square'); if(navigator.vibrate) navigator.vibrate(12); }
+    function sfxCorrect(){ tone(880, 120, 'triangle'); setTimeout(function(){ tone(1320, 90, 'triangle'); }, 110); if(navigator.vibrate) navigator.vibrate(25); }
+    function sfxWrong(){ tone(240, 140, 'sawtooth'); if(navigator.vibrate) navigator.vibrate(15); }
+    function sfxWin(){ tone(660,120,'triangle'); setTimeout(function(){ tone(990,120,'triangle'); },120); setTimeout(function(){ tone(1320,150,'triangle'); },240); if(navigator.vibrate) navigator.vibrate([30,30,50]); }
+
+    // ---------- UI helpers ----------
+    function crumbsText(meta){
+      return meta.level + ' · ' + meta.unit + (state.storyTitle ? ' — ' + state.storyTitle : '');
+    }
+    function renderCrumbs(){
+      qs('#crumbs').textContent = crumbsText(state.meta);
+    }
+
+    function renderMiniMap(){
+      var mm = qs('#miniMap'); mm.innerHTML = '';
+      for(var i=0;i<state.orderIds.length;i++){
+        var d = document.createElement('button');
+        var filled = !!state.slots[i];
+        d.className = 'dot' + (filled?' filled':'');
+        d.type='button'; d.textContent = (i+1);
+        d.setAttribute('data-idx', i);
+        (function(idx, btn){
+          btn.addEventListener('click', function(){
+            var card = qs('[data-slot-card="'+idx+'"]');
+            if(card){ card.scrollIntoView({behavior:'smooth', block:'center'}); }
+            qsa('.dot').forEach(function(x){ x.classList.remove('focus'); });
+            btn.classList.add('focus');
+            setTimeout(function(){ btn.classList.remove('focus'); }, 600);
+          });
+        })(i,d);
+        mm.appendChild(d);
+      }
+    }
+    function badge(el, text, ok){
+      var b = document.createElement('div');
+      b.className = 'badge ' + (ok?'ok':'err');
+      b.textContent = text;
+      el.appendChild(b);
+      requestAnimationFrame(function(){ b.classList.add('show'); });
+      setTimeout(function(){ if(b && b.parentNode){ b.parentNode.removeChild(b); } }, 900);
+    }
+    function highlightMiniMapById(id){
+      var idx = -1;
+      if(typeof id === 'string' && id.charAt(0)==='f'){
+        var n = parseInt(id.slice(1),10);
+        if(!isNaN(n)) idx = n-1;
+      }
+      qsa('#miniMap .dot').forEach(function(x){ x.classList.remove('sel'); });
+      if(idx>=0){
+        var dot = qs('#miniMap .dot[data-idx="'+idx+'"]');
+        if(dot) dot.classList.add('sel');
+      }
+    }
+
+    // ---------- Render ----------
+    function renderBoard(){
+      renderCrumbs();
+      renderMiniMap();
+
+      var list = qs('#timelineList'); list.innerHTML='';
+      for(var i=0;i<state.orderIds.length;i++){
+        var idPlaced = state.slots[i];
+        var card = document.createElement('div');
+        card.className = 'slotCard';
+        card.setAttribute('data-slot-card', i);
+
+        var num = document.createElement('div');
+        num.className='slotNum'; num.textContent = (i+1);
+        card.appendChild(num);
+
+        var slot = document.createElement('div');
+        slot.className='slot' + (idPlaced?' filled':'');
+        slot.setAttribute('data-idx', i);
+
+        if(idPlaced){
+          var fr = frameById(idPlaced);
+          if(fr){
+            var tile = makeTile(fr, true);
+            slot.appendChild(tile);
+          }
+        }
+        // touch to place
+        slot.addEventListener('pointerdown', handleSlotTap);
+        // desktop DnD
+        slot.addEventListener('dragover', function(e){ e.preventDefault(); });
+        slot.addEventListener('drop', function(e){
+          e.preventDefault();
+          var id = e.dataTransfer.getData('text/plain');
+          if(id) placeIdIntoSlot(id, parseInt(this.getAttribute('data-idx'),10));
+        });
+
+        // state color
+        if(idPlaced){
+          if(idPlaced === state.orderIds[i]){ slot.classList.add('is-correct'); }
+          else { slot.classList.add('is-wrong'); }
+        }
+
+        card.appendChild(slot);
+
+        var txt = document.createElement('div');
+        txt.className='slotText';
+        txt.textContent = (state.storyTexts[i]||'');
+        card.appendChild(txt);
+
+        list.appendChild(card);
+      }
+
+      var pool = qs('#poolList'); pool.innerHTML='';
+      pool.addEventListener('dragover', function(e){ e.preventDefault(); });
+      pool.addEventListener('drop', function(e){ e.preventDefault(); var id=e.dataTransfer.getData('text/plain'); if(id) returnToPool(id); });
+
+      pool.addEventListener('pointerdown', function(e){
+        if(!selectedId) return;
+        if(e.target.closest('.poolTile') || e.target.closest('.tile')) return;
+        returnToPool(selectedId);
+        clearSelection();
+      });
+
+      state.poolIds.forEach(function(id){
+        var fr = frameById(id); if(!fr) return;
+        var wrap = document.createElement('div');
+        wrap.className='poolTile'; wrap.setAttribute('data-id', id);
+        var tile = makeTile(fr, false);
+        wrap.appendChild(tile);
+        pool.appendChild(wrap);
+      });
+
+      var btnHint = qs('#btnHint');
+      btnHint.disabled = state.hintUsed;
+      btnHint.textContent = state.hintUsed ? 'Hint (used)' : 'Hint';
+    }
+
+    function makeTile(frame, inSlot){
+      var t = document.createElement('div');
+      t.className='tile'; t.setAttribute('data-id', frame.id);
+
+      var enableDrag = window.matchMedia && window.matchMedia('(pointer:fine)').matches;
+      if(enableDrag){
+        t.draggable = true;
+        t.addEventListener('dragstart', function(e){ e.dataTransfer.setData('text/plain', frame.id); });
+      }
+
+      var img = document.createElement('img'); img.src = frame.image; img.alt = 'frame'; t.appendChild(img);
+
+      t.addEventListener('pointerdown', function(e){
+        e.stopPropagation();
+        selectTile(t);
+      });
+
+      if(inSlot){
+        var ret = document.createElement('button');
+        ret.className='ret-btn'; ret.type='button'; ret.title='Return to pool'; ret.textContent='↩';
+        ret.addEventListener('pointerdown', function(ev){ ev.stopPropagation(); returnToPool(frame.id); });
+        t.appendChild(ret);
+      }
+      return t;
+    }
+
+    // ---------- Interaction ----------
+    var selectedId = null;
+    function selectTile(tile){
+      var id = tile.getAttribute('data-id');
+      if(selectedId === id){ clearSelection(); return; }
+      selectedId = id;
+      qsa('.tile').forEach(function(el){ el.classList.remove('selected'); });
+      tile.classList.add('selected');
+      highlightMiniMapById(id);
+      sfxTick();
+    }
+    function clearSelection(){
+      selectedId = null;
+      qsa('.tile').forEach(function(el){ el.classList.remove('selected'); });
+      qsa('#miniMap .dot').forEach(function(x){ x.classList.remove('sel'); });
+    }
+
+    function handleSlotTap(e){
+      var idx = parseInt(this.getAttribute('data-idx'),10);
+      if(selectedId){ placeIdIntoSlot(selectedId, idx); clearSelection(); }
+    }
+
+    function placeIdIntoSlot(id, idx){
+      var currentIdx = state.slots.findIndex(function(v){ return v===id; });
+      if(currentIdx === idx) return;
+
+      if(currentIdx !== -1){
+        var targetId = state.slots[idx];
+        state.slots[idx] = id;
+        state.slots[currentIdx] = targetId || null;
+      } else {
+        var occupant = state.slots[idx];
+        state.slots[idx] = id;
+        state.poolIds = state.poolIds.filter(function(x){ return x!==id; });
+        if(occupant){ state.poolIds.push(occupant); }
+      }
+
+      var isNowCorrect = (state.orderIds[idx] === id);
+      var slotEl = qs('.slot[data-idx="'+idx+'"]');
+      if(slotEl){
+        slotEl.classList.remove('is-correct','is-wrong');
+        if(isNowCorrect){ slotEl.classList.add('is-correct'); sfxCorrect(); badge(slotEl, 'Great!', true); }
+        else { slotEl.classList.add('is-wrong'); sfxWrong(); badge(slotEl, 'Try again!', false); }
+      }
+
+      renderBoard();
+      checkCompletion();
+    }
+
+    function returnToPool(id){
+      var idx = state.slots.findIndex(function(v){ return v===id; });
+      if(idx !== -1){
+        state.slots[idx] = null;
+        if(state.poolIds.indexOf(id)===-1) state.poolIds.push(id);
+        renderBoard();
+      }
+    }
+
+    function checkCompletion(){
+      for(var i=0;i<state.orderIds.length;i++){
+        if(state.slots[i] !== state.orderIds[i]) return;
+      }
+      if(state.orderIds.length === 0) return;
+      if(state.completed) return;
+      state.completed = true;
+
+      // Progression -> Firebase
+      markPhaseCompleted();
+
+      sfxWin();
+      qs('#modalWin').classList.add('open');
+    }
+
+    // ---------- Controls ----------
+    function doReset(){
+      state.hintUsed = false;
+      state.completed = false;
+      var ids = state.orderIds.slice();
+      state.poolIds = shuffle(ids);
+      state.slots = new Array(ids.length).fill(null);
+      clearSelection();
+      renderBoard();
+    }
+
+    function doHint(){
+      if(state.hintUsed) return;
+      var n = state.orderIds.length, targetIdx=-1;
+      for(var i=0;i<n;i++){ if(state.slots[i] !== state.orderIds[i]){ targetIdx=i; break; } }
+      if(targetIdx===-1) return;
+      var correctId = state.orderIds[targetIdx];
+
+      var where = state.slots.findIndex(function(v){ return v===correctId; });
+      if(where!==-1){
+        var tmp = state.slots[targetIdx];
+        state.slots[targetIdx]=correctId;
+        state.slots[where]=tmp||null;
+      } else {
+        state.poolIds = state.poolIds.filter(function(x){ return x!==correctId; });
+        var occ = state.slots[targetIdx]; if(occ) state.poolIds.push(occ);
+        state.slots[targetIdx]=correctId;
+      }
+      state.hintUsed = true;
+      sfxCorrect();
+      renderBoard();
+      checkCompletion();
+    }
+
+    // ---------- Firebase Progression (from your example) ----------
+    function getParamsFromURL(){
+      const params = new URLSearchParams(window.location.search);
+      return { level: params.get('level'), unit: params.get('unit'), fase: params.get('fase') };
+    }
+    function getPhaseFromURL(){
+      const params = new URLSearchParams(window.location.search);
+      return params.get('fase');
+    }
+
+    function ensureUserIsAuthenticated(callback){
+      // if already have it:
+      if(currentUserId){ callback(currentUserId); return; }
+      firebase.auth().onAuthStateChanged(function(user){
+        if(user){ currentUserId = user.uid; callback(user.uid); }
+        else { console.error("[Auth] User not authenticated"); }
+      });
+    }
+
+    function markPhaseCompleted(){
+      ensureUserIsAuthenticated(updateNextPhase);
+    }
+
+    async function updateNextPhase(userId){
+      console.log("[Progress] Updating next phase…");
+      const { level, unit } = getParamsFromURL();
+      const currentPhase = getPhaseFromURL();
+      if(!level || !unit || !currentPhase){ console.warn("[Progress] Missing URL params."); return; }
+
+      const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+      try{
+        if(currentPhase === "last"){
+          const nextUnit = `Unit${parseInt(unit.replace('Unit','')) + 1}`;
+          console.log(`[Progress] Unlocking next unit: ${nextUnit}`);
+          await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
+        } else if(currentPhase === "end"){
+          const nextLevel = `Level${parseInt(level.replace('Level','')) + 1}`;
+          console.log(`[Progress] Unlocking next level: ${nextLevel}`);
+          await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+        } else {
+          const nextPhase = parseInt(currentPhase) + 1;
+          console.log(`[Progress] Unlocking next phase: fase${nextPhase}`);
+          await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
+        }
+        console.log("[Progress] Update successful.");
+      } catch(err){
+        console.error("[Progress] Error updating next phase:", err);
+      }
+    }
+
+    // ---------- Back button ----------
+    async function goBack(){
+      console.log("[Back] Click");
+      const { level, unit, fase } = getParamsFromURL();
+
+      // If not completed yet, confirm first (clear, kid-friendly)
+      if(!state.completed){
+        const leave = confirm("You haven't completed this phase yet. Do you want to go back?");
+        if(leave){ window.history.back(); }
+        return;
+      }
+
+      // If completed, just go back. (Optional: keep your example's check as fallback)
+      if(!level || !unit || !fase){ window.history.back(); return; }
+
+      firebase.auth().onAuthStateChanged(async (user)=>{
+        if(!user){ window.history.back(); return; }
+        const nextPhase = `fase${parseInt(fase)+1}`;
+        try{
+          const snapshot = await firebase.database()
+            .ref(`usuarios/${user.uid}/progresso/${level}/${unit}/${nextPhase}`)
+            .once("value");
+          if(snapshot.val() === true){
+            window.history.back();
+          } else {
+            const confirmExit = confirm("The next phase is locked. Do you still want to go back?");
+            if(confirmExit){ window.history.back(); }
+          }
+        }catch(err){
+          console.error("[Back] Firebase error:", err);
+          const confirmExit = confirm("Could not verify progress. Do you want to go back anyway?");
+          if(confirmExit){ window.history.back(); }
+        }
+      });
+    }
+
+    // ---------- Data loading ----------
+    function imageExists(url){
+      return new Promise(function(res){
+        var img = new Image();
+        img.onload = function(){ res(true); };
+        img.onerror = function(){ res(false); };
+        img.src = url + (url.indexOf('?')>-1?'&':'?') + 'v=' + Date.now();
+      });
+    }
+    async function loadSequentialImages(base, start, max){
+      var frames = [];
+      for(var i=start;i<=max;i++){
+        var url = base + 'imagem' + i + '.png';
+        /* eslint-disable no-await-in-loop */
+        var ok = await imageExists(url);
+        if(!ok){
+          if(i===start){ continue; } else { break; }
+        }
+        frames.push({ id:'f'+i, image:url });
+      }
+      return frames;
+    }
+    async function loadStoryText(base){
+      var names = ['images.txt','imagens.txt'];
+      for(var i=0;i<names.length;i++){
+        try{
+          var res = await fetch(base + names[i] + '?v=' + Date.now());
+          if(!res.ok) continue;
+          var raw = await res.text();
+          return parseImagesTxt(raw);
+        }catch(e){}
+      }
+      return null;
+    }
+    function parseImagesTxt(raw){
+      var lines = raw.split(/\r?\n/);
+      var title = null;
+      var frames = [];
+      var current = null;
+      for(var i=0;i<lines.length;i++){
+        var line = (lines[i]||'').trim();
+        if(!line) continue;
+        var mTitle = line.match(/^#title:\s*(.+)$/i);
+        if(mTitle){ title = mTitle[1].trim(); continue; }
+        var mImg = line.match(/^#(imagem|image)(\d+)$/i);
+        if(mImg){
+          var idx = parseInt(mImg[2],10) - 1;
+          current = { idx:idx, text:[] };
+          frames[idx] = current;
+          continue;
+        }
+        if(current){ current.text.push(line.replace(/^"|"$/g, '')); }
+      }
+      var ordered = [];
+      for(var j=0;j<frames.length;j++){
+        ordered[j] = frames[j] ? frames[j].text.join(' ').trim() : '';
+      }
+      return { title:title, frames:ordered };
+    }
+
+    // ---------- Bootstrap (reset on reload) ----------
+    window.addEventListener('load', init);
+    async function init(){
+      state.meta = getParams();
+
+      var imgBase = '/' + state.meta.level + '/' + state.meta.unit + '/DataStory/images/';
+      var txtBase = '/' + state.meta.level + '/' + state.meta.unit + '/DataStory/';
+      qs('#crumbs').setAttribute('title', 'Images at: ' + imgBase);
+
+      state.frames = await loadSequentialImages(imgBase, 1, 30);
+      if(!state.frames.length){
+        alert('No images found at ' + imgBase + ' (expected: imagem1.png, imagem2.png, ...)');
+        return;
+      }
+      state.orderIds = state.frames.map(function(f){ return f.id; });
+
+      var story = await loadStoryText(txtBase);
+      if(story){ state.storyTitle = story.title; state.storyTexts = story.frames; }
+
+      // Always reset fresh on load
+      state.hintUsed = false;
+      state.completed = false;
+      state.poolIds = shuffle(state.orderIds.slice());
+      state.slots = new Array(state.orderIds.length).fill(null);
+
+      renderBoard();
+
+      // Controls
+      qs('#btnReset').addEventListener('click', doReset);
+      qs('#btnHint').addEventListener('click', doHint);
+      qs('#btnCloseWin').addEventListener('click', function(){ qs('#modalWin').classList.remove('open'); });
+    }
+  </script>
+</body>
+</html>
