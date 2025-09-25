@@ -41,8 +41,8 @@
     --sidePad: clamp(12px, 2vw, 26px);
 
     /* <<< VELOCIDADE >>> */
-    --locoDur: 2.8s;     /* mais lento que antes (aumente/diminua) */
-    --departDur: 1.8s;   /* partida dos vagões */
+    --locoDur: 6s;     /* mais devagar: aumente para 4–5s se quiser */
+    --departDur: 4s;   /* partida dos vagões */
   }
 
   /* Overlay de orientação */
@@ -154,10 +154,11 @@
     position:absolute;
     bottom: calc(var(--labelBelowVH) * 1vh + 6px);
     left: -30vw;
-    width: clamp(120px, 18vw, 240px);
-    height: clamp(80px, 12vw, 160px);
+    /* >>> Tamanho MAIOR da locomotiva <<< */
+    width: clamp(260px, 32vw, 640px);
+    height: clamp(160px, 20vw, 360px);
     background: url('locomotive.png') no-repeat center/contain;
-    z-index:190; pointer-events:none; display:flex; align-items:center; justify-content:center;
+    z-index:210; pointer-events:none; display:flex; align-items:center; justify-content:center;
     transform: translateX(110vw);
     will-change: transform;
   }
@@ -252,64 +253,26 @@
     let wordsList=[], imagesList=[], numWagons=0, correctCount=0;
     const balloons=[];
 
-    /* ===== Audio (apito) ===== */
-    let audioCtx=null, audioPrimed=false;
-    const SOUND_ENABLED = true;     // mude para false se não quiser som
-    const WHISTLE_VOL = 0.5;        // volume 0.0–1.0
+    /* ===== Áudio: whistle.mp3 ===== */
+    const SOUND_ENABLED = true;
+    const whistle = new Audio('whistle.mp3'); // coloque o arquivo na mesma pasta do index
+    whistle.preload = 'auto';
+    whistle.volume = 0.65;
+    let whistlePrimed = false;
 
-    function primeAudio(){
-      if(!SOUND_ENABLED) return;
-      if(!audioCtx){
-        const Ctx = window.AudioContext || window.webkitAudioContext;
-        if(!Ctx) return;
-        audioCtx = new Ctx();
-      }
-      if(audioCtx.state === 'suspended') audioCtx.resume();
-      audioPrimed = true;
+    // desbloqueia o áudio no primeiro toque/clique (exigência do navegador)
+    function primeWhistle(){
+      if(whistlePrimed) return;
+      whistle.volume = 0; // toca mudo para liberar
+      whistle.play().then(()=>{
+        whistle.pause();
+        whistle.currentTime = 0;
+        whistle.volume = 0.65;
+        whistlePrimed = true;
+      }).catch(()=>{/* ignore */});
     }
-    // desbloqueia o áudio no primeiro clique/toque
-    window.addEventListener('pointerdown', primeAudio, { once:true });
-    window.addEventListener('keydown', primeAudio, { once:true });
-
-    function playWhistle(totalMs){
-      if(!SOUND_ENABLED || !audioCtx || !audioPrimed) return () => {};
-      const dur = Math.max(0.3, totalMs/1000);
-      const now = audioCtx.currentTime;
-
-      const gain = audioCtx.createGain();
-      gain.gain.setValueAtTime(0, now);
-      gain.gain.linearRampToValueAtTime(WHISTLE_VOL, now + 0.05);
-      gain.gain.linearRampToValueAtTime(WHISTLE_VOL*0.85, now + dur - 0.08);
-      gain.gain.linearRampToValueAtTime(0, now + dur);
-
-      const osc = audioCtx.createOscillator();
-      osc.type = 'sine';
-      // curva de frequência "apito"
-      osc.frequency.setValueAtTime(900, now);
-      osc.frequency.linearRampToValueAtTime(1600, now + dur*0.45);
-      osc.frequency.linearRampToValueAtTime(1100, now + dur);
-
-      // vibrato leve
-      const lfo = audioCtx.createOscillator();
-      lfo.frequency.value = 6;
-      const lfoGain = audioCtx.createGain();
-      lfoGain.gain.value = 20;
-      lfo.connect(lfoGain);
-      lfoGain.connect(osc.frequency);
-
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-
-      osc.start(now);
-      lfo.start(now);
-      osc.stop(now + dur);
-      lfo.stop(now + dur);
-
-      return () => {
-        try{ osc.stop(); lfo.stop(); }catch(e){}
-        osc.disconnect(); lfo.disconnect(); gain.disconnect();
-      };
-    }
+    window.addEventListener('pointerdown', primeWhistle, { once:true });
+    window.addEventListener('keydown', primeWhistle, { once:true });
 
     /* ===== Orientação ===== */
     function checkOrientation(){
@@ -439,10 +402,13 @@
     function runDepartureSequence(){
       document.body.classList.add('animating');
 
-      // duração total p/ som
-      const locoMs   = msFromCssVar('--locoDur');
-      const departMs = msFromCssVar('--departDur');
-      const stopWhistle = playWhistle(locoMs + departMs);
+      // toca o apito (se já "primado")
+      if(SOUND_ENABLED && whistlePrimed){
+        try{
+          whistle.currentTime = 0;
+          whistle.play().catch(()=>{});
+        }catch(e){}
+      }
 
       // 1) Locomotiva cruza
       const loco=document.createElement('div');
@@ -457,8 +423,8 @@
         // 2) Depois que a locomotiva sai, os vagões partem
         train.classList.add('depart');
         train.addEventListener('animationend', ()=>{
-          // 3) Parabéns + progresso
-          try{ stopWhistle && stopWhistle(); }catch(e){}
+          // 3) Para o apito, mostra Parabéns + progresso
+          try{ whistle.pause(); }catch(e){}
           showCongrats();
           updateNextPhaseAuth();
           loco.remove();
@@ -525,6 +491,7 @@
       train.classList.remove('depart');
       congrats.classList.remove('show');
       document.querySelectorAll('.locomotive').forEach(l=>l.remove());
+      try{ whistle.pause(); whistle.currentTime = 0; }catch(e){}
     }
   </script>
 </body>
