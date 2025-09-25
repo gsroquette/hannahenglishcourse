@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Word Drop Express</title>
 <link rel="manifest" href="manifest.json">
+<!-- Acelera o download da locomotiva -->
+<link rel="preload" as="image" href="locomotive.png">
 <style>
   /* ===== Base ===== */
   *{margin:0;padding:0;box-sizing:border-box}
@@ -41,8 +43,8 @@
     --sidePad: clamp(12px, 2vw, 26px);
 
     /* <<< VELOCIDADE >>> */
-    --locoDur: 10s;     /* locomotiva cruzando */
-    --departDur: 4s;   /* vagões indo embora */
+    --locoDur: 6s;     /* locomotiva cruzando */
+    --departDur: 2s;   /* vagões indo embora */
   }
 
   /* Overlay de orientação */
@@ -286,6 +288,20 @@
     window.addEventListener('pointerdown', primeAudioOnce, { once:true });
     window.addEventListener('keydown', primeAudioOnce, { once:true });
 
+    /* ===== Pré-carregamento da LOCOMOTIVA (opção #1) ===== */
+    const LOCO_SRC = 'locomotive.png';
+    const LOCO_TIMEOUT_MS = 1500;   // evita travar em rede lenta
+    const locoImg = new Image();
+    let locomotiveLoaded = false;
+
+    // Promise que resolve quando a imagem carrega OU quando dá timeout
+    const locomotiveReady = new Promise(resolve=>{
+      locoImg.onload = ()=>{ locomotiveLoaded = true; resolve(); };
+      locoImg.onerror = ()=>{ resolve(); }; // em erro, segue com fallback
+      locoImg.src = LOCO_SRC;               // dispara o download
+      setTimeout(resolve, LOCO_TIMEOUT_MS); // timeout para não travar
+    });
+
     /* ===== Orientação ===== */
     function checkOrientation(){
       const stand=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
@@ -401,50 +417,51 @@
     function showFeedback(){ feedback.style.display='block'; clearTimeout(fbTimer); fbTimer=setTimeout(()=>feedback.style.display='none',800); }
     function wrongDrop(el){ showFeedback(); const p=el.dataset.pair; el.remove(); const obj=imagesList.find(x=>x.pair===p); if(obj) createBalloon(obj); }
 
-    /* Utilitário: pegar ms de uma var CSS (ex.: "1.8s") */
-    function msFromCssVar(name){
-      const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-      if(!v) return 0;
-      if(v.endsWith('ms')) return parseFloat(v);
-      if(v.endsWith('s'))  return parseFloat(v)*1000;
-      return parseFloat(v)||0;
-    }
-
-    /* ===== Sequência de Partida do Trem ===== */
+    /* ===== Sequência de Partida do Trem (espera a locomotiva carregar) ===== */
     function runDepartureSequence(){
       document.body.classList.add('animating');
 
-      // Sons (se já desbloqueados pelo primeiro toque/tecla)
-      if(SOUND_ENABLED && audioPrimed){
-        try{ locoLoop.currentTime = 0; locoLoop.play(); }catch(e){}
-        try{ whistle.currentTime = 0; whistle.play(); }catch(e){}
-      }
+      // Espera o preload (ou timeout) antes de criar/animar
+      locomotiveReady.then(()=>{
+        // 1) Cria a locomotiva
+        const loco=document.createElement('div');
+        loco.className='locomotive';
 
-      // 1) Locomotiva cruza
-      const loco=document.createElement('div');
-      loco.className='locomotive';
-      const fallback=document.createElement('span');
-      fallback.className='fallback-emoji';
-      fallback.textContent='🚂';
-      loco.appendChild(fallback);
-      gameContainer.appendChild(loco);
+        // Se ainda não carregou (timeout), usa fallback até carregar
+        if(!locomotiveLoaded){
+          const fallback=document.createElement('span');
+          fallback.className='fallback-emoji';
+          fallback.textContent='🚂';
+          loco.appendChild(fallback);
+          // Assim que a imagem REAL terminar de carregar, remove o fallback
+          locoImg.addEventListener('load', ()=>{ try{ fallback.remove(); }catch(e){} }, { once:true });
+        }
 
-      loco.addEventListener('animationend', ()=>{
-        // 2) Depois que a locomotiva sai, os vagões partem
-        train.classList.add('depart');
-        train.addEventListener('animationend', ()=>{
-          // 3) Parar sons + Parabéns + progresso
-          try{ locoLoop.pause(); locoLoop.currentTime = 0; }catch(e){}
-          try{ whistle.pause(); }catch(e){}
-          showCongrats();
-          updateNextPhaseAuth();
-          loco.remove();
-          document.body.classList.remove('animating');
+        gameContainer.appendChild(loco);
+
+        // 2) Inicia sons sincronizados com o início da animação
+        if(SOUND_ENABLED && audioPrimed){
+          try{ locoLoop.currentTime = 0; locoLoop.play(); }catch(e){}
+          try{ whistle.currentTime = 0; whistle.play(); }catch(e){}
+        }
+
+        // 3) Quando a locomotiva sair, os vagões partem
+        loco.addEventListener('animationend', ()=>{
+          train.classList.add('depart');
+          train.addEventListener('animationend', ()=>{
+            // 4) Parar sons + Parabéns + progresso
+            try{ locoLoop.pause(); locoLoop.currentTime = 0; }catch(e){}
+            try{ whistle.pause(); }catch(e){}
+            showCongrats();
+            updateNextPhaseAuth();
+            loco.remove();
+            document.body.classList.remove('animating');
+          }, {once:true});
         }, {once:true});
-      }, {once:true});
 
-      // dispara a animação da locomotiva no próximo frame
-      requestAnimationFrame(()=>loco.classList.add('run'));
+        // Dispara a animação no próximo frame
+        requestAnimationFrame(()=>loco.classList.add('run'));
+      });
     }
 
     function showCongrats(){
