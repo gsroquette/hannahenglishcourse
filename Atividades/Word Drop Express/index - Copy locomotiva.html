@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Word Drop Express</title>
+<link rel="manifest" href="manifest.json">
+<!-- Acelera o download da locomotiva -->
+<link rel="preload" as="image" href="locomotive.png">
+<style>
+  /* ===== Base ===== */
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{
+    width:100vw;height:100vh;
+    background:url('../../../imagens/fundo.png') repeat;
+    font-family:"Times New Roman",Times,serif;
+  }
+  html,body,#game-container{-webkit-user-select:none;user-select:none;touch-action:manipulation}
+  #game-container{position:relative;width:100%;height:100%;overflow:hidden}
+
+  /* =================== CONTROLES RÁPIDOS ===================
+     DURAÇÕES DA ANIMAÇÃO (ajuste aqui):
+     --locoDur   => duração da locomotiva cruzando (s)
+     --departDur => duração do trem indo embora (s)
+  ========================================================== */
+  :root{
+    --trainH: 44;
+    --wagonFactor: 0.86;
+    --wagonScale: 1.12;
+    --liftVH: 3.2;
+
+    --windowInset: clamp(10px, 1.2vw, 18px);
+    --wheelPadVH: 2.0;
+
+    --pairedImgScale: 0.68;
+    --pairedImgLift: -50%;                        /* sua regulagem */
+    --imgSafePad: clamp(16px, 2vw, 26px);
+
+    --labelH: clamp(22px, 3.4vh, 38px);
+    --labelBelowVH: 3.4;
+
+    --colGap: clamp(10px, 1.4vw, 20px);
+    --sidePad: clamp(12px, 2vw, 26px);
+
+    /* <<< VELOCIDADE >>> */
+    --locoDur: 7s;     /* locomotiva cruzando */
+    --departDur: 1s;   /* vagões indo embora */
+  }
+
+  /* Overlay de orientação */
+  #rotate-overlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.85);color:#fff;
+    display:none;justify-content:center;align-items:center;text-align:center;padding:1rem;z-index:3000
+  }
+  #rotate-overlay p{font-size:1.3rem;line-height:1.5}
+
+  /* ===== Faixa do trem (grid dos slots) ===== */
+  #train{
+    position:absolute;left:0;bottom:0;width:100%;
+    height: calc(var(--trainH) * 1vh);
+    display:grid;
+    grid-template-columns: repeat(var(--num-wagons), 1fr);
+    align-items:end;
+    gap: var(--colGap);
+    padding: 0 var(--sidePad) calc(clamp(10px,1.4vw,20px) + var(--labelBelowVH) * 1vh + 6px);
+    z-index:100;
+    will-change: transform;
+  }
+
+  /* ===== Cada vagão (slot) ===== */
+  .wagon{
+    position:relative;
+    height: calc(var(--trainH) * var(--wagonFactor) * 1vh);
+    background-image: url('wagon.png');
+    background-repeat: no-repeat;
+    background-position: center bottom;
+    background-size: calc(100% * var(--wagonScale)) auto;
+    padding:
+      var(--windowInset)
+      var(--windowInset)
+      calc(var(--windowInset) + (var(--wheelPadVH) * 1vh))
+      var(--windowInset);
+    transform: translateY(calc(-1 * var(--liftVH) * 1vh));
+    overflow: visible;
+  }
+
+  /* ===== Área da imagem ===== */
+  .slot-img{
+    position:absolute;
+    top:    calc(var(--windowInset) + 4px);
+    left:   var(--windowInset);
+    right:  var(--windowInset);
+    bottom: calc(var(--windowInset) + (var(--wheelPadVH) * 1vh) + 10px);
+    display:flex; align-items:center; justify-content:center; overflow:hidden;
+  }
+
+  .slot-img img.paired{
+    max-width:  calc((100% - var(--imgSafePad)*2) * var(--pairedImgScale));
+    max-height: calc((100% - var(--imgSafePad)*2) * var(--pairedImgScale));
+    width:auto;height:auto;object-fit:contain;display:block;pointer-events:none;
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,.12));
+    transform: translateY(calc(-1 * var(--pairedImgLift)));
+  }
+
+  /* ===== Rótulo ===== */
+  .word{
+    position:absolute; left:var(--windowInset); right:var(--windowInset);
+    bottom: calc(-1 * var(--labelBelowVH) * 1vh); height: calc(var(--labelH) - 6px);
+    display:flex;align-items:center;justify-content:center;
+    text-transform:uppercase;text-align:center;font-weight:700;
+    color:#1f2d3a;
+    font-size: clamp(14px, calc((100vw / var(--num-wagons))*0.20), 26px);
+    background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,0.88));
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 10px; box-shadow:0 2px 6px rgba(0,0,0,.08);
+    pointer-events:none; z-index: 2;
+  }
+
+  /* Sem brilho verde */
+  .wagon.correct{ animation: none !important; box-shadow: none !important; }
+
+  /* ===== Balões ===== */
+  .balloon{
+    position:absolute;
+    width:clamp(56px, 10.5vw, 112px);
+    height:clamp(68px, 12.5vw, 130px);
+    background:url('balloon.png') no-repeat center/contain;
+    cursor:pointer;transition:transform .2s ease;z-index:200;
+  }
+  .balloon:hover{transform:scale(1.1)}
+  .balloon img{
+    position:absolute;top:calc(90% + 0px);left:50%;transform:translateX(-50%);
+    width:clamp(44px,8.5vw,88px);height:clamp(44px,8.5vw,88px);object-fit:contain;pointer-events:none;z-index:201
+  }
+
+  /* ===== Feedback / Botões ===== */
+  #feedback{
+    position:absolute;top:45%;left:50%;transform:translate(-50%,-50%);
+    background:rgba(231,76,60,.9);color:#fff;padding:15px 25px;border-radius:8px;font-size:1.2em;display:none;z-index:250
+  }
+  #restart-button{
+    position:absolute;top:10px;right:10px;padding:6px 12px;background:#2980b9;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:.9em;z-index:260;
+    box-shadow:0 4px 8px rgba(0,0,0,.2);transition:background-color .3s ease
+  }
+  #restart-button:hover{background:#1c5980}
+
+  .falling{
+    position:absolute;
+    width:  clamp(28px, 5.5vw, 52px);
+    height: clamp(28px, 5.5vw, 52px);
+    object-fit:contain; pointer-events:none; z-index:150;
+  }
+
+  /* ===== Locomotiva e Partida ===== */
+  .locomotive{
+    position:absolute;
+    bottom: calc(var(--labelBelowVH) * 1vh + 6px);
+    left: -30vw;
+    /* >>> Tamanho MAIOR da locomotiva <<< */
+    width: clamp(260px, 32vw, 640px);
+    height: clamp(160px, 20vw, 360px);
+    background: url('locomotive.png') no-repeat center/contain;
+    z-index:210; pointer-events:none; display:flex; align-items:center; justify-content:center;
+    transform: translateX(110vw);
+    will-change: transform;
+  }
+  .locomotive .fallback-emoji{font-size:clamp(40px,6vw,72px);line-height:1}
+  .locomotive.run{ animation: loco-pass var(--locoDur) linear forwards; }
+
+  @keyframes loco-pass{
+    from{ transform: translateX(110vw); }
+    to  { transform: translateX(-120vw); }
+  }
+
+  #train.depart{ animation: train-depart var(--departDur) ease-in forwards; }
+  @keyframes train-depart{
+    to{ transform: translateX(-120vw); opacity:0.98; }
+  }
+
+  body.animating, body.animating *{ cursor: default !important; }
+  body.animating #game-container{ pointer-events:none; }
+
+  /* ===== Painel de Parabéns ===== */
+  #congrats{
+    position:absolute; inset:0; display:none;
+    align-items:center; justify-content:center;
+    backdrop-filter: blur(2px);
+    z-index:500;
+  }
+  #congrats.show{ display:flex; }
+  #congrats .panel{
+    background:#ffffffee; border:1px solid rgba(0,0,0,.06);
+    border-radius:16px; padding:22px 26px; text-align:center;
+    box-shadow:0 10px 30px rgba(0,0,0,.18);
+    animation: pop-in .25s ease-out both;
+  }
+  #congrats h2{ margin-bottom:8px; font-size:1.4rem; }
+  #congrats p{ margin:0 0 14px; }
+  #close-congrats{
+    background:#16a34a; color:#fff; border:none; border-radius:10px;
+    padding:10px 16px; font-weight:700; cursor:pointer;
+    box-shadow:0 4px 10px rgba(0,0,0,.12);
+  }
+  #close-congrats:hover{ background:#12823c; }
+
+  @keyframes pop-in{
+    from{ transform:scale(.9); opacity:0; }
+    to  { transform:scale(1); opacity:1; }
+  }
+</style>
+</head>
+<body>
+  <div id="rotate-overlay"><p>Please rotate your device to Landscape mode to play.</p></div>
+
+  <div id="game-container">
+    <button id="restart-button" onclick="restartGame()">Restart</button>
+    <div id="feedback">Try Again!</div>
+    <div id="train"></div>
+
+    <!-- Painel de Parabéns -->
+    <div id="congrats">
+      <div class="panel">
+        <h2>Congratulations!</h2>
+        <p>You completed this phase.</p>
+        <button id="close-congrats">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+  <script>
+    /* ===== Firebase ===== */
+    const firebaseConfig={
+      apiKey:"AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+      authDomain:"hannahenglishcourse.firebaseapp.com",
+      databaseURL:"https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId:"hannahenglishcourse",
+      storageBucket:"hannahenglishcourse.appspot.com",
+      messagingSenderId:"449818788486",
+      appId:"1:449818788486:web:8a49d3f68591e6fb3f0707"
+    };
+    firebase.initializeApp(firebaseConfig);
+
+    const gameContainer=document.getElementById('game-container');
+    const train=document.getElementById('train');
+    const feedback=document.getElementById('feedback');
+    const overlay=document.getElementById('rotate-overlay');
+    const congrats=document.getElementById('congrats');
+    const closeCongratsBtn=document.getElementById('close-congrats');
+
+    let wordsList=[], imagesList=[], numWagons=0, correctCount=0;
+    const balloons=[];
+
+    /* ===== Áudio: whistle + loop da locomotiva ===== */
+    const SOUND_ENABLED = true;
+
+    // Coloque whistle.wav e locomotive_loop.wav na mesma pasta do index.html
+    const whistle = new Audio('whistle.wav');
+    whistle.preload = 'auto';
+    whistle.volume = 0.65;
+
+    const locoLoop = new Audio('locomotive_loop.wav');
+    locoLoop.loop = true;
+    locoLoop.preload = 'auto';
+    locoLoop.volume = 0.5;
+
+    let audioPrimed = false;
+    function primeAudioOnce(){
+      if(audioPrimed) return;
+      [whistle, locoLoop].forEach(a=>{
+        a.volume = 0;
+        a.play().then(()=>{
+          a.pause();
+          a.currentTime = 0;
+        }).catch(()=>{});
+      });
+      // Volumes reais após liberar
+      whistle.volume = 0.65;
+      locoLoop.volume = 0.5;
+      audioPrimed = true;
+      window.removeEventListener('pointerdown', primeAudioOnce);
+      window.removeEventListener('keydown', primeAudioOnce);
+    }
+    window.addEventListener('pointerdown', primeAudioOnce, { once:true });
+    window.addEventListener('keydown', primeAudioOnce, { once:true });
+
+    /* ===== Pré-carregamento da LOCOMOTIVA (opção #1) ===== */
+    const LOCO_SRC = 'locomotive.png';
+    const LOCO_TIMEOUT_MS = 1500;   // evita travar em rede lenta
+    const locoImg = new Image();
+    let locomotiveLoaded = false;
+
+    // Promise que resolve quando a imagem carrega OU quando dá timeout
+    const locomotiveReady = new Promise(resolve=>{
+      locoImg.onload = ()=>{ locomotiveLoaded = true; resolve(); };
+      locoImg.onerror = ()=>{ resolve(); }; // em erro, segue com fallback
+      locoImg.src = LOCO_SRC;               // dispara o download
+      setTimeout(resolve, LOCO_TIMEOUT_MS); // timeout para não travar
+    });
+
+    /* ===== Orientação ===== */
+    function checkOrientation(){
+      const stand=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+      if(stand && screen.orientation?.type){
+        overlay.style.display = screen.orientation.type.startsWith('portrait') ? 'flex' : 'none'; return;
+      }
+      overlay.style.display = (innerHeight > innerWidth) ? 'flex' : 'none';
+    }
+    addEventListener('resize',checkOrientation);
+    addEventListener('orientationchange',checkOrientation);
+    addEventListener('load',()=>{ checkOrientation(); loadCardsData(init); });
+
+    /* ===== Helpers ===== */
+    function getParams(){ const p=new URLSearchParams(location.search); return {level:p.get('level'),unit:p.get('unit'),fase:p.get('fase')}; }
+    function preload(src){ return new Promise((res,rej)=>{ const im=new Image(); im.onload=res; im.onerror=rej; im.src=src; }); }
+    function rand(a,b){ return a + Math.random()*(b-a); }
+
+    /* ===== Carrega dados ===== */
+    function loadCardsData(cb){
+      const {level,unit}=getParams();
+      if(!level||!unit){console.error("Parâmetros 'level' e 'unit' são obrigatórios na URL."); return;}
+      const wordsPath=`../../${level}/${unit}/data1/words.txt`;
+      const imagePathTemplate=`../../${level}/${unit}/data1/imagens/imagem`;
+
+      fetch(wordsPath).then(r=>{if(!r.ok)throw new Error('Erro ao carregar '+wordsPath);return r.text();})
+        .then(t=>{
+          wordsList = t.split('\n').map(s=>s.trim()).filter(Boolean);
+          numWagons = wordsList.length;
+          imagesList = wordsList.map((w,i)=>({src:`${imagePathTemplate}${i+1}.png`,pair:`pair${i+1}`,word:w}));
+          return Promise.all([preload('wagon.png'), preload('balloon.png'), ...imagesList.map(x=>preload(x.src))]);
+        })
+        .then(()=>cb())
+        .catch(e=>console.error(e));
+    }
+
+    /* ===== Inicia jogo ===== */
+    function init(){
+      correctCount=0; train.innerHTML=''; balloons.length=0;
+      train.style.setProperty('--num-wagons', numWagons);
+
+      // cria slots (vagões)
+      wordsList.forEach((word,i)=>{
+        const slot=document.createElement('div'); slot.className='wagon'; slot.dataset.pair=`pair${i+1}`;
+        const imgBox=document.createElement('div'); imgBox.className='slot-img';
+        const label=document.createElement('div'); label.className='word'; label.textContent=word;
+        slot.appendChild(imgBox); slot.appendChild(label); train.appendChild(slot);
+      });
+
+      // cria balões
+      imagesList.forEach(obj=>createBalloon(obj));
+      requestAnimationFrame(animateBalloons);
+    }
+
+    /* ===== Balões ===== */
+    function createBalloon(obj){
+      const b=document.createElement('div'); b.className='balloon'; b.dataset.pair=obj.pair; gameContainer.appendChild(b);
+      const r=b.getBoundingClientRect(); const w=r.width; const top=innerHeight*0.05; const x=Math.floor(Math.random()*(innerWidth-w-20))+10;
+      b.style.top=top+'px'; b.style.left=x+'px';
+      const img=document.createElement('img'); img.src=obj.src; b.appendChild(img);
+      b.addEventListener('click',()=>popBalloon(b,obj));
+      b._float={speedX:rand(0.03,0.07),dir:Math.random()<0.5?-1:1,amp:rand(10,30),freq:rand(0.002,0.005),phase:Math.random()*Math.PI*2,base:top,w:w,last:null};
+      balloons.push(b);
+    }
+
+    function popBalloon(b,obj){
+      const s=b.getBoundingClientRect(); b.remove();
+      const idx=balloons.indexOf(b); if(idx!==-1) balloons.splice(idx,1);
+      const f=document.createElement('img'); f.src=obj.src; f.className='falling'; gameContainer.appendChild(f);
+      const r=f.getBoundingClientRect();
+      f.style.left=(s.left + (s.width - r.width)/2) + 'px';
+      f.style.top = s.top + 'px';
+      f.dataset.pair=obj.pair;
+      animateFall(f);
+    }
+
+    function animateFall(el){
+      const SPEED=Math.max(250, innerHeight*0.45); let last=null;
+      function step(ts){
+        if(last==null) last=ts; const dt=(ts-last)/1000; last=ts;
+        el.style.top=(parseFloat(el.style.top||'0') + SPEED*dt) + 'px';
+        const trainRect=train.getBoundingClientRect(); const ir=el.getBoundingClientRect();
+
+        if(ir.bottom >= trainRect.top){
+          const cx=ir.left + ir.width/2;
+          const slots=[...train.querySelectorAll('.wagon')];
+          const landed=slots.find(s=>{ const r=s.getBoundingClientRect(); return cx>=r.left && cx<=r.right; });
+          if(landed){
+            if(landed.dataset.pair===el.dataset.pair) correctDrop(landed, el);
+            else wrongDrop(el);
+          } else wrongDrop(el);
+          return;
+        }
+        if(ir.top > innerHeight){ wrongDrop(el); return; }
+        requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+
+    function correctDrop(slot, fallingImg){
+      fallingImg.remove();
+      const box=slot.querySelector('.slot-img');
+      const paired=document.createElement('img'); paired.src=fallingImg.src; paired.className='paired';
+      box.innerHTML=''; box.appendChild(paired);
+      slot.classList.add('correct');
+
+      if(++correctCount===numWagons){
+        runDepartureSequence();
+      }
+    }
+
+    /* ===== Erro / feedback ===== */
+    let fbTimer=null;
+    function showFeedback(){ feedback.style.display='block'; clearTimeout(fbTimer); fbTimer=setTimeout(()=>feedback.style.display='none',800); }
+    function wrongDrop(el){ showFeedback(); const p=el.dataset.pair; el.remove(); const obj=imagesList.find(x=>x.pair===p); if(obj) createBalloon(obj); }
+
+    /* ===== Sequência de Partida do Trem (espera a locomotiva carregar) ===== */
+    function runDepartureSequence(){
+      document.body.classList.add('animating');
+
+      // Espera o preload (ou timeout) antes de criar/animar
+      locomotiveReady.then(()=>{
+        // 1) Cria a locomotiva
+        const loco=document.createElement('div');
+        loco.className='locomotive';
+
+        // Se ainda não carregou (timeout), usa fallback até carregar
+        if(!locomotiveLoaded){
+          const fallback=document.createElement('span');
+          fallback.className='fallback-emoji';
+          fallback.textContent='🚂';
+          loco.appendChild(fallback);
+          // Assim que a imagem REAL terminar de carregar, remove o fallback
+          locoImg.addEventListener('load', ()=>{ try{ fallback.remove(); }catch(e){} }, { once:true });
+        }
+
+        gameContainer.appendChild(loco);
+
+        // 2) Inicia sons sincronizados com o início da animação
+        if(SOUND_ENABLED && audioPrimed){
+          try{ locoLoop.currentTime = 0; locoLoop.play(); }catch(e){}
+          try{ whistle.currentTime = 0; whistle.play(); }catch(e){}
+        }
+
+        // 3) Quando a locomotiva sair, os vagões partem
+        loco.addEventListener('animationend', ()=>{
+          train.classList.add('depart');
+          train.addEventListener('animationend', ()=>{
+            // 4) Parar sons + Parabéns + progresso
+            try{ locoLoop.pause(); locoLoop.currentTime = 0; }catch(e){}
+            try{ whistle.pause(); }catch(e){}
+            showCongrats();
+            updateNextPhaseAuth();
+            loco.remove();
+            document.body.classList.remove('animating');
+          }, {once:true});
+        }, {once:true});
+
+        // Dispara a animação no próximo frame
+        requestAnimationFrame(()=>loco.classList.add('run'));
+      });
+    }
+
+    function showCongrats(){
+      congrats.classList.add('show');
+    }
+    closeCongratsBtn?.addEventListener('click', ()=>{
+      congrats.classList.remove('show');
+    });
+
+    /* ===== Progresso ===== */
+    function updateNextPhaseAuth(){
+      const u=firebase.auth().currentUser;
+      if(u){ updateNextPhase(u.uid); return; }
+      const unsub=firebase.auth().onAuthStateChanged(x=>{ if(x) updateNextPhase(x.uid); unsub&&unsub(); });
+    }
+    async function updateNextPhase(uid){
+      const q=new URLSearchParams(location.search);
+      const fase=q.get('fase'), level=q.get('level'), unit=q.get('unit');
+      const db=firebase.database().ref(`usuarios/${uid}/progresso/${level}/${unit}`);
+      try{
+        if(fase==="last"){
+          const nextUnit=`Unit${parseInt(unit.replace('Unit',''))+1}`;
+          await firebase.database().ref(`usuarios/${uid}/progresso/${level}/${nextUnit}`).set({fase1:true});
+        }else if(fase==="end"){
+          const nextLevel=`Level${parseInt(level.replace('Level',''))+1}`;
+          await firebase.database().ref(`usuarios/${uid}/progresso/${nextLevel}/Unit1`).set({fase1:true});
+        }else{
+          const next=parseInt(fase)+1;
+          await db.update({[`fase${fase}`]:true,[`fase${next}`]:true});
+        }
+      }catch(e){console.error(e);}
+    }
+
+    /* ===== Animação de flutuação dos balões ===== */
+    function animateBalloons(ts){
+      for(const b of balloons){
+        const p=b._float; if(!p.last) p.last=ts;
+        const d=ts - p.last; p.last=ts;
+        let left=parseFloat(b.style.left);
+        left += p.speedX * p.dir * d;
+        if(left > innerWidth) left = -p.w;
+        if(left < -p.w) left = innerWidth;
+        const top = p.base + p.amp * Math.sin(p.phase + p.freq * ts);
+        b.style.left=left+'px'; b.style.top=top+'px';
+      }
+      requestAnimationFrame(animateBalloons);
+    }
+
+    /* ===== Restart ===== */
+    function restartGame(){
+      correctCount=0;
+      gameContainer.querySelectorAll('.falling').forEach(i=>i.remove());
+      train.querySelectorAll('.slot-img').forEach(b=>b.innerHTML='');
+      train.querySelectorAll('.wagon').forEach(w=>w.classList.remove('correct'));
+      train.classList.remove('depart');
+      congrats.classList.remove('show');
+      document.querySelectorAll('.locomotive').forEach(l=>l.remove());
+
+      // parar sons
+      try{ locoLoop.pause(); locoLoop.currentTime = 0; }catch(e){}
+      try{ whistle.pause(); whistle.currentTime = 0; }catch(e){}
+    }
+  </script>
+</body>
+</html>
