@@ -17,7 +17,13 @@
     color:var(--text);display:flex;min-height:100dvh;align-items:center;justify-content:center;padding:16px;
   }
   .app{width:min(980px,100%);background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;position:relative;overflow:hidden}
-  .header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+
+  /* header já com padding para o Back */
+  .header{
+    display:flex;align-items:center;gap:12px;margin-bottom:14px;
+    position:relative; padding-right:110px;
+  }
+
   .avatar{width:54px;height:54px;border-radius:50%;background:#e5f0ff;border:2px solid #cfe0ff;display:flex;align-items:center;justify-content:center;overflow:hidden}
   .avatar img{width:100%;height:100%;object-fit:contain;border-radius:50%;display:block}
   .title-wrap{flex:1}.title{font-weight:700;font-size:20px}.subtitle{color:var(--muted);font-size:14px}
@@ -87,9 +93,9 @@
   .is-hidden{display:none!important}
   .build-grid{display:grid;gap:12px;grid-template-columns:repeat(2,minmax(0,1fr))}
 
-  /* Back button */
+  /* Back button (apenas uma definição) */
   #back-button{
-    position:absolute; right:12px; top:12px;
+    position:absolute; right:16px; top:10px; z-index:5;
     border:none; background:#eef2ff; color:#0f3ea8;
     padding:8px 12px; border-radius:10px; font-weight:700; cursor:pointer;
     box-shadow:0 6px 14px rgba(0,0,0,.06);
@@ -106,6 +112,7 @@
     .match-col{gap:10px}
     .option.word-only .label{font-size:20px}
     .q-prompt{font-size:20px}
+    .header{ padding-right:92px; }
   }
   @media (max-height:700px) and (max-width:540px){
     .options{max-height:44vh;overflow:auto;padding-right:2px}
@@ -122,24 +129,6 @@
   .loading{position:fixed;inset:0;background:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(2px);font-weight:700;color:#334155}
   .spinner{width:42px;height:42px;border-radius:50%;border:4px solid #c7d2fe;border-top-color:#3b82f6;animation:spin 1s linear infinite;margin-right:10px}
   @keyframes spin{to{transform:rotate(360deg)}}
-/* reserve espaço à direita do cabeçalho para o botão Back */
-.header{
-  position: relative;
-  padding-right: 110px;   /* << cria “zona livre” para o Back */
-}
-
-/* garante que o Back fique por cima e alinhado */
-#back-button{
-  position: absolute;
-  right: 16px;
-  top: 10px;
-  z-index: 5;
-}
-
-/* em telas pequenas, um pouco menos de padding já resolve */
-@media (max-width: 540px){
-  .header{ padding-right: 92px; }
-}
 </style>
 </head>
 <body>
@@ -219,9 +208,8 @@ firebase.auth().onAuthStateChanged(function(user){
 <script>
 (function(){
   /* =========================
-     2) Helpers essenciais
+     Helpers essenciais
   ========================= */
-  // URL params (must include level=LevelX, unit=UnitY, fase=Z|'last'|'end')
   function getParams(){
     const url = new URL(location.href);
     const level = url.searchParams.get('level');
@@ -229,8 +217,6 @@ firebase.auth().onAuthStateChanged(function(user){
     const fase  = url.searchParams.get('fase');
     return { level, unit, fase };
   }
-
-  // Normalização de diretórios para paths (aceita também "0"/"1")
   function normalizeDir(prefix, value, fallbackNum){
     if (!value) return prefix + fallbackNum;
     const lower = value.toLowerCase();
@@ -239,7 +225,7 @@ firebase.auth().onAuthStateChanged(function(user){
     return prefix + (onlyNum || fallbackNum);
   }
 
-  // ---- WebAudio SFX (feedback curto) ----
+  /* WebAudio SFX */
   let audioCtx = null;
   function ensureAudio(){ if(!audioCtx){ try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return !!audioCtx; }
   function tone(freq, durMs, type){
@@ -258,7 +244,6 @@ firebase.auth().onAuthStateChanged(function(user){
   function sfxWrong(){ tone(240,140,'sawtooth'); if(navigator.vibrate) navigator.vibrate(15); }
   function sfxWin(){ tone(660,120,'triangle'); setTimeout(()=>tone(990,120,'triangle'),120); setTimeout(()=>tone(1320,150,'triangle'),240); if(navigator.vibrate) navigator.vibrate([30,30,50]); }
 
-  // Toast util
   function toast(msg){
     const t=document.createElement('div');
     t.className='toast';
@@ -268,7 +253,7 @@ firebase.auth().onAuthStateChanged(function(user){
   }
 
   /* =========================
-     3) Progressão de fase
+     Progressão de fase
   ========================= */
   function ensureUserIsAuthenticated(callback){
     if(currentUserId){ callback(currentUserId); return; }
@@ -277,11 +262,7 @@ firebase.auth().onAuthStateChanged(function(user){
       else { console.error("[Auth] User not authenticated"); }
     });
   }
-
-  function markPhaseCompleted(){
-    ensureUserIsAuthenticated(updateNextPhase);
-  }
-
+  function markPhaseCompleted(){ ensureUserIsAuthenticated(updateNextPhase); }
   async function updateNextPhase(userId){
     const { level, unit, fase } = getParams();
     if(!level || !unit || !fase){ console.warn("[Progress] Missing URL params."); return; }
@@ -303,104 +284,9 @@ firebase.auth().onAuthStateChanged(function(user){
     }
   }
 
-  // Back button flow
-  window.activityCompleted = false; // global for back logic
-
-  window.goBack = async function goBack(){
-    const { level, unit, fase } = getParams();
-
-    if(!window.activityCompleted){
-      const leave = confirm("You haven't completed this phase yet. Do you want to go back?");
-      if(leave){ window.history.back(); }
-      return;
-    }
-    if(!level || !unit || !fase){ window.history.back(); return; }
-
-    firebase.auth().onAuthStateChanged(async (user)=>{
-      if(!user){ window.history.back(); return; }
-      const nextPhase = `fase${parseInt((fase||'').replace(/\D/g,''),10)+1}`;
-      try{
-        const snapshot = await firebase.database()
-          .ref(`usuarios/${user.uid}/progresso/${level}/${unit}/${nextPhase}`)
-          .once("value");
-        if(snapshot.val() === true){
-          window.history.back();
-        } else {
-          const confirmExit = confirm("The next phase is locked. Do you still want to go back?");
-          if(confirmExit){ window.history.back(); }
-        }
-      }catch(err){
-        console.error("[Back] Firebase error:", err);
-        const confirmExit = confirm("Could not verify progress. Do you want to go back anyway?");
-        if(confirmExit){ window.history.back(); }
-      }
-    });
-  };
-
   /* =========================
-     7) (Opcional) Helpers para histórias (assets por Level/Unit)
-     — prontos para reuso em outras atividades
+     Avatar + paths
   ========================= */
-  async function imageExists(url){
-    return new Promise(res=>{
-      const img = new Image();
-      img.onload = ()=>res(true);
-      img.onerror = ()=>res(false);
-      img.src = url + (url.indexOf('?')>-1?'&':'?') + 'v=' + Date.now();
-    });
-  }
-  async function loadSequentialImages(base, start, max){
-    const frames = [];
-    for(let i=start;i<=max;i++){
-      const url = base + 'imagem' + i + '.png';
-      /* eslint-disable no-await-in-loop */
-      const ok = await imageExists(url);
-      if(!ok){ if(i===start){ continue; } else { break; } }
-      frames.push({ id:'f'+i, image:url });
-    }
-    return frames;
-  }
-  async function loadStoryText(base){
-    const names = ['images.txt','imagens.txt'];
-    for(let i=0;i<names.length;i++){
-      try{
-        const res = await fetch(base + names[i] + '?v=' + Date.now());
-        if(!res.ok) continue;
-        const raw = await res.text();
-        return parseImagesTxt(raw);
-      }catch(e){}
-    }
-    return null;
-  }
-  function parseImagesTxt(raw){
-    const lines = raw.split(/\r?\n/);
-    let title = null;
-    const frames = [];
-    let current = null;
-    for(let i=0;i<lines.length;i++){
-      const line = (lines[i]||'').trim();
-      if(!line) continue;
-      const mTitle = line.match(/^#title:\s*(.+)$/i);
-      if(mTitle){ title = mTitle[1].trim(); continue; }
-      const mImg = line.match(/^#(imagem|image)(\d+)$/i);
-      if(mImg){
-        const idx = parseInt(mImg[2],10) - 1;
-        current = { idx, text:[] };
-        frames[idx] = current; continue;
-      }
-      if(current){ current.text.push(line.replace(/^"|"$/g, '')); }
-    }
-    const ordered = [];
-    for(let j=0;j<frames.length;j++){
-      ordered[j] = frames[j] ? frames[j].text.join(' ').trim() : '';
-    }
-    return { title, frames:ordered };
-  }
-
-  /* =========================
-     Q&A Activity (this file)
-  ========================= */
-  // Avatar
   (function(){
     const avatarEl = document.getElementById('avatar');
     const img = new Image();
@@ -410,25 +296,24 @@ firebase.auth().onAuthStateChanged(function(user){
     img.onerror = () => { avatarEl.textContent = '🤖'; };
   })();
 
-  // Params + path base
   const { level, unit, fase } = getParams();
-  const levelDir = normalizeDir('Level', level || '0', '0'); // e.g., Level0
-  const unitDir  = normalizeDir('Unit',  unit  || '1', '1'); // e.g., Unit1
+  const levelDir = normalizeDir('Level', level || '0', '0');
+  const unitDir  = normalizeDir('Unit',  unit  || '1', '1');
   const BASE  = `../../${levelDir}/${unitDir}/QA`;
   const QFILE = `${BASE}/questions.txt`;
 
-  // Header crumbs
   const pill = document.getElementById('pill');
   pill.textContent = `${levelDir} • ${unitDir}${fase ? ' • Phase '+fase : ''}`;
 
-  // Activity state
+  /* =========================
+     Activity state/els
+  ========================= */
   let questions = [];
   let isReading = false;
   let currentAudio = null;
   let idx = 0;
   let answered = false;
 
-  // Elements
   const subtitle   = document.getElementById('subtitle');
   const bar        = document.getElementById('bar');
   const promptEl   = document.getElementById('prompt');
@@ -442,20 +327,18 @@ firebase.auth().onAuthStateChanged(function(user){
   const liveEl     = document.getElementById('live');
   const loadingEl  = document.getElementById('loading');
 
-  // Light SFX mp3 (fallback if WebAudio blocked)
   const sCorrect = new Audio(`${BASE}/sounds/correct.mp3`);
   const sWrong   = new Audio(`${BASE}/sounds/wrong.mp3`);
   const sTap     = new Audio(`${BASE}/sounds/tap.mp3`);
   const sNext    = new Audio(`${BASE}/sounds/next.mp3`);
   [sCorrect,sWrong,sTap,sNext].forEach(a=>{a.preload='auto'});
 
-  // Loader + fetch
+  /* =========================
+     Load questions
+  ========================= */
   showLoader(true);
   fetch(QFILE, {cache:'no-store'})
-    .then(r => {
-      if(!r.ok) throw new Error(`Could not load ${QFILE} (HTTP ${r.status})`);
-      return r.text();
-    })
+    .then(r => { if(!r.ok) throw new Error(`Could not load ${QFILE} (HTTP ${r.status})`); return r.text(); })
     .then(text => {
       const data = JSON.parse(text);
       if(!data || !Array.isArray(data.questions)) throw new Error('Invalid format in questions.txt');
@@ -474,7 +357,9 @@ firebase.auth().onAuthStateChanged(function(user){
     })
     .finally(()=> showLoader(false));
 
-  /* ===== Prompt/blank utilities ===== */
+  /* =========================
+     Prompt/blank utils + TTS builder
+  ========================= */
   function renderPromptWithBlanks(str){
     const s = String(str ?? '');
     return s
@@ -491,14 +376,10 @@ firebase.auth().onAuthStateChanged(function(user){
   function stripQuotesForTTS(str){
     return String(str ?? '').replace(/[“”"]/g,'').replace(/\s{2,}/g,' ').trim();
   }
-
-  // Build spoken text with correct answers for fillblank
   function buildSpokenPrompt(q){
     if (q.tts && String(q.tts).trim()) return stripQuotesForTTS(q.tts);
     let text = String(q.prompt || '');
-    if (q.type !== 'fillblank'){
-      return stripQuotesForTTS(ttsSanitize(text));
-    }
+    if (q.type !== 'fillblank'){ return stripQuotesForTTS(ttsSanitize(text)); }
     const optMap = new Map();
     (Array.isArray(q.options) ? q.options : []).forEach(op=>{
       const o = (typeof op === 'string') ? {label:op, value:op} : {...op};
@@ -509,7 +390,6 @@ firebase.auth().onAuthStateChanged(function(user){
       const o = optMap.get(key);
       return stripQuotesForTTS((o && (o.tts || o.label || o.value)) || String(val||''));
     };
-    // {b1},{b2},...
     text = text.replace(/\{b(\d+)\}/gi, (_m, nStr)=>{
       const n = parseInt(nStr,10);
       let ans = null;
@@ -518,7 +398,6 @@ firebase.auth().onAuthStateChanged(function(user){
       else ans = q.answer;
       return speakValue(ans);
     });
-    // {blank} and ___ (sequential)
     const seqAnswers = (()=>{
       if (Array.isArray(q.answer)) return q.answer.slice();
       if (q.answer && typeof q.answer==='object'){
@@ -540,7 +419,9 @@ firebase.auth().onAuthStateChanged(function(user){
     return stripQuotesForTTS(text);
   }
 
-  /* ===== Audio helpers (prompt & selection) ===== */
+  /* =========================
+     Audio helpers
+  ========================= */
   function stopAllAudio(){
     try { speechSynthesis.cancel(); } catch(e){}
     if (currentAudio){
@@ -559,15 +440,14 @@ firebase.auth().onAuthStateChanged(function(user){
   }
   function speakFriendly(pool){ const pick = pool[(Math.random()*pool.length)|0]; speak(pick); }
 
-  /* ===== Render current question ===== */
+  /* =========================
+     Render current question
+  ========================= */
   function renderQuestion(){
     answered = false;
-    btnNext.disabled = true;
-    btnNext.classList.remove('ready');
-    btnPlayPrompt.disabled = false;
-    btnRepeat.disabled = false;
-    btnPlayPrompt.classList.remove('is-hidden');
-    btnRepeat.classList.remove('is-hidden');
+    btnNext.disabled = true; btnNext.classList.remove('ready');
+    btnPlayPrompt.disabled = false; btnRepeat.disabled = false;
+    btnPlayPrompt.classList.remove('is-hidden'); btnRepeat.classList.remove('is-hidden');
 
     const q = questions[idx];
     if(!q){ finish(); return; }
@@ -576,7 +456,6 @@ firebase.auth().onAuthStateChanged(function(user){
     bar.style.width = pct + '%';
     statusPill.textContent = `Question ${idx+1}/${questions.length}`;
 
-    // Prompt UI: show visual blanks in-place, or fallback at end
     const rawPrompt = q.prompt || '—';
     promptEl.innerHTML = renderPromptWithBlanks(rawPrompt);
     if (q.type === 'fillblank' && !/\{blank\}|\{b\d+\}|_{3,}/i.test(rawPrompt)) {
@@ -586,15 +465,9 @@ firebase.auth().onAuthStateChanged(function(user){
       promptEl.appendChild(span);
     }
 
-    // Listen / Repeat — speak full sentence with answers
     btnPlayPrompt.onclick = () => { if (!isReading) playPrompt(q); };
-    btnRepeat.onclick     = () => {
-      if (isReading) return;
-      stopAllAudio();
-      speak(buildSpokenPrompt(q));
-    };
+    btnRepeat.onclick     = () => { if (isReading) return; stopAllAudio(); speak(buildSpokenPrompt(q)); };
 
-    // Media
     mediaBox.innerHTML = '';
     if(q.image){
       const img = new Image(); img.alt = 'Question image';
@@ -604,7 +477,6 @@ firebase.auth().onAuthStateChanged(function(user){
       mediaBox.appendChild(img);
     }
 
-    // Options
     optionsEl.innerHTML = '';
     optionsEl.classList.remove('is-order');
 
@@ -625,13 +497,14 @@ firebase.auth().onAuthStateChanged(function(user){
     };
   }
 
-  /* ===== Build option button ===== */
+  /* =========================
+     Multiple-choice option
+  ========================= */
   function makeOption(q, opt){
     const o = (typeof opt === 'string') ? { label: opt, value: opt } : { ...opt };
 
     const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'option';
+    btn.type = 'button'; btn.className = 'option';
     btn.setAttribute('aria-label', o.aria || o.label || 'option');
 
     const thumb = document.createElement('div'); thumb.className = 'thumb';
@@ -671,7 +544,205 @@ firebase.auth().onAuthStateChanged(function(user){
     return btn;
   }
 
-  /* ===== Answer handling ===== */
+  /* =========================
+     Order type
+  ========================= */
+  function renderOrderQuestion(q){
+    optionsEl.classList.add('is-order');
+
+    const words = (q.options || []).map(w => String(w));
+    const answerSeq = Array.isArray(q.answer) ? q.answer.map(String) : [];
+    let built = [];
+
+    const wrap = document.createElement('div'); wrap.className = 'build-wrap';
+    const tray = document.createElement('div'); tray.className = 'build-tray'; tray.id = 'buildTray';
+    tray.setAttribute('aria-label','Sentence tray');
+    const actions = document.createElement('div'); actions.className = 'build-actions';
+    const undoBtn = document.createElement('button'); undoBtn.className = 'build-btn'; undoBtn.textContent = 'Undo';
+    const clearBtn = document.createElement('button'); clearBtn.className = 'build-btn'; clearBtn.textContent = 'Clear';
+    actions.appendChild(undoBtn); actions.appendChild(clearBtn);
+    wrap.appendChild(tray); wrap.appendChild(actions);
+    optionsEl.appendChild(wrap);
+
+    const grid = document.createElement('div'); grid.className = 'build-grid';
+    optionsEl.appendChild(grid);
+
+    words.forEach(w=>{
+      const b = document.createElement('button');
+      b.type='button'; b.className='option word-only';
+      b.innerHTML = `<div class="label">${w}</div>`;
+      b.onclick = ()=>{
+        (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
+        if (built.length >= answerSeq.length) return;
+        built.push(w);
+        drawTray();
+        checkBuilt();
+      };
+      grid.appendChild(b);
+    });
+
+    undoBtn.onclick = ()=>{ built.pop(); drawTray(); btnNext.disabled = true; btnNext.classList.remove('ready'); };
+    clearBtn.onclick = ()=>{ built = []; drawTray(); btnNext.disabled = true; btnNext.classList.remove('ready'); };
+
+    function drawTray(){
+      tray.innerHTML = '';
+      built.forEach(word=>{
+        const chip = document.createElement('span');
+        chip.className='word-chip';
+        chip.textContent = word;
+        tray.appendChild(chip);
+      });
+    }
+    function checkBuilt(){
+      const sameLen = built.length === answerSeq.length;
+      if (!sameLen) return;
+      const ok = built.every((w,i)=> normalize(w) === normalize(answerSeq[i]));
+      if (ok){
+        try{
+          mediaBox.innerHTML = '';
+          const gif = new Image(); gif.src = './hannah_feliz.gif'; gif.alt = 'Hannah celebrating';
+          gif.setAttribute('draggable','false'); gif.style.pointerEvents = 'none';
+          mediaBox.appendChild(gif);
+        }catch(e){}
+        confetti(18);
+        (ensureAudio()? sfxCorrect() : sCorrect.play().catch(()=>{}));
+        speakFriendly(['Great!','Awesome!']);
+        liveEl.textContent = 'Correct order';
+        btnNext.disabled = false; btnNext.classList.add('ready');
+        answered = true;
+        Array.from(optionsEl.querySelectorAll('.option')).forEach(el=> el.disabled = true);
+        undoBtn.disabled = true; clearBtn.disabled = true;
+      } else {
+        (ensureAudio()? sfxWrong() : sWrong.play().catch(()=>{}));
+        speakFriendly(['Try again!']);
+        liveEl.textContent = 'Incorrect order, try again';
+      }
+    }
+  }
+
+  /* =========================
+     Match type
+  ========================= */
+  function renderMatchQuestion(q){
+    const sourcePairs = Array.isArray(q.pairs) ? q.pairs : [];
+
+    const normItem = (side, it) => {
+      if (typeof it === 'string') return { label: it, value: it };
+      const o = {...it};
+      if (!o.value) o.value = o.label || o.image || String(Math.random());
+      return o;
+    };
+
+    const leftItems  = sourcePairs.map(p => normItem('left',  p.left));
+    const rightItems = sourcePairs.map(p => normItem('right', p.right));
+
+    const leftShuf  = shuffle([...leftItems]);
+    const rightShuf = shuffle([...rightItems]);
+
+    const grid = document.createElement('div'); grid.className = 'match-grid';
+    const colL = document.createElement('div'); colL.className = 'match-col';
+    const colR = document.createElement('div'); colR.className = 'match-col';
+    grid.appendChild(colL); grid.appendChild(colR);
+    optionsEl.appendChild(grid);
+
+    let selectedLeftBtn = null;
+    let selectedLeftVal = null;
+    let matched = new Set();
+
+    const makeLeftBtn = (item) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'option word-only';
+      b.dataset.value = item.value;
+
+      const label = document.createElement('div'); label.className = 'label'; label.textContent = item.label || item.value;
+      b.appendChild(label);
+
+      b.onclick = () => {
+        if (b.classList.contains('matched')) return;
+        (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
+        Array.from(colL.children).forEach(el => el.classList.remove('selected'));
+        b.classList.add('selected');
+        selectedLeftBtn = b;
+        selectedLeftVal = item.value;
+      };
+      return b;
+    };
+
+    const makeRightBtn = (item) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'option';
+      b.dataset.value = item.value;
+
+      const thumb = document.createElement('div'); thumb.className = 'thumb';
+      if (item.image){
+        const img = new Image(); img.src = absPath(item.image); img.alt = item.label || '';
+        thumb.appendChild(img);
+      } else {
+        thumb.textContent = item.label ? '🔤' : '❔';
+      }
+
+      const hasLabel = !!(item.label && String(item.label).trim());
+      if (hasLabel){
+        const label = document.createElement('div'); label.className = 'label'; label.textContent = item.label;
+        b.appendChild(thumb); b.appendChild(label);
+      } else {
+        b.classList.add('img-only'); b.appendChild(thumb);
+      }
+
+      b.onclick = ()=>{
+        if (b.classList.contains('matched')) return;
+        if (!selectedLeftBtn){ toast('Choose a word first 🙂'); return; }
+        const leftVal  = selectedLeftVal;
+        const rightVal = item.value;
+        const ok = normalize(leftVal) === normalize(rightVal);
+
+        if (ok){
+          (ensureAudio()? sfxCorrect() : sCorrect.play().catch(()=>{}));
+          confetti(10);
+          speakFriendly(['Great!','Nice!']);
+
+          b.classList.add('matched');
+          selectedLeftBtn.classList.add('matched');
+          selectedLeftBtn.classList.remove('selected');
+          matched.add(leftVal);
+
+          selectedLeftBtn = null;
+          selectedLeftVal = null;
+
+          if (matched.size === sourcePairs.length){
+            try{
+              mediaBox.innerHTML = '';
+              const gif = new Image(); gif.src = './hannah_feliz.gif'; gif.alt = 'Hannah celebrating';
+              gif.setAttribute('draggable','false'); gif.style.pointerEvents = 'none';
+              mediaBox.appendChild(gif);
+            }catch(e){}
+            confetti(18);
+            (ensureAudio()? sfxCorrect() : sCorrect.play().catch(()=>{}));
+            speakFriendly(['Great!','Awesome!']);
+            liveEl.textContent = 'All pairs matched';
+            answered = true;
+            btnNext.disabled = false; btnNext.classList.add('ready');
+            Array.from(optionsEl.querySelectorAll('.option')).forEach(el => el.disabled = true);
+          }
+        } else {
+          (ensureAudio()? sfxWrong() : sWrong.play().catch(()=>{}));
+          speakFriendly(['Try again!']);
+          b.classList.add('err');
+          setTimeout(()=>b.classList.remove('err'), 250);
+        }
+      };
+      return b;
+    };
+
+    leftShuf.forEach(item => colL.appendChild(makeLeftBtn(item)));
+    rightShuf.forEach(item => colR.appendChild(makeRightBtn(item)));
+  }
+
+  /* =========================
+     Selection flow for MCQ
+  ========================= */
   function handleAnswer(q, opt, btn){
     if(answered) return;
     const isCorrect = normalize(opt.value) === normalize(q.answer);
@@ -704,7 +775,6 @@ firebase.auth().onAuthStateChanged(function(user){
     });
   }
 
-  /* ===== Prompt playback: mp3 if present, else TTS full sentence ===== */
   function playPrompt(q){
     stopAllAudio();
     const spoken = buildSpokenPrompt(q);
@@ -719,7 +789,6 @@ firebase.auth().onAuthStateChanged(function(user){
     }
   }
 
-  /* ===== Selection speaking: mp3 option if present; else TTS ===== */
   function speakSelectedThenCheck(q, o, btn){
     if (answered || isReading) return;
     isReading = true;
@@ -762,14 +831,15 @@ firebase.auth().onAuthStateChanged(function(user){
     }
   }
 
-  /* ===== Activity completion ===== */
+  /* =========================
+     Finish + Back
+  ========================= */
   function onActivityComplete(){
     if(window.activityCompleted) return;
     window.activityCompleted = true;
     (ensureAudio()? sfxWin() : sCorrect.play().catch(()=>{}));
     markPhaseCompleted();
   }
-
   function finish(){
     try { stopAllAudio(); } catch(e){} try { speechSynthesis.cancel(); } catch(e){}
     isReading = false;
@@ -783,15 +853,12 @@ firebase.auth().onAuthStateChanged(function(user){
     confetti(30);
     speakFriendly(['Great! You finished!','Amazing work!']);
 
-    btnPlayPrompt.disabled = true;
-    btnRepeat.disabled = true;
-    btnPlayPrompt.classList.add('is-hidden');
-    btnRepeat.classList.add('is-hidden');
+    btnPlayPrompt.disabled = true; btnRepeat.disabled = true;
+    btnPlayPrompt.classList.add('is-hidden'); btnRepeat.classList.add('is-hidden');
 
-    onActivityComplete(); // <- progressão de fase
+    onActivityComplete();
   }
 
-  /* ===== General helpers ===== */
   function confetti(n=16){
     for(let i=0;i<n;i++){
       const p=document.createElement('div'); p.className='piece';
@@ -809,12 +876,42 @@ firebase.auth().onAuthStateChanged(function(user){
   function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
   function normalize(v){ return String(v ?? '').trim().toLowerCase(); }
   function absPath(p){ if(!p) return p; if(p.startsWith('http')) return p; if(p.startsWith('/')) return p; return `${BASE}/${p}`.replace(/\/+/g,'/'); }
-  function showLoader(v){ if (loadingEl) loadingEl.style.display = v ? 'flex' : 'none'; }
+  function showLoader(v){ const el=document.getElementById('loading'); if (el) el.style.display = v ? 'flex' : 'none'; }
 
-  // Fresh reset on load (no auto-restore)
-  window.addEventListener('load', function(){
-    window.activityCompleted = false;
-  });
+  window.activityCompleted = false;
+  window.addEventListener('load', function(){ window.activityCompleted = false; });
+
+  /* Back button (confirmations) */
+  window.goBack = async function goBack(){
+    const { level, unit, fase } = getParams();
+
+    if(!window.activityCompleted){
+      const leave = confirm("You haven't completed this phase yet. Do you want to go back?");
+      if(leave){ window.history.back(); }
+      return;
+    }
+    if(!level || !unit || !fase){ window.history.back(); return; }
+
+    firebase.auth().onAuthStateChanged(async (user)=>{
+      if(!user){ window.history.back(); return; }
+      const nextPhase = `fase${parseInt((fase||'').replace(/\D/g,''),10)+1}`;
+      try{
+        const snapshot = await firebase.database()
+          .ref(`usuarios/${user.uid}/progresso/${level}/${unit}/${nextPhase}`)
+          .once("value");
+        if(snapshot.val() === true){
+          window.history.back();
+        } else {
+          const confirmExit = confirm("The next phase is locked. Do you still want to go back?");
+          if(confirmExit){ window.history.back(); }
+        }
+      }catch(err){
+        console.error("[Back] Firebase error:", err);
+        const confirmExit = confirm("Could not verify progress. Do you want to go back anyway?");
+        if(confirmExit){ window.history.back(); }
+      }
+    });
+  };
 
 })();
 </script>
