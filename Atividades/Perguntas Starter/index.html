@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Q&A Kids – Hannah Neurolearning</title>
+<title>Hannah Questions — Fill in the Blanks</title>
 <style>
   :root{
     --bg:#f7f9fc; --card:#ffffff; --text:#1f2937; --muted:#6b7280;
@@ -44,7 +44,7 @@
   .option .label{font-size:20px;font-weight:800;letter-spacing:.2px}
   .option .sub{font-size:13px;color:var(--muted)}
 
-  /* quadrado roxo + check verde */
+  /* Purple square + green tick */
   .square-outline{width:42px;height:42px;border:6px solid var(--sq,#7c3aed);border-radius:10px;background:transparent;display:inline-block;position:relative;transition:border-color .2s ease,background .2s ease,transform .15s ease}
   .option.ok .square-outline{border-color:#16a34a;background:#dcfce7}
   .option.ok .square-outline::after{content:"✔";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#166534;font-size:22px;font-weight:900;animation:pop-in .18s ease-out}
@@ -80,12 +80,21 @@
   .option.selected{outline:3px solid #60a5fa}
   .option.matched{border-color:#86efac;opacity:.65;pointer-events:none}
 
-  /* linha visual da lacuna */
+  /* Visual blank line */
   .blank{display:inline-block;min-width:56px;height:1em;border-bottom:3px solid #cfe0ff;margin:0 6px -2px}
 
   .icon-btn[disabled]{opacity:.4;pointer-events:none}
   .is-hidden{display:none!important}
   .build-grid{display:grid;gap:12px;grid-template-columns:repeat(2,minmax(0,1fr))}
+
+  /* Back button */
+  #back-button{
+    position:absolute; right:12px; top:12px;
+    border:none; background:#eef2ff; color:#0f3ea8;
+    padding:8px 12px; border-radius:10px; font-weight:700; cursor:pointer;
+    box-shadow:0 6px 14px rgba(0,0,0,.06);
+  }
+  #back-button:active{ transform: translateY(1px); }
 
   @media (max-width:540px){
     .q-media{aspect-ratio:4/3;padding:6px}
@@ -109,7 +118,7 @@
   .option.word-only .label{width:100%;text-align:center;font-size:22px;font-weight:800}
   .build-btn:disabled{opacity:.45;pointer-events:none;filter:grayscale(.2)}
 
-  /* loader */
+  /* Loader */
   .loading{position:fixed;inset:0;background:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(2px);font-weight:700;color:#334155}
   .spinner{width:42px;height:42px;border-radius:50%;border:4px solid #c7d2fe;border-top-color:#3b82f6;animation:spin 1s linear infinite;margin-right:10px}
   @keyframes spin{to{transform:rotate(360deg)}}
@@ -117,13 +126,15 @@
 </head>
 <body>
   <div class="app" id="app">
+    <button id="back-button" onclick="goBack()">Back</button>
+
     <div class="confetti" id="confetti"></div>
 
     <div class="header">
       <div class="avatar" id="avatar" aria-hidden="true">🤖</div>
       <div class="title-wrap">
         <div class="title">Hannah Questions</div>
-        <div class="subtitle" id="subtitle">Carregando conteúdo…</div>
+        <div class="subtitle" id="subtitle">Loading content…</div>
         <div class="progress"><div id="bar"></div></div>
       </div>
       <div class="pill" id="pill">Unit —</div>
@@ -139,7 +150,7 @@
               <button class="icon-btn" id="btnRepeat" title="Repeat aloud (optional)">🎤 Repeat</button>
             </div>
           </div>
-          <div class="q-media" id="mediaBox" aria-label="Imagem da pergunta"></div>
+          <div class="q-media" id="mediaBox" aria-label="Question image"></div>
         </div>
 
         <div class="options" id="options"></div>
@@ -155,41 +166,252 @@
   <!-- Loader -->
   <div class="loading" id="loading" aria-live="polite">
     <div class="spinner" aria-hidden="true"></div>
-    <span>Carregando…</span>
+    <span>Loading…</span>
   </div>
 
   <div class="sr-only" aria-live="polite" id="live"></div>
 
+  <!-- Firebase SDK v8 -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<script>
+/* =========================
+   Firebase init (v8)
+========================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+  authDomain: "hannahenglishcourse.firebaseapp.com",
+  databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "hannahenglishcourse",
+  storageBucket: "hannahenglishcourse.appspot.com",
+  messagingSenderId: "449818788486",
+  appId: "1:449818788486:web:8a49d3f68591e6fb3f0707"
+};
+firebase.initializeApp(firebaseConfig);
+
+// Keep user uid
+let currentUserId = null;
+firebase.auth().onAuthStateChanged(function(user){
+  currentUserId = user ? user.uid : null;
+});
+</script>
+
 <script>
 (function(){
-  /* ===== Params normalizados ===== */
-  const params = new URLSearchParams(location.search);
-  const rawLevel = (params.get('level') ?? '').trim();
-  const rawUnit  = (params.get('unit')  ?? '').trim();
-  const rawFase  = (params.get('fase')  ?? '').trim();
+  /* =========================
+     2) Helpers essenciais
+  ========================= */
+  // URL params (must include level=LevelX, unit=UnitY, fase=Z|'last'|'end')
+  function getParams(){
+    const url = new URL(location.href);
+    const level = url.searchParams.get('level');
+    const unit  = url.searchParams.get('unit');
+    const fase  = url.searchParams.get('fase');
+    return { level, unit, fase };
+  }
 
+  // Normalização de diretórios para paths (aceita também "0"/"1")
   function normalizeDir(prefix, value, fallbackNum){
     if (!value) return prefix + fallbackNum;
     const lower = value.toLowerCase();
     if (lower.startsWith(prefix.toLowerCase())) return value.trim();
-    return prefix + value.replace(/\D+/g,'').trim();
+    const onlyNum = (value.match(/\d+/)||[''])[0];
+    return prefix + (onlyNum || fallbackNum);
   }
-  const levelDir = normalizeDir('Level', rawLevel || '0', '0'); // Level0
-  const unitDir  = normalizeDir('Unit',  rawUnit  || '1', '1'); // Unit1
-  const fase     = rawFase || '';
+
+  // ---- WebAudio SFX (feedback curto) ----
+  let audioCtx = null;
+  function ensureAudio(){ if(!audioCtx){ try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return !!audioCtx; }
+  function tone(freq, durMs, type){
+    if(!ensureAudio()) return;
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = type || 'sine'; o.frequency.value = freq;
+    o.connect(g); g.connect(audioCtx.destination);
+    const t0 = audioCtx.currentTime;
+    g.gain.setValueAtTime(0.001, t0);
+    g.gain.exponentialRampToValueAtTime(0.16, t0+0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + (durMs/1000));
+    o.start(t0); o.stop(t0 + (durMs/1000));
+  }
+  function sfxTick(){ tone(520, 70, 'square'); if(navigator.vibrate) navigator.vibrate(12); }
+  function sfxCorrect(){ tone(880,120,'triangle'); setTimeout(()=>tone(1320,90,'triangle'),110); if(navigator.vibrate) navigator.vibrate(25); }
+  function sfxWrong(){ tone(240,140,'sawtooth'); if(navigator.vibrate) navigator.vibrate(15); }
+  function sfxWin(){ tone(660,120,'triangle'); setTimeout(()=>tone(990,120,'triangle'),120); setTimeout(()=>tone(1320,150,'triangle'),240); if(navigator.vibrate) navigator.vibrate([30,30,50]); }
+
+  // Toast util
+  function toast(msg){
+    const t=document.createElement('div');
+    t.className='toast';
+    t.textContent=msg;
+    document.body.appendChild(t);
+    setTimeout(()=>t.remove(),2500);
+  }
+
+  /* =========================
+     3) Progressão de fase
+  ========================= */
+  function ensureUserIsAuthenticated(callback){
+    if(currentUserId){ callback(currentUserId); return; }
+    firebase.auth().onAuthStateChanged(function(user){
+      if(user){ currentUserId = user.uid; callback(user.uid); }
+      else { console.error("[Auth] User not authenticated"); }
+    });
+  }
+
+  function markPhaseCompleted(){
+    ensureUserIsAuthenticated(updateNextPhase);
+  }
+
+  async function updateNextPhase(userId){
+    const { level, unit, fase } = getParams();
+    if(!level || !unit || !fase){ console.warn("[Progress] Missing URL params."); return; }
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+    try{
+      if(fase === "last"){
+        const nextUnit = `Unit${parseInt((unit||'').replace(/\D/g,''),10) + 1}`;
+        await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
+      } else if(fase === "end"){
+        const nextLevel = `Level${parseInt((level||'').replace(/\D/g,''),10) + 1}`;
+        await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+      } else {
+        const nextPhase = parseInt(fase,10) + 1;
+        await dbRef.update({ [`fase${fase}`]: true, [`fase${nextPhase}`]: true });
+      }
+      console.log("[Progress] Update successful.");
+    } catch(err){
+      console.error("[Progress] Error updating next phase:", err);
+    }
+  }
+
+  // Back button flow
+  window.activityCompleted = false; // global for back logic
+
+  window.goBack = async function goBack(){
+    const { level, unit, fase } = getParams();
+
+    if(!window.activityCompleted){
+      const leave = confirm("You haven't completed this phase yet. Do you want to go back?");
+      if(leave){ window.history.back(); }
+      return;
+    }
+    if(!level || !unit || !fase){ window.history.back(); return; }
+
+    firebase.auth().onAuthStateChanged(async (user)=>{
+      if(!user){ window.history.back(); return; }
+      const nextPhase = `fase${parseInt((fase||'').replace(/\D/g,''),10)+1}`;
+      try{
+        const snapshot = await firebase.database()
+          .ref(`usuarios/${user.uid}/progresso/${level}/${unit}/${nextPhase}`)
+          .once("value");
+        if(snapshot.val() === true){
+          window.history.back();
+        } else {
+          const confirmExit = confirm("The next phase is locked. Do you still want to go back?");
+          if(confirmExit){ window.history.back(); }
+        }
+      }catch(err){
+        console.error("[Back] Firebase error:", err);
+        const confirmExit = confirm("Could not verify progress. Do you want to go back anyway?");
+        if(confirmExit){ window.history.back(); }
+      }
+    });
+  };
+
+  /* =========================
+     7) (Opcional) Helpers para histórias (assets por Level/Unit)
+     — prontos para reuso em outras atividades
+  ========================= */
+  async function imageExists(url){
+    return new Promise(res=>{
+      const img = new Image();
+      img.onload = ()=>res(true);
+      img.onerror = ()=>res(false);
+      img.src = url + (url.indexOf('?')>-1?'&':'?') + 'v=' + Date.now();
+    });
+  }
+  async function loadSequentialImages(base, start, max){
+    const frames = [];
+    for(let i=start;i<=max;i++){
+      const url = base + 'imagem' + i + '.png';
+      /* eslint-disable no-await-in-loop */
+      const ok = await imageExists(url);
+      if(!ok){ if(i===start){ continue; } else { break; } }
+      frames.push({ id:'f'+i, image:url });
+    }
+    return frames;
+  }
+  async function loadStoryText(base){
+    const names = ['images.txt','imagens.txt'];
+    for(let i=0;i<names.length;i++){
+      try{
+        const res = await fetch(base + names[i] + '?v=' + Date.now());
+        if(!res.ok) continue;
+        const raw = await res.text();
+        return parseImagesTxt(raw);
+      }catch(e){}
+    }
+    return null;
+  }
+  function parseImagesTxt(raw){
+    const lines = raw.split(/\r?\n/);
+    let title = null;
+    const frames = [];
+    let current = null;
+    for(let i=0;i<lines.length;i++){
+      const line = (lines[i]||'').trim();
+      if(!line) continue;
+      const mTitle = line.match(/^#title:\s*(.+)$/i);
+      if(mTitle){ title = mTitle[1].trim(); continue; }
+      const mImg = line.match(/^#(imagem|image)(\d+)$/i);
+      if(mImg){
+        const idx = parseInt(mImg[2],10) - 1;
+        current = { idx, text:[] };
+        frames[idx] = current; continue;
+      }
+      if(current){ current.text.push(line.replace(/^"|"$/g, '')); }
+    }
+    const ordered = [];
+    for(let j=0;j<frames.length;j++){
+      ordered[j] = frames[j] ? frames[j].text.join(' ').trim() : '';
+    }
+    return { title, frames:ordered };
+  }
+
+  /* =========================
+     Q&A Activity (this file)
+  ========================= */
+  // Avatar
+  (function(){
+    const avatarEl = document.getElementById('avatar');
+    const img = new Image();
+    img.src = '../../imagens/robo1_static.png';
+    img.alt = 'App mascot';
+    img.onload = () => { avatarEl.textContent = ''; avatarEl.appendChild(img); };
+    img.onerror = () => { avatarEl.textContent = '🤖'; };
+  })();
+
+  // Params + path base
+  const { level, unit, fase } = getParams();
+  const levelDir = normalizeDir('Level', level || '0', '0'); // e.g., Level0
+  const unitDir  = normalizeDir('Unit',  unit  || '1', '1'); // e.g., Unit1
   const BASE  = `../../${levelDir}/${unitDir}/QA`;
   const QFILE = `${BASE}/questions.txt`;
 
-  /* ===== Estado ===== */
+  // Header crumbs
+  const pill = document.getElementById('pill');
+  pill.textContent = `${levelDir} • ${unitDir}${fase ? ' • Phase '+fase : ''}`;
+
+  // Activity state
   let questions = [];
   let isReading = false;
   let currentAudio = null;
   let idx = 0;
   let answered = false;
 
-  /* ===== Elementos ===== */
+  // Elements
   const subtitle   = document.getElementById('subtitle');
-  const pill       = document.getElementById('pill');
   const bar        = document.getElementById('bar');
   const promptEl   = document.getElementById('prompt');
   const mediaBox   = document.getElementById('mediaBox');
@@ -202,50 +424,39 @@
   const liveEl     = document.getElementById('live');
   const loadingEl  = document.getElementById('loading');
 
-  /* Avatar */
-  (function(){
-    const avatarEl = document.getElementById('avatar');
-    const img = new Image();
-    img.src = '../../imagens/robo1_static.png';
-    img.alt = 'Mascote do app';
-    img.onload = () => { avatarEl.textContent = ''; avatarEl.appendChild(img); };
-    img.onerror = () => { avatarEl.textContent = '🤖'; };
-  })();
-  pill.textContent = `${levelDir} • ${unitDir}${fase ? ' • Fase '+fase : ''}`;
-
-  /* Sons leves */
+  // Light SFX mp3 (fallback if WebAudio blocked)
   const sCorrect = new Audio(`${BASE}/sounds/correct.mp3`);
   const sWrong   = new Audio(`${BASE}/sounds/wrong.mp3`);
   const sTap     = new Audio(`${BASE}/sounds/tap.mp3`);
   const sNext    = new Audio(`${BASE}/sounds/next.mp3`);
   [sCorrect,sWrong,sTap,sNext].forEach(a=>{a.preload='auto'});
 
-  /* ===== Loader + fetch ===== */
+  // Loader + fetch
   showLoader(true);
   fetch(QFILE, {cache:'no-store'})
     .then(r => {
-      if(!r.ok) throw new Error(`Não foi possível carregar ${QFILE} (HTTP ${r.status})`);
+      if(!r.ok) throw new Error(`Could not load ${QFILE} (HTTP ${r.status})`);
       return r.text();
     })
     .then(text => {
       const data = JSON.parse(text);
-      if(!data || !Array.isArray(data.questions)) throw new Error('Formato inválido em questions.txt');
+      if(!data || !Array.isArray(data.questions)) throw new Error('Invalid format in questions.txt');
       questions = data.questions;
-      subtitle.textContent = data.title || 'Pratique respondendo rápido e com atenção!';
+      subtitle.textContent = data.title || 'Practice answering quickly and carefully!';
       idx = 0;
       renderQuestion();
     })
     .catch(err=>{
-      console.error('[Q&A] Falha ao carregar:', err);
-      toast('Erro ao carregar questões. Verifique level, unit e o arquivo questions.txt.');
-      subtitle.textContent = 'Falha ao carregar conteúdo';
-      promptEl.textContent = `Caminho não encontrado.\nBASE: ${BASE}\nArquivo: ${QFILE}`;
+      console.error('[Q&A] Load failed:', err);
+      toast('Error loading questions. Check level, unit and questions.txt.');
+      subtitle.textContent = 'Failed to load content';
+      promptEl.textContent = `Path not found.\nBASE: ${BASE}\nFile: ${QFILE}`;
       mediaBox.innerHTML = '';
       optionsEl.innerHTML = '';
     })
     .finally(()=> showLoader(false));
 
-  /* ===== Prompt/blank utils ===== */
+  /* ===== Prompt/blank utilities ===== */
   function renderPromptWithBlanks(str){
     const s = String(str ?? '');
     return s
@@ -259,24 +470,17 @@
       .replace(/\{b\d+\}/gi, '')
       .replace(/_{3,}/g, '');
   }
-  // remove apenas aspas duplas (mantém apóstrofos/contrações)
   function stripQuotesForTTS(str){
     return String(str ?? '').replace(/[“”"]/g,'').replace(/\s{2,}/g,' ').trim();
   }
 
-  /* ===== Monta o texto COMPLETO p/ TTS em fillblank ===== */
+  // Build spoken text with correct answers for fillblank
   function buildSpokenPrompt(q){
-    // se autor forneceu tts explícito para a pergunta, usa ele
     if (q.tts && String(q.tts).trim()) return stripQuotesForTTS(q.tts);
-
-    // base do prompt
     let text = String(q.prompt || '');
-
     if (q.type !== 'fillblank'){
       return stripQuotesForTTS(ttsSanitize(text));
     }
-
-    // mapa value -> option (normalizado) para achar tts/label/value da resposta
     const optMap = new Map();
     (Array.isArray(q.options) ? q.options : []).forEach(op=>{
       const o = (typeof op === 'string') ? {label:op, value:op} : {...op};
@@ -287,8 +491,7 @@
       const o = optMap.get(key);
       return stripQuotesForTTS((o && (o.tts || o.label || o.value)) || String(val||''));
     };
-
-    // 1) {b1},{b2}…: substitui por respostas por índice
+    // {b1},{b2},...
     text = text.replace(/\{b(\d+)\}/gi, (_m, nStr)=>{
       const n = parseInt(nStr,10);
       let ans = null;
@@ -297,8 +500,7 @@
       else ans = q.answer;
       return speakValue(ans);
     });
-
-    // 2) {blank} e ___: preenche em sequência
+    // {blank} and ___ (sequential)
     const seqAnswers = (()=>{
       if (Array.isArray(q.answer)) return q.answer.slice();
       if (q.answer && typeof q.answer==='object'){
@@ -317,11 +519,10 @@
       seqIdx++;
       return speakValue(val);
     });
-
     return stripQuotesForTTS(text);
   }
 
-  /* ===== Áudio helpers ===== */
+  /* ===== Audio helpers (prompt & selection) ===== */
   function stopAllAudio(){
     try { speechSynthesis.cancel(); } catch(e){}
     if (currentAudio){
@@ -340,7 +541,7 @@
   }
   function speakFriendly(pool){ const pick = pool[(Math.random()*pool.length)|0]; speak(pick); }
 
-  /* ===== Render ===== */
+  /* ===== Render current question ===== */
   function renderQuestion(){
     answered = false;
     btnNext.disabled = true;
@@ -357,10 +558,9 @@
     bar.style.width = pct + '%';
     statusPill.textContent = `Question ${idx+1}/${questions.length}`;
 
-    // UI: mostra linhas nas posições corretas
+    // Prompt UI: show visual blanks in-place, or fallback at end
     const rawPrompt = q.prompt || '—';
     promptEl.innerHTML = renderPromptWithBlanks(rawPrompt);
-    // fallback: se não houver marcador, mantém comportamento antigo (linha no fim)
     if (q.type === 'fillblank' && !/\{blank\}|\{b\d+\}|_{3,}/i.test(rawPrompt)) {
       const span = document.createElement('span');
       span.className = 'blank'; span.setAttribute('aria-hidden','true');
@@ -368,7 +568,7 @@
       promptEl.appendChild(span);
     }
 
-    // Listen / Repeat: falam a FRASE COMPLETA
+    // Listen / Repeat — speak full sentence with answers
     btnPlayPrompt.onclick = () => { if (!isReading) playPrompt(q); };
     btnRepeat.onclick     = () => {
       if (isReading) return;
@@ -376,38 +576,38 @@
       speak(buildSpokenPrompt(q));
     };
 
-    // Mídia
+    // Media
     mediaBox.innerHTML = '';
     if(q.image){
-      const img = new Image(); img.alt = 'Imagem da pergunta';
+      const img = new Image(); img.alt = 'Question image';
       img.src = absPath(q.image); mediaBox.appendChild(img);
     } else {
-      const img = new Image(); img.src = './hannah_pensando.png'; img.alt = 'Hannah pensando';
+      const img = new Image(); img.src = './hannah_pensando.png'; img.alt = 'Hannah thinking';
       mediaBox.appendChild(img);
     }
 
-    // Opções
+    // Options
     optionsEl.innerHTML = '';
     optionsEl.classList.remove('is-order');
 
     if (q.type === 'order') {
-      renderOrderQuestion(q); // mantido
+      renderOrderQuestion(q);
     } else if (q.type === 'match') {
-      renderMatchQuestion(q); // mantido
+      renderMatchQuestion(q);
     } else {
       const opts = (q.shuffleOptions===false) ? q.options : shuffle([...q.options]);
       opts.forEach(opt => optionsEl.appendChild(makeOption(q, opt)));
     }
 
     btnNext.onclick = () => {
-      sNext.play().catch(()=>{});
+      (ensureAudio()? sfxTick() : sNext.play().catch(()=>{}));
       idx++;
       if (idx >= questions.length) { finish(); return; }
       renderQuestion();
     };
   }
 
-  /* ===== Opção ===== */
+  /* ===== Build option button ===== */
   function makeOption(q, opt){
     const o = (typeof opt === 'string') ? { label: opt, value: opt } : { ...opt };
 
@@ -416,8 +616,7 @@
     btn.className = 'option';
     btn.setAttribute('aria-label', o.aria || o.label || 'option');
 
-    const thumb = document.createElement('div');
-    thumb.className = 'thumb';
+    const thumb = document.createElement('div'); thumb.className = 'thumb';
     if (o.image){
       const img = new Image(); img.src = absPath(o.image); img.alt = o.label || '';
       thumb.appendChild(img);
@@ -431,56 +630,66 @@
     }
 
     const textWrap = document.createElement('div');
-    const label = document.createElement('div');
-    label.className = 'label';
-    label.textContent = o.label || '';
+    const label = document.createElement('div'); label.className = 'label'; label.textContent = o.label || '';
     textWrap.appendChild(label);
-
-    if (typeof o.sub === 'string' && o.sub.trim()) {
-      const sub = document.createElement('div');
-      sub.className = 'sub';
-      sub.textContent = o.sub;
+    if (typeof o.sub === 'string' && o.sub.trim()){
+      const sub = document.createElement('div'); sub.className = 'sub'; sub.textContent = o.sub;
       textWrap.appendChild(sub);
     }
 
-    btn.appendChild(thumb);
-    btn.appendChild(textWrap);
+    btn.appendChild(thumb); btn.appendChild(textWrap);
 
-    btn.onclick = () => { sTap.play().catch(()=>{}); speakSelectedThenCheck(q, o, btn); };
+    btn.onclick = () => {
+      (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
+      speakSelectedThenCheck(q, o, btn);
+    };
     thumb.style.cursor = 'pointer'; thumb.title = 'Play & choose';
-    thumb.onclick = (e) => { e.preventDefault(); e.stopPropagation(); sTap.play().catch(()=>{}); speakSelectedThenCheck(q, o, btn); };
+    thumb.onclick = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
+      speakSelectedThenCheck(q, o, btn);
+    };
 
     return btn;
   }
 
-  /* ===== Resposta ===== */
+  /* ===== Answer handling ===== */
   function handleAnswer(q, opt, btn){
     if(answered) return;
     const isCorrect = normalize(opt.value) === normalize(q.answer);
 
     if(isCorrect){
-      btn.classList.add('ok'); confetti(18);
-      sCorrect.play().catch(()=>{}); speakFriendly(['Yes! Great job!','Awesome!','You did it!']);
-      try {
+      btn.classList.add('ok');
+      (ensureAudio()? sfxCorrect() : sCorrect.play().catch(()=>{}));
+      confetti(18);
+      speakFriendly(['Yes! Great job!','Awesome!','You did it!']);
+      try{
         mediaBox.innerHTML = '';
-        const gif = new Image(); gif.src = './hannah_feliz.gif'; gif.alt = 'Hannah comemorando';
-        gif.setAttribute('draggable','false'); gif.style.pointerEvents = 'none'; mediaBox.appendChild(gif);
-      } catch(e){}
-      liveEl.textContent = 'Resposta correta';
-      answered = true; btnNext.disabled = false; btnNext.classList.add('ready');
+        const gif = new Image(); gif.src = './hannah_feliz.gif'; gif.alt = 'Hannah celebrating';
+        gif.setAttribute('draggable','false'); gif.style.pointerEvents = 'none';
+        mediaBox.appendChild(gif);
+      }catch(e){}
+      liveEl.textContent = 'Correct answer';
+      answered = true;
+      btnNext.disabled = false; btnNext.classList.add('ready');
       disableOthers(btn);
     } else {
-      btn.classList.add('err'); sWrong.play().catch(()=>{}); speakFriendly(['Hmm… try again!','Not this one!','Almost!']);
-      liveEl.textContent = 'Resposta incorreta, tente novamente';
+      btn.classList.add('err');
+      (ensureAudio()? sfxWrong() : sWrong.play().catch(()=>{}));
+      speakFriendly(['Hmm… try again!','Not this one!','Almost!']);
+      liveEl.textContent = 'Incorrect answer, try again';
     }
   }
-  function disableOthers(keepBtn){ Array.from(optionsEl.children).forEach(el=>{ if(el!==keepBtn){ el.disabled = true; el.style.opacity = .5; } }); }
+  function disableOthers(keepBtn){
+    Array.from(optionsEl.children).forEach(el=>{
+      if(el!==keepBtn){ el.disabled = true; el.style.opacity = .5; }
+    });
+  }
 
-  /* ===== Enunciado: MP3 se houver; senão TTS montado ===== */
+  /* ===== Prompt playback: mp3 if present, else TTS full sentence ===== */
   function playPrompt(q){
     stopAllAudio();
     const spoken = buildSpokenPrompt(q);
-
     if (q.promptAudio){
       const a = new Audio(absPath(q.promptAudio));
       currentAudio = a;
@@ -492,10 +701,59 @@
     }
   }
 
-  /* ===== Fim ===== */
+  /* ===== Selection speaking: mp3 option if present; else TTS ===== */
+  function speakSelectedThenCheck(q, o, btn){
+    if (answered || isReading) return;
+    isReading = true;
+
+    const allBtns = Array.from(document.querySelectorAll('.option'));
+    allBtns.forEach(el => el.disabled = true);
+    btnNext.disabled = true; btnNext.classList.remove('ready');
+
+    const finish = () => {
+      isReading = false;
+      if (!answered) allBtns.forEach(el => el.disabled = false);
+      handleAnswer(q, o, btn);
+    };
+
+    const say = (o.tts || o.label || o.value || '').toString().trim();
+    stopAllAudio();
+
+    if (o.audio){
+      try{
+        const a = new Audio(absPath(o.audio));
+        currentAudio = a;
+        let done = false;
+        const safeFinish = () => { if (!done){ done = true; currentAudio = null; finish(); } };
+        a.onended = safeFinish;
+        a.onerror = () => { currentAudio = null; speak(say); setTimeout(safeFinish, 600); };
+        a.play().catch(() => { currentAudio = null; speak(say); setTimeout(safeFinish, 600); });
+        setTimeout(safeFinish, 3500);
+      }catch{
+        speak(say); setTimeout(finish, 600);
+      }
+    } else {
+      try{
+        const u = new SpeechSynthesisUtterance(say || ' '); u.lang = 'en-US'; u.rate = 0.95; u.pitch = 1.0;
+        u.onend   = finish; u.onerror = () => setTimeout(finish, 300);
+        speechSynthesis.cancel(); speechSynthesis.speak(u);
+        setTimeout(() => { if (isReading) finish(); }, 2500);
+      }catch{
+        setTimeout(finish, 300);
+      }
+    }
+  }
+
+  /* ===== Activity completion ===== */
+  function onActivityComplete(){
+    if(window.activityCompleted) return;
+    window.activityCompleted = true;
+    (ensureAudio()? sfxWin() : sCorrect.play().catch(()=>{}));
+    markPhaseCompleted();
+  }
+
   function finish(){
-    try { stopAllAudio(); } catch(e){}
-    try { speechSynthesis.cancel(); } catch(e){}
+    try { stopAllAudio(); } catch(e){} try { speechSynthesis.cancel(); } catch(e){}
     isReading = false;
 
     bar.style.width = '100%';
@@ -503,170 +761,42 @@
     mediaBox.innerHTML = '<div style="font-size:44px">🏅</div>';
     optionsEl.innerHTML = '';
     btnNext.disabled = true; btnNext.classList.remove('ready');
-    statusPill.textContent = `Concluído • ${questions.length}/${questions.length}`;
-    confetti(30); speakFriendly(['Great! You finished!','Amazing work!']);
-    btnPlayPrompt.disabled = true; btnRepeat.disabled = true;
-    btnPlayPrompt.classList.add('is-hidden'); btnRepeat.classList.add('is-hidden');
+    statusPill.textContent = `Completed • ${questions.length}/${questions.length}`;
+    confetti(30);
+    speakFriendly(['Great! You finished!','Amazing work!']);
+
+    btnPlayPrompt.disabled = true;
+    btnRepeat.disabled = true;
+    btnPlayPrompt.classList.add('is-hidden');
+    btnRepeat.classList.add('is-hidden');
+
+    onActivityComplete(); // <- progressão de fase
   }
 
-  /* ===== Helpers ===== */
-  function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2500); }
+  /* ===== General helpers ===== */
   function confetti(n=16){
     for(let i=0;i<n;i++){
       const p=document.createElement('div'); p.className='piece';
-      const left = Math.random()*100; const dur = 1200 + Math.random()*1400; const delay = Math.random()*100;
-      p.style.left = left+'%'; p.style.setProperty('--h', Math.floor(Math.random()*360));
-      p.style.animationDuration = dur+'ms'; p.style.animationDelay = delay+'ms';
-      document.getElementById('confetti').appendChild(p);
+      const left = Math.random()*100;
+      const dur = 1200 + Math.random()*1400;
+      const delay = Math.random()*100;
+      p.style.left = left+'%';
+      p.style.setProperty('--h', Math.floor(Math.random()*360));
+      p.style.animationDuration = dur+'ms';
+      p.style.animationDelay = delay+'ms';
+      confettiEl.appendChild(p);
       setTimeout(()=>p.remove(), dur+delay+200);
     }
   }
   function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
   function normalize(v){ return String(v ?? '').trim().toLowerCase(); }
   function absPath(p){ if(!p) return p; if(p.startsWith('http')) return p; if(p.startsWith('/')) return p; return `${BASE}/${p}`.replace(/\/+/g,'/'); }
-  function showLoader(v){ const el = loadingEl; if (el) el.style.display = v ? 'flex' : 'none'; }
+  function showLoader(v){ if (loadingEl) loadingEl.style.display = v ? 'flex' : 'none'; }
 
-  /* ===== ORDER (mantido) ===== */
-  function renderOrderQuestion(q){
-    optionsEl.classList.add('is-order');
-    const words = q.options.map(w => String(w));
-    const answerSeq = (q.answer || []).map(w => String(w));
-    let built = [];
-
-    const wrap = document.createElement('div'); wrap.className = 'build-wrap';
-    const tray = document.createElement('div'); tray.className = 'build-tray'; tray.id = 'buildTray'; tray.setAttribute('aria-label','Sentence tray');
-    const actions = document.createElement('div'); actions.className = 'build-actions';
-    const undoBtn = document.createElement('button'); undoBtn.className = 'build-btn'; undoBtn.textContent = 'Undo';
-    const clearBtn = document.createElement('button'); clearBtn.className = 'build-btn'; clearBtn.textContent = 'Clear';
-    actions.appendChild(undoBtn); actions.appendChild(clearBtn);
-    wrap.appendChild(tray); wrap.appendChild(actions); optionsEl.appendChild(wrap);
-
-    const grid = document.createElement('div'); grid.className = 'build-grid'; optionsEl.appendChild(grid);
-
-    words.forEach(w=>{
-      const b = document.createElement('button'); b.type='button'; b.className='option word-only';
-      b.innerHTML = `<div class="label">${w}</div>`;
-      b.onclick = ()=>{ sTap.play().catch(()=>{}); if (built.length >= answerSeq.length) return; built.push(w); drawTray(); checkBuilt(); };
-      grid.appendChild(b);
-    });
-
-    undoBtn.onclick = ()=>{ built.pop(); drawTray(); btnNext.disabled = true; btnNext.classList.remove('ready'); };
-    clearBtn.onclick = ()=>{ built = []; drawTray(); btnNext.disabled = true; btnNext.classList.remove('ready'); };
-
-    function drawTray(){ tray.innerHTML = ''; built.forEach(word=>{ const chip = document.createElement('span'); chip.className='word-chip'; chip.textContent = word; tray.appendChild(chip); }); }
-    function checkBuilt(){
-      if (built.length !== answerSeq.length) return;
-      const ok = built.every((w,i)=> normalize(w) === normalize(answerSeq[i]));
-      if (ok){
-        try { mediaBox.innerHTML = ''; const gif = new Image(); gif.src = './hannah_feliz.gif'; gif.alt = 'Hannah comemorando'; gif.setAttribute('draggable','false'); gif.style.pointerEvents = 'none'; mediaBox.appendChild(gif); } catch(e){}
-        confetti(18); sCorrect.play().catch(()=>{}); speakFriendly(['Great!','Awesome!']);
-        liveEl.textContent = 'Ordem correta'; btnNext.disabled = false; btnNext.classList.add('ready'); answered = true;
-        Array.from(optionsEl.querySelectorAll('.option')).forEach(el=> el.disabled = true); undoBtn.disabled = true; clearBtn.disabled = true;
-      } else { sWrong.play().catch(()=>{}); speakFriendly(['Try again!']); liveEl.textContent = 'Ordem incorreta, tente novamente'; }
-    }
-  }
-
-  /* ===== MATCH (mantido) ===== */
-  function renderMatchQuestion(q){
-    const sourcePairs = Array.isArray(q.pairs) ? q.pairs : [];
-    const normItem = (it) => { if (typeof it === 'string') return { label: it, value: it }; const o = {...it}; if (!o.value) o.value = o.label || o.image || String(Math.random()); return o; };
-    const leftItems  = sourcePairs.map(p => normItem(p.left));
-    const rightItems = sourcePairs.map(p => normItem(p.right));
-    const leftShuf  = shuffle([...leftItems]);
-    const rightShuf = shuffle([...rightItems]);
-
-    const grid = document.createElement('div'); grid.className = 'match-grid';
-    const colL = document.createElement('div'); colL.className = 'match-col';
-    const colR = document.createElement('div'); colR.className = 'match-col';
-    grid.appendChild(colL); grid.appendChild(colR); optionsEl.appendChild(grid);
-
-    let selectedLeftBtn = null, selectedLeftVal = null, matched = new Set();
-
-    const makeLeftBtn = (item) => {
-      const b = document.createElement('button'); b.type = 'button'; b.className = 'option word-only'; b.dataset.value = item.value;
-      const label = document.createElement('div'); label.className = 'label'; label.textContent = item.label || item.value; b.appendChild(label);
-      b.onclick = () => { if (b.classList.contains('matched')) return; sTap.play().catch(()=>{}); Array.from(colL.children).forEach(el => el.classList.remove('selected')); b.classList.add('selected'); selectedLeftBtn = b; selectedLeftVal = item.value; };
-      return b;
-    };
-    const makeRightBtn = (item) => {
-      const b = document.createElement('button'); b.type = 'button'; b.className = 'option'; b.dataset.value = item.value;
-      const thumb = document.createElement('div'); thumb.className = 'thumb';
-      if (item.image){ const img = new Image(); img.src = absPath(item.image); img.alt = item.label || ''; thumb.appendChild(img); } else { thumb.textContent = item.label ? '🔤' : '❔'; }
-      const hasLabel = !!(item.label && String(item.label).trim());
-      if (hasLabel){ const label = document.createElement('div'); label.className = 'label'; label.textContent = item.label; b.appendChild(thumb); b.appendChild(label); } else { b.classList.add('img-only'); b.appendChild(thumb); }
-      b.onclick = ()=>{
-        if (b.classList.contains('matched')) return;
-        if (!selectedLeftBtn){ toast('Choose a word first 🙂'); return; }
-        const ok = normalize(selectedLeftVal) === normalize(item.value);
-        if (ok){
-          sCorrect.play().catch(()=>{}); confetti(10); speakFriendly(['Great!','Nice!']);
-          b.classList.add('matched'); selectedLeftBtn.classList.add('matched'); selectedLeftBtn.classList.remove('selected'); matched.add(selectedLeftVal);
-          selectedLeftBtn = null; selectedLeftVal = null;
-          if (matched.size === sourcePairs.length){
-            try{ mediaBox.innerHTML = ''; const gif = new Image(); gif.src = './hannah_feliz.gif'; gif.alt = 'Hannah comemorando'; gif.setAttribute('draggable','false'); gif.style.pointerEvents = 'none'; mediaBox.appendChild(gif);}catch(e){}
-            confetti(18); sCorrect.play().catch(()=>{}); speakFriendly(['Great!','Awesome!']); liveEl.textContent = 'All pairs matched';
-            answered = true; btnNext.disabled = false; btnNext.classList.add('ready'); Array.from(optionsEl.querySelectorAll('.option')).forEach(el => el.disabled = true);
-          }
-        } else { sWrong.play().catch(()=>{}); speakFriendly(['Try again!']); b.classList.add('err'); setTimeout(()=>b.classList.remove('err'), 250); }
-      };
-      return b;
-    };
-
-    leftShuf.forEach(item => colL.appendChild(makeLeftBtn(item)));
-    rightShuf.forEach(item => colR.appendChild(makeRightBtn(item)));
-  }
-
-  /* ===== Seleção: MP3 se houver; senão TTS ===== */
-  function speakSelectedThenCheck(q, o, btn){
-    if (answered || isReading) return;
-    isReading = true;
-
-    const allBtns = Array.from(document.querySelectorAll('.option'));
-    allBtns.forEach(el => el.disabled = true);
-    btnNext.disabled = true;
-    btnNext.classList.remove('ready');
-
-    const finish = () => { isReading = false; if (!answered) allBtns.forEach(el => el.disabled = false); handleAnswer(q, o, btn); };
-
-    const say = (o.tts || o.label || o.value || '').toString().trim();
-    stopAllAudio();
-
-    if (o.audio){
-      try{
-        const a = new Audio(absPath(o.audio)); currentAudio = a;
-        let done = false; const safeFinish = () => { if (!done){ done = true; currentAudio = null; finish(); } };
-        a.onended = safeFinish;
-        a.onerror = () => { currentAudio = null; speak(say); setTimeout(safeFinish, 600); };
-        a.play().catch(() => { currentAudio = null; speak(say); setTimeout(safeFinish, 600); });
-        setTimeout(safeFinish, 3500);
-      }catch{ speak(say); setTimeout(finish, 600); }
-    } else {
-      try{
-        const u = new SpeechSynthesisUtterance(say || ' '); u.lang = 'en-US'; u.rate = 0.95; u.pitch = 1.0;
-        u.onend = finish; u.onerror = () => setTimeout(finish, 300);
-        speechSynthesis.cancel(); speechSynthesis.speak(u);
-        setTimeout(()=>{ if (isReading) finish(); }, 2500);
-      }catch{ setTimeout(finish, 300); }
-    }
-  }
-
-  /* ===== Fim ===== */
-  function finish(){
-    try { stopAllAudio(); } catch(e){} try { speechSynthesis.cancel(); } catch(e){} isReading = false;
-    bar.style.width = '100%'; promptEl.textContent = "🎉 Congratulations! You've completed all the questions!";
-    mediaBox.innerHTML = '<div style="font-size:44px">🏅</div>'; optionsEl.innerHTML = '';
-    btnNext.disabled = true; btnNext.classList.remove('ready');
-    statusPill.textContent = `Concluído • ${questions.length}/${questions.length}`;
-    confetti(30); speakFriendly(['Great! You finished!','Amazing work!']);
-    btnPlayPrompt.disabled = true; btnRepeat.disabled = true; btnPlayPrompt.classList.add('is-hidden'); btnRepeat.classList.add('is-hidden');
-  }
-
-  /* ===== Utilidades ===== */
-  function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2500); }
-  function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
-  function normalize(v){ return String(v ?? '').trim().toLowerCase(); }
-  function absPath(p){ if(!p) return p; if(p.startsWith('http')) return p; if(p.startsWith('/')) return p; return `${BASE}/${p}`.replace(/\/+/g,'/'); }
-  function showLoader(v){ const el = loadingEl; if (el) el.style.display = v ? 'flex' : 'none'; }
+  // Fresh reset on load (no auto-restore)
+  window.addEventListener('load', function(){
+    window.activityCompleted = false;
+  });
 
 })();
 </script>
