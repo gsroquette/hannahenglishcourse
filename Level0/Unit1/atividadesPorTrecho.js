@@ -20,7 +20,6 @@ function getActivitiesByTrecho(trecho, level, unit) {
                 { id: 11, name: "MemoryGame2", path: `/Atividades/MemoryGame2/index.html?level=${level}&unit=${unit}&fase=11`, img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
                 { id: 12, name: "WordSearchFacil2", path: `/Atividades/WordSearchHorizontal2/index.html?level=${level}&unit=${unit}&fase=12`, img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
                 { id: 13, name: "Perguntas Starter3", path: `/Atividades/perguntas%20starter3/index.html?level=${level}&unit=${unit}&fase=13`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
-
             ];
         case "trecho3":
             return [
@@ -29,6 +28,8 @@ function getActivitiesByTrecho(trecho, level, unit) {
                 { id: 12, name: "Missing Word2", path: `/Atividades/Missing Word2/index.html?level=${level}&unit=${unit}&fase=12`, img: "../../imagens/botoes/missing_word_button.png", unlocked: false },   
                 { id: 13, name: "Mixed Letters starter", path: `/Atividades/Mixed Letters starter/index.html?level=${level}&unit=${unit}&fase=13`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
                 { id: 14, name: "Mixed Letters starter2", path: `/Atividades/Mixed Letters starter2/index.html?level=${level}&unit=${unit}&fase=14`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
+                { id: 13, name: "Perguntas Starter4", path: `/Atividades/perguntas%20starter4/index.html?level=${level}&unit=${unit}&fase=13`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
+                { id: 13, name: "Perguntas Starter5", path: `/Atividades/perguntas%20starter5/index.html?level=${level}&unit=${unit}&fase=13`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
             ];
         case "trecho4":
             return [
