@@ -14,11 +14,13 @@ function getActivitiesByTrecho(trecho, level, unit) {
             ];
         case "trecho2":
             return [
-                { id: 8, name: "Perguntas Starter2", path: `/Atividades/perguntas%20starter2/index.html?level=${level}&unit=${unit}&fase=8`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
-                { id: 6, name: "MemoryGame", path: `/Atividades/MemoryGame/index.html?level=${level}&unit=${unit}&fase=6`, img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
-                { id: 7, name: "WordSearchFacil", path: `/Atividades/WordSearchHorizontal/index.html?level=${level}&unit=${unit}&fase=7`, img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
-                { id: 8, name: "MemoryGame2", path: `/Atividades/MemoryGame2/index.html?level=${level}&unit=${unit}&fase=8`, img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
-                { id: 9, name: "WordSearchFacil2", path: `/Atividades/WordSearchHorizontal2/index.html?level=${level}&unit=${unit}&fase=9`, img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
+                { id: 8, name: "MemoryGame", path: `/Atividades/MemoryGame/index.html?level=${level}&unit=${unit}&fase=8`, img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
+                { id: 9, name: "WordSearchFacil", path: `/Atividades/WordSearchHorizontal/index.html?level=${level}&unit=${unit}&fase=9`, img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
+                { id: 10, name: "Perguntas Starter2", path: `/Atividades/perguntas%20starter2/index.html?level=${level}&unit=${unit}&fase=10`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
+                { id: 11, name: "MemoryGame2", path: `/Atividades/MemoryGame2/index.html?level=${level}&unit=${unit}&fase=11`, img: "../../imagens/botoes/memorygame_button.png", unlocked: false },
+                { id: 12, name: "WordSearchFacil2", path: `/Atividades/WordSearchHorizontal2/index.html?level=${level}&unit=${unit}&fase=12`, img: "../../imagens/botoes/wordsearch_button.png", unlocked: false },
+                { id: 13, name: "Perguntas Starter3", path: `/Atividades/perguntas%20starter3/index.html?level=${level}&unit=${unit}&fase=13`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
+
             ];
         case "trecho3":
             return [
