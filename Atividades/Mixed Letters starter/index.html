@@ -93,10 +93,9 @@
             display: grid;
             place-items: center;
             position: relative;
-            outline: none;           /* tira foco azul iOS/Android/desktop */
+            outline: none;
         }
-        .slot:focus { outline: none }
-        .slot:focus-visible { outline: none }
+        .slot:focus, .slot:focus-visible { outline: none }
         .slot.correct {
             border-style: solid;
             border-color: var(--ok);
@@ -140,13 +139,17 @@
             cursor: grab;
             user-select: none;
             touch-action: none;
-            transition: transform 0.2s ease; /* Suaviza o movimento no touch */
+            transition: transform 0.2s ease;
+            outline: none; /* garante sem halo azul nos tiles */
         }
         .tile:active { cursor: grabbing }
-        .tile[aria-grabbed="true"] { 
+        .tile:focus, .tile:focus-visible { outline: none }
+        /* halo azul só durante o ARRASTO, não após o drop */
+        .tile.dragging,
+        .tile[aria-grabbed="true"] {
             outline: 3px solid var(--focus);
-            transform: scale(1.1); /* Feedback visual para touch */
-            z-index: 100; /* Garante que fique acima dos outros elementos */
+            transform: scale(1.1);
+            z-index: 100;
         }
         .controls { display: flex; gap: 8px; flex-wrap: wrap }
         .pill {
@@ -344,7 +347,7 @@
             s.setAttribute('role', 'button');
             s.tabIndex = 0;
             s.addEventListener('dragover', (e) => e.preventDefault());
-            s.addEventListener('drop', (e) => handleDrop(e, s, i));
+            s.addEventListener('drop', (e) => handleDrop(e, s));
             
             // Eventos para touch nos slots
             if (isTouchDevice) {
@@ -359,14 +362,15 @@
                 const child = s.querySelector('.tile');
                 if (child) {
                     child.setAttribute('draggable', 'true');
-                    child.setAttribute('aria-grabbed', 'false');
-                    tray.appendChild(child);
+                    child.setAttribute('aria-grabbed', 'false');  // garante sem halo
+                    child.style.outline = 'none';
+                    dropZone.nextSibling.nextSibling.appendChild(child); // tray
                     s.innerHTML = '';
                     s.classList.remove('correct','wrong');
                     s.classList.add('empty');
                     // manter ghost se era a primeira letra
                     if (i === 0 && revealHintBtn.disabled) s.dataset.ghost = word[0].toUpperCase();
-                    updatePerSlotFeedback();  // <- feedback imediato
+                    updatePerSlotFeedback();  // feedback imediato
                 }
             });
             slots.push(s);
@@ -403,7 +407,6 @@
 
         // Letras embaralhadas
         const shuffled = shuffleWord(word);
-        // Garante que não fique igual ao original
         const finalShuffle = (shuffled.toUpperCase() === word.toUpperCase()) ? forcedShuffle(word) : shuffled;
 
         for (const ch of finalShuffle.toUpperCase()) {
@@ -417,13 +420,17 @@
 
             tile.addEventListener('dragstart', () => {
                 tile.setAttribute('aria-grabbed', 'true');
-                // fala a letra ao começar a arrastar (reforço)
+                tile.classList.add('dragging');
                 speak(ch);
             });
-            tile.addEventListener('dragend', () => tile.setAttribute('aria-grabbed', 'false'));
-            tile.addEventListener('click', () => speak(ch)); // toque fala a letra
+            tile.addEventListener('dragend', () => {
+                tile.setAttribute('aria-grabbed', 'false');  // <- remove halo
+                tile.classList.remove('dragging');
+                tile.style.outline = 'none';
+            });
+            tile.addEventListener('click', () => speak(ch));
             
-            // Eventos para touch nas peças
+            // Touch nos tiles
             if (isTouchDevice) {
                 tile.addEventListener('touchstart', (e) => handleTileTouchStart(e, tile), { passive: false });
                 tile.addEventListener('touchmove', (e) => handleTileTouchMove(e, tile), { passive: false });
@@ -434,7 +441,7 @@
             tray.appendChild(tile);
         }
 
-        function handleDrop(e, slotEl, index) {
+        function handleDrop(e, slotEl) {
             e.preventDefault();
             const tile = document.querySelector('.tile[aria-grabbed="true"]');
             if (!tile) return;
@@ -444,56 +451,45 @@
             }
             // ocupa o slot
             slotEl.innerHTML = '';
-            // remover ghost se existir
             if (slotEl.dataset.ghost) delete slotEl.dataset.ghost;
 
             tile.setAttribute('draggable', 'false'); // evita arrasto direto do slot
+            tile.setAttribute('aria-grabbed', 'false'); // <- remove halo azul
+            tile.classList.remove('dragging');
+            tile.style.outline = 'none';
             slotEl.appendChild(tile);
 
-            updatePerSlotFeedback();  // <- feedback imediato
+            updatePerSlotFeedback();  // feedback imediato
             checkAnswer();            // verifica completude
         }
         
         // Variáveis para controle do touch
         let activeTile = null;
-        let touchStartX = 0;
-        let touchStartY = 0;
         let touchOffsetX = 0;
         let touchOffsetY = 0;
         
         function handleTileTouchStart(e, tile) {
             e.preventDefault();
             const touch = e.touches[0];
-            activeTile = tile;
-            touchStartX = touch.clientX;
-            touchStartY = touch.clientY;
-            
-            // Calcula o offset do toque em relação ao elemento
             const rect = tile.getBoundingClientRect();
             touchOffsetX = touch.clientX - rect.left;
             touchOffsetY = touch.clientY - rect.top;
-            
-            // Prepara o tile para arrasto
-            tile.setAttribute('aria-grabbed', 'true');
+            activeTile = tile;
+            tile.setAttribute('aria-grabbed', 'true'); // halo só enquanto arrasta
             tile.classList.add('dragging');
-            
-            // Fala a letra
             speak(tile.textContent);
         }
         
         function handleTileTouchMove(e, tile) {
             if (!activeTile) return;
             e.preventDefault();
-            
             const touch = e.touches[0];
             const currentX = touch.clientX - touchOffsetX;
             const currentY = touch.clientY - touchOffsetY;
-            
-            // Move o tile com o dedo
             activeTile.style.left = currentX + 'px';
             activeTile.style.top = currentY + 'px';
-            
-            // Feedback ao passar sobre slots (opcional)
+
+            // feedback ao passar sobre slots (opcional)
             const slotsEls = dropZone.querySelectorAll('.slot');
             slotsEls.forEach(slot => {
                 const rect = slot.getBoundingClientRect();
@@ -513,13 +509,12 @@
         function handleTileTouchEnd(e, tile) {
             if (!activeTile) return;
             e.preventDefault();
-            
             const touch = e.changedTouches[0];
             const slotsEls = dropZone.querySelectorAll('.slot');
             let dropped = false;
             
             // Verifica em qual slot foi solto
-            slotsEls.forEach((slot, idx) => {
+            slotsEls.forEach((slot) => {
                 const rect = slot.getBoundingClientRect();
                 if (
                     touch.clientX >= rect.left &&
@@ -535,6 +530,7 @@
                         existingTile.classList.remove('dragging');
                         existingTile.style.left = '';
                         existingTile.style.top = '';
+                        existingTile.style.outline = 'none';
                         tray.appendChild(existingTile);
                     }
                     
@@ -543,17 +539,17 @@
                     if (slot.dataset.ghost) delete slot.dataset.ghost;
                     
                     tile.setAttribute('draggable', 'false');
-                    slot.appendChild(tile);
+                    tile.setAttribute('aria-grabbed', 'false'); // <- remove halo azul APÓS drop
                     tile.classList.remove('dragging');
                     tile.style.left = '';
                     tile.style.top = '';
+                    tile.style.outline = 'none';
+                    slot.appendChild(tile);
                     
                     dropped = true;
-                    updatePerSlotFeedback();  // <- feedback imediato
+                    updatePerSlotFeedback();  // feedback imediato
                     checkAnswer();            // verifica completude
                 }
-                
-                // Remove o feedback visual de hover
                 slot.style.backgroundColor = '';
             });
             
@@ -561,48 +557,43 @@
             if (!dropped) {
                 tray.appendChild(tile);
                 tile.classList.remove('dragging');
+                tile.setAttribute('aria-grabbed', 'false'); // garante sem halo
                 tile.style.left = '';
                 tile.style.top = '';
-                tile.setAttribute('aria-grabbed', 'false');
-                updatePerSlotFeedback();      // mantem feedback consistente
+                tile.style.outline = 'none';
+                updatePerSlotFeedback();
             }
-            
             activeTile = null;
         }
         
         function handleTileTouchCancel(e, tile) {
             if (activeTile) {
                 tile.classList.remove('dragging');
+                tile.setAttribute('aria-grabbed', 'false'); // garante sem halo
                 tile.style.left = '';
                 tile.style.top = '';
-                tile.setAttribute('aria-grabbed', 'false');
+                tile.style.outline = 'none';
                 activeTile = null;
             }
         }
         
         // Funções para manipulação de slots via touch
-        function handleTouchStart(e, slot) {
-            e.preventDefault();
-        }
-        function handleTouchMove(e, slot) {
-            e.preventDefault();
-        }
+        function handleTouchStart(e, slot) { e.preventDefault(); }
+        function handleTouchMove(e, slot)  { e.preventDefault(); }
         function handleTouchEnd(e, slot) {
-            // Se há uma letra ativa sendo arrastada, trata no handleTileTouchEnd
             if (!activeTile) {
-                // Se não há tile ativo, trata como clique para remover a letra do slot
                 const child = slot.querySelector('.tile');
                 if (child) {
                     child.setAttribute('draggable', 'true');
-                    child.setAttribute('aria-grabbed', 'false');
+                    child.setAttribute('aria-grabbed', 'false'); // sem halo
+                    child.style.outline = 'none';
                     tray.appendChild(child);
                     slot.innerHTML = '';
                     slot.classList.remove('correct','wrong');
                     slot.classList.add('empty');
-                    // manter ghost se era a primeira letra
                     const index = Array.from(slots).indexOf(slot);
                     if (index === 0 && revealHintBtn.disabled) slot.dataset.ghost = word[0].toUpperCase();
-                    updatePerSlotFeedback();  // <- feedback imediato
+                    updatePerSlotFeedback();
                 }
             }
         }
@@ -612,7 +603,7 @@
             return slots.map(s => (s.querySelector('.tile')?.textContent || '')).join('');
         }
 
-        // === NOVO: feedback imediato por letra ===
+        // === Feedback imediato por letra ===
         function updatePerSlotFeedback(){
             slots.forEach((s, idx) => {
                 const t = s.querySelector('.tile');
@@ -630,19 +621,16 @@
 
         function checkAnswer(){
             const ans = currentAnswer();
-            // Só verifica conclusão quando todos os slots têm letra
             if (ans.length !== word.length || slots.some(s => !s.querySelector('.tile'))) return;
 
             if (ans.toUpperCase() === word.toUpperCase()){
-                // sucesso
                 if (div.dataset.completed === "false") {
                     div.dataset.completed = "true";
-                    celebrate(div);         // confete SEMPRE que completar esta palavra
+                    celebrate(div);
                     speak(word);
                     completedWords++;
                     updateSessionStatus();
                 }
-                // trava os tiles e pinta verde
                 slots.forEach(s => {
                     const t = s.querySelector('.tile');
                     if (t) t.setAttribute('draggable','false');
@@ -655,7 +643,6 @@
                     firebase.auth().onAuthStateChanged((user) => { if (user) updateNextPhase(user.uid); });
                 }
             } else {
-                // erro geral (todos preenchidos): manter per-slot já aplicado no updatePerSlotFeedback()
                 updatePerSlotFeedback();
             }
         }
@@ -665,10 +652,11 @@
                 const t = s.querySelector('.tile');
                 if (t) {
                     t.setAttribute('draggable','true');
-                    t.setAttribute('aria-grabbed','false');
+                    t.setAttribute('aria-grabbed','false'); // sem halo
                     t.classList.remove('dragging');
                     t.style.left = '';
                     t.style.top = '';
+                    t.style.outline = 'none';
                     tray.appendChild(t);
                 }
                 s.innerHTML = '';
@@ -727,7 +715,6 @@
             const text = await resp.text();
             let words = text.trim().split('\n').map(w => w.trim()).filter(Boolean);
 
-            // Limite de sessão para crianças pequenas
             if (words.length > SESSION_LIMIT) words = words.slice(0, SESSION_LIMIT);
 
             words.forEach((word, index) => {
@@ -764,7 +751,6 @@
         }
         return arr.join('');
     }
-    // Força ao menos 1 troca quando shuffle sai igual
     function forcedShuffle(word){
         const arr = word.toUpperCase().split('');
         if (arr.length < 2) return arr.join('');
@@ -781,7 +767,7 @@
         document.getElementById('completion-modal').style.display = 'none';
     }
 
-    // ================== PDF (mantido, ajustado para slots) ==================
+    // ================== PDF (mantido) ==================
     async function generatePDF() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
@@ -798,7 +784,6 @@
         function drawActivity(activityEl, y){
             const imgEl = activityEl.querySelector('img');
             if (imgEl) {
-                // desenho simples (sem canvas pesado)
                 try {
                     const cv = document.createElement('canvas');
                     const ctx = cv.getContext('2d');
@@ -809,7 +794,6 @@
                     doc.addImage(data, 'PNG', 10, y, 24, 24);
                 } catch {}
             }
-            // slots como linhas
             const slotsCount = activityEl.querySelectorAll('.slot').length;
             let x = 50;
             doc.setFontSize(14);
@@ -817,7 +801,6 @@
                 doc.text("_____", x, y + 10);
                 x += 16;
             }
-            // letras embaralhadas (impressas ao lado)
             const trayTiles = [...activityEl.querySelectorAll('.tray .tile')].map(t => t.textContent).join(' ');
             const filledTiles = [...activityEl.querySelectorAll('.slot .tile')].map(t => t.textContent).join(' ');
             const mixed = (trayTiles || filledTiles || '').trim();
