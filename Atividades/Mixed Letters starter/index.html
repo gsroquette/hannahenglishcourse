@@ -16,6 +16,7 @@
             --focus: #1e88e5;
             --tile: #fff;
             --tile-border: #333;
+            --err: #e53935;
         }
         * { box-sizing: border-box }
         body {
@@ -92,7 +93,23 @@
             display: grid;
             place-items: center;
             position: relative;
+            outline: none;           /* tira foco azul iOS/Android/desktop */
         }
+        .slot:focus { outline: none }
+        .slot:focus-visible { outline: none }
+        .slot.correct {
+            border-style: solid;
+            border-color: var(--ok);
+        }
+        .slot.wrong {
+            border-style: solid;
+            border-color: var(--err);
+        }
+        .slot.empty {
+            border-style: dashed;
+            border-color: #999;
+        }
+
         .slot[data-ghost]::after{
             content: attr(data-ghost);
             position: absolute;
@@ -318,6 +335,44 @@
         dropZone.className = 'drop-zone';
         area.appendChild(dropZone);
 
+        // Cria slots
+        const slots = [];
+        for (let i = 0; i < word.length; i++) {
+            const s = document.createElement('div');
+            s.className = 'slot empty';
+            s.setAttribute('aria-label', `Position ${i+1}`);
+            s.setAttribute('role', 'button');
+            s.tabIndex = 0;
+            s.addEventListener('dragover', (e) => e.preventDefault());
+            s.addEventListener('drop', (e) => handleDrop(e, s, i));
+            
+            // Eventos para touch nos slots
+            if (isTouchDevice) {
+                s.addEventListener('touchstart', (e) => handleTouchStart(e, s), { passive: false });
+                s.addEventListener('touchmove', (e) => handleTouchMove(e, s), { passive: false });
+                s.addEventListener('touchend', (e) => handleTouchEnd(e, s), { passive: false });
+                s.addEventListener('touchcancel', (e) => handleTouchCancel(e, s));
+            }
+            
+            s.addEventListener('click', () => {
+                // remover letra do slot (se houver)
+                const child = s.querySelector('.tile');
+                if (child) {
+                    child.setAttribute('draggable', 'true');
+                    child.setAttribute('aria-grabbed', 'false');
+                    tray.appendChild(child);
+                    s.innerHTML = '';
+                    s.classList.remove('correct','wrong');
+                    s.classList.add('empty');
+                    // manter ghost se era a primeira letra
+                    if (i === 0 && revealHintBtn.disabled) s.dataset.ghost = word[0].toUpperCase();
+                    updatePerSlotFeedback();  // <- feedback imediato
+                }
+            });
+            slots.push(s);
+            dropZone.appendChild(s);
+        }
+
         // Ghost hint (primeira letra)
         const revealHintBtn = document.createElement('button');
         revealHintBtn.className = 'pill';
@@ -346,41 +401,6 @@
         tray.className = 'tray';
         area.appendChild(tray);
 
-        // Cria slots
-        const slots = [];
-        for (let i = 0; i < word.length; i++) {
-            const s = document.createElement('div');
-            s.className = 'slot';
-            s.setAttribute('aria-label', `Position ${i+1}`);
-            s.setAttribute('role', 'button');
-            s.tabIndex = 0;
-            s.addEventListener('dragover', (e) => e.preventDefault());
-            s.addEventListener('drop', (e) => handleDrop(e, s));
-            
-            // Eventos para touch nos slots
-            if (isTouchDevice) {
-                s.addEventListener('touchstart', (e) => handleTouchStart(e, s), { passive: false });
-                s.addEventListener('touchmove', (e) => handleTouchMove(e, s), { passive: false });
-                s.addEventListener('touchend', (e) => handleTouchEnd(e, s));
-                s.addEventListener('touchcancel', (e) => handleTouchCancel(e, s));
-            }
-            
-            s.addEventListener('click', () => {
-                // remover letra do slot (se houver)
-                const child = s.querySelector('.tile');
-                if (child) {
-                    child.setAttribute('draggable', 'true');
-                    child.setAttribute('aria-grabbed', 'false');
-                    tray.appendChild(child);
-                    s.innerHTML = '';
-                    // manter ghost se era a primeira letra
-                    if (i === 0 && revealHintBtn.disabled) s.dataset.ghost = word[0].toUpperCase();
-                }
-            });
-            slots.push(s);
-            dropZone.appendChild(s);
-        }
-
         // Letras embaralhadas
         const shuffled = shuffleWord(word);
         // Garante que não fique igual ao original
@@ -407,14 +427,14 @@
             if (isTouchDevice) {
                 tile.addEventListener('touchstart', (e) => handleTileTouchStart(e, tile), { passive: false });
                 tile.addEventListener('touchmove', (e) => handleTileTouchMove(e, tile), { passive: false });
-                tile.addEventListener('touchend', (e) => handleTileTouchEnd(e, tile));
+                tile.addEventListener('touchend', (e) => handleTileTouchEnd(e, tile), { passive: false });
                 tile.addEventListener('touchcancel', (e) => handleTileTouchCancel(e, tile));
             }
 
             tray.appendChild(tile);
         }
 
-        function handleDrop(e, slotEl) {
+        function handleDrop(e, slotEl, index) {
             e.preventDefault();
             const tile = document.querySelector('.tile[aria-grabbed="true"]');
             if (!tile) return;
@@ -430,8 +450,8 @@
             tile.setAttribute('draggable', 'false'); // evita arrasto direto do slot
             slotEl.appendChild(tile);
 
-            // verifica se completou
-            checkAnswer();
+            updatePerSlotFeedback();  // <- feedback imediato
+            checkAnswer();            // verifica completude
         }
         
         // Variáveis para controle do touch
@@ -473,11 +493,9 @@
             activeTile.style.left = currentX + 'px';
             activeTile.style.top = currentY + 'px';
             
-            // Verifica se está sobre um slot
-            const slots = dropZone.querySelectorAll('.slot');
-            let overSlot = null;
-            
-            slots.forEach(slot => {
+            // Feedback ao passar sobre slots (opcional)
+            const slotsEls = dropZone.querySelectorAll('.slot');
+            slotsEls.forEach(slot => {
                 const rect = slot.getBoundingClientRect();
                 if (
                     touch.clientX >= rect.left &&
@@ -485,8 +503,7 @@
                     touch.clientY >= rect.top &&
                     touch.clientY <= rect.bottom
                 ) {
-                    overSlot = slot;
-                    slot.style.backgroundColor = '#f0f0f0'; // Feedback visual
+                    slot.style.backgroundColor = '#f0f0f0';
                 } else {
                     slot.style.backgroundColor = '';
                 }
@@ -498,11 +515,11 @@
             e.preventDefault();
             
             const touch = e.changedTouches[0];
-            const slots = dropZone.querySelectorAll('.slot');
+            const slotsEls = dropZone.querySelectorAll('.slot');
             let dropped = false;
             
             // Verifica em qual slot foi solto
-            slots.forEach(slot => {
+            slotsEls.forEach((slot, idx) => {
                 const rect = slot.getBoundingClientRect();
                 if (
                     touch.clientX >= rect.left &&
@@ -523,7 +540,6 @@
                     
                     // Coloca a letra no slot
                     slot.innerHTML = '';
-                    // remover ghost se existir
                     if (slot.dataset.ghost) delete slot.dataset.ghost;
                     
                     tile.setAttribute('draggable', 'false');
@@ -533,10 +549,11 @@
                     tile.style.top = '';
                     
                     dropped = true;
-                    checkAnswer();
+                    updatePerSlotFeedback();  // <- feedback imediato
+                    checkAnswer();            // verifica completude
                 }
                 
-                // Remove o feedback visual
+                // Remove o feedback visual de hover
                 slot.style.backgroundColor = '';
             });
             
@@ -547,6 +564,7 @@
                 tile.style.left = '';
                 tile.style.top = '';
                 tile.setAttribute('aria-grabbed', 'false');
+                updatePerSlotFeedback();      // mantem feedback consistente
             }
             
             activeTile = null;
@@ -564,15 +582,11 @@
         
         // Funções para manipulação de slots via touch
         function handleTouchStart(e, slot) {
-            // Previne o comportamento padrão para evitar scroll
             e.preventDefault();
         }
-        
         function handleTouchMove(e, slot) {
-            // Previne o comportamento padrão para evitar scroll
             e.preventDefault();
         }
-        
         function handleTouchEnd(e, slot) {
             // Se há uma letra ativa sendo arrastada, trata no handleTileTouchEnd
             if (!activeTile) {
@@ -583,39 +597,57 @@
                     child.setAttribute('aria-grabbed', 'false');
                     tray.appendChild(child);
                     slot.innerHTML = '';
+                    slot.classList.remove('correct','wrong');
+                    slot.classList.add('empty');
                     // manter ghost se era a primeira letra
                     const index = Array.from(slots).indexOf(slot);
                     if (index === 0 && revealHintBtn.disabled) slot.dataset.ghost = word[0].toUpperCase();
+                    updatePerSlotFeedback();  // <- feedback imediato
                 }
             }
         }
-        
-        function handleTouchCancel(e, slot) {
-            // Limpa qualquer estado se necessário
-        }
+        function handleTouchCancel(e, slot) {}
 
         function currentAnswer(){
             return slots.map(s => (s.querySelector('.tile')?.textContent || '')).join('');
         }
 
+        // === NOVO: feedback imediato por letra ===
+        function updatePerSlotFeedback(){
+            slots.forEach((s, idx) => {
+                const t = s.querySelector('.tile');
+                if (!t) {
+                    s.classList.remove('correct','wrong');
+                    s.classList.add('empty');
+                    return;
+                }
+                const correct = word[idx].toUpperCase() === t.textContent;
+                s.classList.remove('empty');
+                s.classList.toggle('correct', !!t && correct);
+                s.classList.toggle('wrong', !!t && !correct);
+            });
+        }
+
         function checkAnswer(){
             const ans = currentAnswer();
-            if (ans.length !== word.length) return;
+            // Só verifica conclusão quando todos os slots têm letra
+            if (ans.length !== word.length || slots.some(s => !s.querySelector('.tile'))) return;
 
             if (ans.toUpperCase() === word.toUpperCase()){
                 // sucesso
-                celebrate(div);
-                speak(word);
                 if (div.dataset.completed === "false") {
                     div.dataset.completed = "true";
+                    celebrate(div);         // confete SEMPRE que completar esta palavra
+                    speak(word);
                     completedWords++;
                     updateSessionStatus();
                 }
-                // trava os tiles
+                // trava os tiles e pinta verde
                 slots.forEach(s => {
                     const t = s.querySelector('.tile');
                     if (t) t.setAttribute('draggable','false');
-                    s.style.borderColor = 'var(--ok)';
+                    s.classList.remove('wrong','empty');
+                    s.classList.add('correct');
                 });
 
                 if (completedWords === activities.length) {
@@ -623,13 +655,8 @@
                     firebase.auth().onAuthStateChanged((user) => { if (user) updateNextPhase(user.uid); });
                 }
             } else {
-                // erro: feedback suave (cor), sem penalizar
-                slots.forEach((s, idx) => {
-                    const t = s.querySelector('.tile');
-                    if (!t) return;
-                    const correct = word[idx].toUpperCase() === t.textContent;
-                    s.style.borderColor = correct ? 'var(--ok)' : '#e53935';
-                });
+                // erro geral (todos preenchidos): manter per-slot já aplicado no updatePerSlotFeedback()
+                updatePerSlotFeedback();
             }
         }
 
@@ -645,10 +672,12 @@
                     tray.appendChild(t);
                 }
                 s.innerHTML = '';
-                s.style.borderColor = '#999';
+                s.classList.remove('correct','wrong');
+                s.classList.add('empty');
                 if (i === 0 && !revealHintBtn.disabled) delete s.dataset.ghost;
                 if (i === 0 && revealHintBtn.disabled) s.dataset.ghost = word[0].toUpperCase();
             });
+            updatePerSlotFeedback();
         }
 
         container.appendChild(div);
@@ -714,8 +743,14 @@
     }
 
     function updateSessionStatus(){
-        sessionStatus.textContent = `Activities: ${completedWords}/${activities.length}`;
-        if (completedWords === activities.length && activities.length > 0) {
+        const total = activities.length;
+        const done = completedWords;
+        if (total === 0) {
+            sessionStatus.textContent = '';
+            return;
+        }
+        sessionStatus.textContent = `Activities: ${done}/${total}`;
+        if (done === total) {
             sessionStatus.innerHTML = `<span class="good">All done! Great job!</span>`;
         }
     }

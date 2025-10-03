@@ -28,6 +28,7 @@
             background-image: url('../../../imagens/fundo.png');
             background-repeat: repeat;
             background-size: auto;
+            -webkit-tap-highlight-color: transparent; /* Remove highlight on tap */
         }
         h1 {
             text-align: center;
@@ -122,9 +123,14 @@
             cursor: grab;
             user-select: none;
             touch-action: none;
+            transition: transform 0.2s ease; /* Suaviza o movimento no touch */
         }
         .tile:active { cursor: grabbing }
-        .tile[aria-grabbed="true"] { outline: 3px solid var(--focus) }
+        .tile[aria-grabbed="true"] { 
+            outline: 3px solid var(--focus);
+            transform: scale(1.1); /* Feedback visual para touch */
+            z-index: 100; /* Garante que fique acima dos outros elementos */
+        }
         .controls { display: flex; gap: 8px; flex-wrap: wrap }
         .pill {
             background: #fff;
@@ -170,6 +176,12 @@
             .activity { grid-template-columns: 1fr; justify-items: center }
             .activity img { width: 140px; height: 140px }
             .slot, .tile { width: 52px; height: 60px }
+        }
+        
+        /* Estilo para o tile sendo arrastado no touch */
+        .tile.dragging {
+            position: fixed;
+            pointer-events: none;
         }
     </style>
 </head>
@@ -266,6 +278,9 @@
     let activities = [];
     let completedWords = 0;
     const sessionStatus = document.getElementById('sessionStatus');
+    
+    // Detectar se é dispositivo touch
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
     document.addEventListener('DOMContentLoaded', () => {
         initializeVoices();
@@ -341,6 +356,15 @@
             s.tabIndex = 0;
             s.addEventListener('dragover', (e) => e.preventDefault());
             s.addEventListener('drop', (e) => handleDrop(e, s));
+            
+            // Eventos para touch nos slots
+            if (isTouchDevice) {
+                s.addEventListener('touchstart', (e) => handleTouchStart(e, s), { passive: false });
+                s.addEventListener('touchmove', (e) => handleTouchMove(e, s), { passive: false });
+                s.addEventListener('touchend', (e) => handleTouchEnd(e, s));
+                s.addEventListener('touchcancel', (e) => handleTouchCancel(e, s));
+            }
+            
             s.addEventListener('click', () => {
                 // remover letra do slot (se houver)
                 const child = s.querySelector('.tile');
@@ -378,6 +402,14 @@
             });
             tile.addEventListener('dragend', () => tile.setAttribute('aria-grabbed', 'false'));
             tile.addEventListener('click', () => speak(ch)); // toque fala a letra
+            
+            // Eventos para touch nas peças
+            if (isTouchDevice) {
+                tile.addEventListener('touchstart', (e) => handleTileTouchStart(e, tile), { passive: false });
+                tile.addEventListener('touchmove', (e) => handleTileTouchMove(e, tile), { passive: false });
+                tile.addEventListener('touchend', (e) => handleTileTouchEnd(e, tile));
+                tile.addEventListener('touchcancel', (e) => handleTileTouchCancel(e, tile));
+            }
 
             tray.appendChild(tile);
         }
@@ -400,6 +432,166 @@
 
             // verifica se completou
             checkAnswer();
+        }
+        
+        // Variáveis para controle do touch
+        let activeTile = null;
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchOffsetX = 0;
+        let touchOffsetY = 0;
+        
+        function handleTileTouchStart(e, tile) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            activeTile = tile;
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
+            
+            // Calcula o offset do toque em relação ao elemento
+            const rect = tile.getBoundingClientRect();
+            touchOffsetX = touch.clientX - rect.left;
+            touchOffsetY = touch.clientY - rect.top;
+            
+            // Prepara o tile para arrasto
+            tile.setAttribute('aria-grabbed', 'true');
+            tile.classList.add('dragging');
+            
+            // Fala a letra
+            speak(tile.textContent);
+        }
+        
+        function handleTileTouchMove(e, tile) {
+            if (!activeTile) return;
+            e.preventDefault();
+            
+            const touch = e.touches[0];
+            const currentX = touch.clientX - touchOffsetX;
+            const currentY = touch.clientY - touchOffsetY;
+            
+            // Move o tile com o dedo
+            activeTile.style.left = currentX + 'px';
+            activeTile.style.top = currentY + 'px';
+            
+            // Verifica se está sobre um slot
+            const slots = dropZone.querySelectorAll('.slot');
+            let overSlot = null;
+            
+            slots.forEach(slot => {
+                const rect = slot.getBoundingClientRect();
+                if (
+                    touch.clientX >= rect.left &&
+                    touch.clientX <= rect.right &&
+                    touch.clientY >= rect.top &&
+                    touch.clientY <= rect.bottom
+                ) {
+                    overSlot = slot;
+                    slot.style.backgroundColor = '#f0f0f0'; // Feedback visual
+                } else {
+                    slot.style.backgroundColor = '';
+                }
+            });
+        }
+        
+        function handleTileTouchEnd(e, tile) {
+            if (!activeTile) return;
+            e.preventDefault();
+            
+            const touch = e.changedTouches[0];
+            const slots = dropZone.querySelectorAll('.slot');
+            let dropped = false;
+            
+            // Verifica em qual slot foi solto
+            slots.forEach(slot => {
+                const rect = slot.getBoundingClientRect();
+                if (
+                    touch.clientX >= rect.left &&
+                    touch.clientX <= rect.right &&
+                    touch.clientY >= rect.top &&
+                    touch.clientY <= rect.bottom
+                ) {
+                    // Se o slot já tem letra, devolve ao tray
+                    if (slot.firstElementChild) {
+                        const existingTile = slot.firstElementChild;
+                        existingTile.setAttribute('draggable', 'true');
+                        existingTile.setAttribute('aria-grabbed', 'false');
+                        existingTile.classList.remove('dragging');
+                        existingTile.style.left = '';
+                        existingTile.style.top = '';
+                        tray.appendChild(existingTile);
+                    }
+                    
+                    // Coloca a letra no slot
+                    slot.innerHTML = '';
+                    // remover ghost se existir
+                    if (slot.dataset.ghost) delete slot.dataset.ghost;
+                    
+                    tile.setAttribute('draggable', 'false');
+                    slot.appendChild(tile);
+                    tile.classList.remove('dragging');
+                    tile.style.left = '';
+                    tile.style.top = '';
+                    
+                    dropped = true;
+                    checkAnswer();
+                }
+                
+                // Remove o feedback visual
+                slot.style.backgroundColor = '';
+            });
+            
+            // Se não foi solto em um slot, volta para a bandeja
+            if (!dropped) {
+                tray.appendChild(tile);
+                tile.classList.remove('dragging');
+                tile.style.left = '';
+                tile.style.top = '';
+                tile.setAttribute('aria-grabbed', 'false');
+            }
+            
+            activeTile = null;
+        }
+        
+        function handleTileTouchCancel(e, tile) {
+            if (activeTile) {
+                tile.classList.remove('dragging');
+                tile.style.left = '';
+                tile.style.top = '';
+                tile.setAttribute('aria-grabbed', 'false');
+                activeTile = null;
+            }
+        }
+        
+        // Funções para manipulação de slots via touch
+        function handleTouchStart(e, slot) {
+            // Previne o comportamento padrão para evitar scroll
+            e.preventDefault();
+        }
+        
+        function handleTouchMove(e, slot) {
+            // Previne o comportamento padrão para evitar scroll
+            e.preventDefault();
+        }
+        
+        function handleTouchEnd(e, slot) {
+            // Se há uma letra ativa sendo arrastada, trata no handleTileTouchEnd
+            if (!activeTile) {
+                // Se não há tile ativo, trata como clique para remover a letra do slot
+                const child = slot.querySelector('.tile');
+                if (child) {
+                    child.setAttribute('draggable', 'true');
+                    child.setAttribute('aria-grabbed', 'false');
+                    tray.appendChild(child);
+                    slot.innerHTML = '';
+                    // manter ghost se era a primeira letra
+                    const index = Array.from(slots).indexOf(slot);
+                    if (index === 0 && revealHintBtn.disabled) slot.dataset.ghost = word[0].toUpperCase();
+                }
+            }
+        }
+        
+        function handleTouchCancel(e, slot) {
+            // Limpa qualquer estado se necessário
         }
 
         function currentAnswer(){
@@ -447,6 +639,9 @@
                 if (t) {
                     t.setAttribute('draggable','true');
                     t.setAttribute('aria-grabbed','false');
+                    t.classList.remove('dragging');
+                    t.style.left = '';
+                    t.style.top = '';
                     tray.appendChild(t);
                 }
                 s.innerHTML = '';
