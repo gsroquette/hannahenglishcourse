@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Hannah Questions — Fill in the Blanks (Test)</title>
+<title>Hannah Questions — Grammar Test</title>
 <style>
   :root{
     --bg:#f7f9fc; --card:#ffffff; --text:#1f2937; --muted:#6b7280;
@@ -74,9 +74,10 @@
   .option:active{transform:translateY(0)}
   .option .thumb{width:60px;height:60px;border-radius:14px;background:#f3f6ff;border:1px solid #e6ecfb;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:30px;flex:0 0 60px}
   .option .thumb img{width:100%;height:100%;object-fit:contain;padding:6px;display:block}
-  .option.img-only{justify-content:center;gap:0}/* .option.img-only .label{display:none} */
-  .option .label{font-size:19px;font-weight:800;letter-spacing:.2px;word-break:break-word}
+  /* NÃO escondemos o label mesmo quando houver imagem */
+  .option .label{font-size:19px;font-weight:800;letter-spacing:.2px;word-break:break-word;color:var(--text)}
   .option .sub{font-size:13px;color:var(--muted)}
+  .option .textwrap{flex:1; min-width:0;}
 
   .square-outline{width:38px;height:38px;border:6px solid var(--sq,#7c3aed);border-radius:10px;background:transparent;display:inline-block;position:relative;transition:border-color .2s ease,background .2s ease,transform .15s ease}
   .option.ok .square-outline{border-color:#16a34a;background:#dcfce7}
@@ -159,18 +160,8 @@
   }
   #finishButton{ background:#22c55e; }
   #finishButton:disabled{ opacity:.5; cursor:not-allowed }
-  #restartButton{ background:#ef4444; display:none; margin-bottom:24px; }
-
-  #overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;z-index:2000}
-  #completion-modal{
-    position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
-    background:#fff;border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.25);
-    padding:24px;display:none;z-index:2001;max-width:520px;width:92%;
-    text-align:center;
-  }
-  #completion-modal h2{margin:0 0 8px 0;color:#16a34a}
-  #completion-modal p{margin:0 0 12px 0}
-  #completion-modal button{border:none;background:#2563eb;color:#fff;border-radius:10px;padding:10px 14px;font-weight:800;cursor:pointer}
+  #restartButton{ background:#ef4444; display:none; margin-bottom:8px; }
+  #restartNote{ max-width:1140px; margin: 6px auto 24px auto; text-align:center; color:#ef4444; font-weight:700; display:none; }
 </style>
 </head>
 <body>
@@ -212,17 +203,11 @@
     </div>
   </div>
 
-  <!-- ====== TEST UI (nota + finish + restart + modal) ====== -->
+  <!-- ====== TEST UI (grade + finish + restart) ====== -->
   <div id="grade-display"></div>
   <button id="finishButton" disabled>Finish Test</button>
-  <button id="restartButton">Restart Test</button>
-
-  <div id="overlay"></div>
-  <div id="completion-modal">
-    <h2>Test Completed!</h2>
-    <p></p>
-    <button onclick="closeModal()">Close</button>
-  </div>
+  <button id="restartButton" disabled>Restart Test</button>
+  <div id="restartNote"></div>
 
   <!-- Loader -->
   <div class="loading" id="loading" aria-live="polite" style="display:none">
@@ -266,7 +251,8 @@ firebase.auth().onAuthStateChanged(function(user){
   ========================= */
   const TEST_MODE = true;
   const PASSING_GRADE = 70;
-  const TEST_DB_KEY = "test - fill in the blanks"; // chave no RTDB
+  /* *** APENAS alteramos o nome gravado no banco: *** */
+  const TEST_DB_KEY = "GrammarTest"; // (mantido o nome da constante)
 
   /* ======= Estado do teste ======= */
   let userAnswers = [];    // por índice da questão
@@ -328,7 +314,7 @@ firebase.auth().onAuthStateChanged(function(user){
   }
 
   /* =========================
-     Progressão de fase (mantida)
+     Progressão de fase
   ========================= */
   function ensureUserIsAuthenticated(callback){
     if(currentUserId){ callback(currentUserId); return; }
@@ -352,7 +338,6 @@ firebase.auth().onAuthStateChanged(function(user){
         const nextPhase = parseInt(fase,10) + 1;
         await dbRef.update({ [`fase${nextPhase}`]: true });
       }
-      console.log("[Progress] Update successful.");
     } catch(err){
       console.error("[Progress] Error updating next phase:", err);
     }
@@ -404,8 +389,7 @@ firebase.auth().onAuthStateChanged(function(user){
   const gradeEl    = document.getElementById('grade-display');
   const finishBtn  = document.getElementById('finishButton');
   const restartBtn = document.getElementById('restartButton');
-  const overlayEl  = document.getElementById('overlay');
-  const modalEl    = document.getElementById('completion-modal');
+  const restartNote= document.getElementById('restartNote');
 
   const sCorrect = new Audio(`${BASE}/sounds/correct.mp3`);
   const sWrong   = new Audio(`${BASE}/sounds/wrong.mp3`);
@@ -413,7 +397,7 @@ firebase.auth().onAuthStateChanged(function(user){
   const sNext    = new Audio(`${BASE}/sounds/next.mp3`);
   [sCorrect,sWrong,sTap,sNext].forEach(a=>{a.preload='auto'});
 
-  finishBtn.onclick = () => checkCompletion(true);
+  finishBtn.onclick  = () => checkCompletion(true);
   restartBtn.onclick = () => resetTest();
 
   /* =========================
@@ -431,9 +415,8 @@ firebase.auth().onAuthStateChanged(function(user){
       buildCorrectAnswers();
       idx = 0;
       renderQuestion();
-      if(questions.length>0) finishBtn.disabled = false;
-      // Carrega nota existente (se houver) e definimos canOverwrite
-      loadExistingGrade();
+      updateFinishEnabled();         // começa desabilitado
+      loadExistingGrade();           // carrega nota (e estado de restart)
     })
     .catch(err=>{
       console.error('[Q&A] Load failed:', err);
@@ -469,7 +452,6 @@ firebase.auth().onAuthStateChanged(function(user){
         });
         return {type:'match', value: canon.sort().map(String) };
       } else {
-        // choice/fillblank — cobre string, array e objeto {b1,b2,...}
         if (Array.isArray(q.answer)) {
           return { type:'choice', value: q.answer.map(String) };
         } else if (q.answer && typeof q.answer === 'object') {
@@ -606,7 +588,7 @@ firebase.auth().onAuthStateChanged(function(user){
       mediaBox.appendChild(img);
     }
 
-    // ==== opções (com fix para garantir array) ====
+    // ==== opções (garantindo sempre label visível) ====
     optionsEl.innerHTML = '';
     optionsEl.classList.remove('is-order');
 
@@ -632,76 +614,76 @@ firebase.auth().onAuthStateChanged(function(user){
      Multiple-choice (1 tentativa)
   ========================= */
   function makeOption(q, opt){
-  // normaliza o objeto de opção e garante rótulos
-  const o0 = (typeof opt === 'string') ? { label: opt, value: opt } : { ...opt };
-  const o = {
-    ...o0,
-    // Fallbacks sólidos: se não houver label, usa value; se não houver value, usa label
-    label: (o0.label != null && String(o0.label).trim() !== '') ? String(o0.label) : String(o0.value ?? ''),
-    value: (o0.value != null && String(o0.value).trim() !== '') ? String(o0.value) : String(o0.label ?? '')
-  };
+    // normaliza e garante rótulo
+    const tmp = (typeof opt === 'string') ? { label: opt, value: opt } : { ...opt };
+    const o = {
+      ...tmp,
+      label: (tmp.label != null && String(tmp.label).trim() !== '') ? String(tmp.label) : String(tmp.value ?? ''),
+      value: (tmp.value != null && String(tmp.value).trim() !== '') ? String(tmp.value) : String(tmp.label ?? '')
+    };
 
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'option';
-  btn.setAttribute('aria-label', o.aria || o.label || 'option');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'option';
+    btn.setAttribute('aria-label', o.aria || o.label || 'option');
 
-  const thumb = document.createElement('div');
-  thumb.className = 'thumb';
-  if (o.image) {
-    const img = new Image();
-    img.src = absPath(o.image);
-    img.alt = o.label || '';
-    thumb.appendChild(img);
-  } else if (o.emoji) {
-    thumb.textContent = o.emoji;
-  } else {
-    const box = document.createElement('span');
-    box.className = 'square-outline';
-    box.style.setProperty('--sq', '#7c3aed');
-    thumb.appendChild(box);
-  }
-
-  const textWrap = document.createElement('div');
-  textWrap.style.flex = '1';                 // <- garante espaço para o texto
-
-  const label = document.createElement('div');
-  label.className = 'label';
-  label.textContent = o.label || o.value;   // <- fallback visível
-  textWrap.appendChild(label);
-
-  if (typeof o.sub === 'string' && o.sub.trim()) {
-    const sub = document.createElement('div');
-    sub.className = 'sub';
-    sub.textContent = o.sub;
-    textWrap.appendChild(sub);
-  }
-
-  btn.appendChild(thumb);
-  btn.appendChild(textWrap);
-
-  const commit = () => {
-    if (TEST_MODE && !lockedQuestion[idx]) {
-      userAnswers[idx] = String(o.value ?? o.label ?? '');
-      lockedQuestion[idx] = true;
+    const thumb = document.createElement('div');
+    thumb.className = 'thumb';
+    if (o.image) {
+      const img = new Image();
+      img.src = absPath(o.image);
+      img.alt = o.label || '';
+      thumb.appendChild(img);
+    } else if (o.emoji) {
+      thumb.textContent = o.emoji;
+    } else {
+      const box = document.createElement('span');
+      box.className = 'square-outline';
+      box.style.setProperty('--sq', '#7c3aed');
+      thumb.appendChild(box);
     }
-    handleAnswer(q, o, btn);
-  };
 
-  btn.onclick = () => {
-    (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
-    speakSelectedThenCheck(q, o, btn, commit);
-  };
-  thumb.style.cursor = 'pointer';
-  thumb.title = 'Play & choose';
-  thumb.onclick = (e) => {
-    e.preventDefault(); e.stopPropagation();
-    (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
-    speakSelectedThenCheck(q, o, btn, commit);
-  };
+    const textWrap = document.createElement('div');
+    textWrap.className = 'textwrap';
 
-  return btn;
-}
+    const label = document.createElement('div');
+    label.className = 'label';
+    label.textContent = o.label || o.value; // fallback
+    textWrap.appendChild(label);
+
+    if (typeof o.sub === 'string' && o.sub.trim()) {
+      const sub = document.createElement('div');
+      sub.className = 'sub';
+      sub.textContent = o.sub;
+      textWrap.appendChild(sub);
+    }
+
+    btn.appendChild(thumb);
+    btn.appendChild(textWrap);
+
+    const commit = () => {
+      if (TEST_MODE && !lockedQuestion[idx]) {
+        userAnswers[idx] = String(o.value ?? o.label ?? '');
+        lockedQuestion[idx] = true;
+        updateFinishEnabled();
+      }
+      handleAnswer(q, o, btn);
+    };
+
+    btn.onclick = () => {
+      (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
+      speakSelectedThenCheck(q, o, btn, commit);
+    };
+    thumb.style.cursor = 'pointer';
+    thumb.title = 'Play & choose';
+    thumb.onclick = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
+      speakSelectedThenCheck(q, o, btn, commit);
+    };
+
+    return btn;
+  }
 
   /* =========================
      Order type
@@ -756,6 +738,7 @@ firebase.auth().onAuthStateChanged(function(user){
       if(TEST_MODE && !lockedQuestion[idx]){
         userAnswers[idx] = built.slice();
         lockedQuestion[idx] = true;
+        updateFinishEnabled();
       }
       if(ok){
         try{
@@ -851,13 +834,10 @@ firebase.auth().onAuthStateChanged(function(user){
         thumb.textContent = item.label ? '🔤' : '❔';
       }
 
-      const hasLabel = !!(item.label && String(item.label).trim());
-      if (hasLabel){
-        const label = document.createElement('div'); label.className = 'label'; label.textContent = item.label;
-        b.appendChild(thumb); b.appendChild(label);
-      } else {
-        b.classList.add('img-only'); b.appendChild(thumb);
-      }
+      const label = document.createElement('div'); label.className = 'label'; label.textContent = item.label || '';
+      const textWrap = document.createElement('div'); textWrap.className='textwrap'; textWrap.appendChild(label);
+
+      b.appendChild(thumb); b.appendChild(textWrap);
 
       b.onclick = ()=>{
         if (b.classList.contains('matched')) return;
@@ -878,14 +858,10 @@ firebase.auth().onAuthStateChanged(function(user){
           selectedLeftVal = null;
 
           if (matched.size === sourcePairs.length){
-            // Finaliza e registra
-            const canon = sourcePairs.map(p=>{
-              const R = (typeof p.right === 'string')?p.right:(p.right.value || p.right.label || '');
-              return String(R);
-            }).sort();
             if(TEST_MODE && !lockedQuestion[idx]){
               userAnswers[idx] = { pairs: Array.from(matched).sort(), wrongs };
               lockedQuestion[idx] = true;
+              updateFinishEnabled();
             }
             const okAll = wrongs===0;
             if(okAll){
@@ -928,12 +904,10 @@ firebase.auth().onAuthStateChanged(function(user){
     let isCorrect;
 
     if (correct?.type==='choice'){
-      const chosen = (TEST_MODE ? userAnswers[idx] : (opt.value ?? opt.label ?? ''));
-      // Se a resposta correta vier como array (multi-blank), comparamos com a 1ª (ou considere mudar este critério conforme seu design).
-      const expected = Array.isArray(correct.value) ? correct.value[0] : correct.value;
-      isCorrect = normalize(chosen) === normalize(expected);
+      const chosen  = (TEST_MODE ? userAnswers[idx] : (opt.value ?? opt.label ?? ''));
+      const expectV = Array.isArray(correct.value) ? correct.value[0] : correct.value;
+      isCorrect = normalize(chosen) === normalize(expectV);
     }
-    // order/match são decididos nos seus próprios fluxos.
 
     if(isCorrect === true){
       btn?.classList?.add('ok');
@@ -1048,8 +1022,12 @@ firebase.auth().onAuthStateChanged(function(user){
     btnPlayPrompt.disabled = true; btnRepeat.disabled = true;
     btnPlayPrompt.classList.add('is-hidden'); btnRepeat.classList.add('is-hidden');
 
-    // Calcula e salva automaticamente ao final
     checkCompletion(false);
+  }
+
+  function updateFinishEnabled(){
+    const allAnswered = userAnswers.every(a => a !== null);
+    finishBtn.disabled = !allAnswered;
   }
 
   function confetti(n=16){
@@ -1090,7 +1068,6 @@ firebase.auth().onAuthStateChanged(function(user){
      ======== TEST KIT ========
   ========================= */
 
-  // 1) Comparador genérico
   function isAnswerCorrect(i){
     const q = questions[i];
     const corr = correctAnswers[i];
@@ -1107,12 +1084,10 @@ firebase.auth().onAuthStateChanged(function(user){
       const got   = ans.pairs.slice().sort();
       return arraysEqual(got, canon);
     }
-    // choice/fillblank
     const expected = Array.isArray(corr.value) ? corr.value[0] : corr.value;
     return normalize(ans) === normalize(expected);
   }
 
-  // 2) Cálculo da nota e salvamento
   async function checkCompletion(showModalNow){
     const total = questions.length;
     let correctCount  = 0;
@@ -1129,35 +1104,37 @@ firebase.auth().onAuthStateChanged(function(user){
         displayGrade(grade, linked);
         window.activityCompleted = true;
 
-        // mostra botão de reinício se reprovado
+        // lógica do restart
         if(grade < PASSING_GRADE){
-          restartBtn.style.display = 'block';
+          if(linked){
+            // com professor: botão aparece desabilitado + aviso
+            restartBtn.style.display = 'block';
+            restartBtn.disabled = true;
+            restartNote.style.display = 'block';
+            restartNote.textContent = "Your score wasn’t enough to pass. Please contact your teacher to clear your stored grade so you can take a new test.";
+          }else{
+            // sem professor: pode reiniciar
+            restartBtn.style.display = 'block';
+            restartBtn.disabled = false;
+            restartNote.style.display = 'block';
+            restartNote.textContent = "Your score wasn’t enough to pass. You can restart the test now.";
+          }
         } else {
           restartBtn.style.display = 'none';
+          restartNote.style.display = 'none';
         }
 
         if(showModalNow){
           const msg = grade>=PASSING_GRADE ? "Congratulations! You have passed this test."
-                                           : "Insufficient score. Try again!";
-          showModal(msg, grade);
+                                           : "Insufficient score.";
+          alert(`${msg} Your Grade: ${grade}%.`);
         }
       }catch(e){
         console.error("[TEST] Save/unlock error:", e);
-        showModal("An error occurred while saving your progress. Please try again.", 0);
+        alert("An error occurred while saving your progress. Please try again.");
       }
     });
   }
-
-  function showModal(message, grade){
-    overlayEl.style.display = 'block';
-    modalEl.style.display   = 'block';
-    const p = modalEl.querySelector('p');
-    p.innerHTML = `${message}<br>Your Grade: ${grade}%.`;
-  }
-  window.closeModal = function(){
-    overlayEl.style.display = 'none';
-    modalEl.style.display   = 'none';
-  };
 
   function displayGrade(grade, linked){
     gradeEl.style.display = 'block';
@@ -1183,19 +1160,16 @@ firebase.auth().onAuthStateChanged(function(user){
     const snap = await ref.once('value');
     const existing = snap.val() ?? 0;
 
-    // define se pode sobrescrever em retentativa
     canOverwrite = !isLinked || existing === 0;
 
     if(isLinked){
       if(existing===0){
         await ref.set(newGrade);
-        console.log("[Linked] Grade saved:", newGrade);
       }else{
-        console.log("[Linked] Grade unchanged (teacher reset required).");
+        // professor precisa limpar para permitir novo valor
       }
     }else{
       await ref.set(newGrade);
-      console.log("[Unlinked] Grade overwritten:", newGrade);
     }
   }
 
@@ -1211,11 +1185,28 @@ firebase.auth().onAuthStateChanged(function(user){
           const g = snap.val();
           displayGrade(g, linked);
           canOverwrite = !linked || g===0;
-          if(g>=PASSING_GRADE){ window.activityCompleted = true; restartBtn.style.display = 'none'; }
-          else { restartBtn.style.display = 'block'; }
+
+          if(g>=PASSING_GRADE){
+            window.activityCompleted = true;
+            restartBtn.style.display = 'none';
+            restartNote.style.display = 'none';
+          }else{
+            if(linked && g>0){
+              restartBtn.style.display = 'block';
+              restartBtn.disabled = true;
+              restartNote.style.display = 'block';
+              restartNote.textContent = "Your score wasn’t enough to pass. Please contact your teacher to clear your stored grade so you can take a new test.";
+            }else{
+              restartBtn.style.display = 'block';
+              restartBtn.disabled = false;
+              restartNote.style.display = 'block';
+              restartNote.textContent = "Your score wasn’t enough to pass. You can restart the test now.";
+            }
+          }
         } else {
           canOverwrite = true;
           restartBtn.style.display = 'none';
+          restartNote.style.display = 'none';
         }
       }catch(e){ console.error("loadExistingGrade error", e); }
     });
@@ -1225,8 +1216,6 @@ firebase.auth().onAuthStateChanged(function(user){
      Restart Test
   ========================= */
   function resetTest(){
-    // fecha modal se aberto
-    closeModal();
     // limpa estado
     initTestArrays(questions.length);
     idx = 0;
@@ -1237,16 +1226,14 @@ firebase.auth().onAuthStateChanged(function(user){
     bar.style.width = '0%';
     gradeEl.style.display = 'none';
     restartBtn.style.display = 'none';
-    finishBtn.disabled = questions.length === 0;
+    restartNote.style.display = 'none';
 
-    // re-render
     renderQuestion();
+    updateFinishEnabled();
 
-    // aviso se não vai sobrescrever nota (conta atrelada já com nota)
     if(!canOverwrite){
       toast('This attempt is for practice only. Your stored grade will not change.');
     }
-    // rola para topo
     try{ window.scrollTo({top:0, behavior:'smooth'}); }catch(e){}
   }
 
