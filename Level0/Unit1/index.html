@@ -133,6 +133,7 @@
       box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
     }
 
+    /* Botão ROBÔ LEX (já existente) */
     .robot-lex {
       grid-column: span 2;
       display: flex;
@@ -158,6 +159,7 @@
       box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
     }
 
+    /* Botão TEST (já existente) */
     .test-button {
       grid-column: span 2;
       display: flex;
@@ -183,10 +185,37 @@
       box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
     }
 
+    /* NOVO: Botão HANNAH VIDEO (grid próprio como Test e Robô Lex) */
+    .hannah-video {
+      grid-column: span 2;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 15px;
+      background-color: #FFFFFF;
+      border: 2px solid #4CAF50;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      text-decoration: none;
+    }
+
+    .hannah-video img {
+      width: 100%;
+      height: auto;
+      max-width: 130px;
+    }
+
+    .hannah-video:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+    }
+
     @media (max-width: 400px) {
       .teacher-resources,
       .robot-lex,
-      .test-button {
+      .test-button,
+      .hannah-video {
         grid-column: span 1;
       }
     }
@@ -200,48 +229,65 @@
     </header>
     <main>
       <div class="activity-buttons" id="activity-buttons">
-        <!-- Botões serão criados por JavaScript aqui -->
+        <!-- Botão Teacher Resources (controlado por role) -->
         <a href="teacher/index.html" class="teacher-resources">
           <img src="../../imagens/resources.png" alt="Teacher Resources">
         </a>
+        <!-- O botão Hannah Video será inserido via JS logo APÓS este elemento -->
       </div>
     </main>
   </div>
 
   <script>
-  // Cria dinamicamente os botões de atividade, incluindo TEST e ROBÔ LEX
+  // Cria dinamicamente os botões de atividade, incluindo TEST, ROBÔ LEX e o NOVO HANNAH VIDEO
   document.addEventListener("DOMContentLoaded", () => {
     const pathParts = window.location.pathname.split("/");
     const level = pathParts[1] || "Level1";
-    const unit = pathParts[2] || "Unit1";
-
-    const buttonData = [
-      { trecho: "trecho1", img: "../../imagens/listening.png", alt: "Listening" },
-      { trecho: "trecho2", img: "../../imagens/grammar.png", alt: "Grammar" },
-      { trecho: "trecho3", img: "../../imagens/speaking.png", alt: "Speaking" },
-      { trecho: "trecho4", img: "../../imagens/writing.png", alt: "Writing" },
-      { trecho: "trecho5", img: "../../imagens/Bible.png", alt: "Bible" },
-      { trecho: "trecho6", img: "../../imagens/apresentacao.png", alt: "Apresentação" },
-      { trecho: "trecho7", img: "../../imagens/test.png", alt: "Test", className: "test-button" }
-    ];
+    const unit  = pathParts[2] || "Unit1";
 
     const container = document.getElementById("activity-buttons");
 
-    // Botões normais
+    // 1) NOVO Botão: HANNAH VIDEO (aparece para todos, grid próprio, primeiro após Teacher)
+    const hannahVideo = document.createElement("a");
+    hannahVideo.href = `/Atividades/HannahVideo/index.html?level=${level}&unit=${unit}`;
+    hannahVideo.className = "activity-button hannah-video";
+    const hvImg = document.createElement("img");
+    hvImg.src = "../../imagens/botoes/video_button.png";
+    hvImg.alt = "Hannah Video";
+    hannahVideo.appendChild(hvImg);
+
+    // Inserir imediatamente após o .teacher-resources, se existir;
+    // caso contrário, inserir no início do container.
+    const teacherEl = container.querySelector(".teacher-resources");
+    if (teacherEl) {
+      teacherEl.insertAdjacentElement("afterend", hannahVideo);
+    } else {
+      container.prepend(hannahVideo);
+    }
+
+    // 2) Botões normais (trechos)
+    const buttonData = [
+      { trecho: "trecho1", img: "../../imagens/listening.png",  alt: "Listening" },
+      { trecho: "trecho2", img: "../../imagens/grammar.png",    alt: "Grammar" },
+      { trecho: "trecho3", img: "../../imagens/speaking.png",   alt: "Speaking" },
+      { trecho: "trecho4", img: "../../imagens/writing.png",    alt: "Writing" },
+      { trecho: "trecho5", img: "../../imagens/Bible.png",      alt: "Bible" },
+      { trecho: "trecho6", img: "../../imagens/apresentacao.png", alt: "Apresentação" },
+      { trecho: "trecho7", img: "../../imagens/test.png",       alt: "Test", className: "test-button" }
+    ];
+
     buttonData.forEach(data => {
       const a = document.createElement("a");
       a.href = `/${level}/${unit}/fases.html?trecho=${data.trecho}`;
       a.className = "activity-button" + (data.className ? ` ${data.className}` : "");
-
       const img = document.createElement("img");
       img.src = data.img;
       img.alt = data.alt;
-
       a.appendChild(img);
       container.appendChild(a);
     });
 
-    // Botão ROBÔ LEX
+    // 3) Botão ROBÔ LEX (grid próprio)
     const robotButton = document.createElement("a");
     robotButton.href = `../../Atividades/LEX/index.html?level=${level}&unit=${unit}`;
     robotButton.className = "activity-button robot-lex";
@@ -255,16 +301,16 @@
 </script>
 
   <script>
-    // Verifica usuário no Firebase e exibe Teacher Resources se for professor
+    // Verifica usuário no Firebase e exibe Teacher Resources se for professor/proprietario
     firebase.auth().onAuthStateChanged((user) => {
       if (user) {
         const userId = user.uid;
         const userRoleRef = firebase.database().ref(`/usuarios/${userId}/role`);
-
         userRoleRef.once("value").then((snapshot) => {
           const role = snapshot.val();
           if (role === "professor" || role === "proprietario") {
-            document.querySelector(".teacher-resources").style.display = "flex";
+            const tr = document.querySelector(".teacher-resources");
+            if (tr) tr.style.display = "flex";
           }
         }).catch((error) => {
           console.error("Erro ao obter o role do usuário:", error);
