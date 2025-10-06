@@ -74,7 +74,7 @@
   .option:active{transform:translateY(0)}
   .option .thumb{width:60px;height:60px;border-radius:14px;background:#f3f6ff;border:1px solid #e6ecfb;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:30px;flex:0 0 60px}
   .option .thumb img{width:100%;height:100%;object-fit:contain;padding:6px;display:block}
-  .option.img-only{justify-content:center;gap:0}.option.img-only .label{display:none}
+  .option.img-only{justify-content:center;gap:0}/* .option.img-only .label{display:none} */
   .option .label{font-size:19px;font-weight:800;letter-spacing:.2px;word-break:break-word}
   .option .sub{font-size:13px;color:var(--muted)}
 
@@ -632,56 +632,76 @@ firebase.auth().onAuthStateChanged(function(user){
      Multiple-choice (1 tentativa)
   ========================= */
   function makeOption(q, opt){
-    const o = (typeof opt === 'string') ? { label: opt, value: opt } : { ...opt };
+  // normaliza o objeto de opção e garante rótulos
+  const o0 = (typeof opt === 'string') ? { label: opt, value: opt } : { ...opt };
+  const o = {
+    ...o0,
+    // Fallbacks sólidos: se não houver label, usa value; se não houver value, usa label
+    label: (o0.label != null && String(o0.label).trim() !== '') ? String(o0.label) : String(o0.value ?? ''),
+    value: (o0.value != null && String(o0.value).trim() !== '') ? String(o0.value) : String(o0.label ?? '')
+  };
 
-    const btn = document.createElement('button');
-    btn.type = 'button'; btn.className = 'option';
-    btn.setAttribute('aria-label', o.aria || o.label || 'option');
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'option';
+  btn.setAttribute('aria-label', o.aria || o.label || 'option');
 
-    const thumb = document.createElement('div'); thumb.className = 'thumb';
-    if (o.image){
-      const img = new Image(); img.src = absPath(o.image); img.alt = o.label || '';
-      thumb.appendChild(img);
-    } else if (o.emoji){
-      thumb.textContent = o.emoji;
-    } else {
-      const box = document.createElement('span');
-      box.className = 'square-outline';
-      box.style.setProperty('--sq', '#7c3aed');
-      thumb.textContent = ''; thumb.appendChild(box);
-    }
-
-    const textWrap = document.createElement('div');
-    const label = document.createElement('div'); label.className = 'label'; label.textContent = o.label || '';
-    textWrap.appendChild(label);
-    if (typeof o.sub === 'string' && o.sub.trim()){
-      const sub = document.createElement('div'); sub.className = 'sub'; sub.textContent = o.sub;
-      textWrap.appendChild(sub);
-    }
-
-    btn.appendChild(thumb); btn.appendChild(textWrap);
-
-    const commit = () => {
-      if(TEST_MODE && !lockedQuestion[idx]){
-        userAnswers[idx] = String(o.value ?? o.label ?? '');
-        lockedQuestion[idx] = true;
-      }
-      handleAnswer(q, o, btn);
-    };
-
-    btn.onclick = () => {
-      (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
-      speakSelectedThenCheck(q, o, btn, commit);
-    };
-    thumb.style.cursor = 'pointer'; thumb.title = 'Play & choose';
-    thumb.onclick = (e) => {
-      e.preventDefault(); e.stopPropagation();
-      (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
-      speakSelectedThenCheck(q, o, btn, commit);
-    };
-
-    return btn;
+  const thumb = document.createElement('div');
+  thumb.className = 'thumb';
+  if (o.image) {
+    const img = new Image();
+    img.src = absPath(o.image);
+    img.alt = o.label || '';
+    thumb.appendChild(img);
+  } else if (o.emoji) {
+    thumb.textContent = o.emoji;
+  } else {
+    const box = document.createElement('span');
+    box.className = 'square-outline';
+    box.style.setProperty('--sq', '#7c3aed');
+    thumb.appendChild(box);
   }
+
+  const textWrap = document.createElement('div');
+  textWrap.style.flex = '1';                 // <- garante espaço para o texto
+
+  const label = document.createElement('div');
+  label.className = 'label';
+  label.textContent = o.label || o.value;   // <- fallback visível
+  textWrap.appendChild(label);
+
+  if (typeof o.sub === 'string' && o.sub.trim()) {
+    const sub = document.createElement('div');
+    sub.className = 'sub';
+    sub.textContent = o.sub;
+    textWrap.appendChild(sub);
+  }
+
+  btn.appendChild(thumb);
+  btn.appendChild(textWrap);
+
+  const commit = () => {
+    if (TEST_MODE && !lockedQuestion[idx]) {
+      userAnswers[idx] = String(o.value ?? o.label ?? '');
+      lockedQuestion[idx] = true;
+    }
+    handleAnswer(q, o, btn);
+  };
+
+  btn.onclick = () => {
+    (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
+    speakSelectedThenCheck(q, o, btn, commit);
+  };
+  thumb.style.cursor = 'pointer';
+  thumb.title = 'Play & choose';
+  thumb.onclick = (e) => {
+    e.preventDefault(); e.stopPropagation();
+    (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
+    speakSelectedThenCheck(q, o, btn, commit);
+  };
+
+  return btn;
+}
 
   /* =========================
      Order type
