@@ -74,10 +74,9 @@
   .option:active{transform:translateY(0)}
   .option .thumb{width:60px;height:60px;border-radius:14px;background:#f3f6ff;border:1px solid #e6ecfb;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:30px;flex:0 0 60px}
   .option .thumb img{width:100%;height:100%;object-fit:contain;padding:6px;display:block}
-  /* NÃO escondemos o label mesmo quando houver imagem */
-  .option .label{font-size:19px;font-weight:800;letter-spacing:.2px;word-break:break-word;color:var(--text)}
+  .option.img-only{justify-content:center;gap:0}
+  .option .label{font-size:19px;font-weight:800;letter-spacing:.2px;word-break:break-word}
   .option .sub{font-size:13px;color:var(--muted)}
-  .option .textwrap{flex:1; min-width:0;}
 
   .square-outline{width:38px;height:38px;border:6px solid var(--sq,#7c3aed);border-radius:10px;background:transparent;display:inline-block;position:relative;transition:border-color .2s ease,background .2s ease,transform .15s ease}
   .option.ok .square-outline{border-color:#16a34a;background:#dcfce7}
@@ -148,20 +147,28 @@
     .option .label{ font-size:17px; }
   }
 
-  /* ===== Test extras (grade/finish/restart/modal) ===== */
+  /* ===== Test extras (grade/restart/modal) ===== */
   #grade-display{
     display:none; text-align:center; font-size:1.1rem; font-weight:700; margin: 0 auto 8px auto;
     max-width:1140px;
   }
-  #finishButton, #restartButton{
-    display:block; margin: 8px auto 0 auto; padding: 12px 18px;
-    color:#fff; border:none; border-radius:12px; font-weight:800; cursor:pointer;
+  #restartWrap{ display:block; margin: 8px auto 24px auto; text-align:center; }
+  #restartButton{
+    display:inline-block; padding: 12px 18px; background:#ef4444; color:#fff; border:none; border-radius:12px; font-weight:800; cursor:pointer;
     box-shadow:0 8px 16px rgba(0,0,0,.25);
   }
-  #finishButton{ background:#22c55e; }
-  #finishButton:disabled{ opacity:.5; cursor:not-allowed }
-  #restartButton{ background:#ef4444; display:none; margin-bottom:8px; }
-  #restartNote{ max-width:1140px; margin: 6px auto 24px auto; text-align:center; color:#ef4444; font-weight:700; display:none; }
+  #restartButton:disabled{ opacity:.5; cursor:not-allowed }
+  #restartNote{ margin-top:8px; font-size:.95rem; color:#374151; }
+
+  #overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;z-index:2000}
+  #completion-modal{
+    position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+    background:#fff;border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.25);
+    padding:24px;display:none;z-index:2001;max-width:520px;width:92%; text-align:center;
+  }
+  #completion-modal h2{margin:0 0 8px 0;color:#16a34a}
+  #completion-modal p{margin:0 0 12px 0}
+  #completion-modal button{border:none;background:#2563eb;color:#fff;border-radius:10px;padding:10px 14px;font-weight:800;cursor:pointer}
 </style>
 </head>
 <body>
@@ -203,11 +210,19 @@
     </div>
   </div>
 
-  <!-- ====== TEST UI (grade + finish + restart) ====== -->
+  <!-- Nota + Restart + modal (sem Finish) -->
   <div id="grade-display"></div>
-  <button id="finishButton" disabled>Finish Test</button>
-  <button id="restartButton" disabled>Restart Test</button>
-  <div id="restartNote"></div>
+  <div id="restartWrap">
+    <button id="restartButton">Restart Test</button>
+    <div id="restartNote"></div>
+  </div>
+
+  <div id="overlay"></div>
+  <div id="completion-modal">
+    <h2>Test Completed!</h2>
+    <p></p>
+    <button onclick="closeModal()">Close</button>
+  </div>
 
   <!-- Loader -->
   <div class="loading" id="loading" aria-live="polite" style="display:none">
@@ -251,15 +266,16 @@ firebase.auth().onAuthStateChanged(function(user){
   ========================= */
   const TEST_MODE = true;
   const PASSING_GRADE = 70;
-  /* *** APENAS alteramos o nome gravado no banco: *** */
-  const TEST_DB_KEY = "GrammarTest"; // (mantido o nome da constante)
+  const TEST_DB_KEY = "test - fill in the blanks"; // NÃO alterar a chave
+  const TEST_DISPLAY_NAME = "Grammar Test";
 
   /* ======= Estado do teste ======= */
   let userAnswers = [];    // por índice da questão
   let correctAnswers = []; // {type, value}
   let lockedQuestion = []; // impede segunda tentativa
   let wrongTapCount = [];  // para MATCH
-  let canOverwrite = true; // se professor estiver atrelado e nota já existir, fica false
+  let canOverwrite = true; // unlinked => true | linked => depende se já tem nota
+  let isLinked = false;    // aluno atrelado a professor?
 
   /* =========================
      Helpers essenciais
@@ -338,6 +354,7 @@ firebase.auth().onAuthStateChanged(function(user){
         const nextPhase = parseInt(fase,10) + 1;
         await dbRef.update({ [`fase${nextPhase}`]: true });
       }
+      console.log("[Progress] Update successful.");
     } catch(err){
       console.error("[Progress] Error updating next phase:", err);
     }
@@ -387,9 +404,10 @@ firebase.auth().onAuthStateChanged(function(user){
   const loadingEl  = document.getElementById('loading');
 
   const gradeEl    = document.getElementById('grade-display');
-  const finishBtn  = document.getElementById('finishButton');
   const restartBtn = document.getElementById('restartButton');
   const restartNote= document.getElementById('restartNote');
+  const overlayEl  = document.getElementById('overlay');
+  const modalEl    = document.getElementById('completion-modal');
 
   const sCorrect = new Audio(`${BASE}/sounds/correct.mp3`);
   const sWrong   = new Audio(`${BASE}/sounds/wrong.mp3`);
@@ -397,7 +415,6 @@ firebase.auth().onAuthStateChanged(function(user){
   const sNext    = new Audio(`${BASE}/sounds/next.mp3`);
   [sCorrect,sWrong,sTap,sNext].forEach(a=>{a.preload='auto'});
 
-  finishBtn.onclick  = () => checkCompletion(true);
   restartBtn.onclick = () => resetTest();
 
   /* =========================
@@ -410,13 +427,13 @@ firebase.auth().onAuthStateChanged(function(user){
       const data = JSON.parse(text);
       if(!data || !Array.isArray(data.questions)) throw new Error('Invalid format in questions.txt');
       questions = data.questions;
-      subtitle.textContent = data.title || 'Answer carefully — this is a test.';
+      subtitle.textContent = data.title || `${TEST_DISPLAY_NAME} — answer carefully.`;
       initTestArrays(questions.length);
       buildCorrectAnswers();
       idx = 0;
       renderQuestion();
-      updateFinishEnabled();         // começa desabilitado
-      loadExistingGrade();           // carrega nota (e estado de restart)
+      // Carrega nota existente (se houver) e define políticas de restart
+      loadExistingGrade();
     })
     .catch(err=>{
       console.error('[Q&A] Load failed:', err);
@@ -452,6 +469,7 @@ firebase.auth().onAuthStateChanged(function(user){
         });
         return {type:'match', value: canon.sort().map(String) };
       } else {
+        // choice/fillblank robusto (string | array | objeto)
         if (Array.isArray(q.answer)) {
           return { type:'choice', value: q.answer.map(String) };
         } else if (q.answer && typeof q.answer === 'object') {
@@ -588,7 +606,7 @@ firebase.auth().onAuthStateChanged(function(user){
       mediaBox.appendChild(img);
     }
 
-    // ==== opções (garantindo sempre label visível) ====
+    // ==== opções (com fix para garantir label visível) ====
     optionsEl.innerHTML = '';
     optionsEl.classList.remove('is-order');
 
@@ -614,12 +632,12 @@ firebase.auth().onAuthStateChanged(function(user){
      Multiple-choice (1 tentativa)
   ========================= */
   function makeOption(q, opt){
-    // normaliza e garante rótulo
-    const tmp = (typeof opt === 'string') ? { label: opt, value: opt } : { ...opt };
+    // normaliza o objeto e garante rótulos
+    const o0 = (typeof opt === 'string') ? { label: opt, value: opt } : { ...opt };
     const o = {
-      ...tmp,
-      label: (tmp.label != null && String(tmp.label).trim() !== '') ? String(tmp.label) : String(tmp.value ?? ''),
-      value: (tmp.value != null && String(tmp.value).trim() !== '') ? String(tmp.value) : String(tmp.label ?? '')
+      ...o0,
+      label: (o0.label != null && String(o0.label).trim() !== '') ? String(o0.label) : String(o0.value ?? ''),
+      value: (o0.value != null && String(o0.value).trim() !== '') ? String(o0.value) : String(o0.label ?? '')
     };
 
     const btn = document.createElement('button');
@@ -629,12 +647,10 @@ firebase.auth().onAuthStateChanged(function(user){
 
     const thumb = document.createElement('div');
     thumb.className = 'thumb';
-    if (o.image) {
-      const img = new Image();
-      img.src = absPath(o.image);
-      img.alt = o.label || '';
+    if (o.image){
+      const img = new Image(); img.src = absPath(o.image); img.alt = o.label || '';
       thumb.appendChild(img);
-    } else if (o.emoji) {
+    } else if (o.emoji){
       thumb.textContent = o.emoji;
     } else {
       const box = document.createElement('span');
@@ -644,28 +660,23 @@ firebase.auth().onAuthStateChanged(function(user){
     }
 
     const textWrap = document.createElement('div');
-    textWrap.className = 'textwrap';
-
+    textWrap.style.flex = '1';         /* <<< evita colapso */
+    textWrap.style.minWidth = '0';     /* <<< garante render do label */
     const label = document.createElement('div');
     label.className = 'label';
-    label.textContent = o.label || o.value; // fallback
+    label.textContent = o.label || o.value;
     textWrap.appendChild(label);
-
-    if (typeof o.sub === 'string' && o.sub.trim()) {
-      const sub = document.createElement('div');
-      sub.className = 'sub';
-      sub.textContent = o.sub;
+    if (typeof o.sub === 'string' && o.sub.trim()){
+      const sub = document.createElement('div'); sub.className = 'sub'; sub.textContent = o.sub;
       textWrap.appendChild(sub);
     }
 
-    btn.appendChild(thumb);
-    btn.appendChild(textWrap);
+    btn.appendChild(thumb); btn.appendChild(textWrap);
 
     const commit = () => {
-      if (TEST_MODE && !lockedQuestion[idx]) {
+      if(TEST_MODE && !lockedQuestion[idx]){
         userAnswers[idx] = String(o.value ?? o.label ?? '');
         lockedQuestion[idx] = true;
-        updateFinishEnabled();
       }
       handleAnswer(q, o, btn);
     };
@@ -738,7 +749,6 @@ firebase.auth().onAuthStateChanged(function(user){
       if(TEST_MODE && !lockedQuestion[idx]){
         userAnswers[idx] = built.slice();
         lockedQuestion[idx] = true;
-        updateFinishEnabled();
       }
       if(ok){
         try{
@@ -834,10 +844,13 @@ firebase.auth().onAuthStateChanged(function(user){
         thumb.textContent = item.label ? '🔤' : '❔';
       }
 
-      const label = document.createElement('div'); label.className = 'label'; label.textContent = item.label || '';
-      const textWrap = document.createElement('div'); textWrap.className='textwrap'; textWrap.appendChild(label);
-
-      b.appendChild(thumb); b.appendChild(textWrap);
+      const hasLabel = !!(item.label && String(item.label).trim());
+      if (hasLabel){
+        const label = document.createElement('div'); label.className = 'label'; label.textContent = item.label;
+        b.appendChild(thumb); b.appendChild(label);
+      } else {
+        b.classList.add('img-only'); b.appendChild(thumb);
+      }
 
       b.onclick = ()=>{
         if (b.classList.contains('matched')) return;
@@ -861,7 +874,6 @@ firebase.auth().onAuthStateChanged(function(user){
             if(TEST_MODE && !lockedQuestion[idx]){
               userAnswers[idx] = { pairs: Array.from(matched).sort(), wrongs };
               lockedQuestion[idx] = true;
-              updateFinishEnabled();
             }
             const okAll = wrongs===0;
             if(okAll){
@@ -904,9 +916,9 @@ firebase.auth().onAuthStateChanged(function(user){
     let isCorrect;
 
     if (correct?.type==='choice'){
-      const chosen  = (TEST_MODE ? userAnswers[idx] : (opt.value ?? opt.label ?? ''));
-      const expectV = Array.isArray(correct.value) ? correct.value[0] : correct.value;
-      isCorrect = normalize(chosen) === normalize(expectV);
+      const chosen = (TEST_MODE ? userAnswers[idx] : (opt.value ?? opt.label ?? ''));
+      const expected = Array.isArray(correct.value) ? correct.value[0] : correct.value; // 1 blank (seu caso atual)
+      isCorrect = normalize(chosen) === normalize(expected);
     }
 
     if(isCorrect === true){
@@ -1000,12 +1012,6 @@ firebase.auth().onAuthStateChanged(function(user){
   /* =========================
      Finish + Back
   ========================= */
-  function onActivityComplete(){
-    if(window.activityCompleted) return;
-    window.activityCompleted = true;
-    (ensureAudio()? sfxWin() : sCorrect.play().catch(()=>{}));
-  }
-
   function finish(){
     try { stopAllAudio(); } catch(e){} try { speechSynthesis.cancel(); } catch(e){}
     isReading = false;
@@ -1017,17 +1023,13 @@ firebase.auth().onAuthStateChanged(function(user){
     btnNext.disabled = true; btnNext.classList.remove('ready');
     statusPill.textContent = `Completed • ${questions.length}/${questions.length}`;
     confetti(22);
-    speakFriendly(['You may finish the test now.']);
+    speakFriendly(['You may review your result now.']);
 
     btnPlayPrompt.disabled = true; btnRepeat.disabled = true;
     btnPlayPrompt.classList.add('is-hidden'); btnRepeat.classList.add('is-hidden');
 
+    // Calcula e salva automaticamente ao final
     checkCompletion(false);
-  }
-
-  function updateFinishEnabled(){
-    const allAnswered = userAnswers.every(a => a !== null);
-    finishBtn.disabled = !allAnswered;
   }
 
   function confetti(n=16){
@@ -1045,7 +1047,7 @@ firebase.auth().onAuthStateChanged(function(user){
       setTimeout(()=>p.remove(), dur+delay+200);
     }
   }
-  function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j]]; } return arr; }
+  function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
   function absPath(p){
     if(!p) return p;
     if (p.startsWith('http') || p.startsWith('/') || p.startsWith('../')) return p;
@@ -1084,6 +1086,7 @@ firebase.auth().onAuthStateChanged(function(user){
       const got   = ans.pairs.slice().sort();
       return arraysEqual(got, canon);
     }
+    // choice/fillblank (1 blank)
     const expected = Array.isArray(corr.value) ? corr.value[0] : corr.value;
     return normalize(ans) === normalize(expected);
   }
@@ -1097,6 +1100,7 @@ firebase.auth().onAuthStateChanged(function(user){
     ensureUserIsAuthenticated(async (userId)=>{
       try{
         const linked = await isStudentLinkedToProfessor(userId);
+        isLinked = linked;
         await saveGradeToDatabase(userId, grade, linked);
         if(grade >= PASSING_GRADE){
           await updateNextPhase(userId);
@@ -1104,47 +1108,42 @@ firebase.auth().onAuthStateChanged(function(user){
         displayGrade(grade, linked);
         window.activityCompleted = true;
 
-        // lógica do restart
-        if(grade < PASSING_GRADE){
-          if(linked){
-            // com professor: botão aparece desabilitado + aviso
-            restartBtn.style.display = 'block';
-            restartBtn.disabled = true;
-            restartNote.style.display = 'block';
-            restartNote.textContent = "Your score wasn’t enough to pass. Please contact your teacher to clear your stored grade so you can take a new test.";
-          }else{
-            // sem professor: pode reiniciar
-            restartBtn.style.display = 'block';
-            restartBtn.disabled = false;
-            restartNote.style.display = 'block';
-            restartNote.textContent = "Your score wasn’t enough to pass. You can restart the test now.";
-          }
-        } else {
-          restartBtn.style.display = 'none';
-          restartNote.style.display = 'none';
-        }
-
         if(showModalNow){
           const msg = grade>=PASSING_GRADE ? "Congratulations! You have passed this test."
                                            : "Insufficient score.";
-          alert(`${msg} Your Grade: ${grade}%.`);
+          showModal(msg, grade);
         }
       }catch(e){
         console.error("[TEST] Save/unlock error:", e);
-        alert("An error occurred while saving your progress. Please try again.");
+        showModal("An error occurred while saving your progress. Please try again.", 0);
       }
     });
   }
 
+  function showModal(message, grade){
+    overlayEl.style.display = 'block';
+    modalEl.style.display   = 'block';
+    const p = modalEl.querySelector('p');
+    p.innerHTML = `${message}<br>Your Grade: ${grade}%.`;
+  }
+  window.closeModal = function(){
+    overlayEl.style.display = 'none';
+    modalEl.style.display   = 'none';
+  };
+
   function displayGrade(grade, linked){
     gradeEl.style.display = 'block';
     gradeEl.style.color   = grade>=PASSING_GRADE ? '#16a34a' : '#ef4444';
-    const extra = (grade<PASSING_GRADE && linked)
-      ? ' Please contact your teacher to reset your stored grade.'
-      : (grade<PASSING_GRADE ? ' You may restart the test.' : '');
-    gradeEl.innerHTML = (grade>=PASSING_GRADE)
-      ? `Your Grade: ${grade}% — Congratulations on passing!`
-      : `Your Grade: ${grade}% — Insufficient score.${extra}`;
+    const base = (grade>=PASSING_GRADE)
+      ? `Your Grade: ${grade}% — Congratulations on passing the ${TEST_DISPLAY_NAME}!`
+      : `Your Grade: ${grade}% — Insufficient score for the ${TEST_DISPLAY_NAME}.`;
+    gradeEl.innerHTML = base;
+
+    // Política do botão de restart + mensagem
+    if (linked){
+      // aluno com professor: só pode clicar se NÃO houver nota (ausente/zero)
+      // a habilitação visual será tratada em loadExistingGrade() também
+    }
   }
 
   function isStudentLinkedToProfessor(userId){
@@ -1154,22 +1153,27 @@ firebase.auth().onAuthStateChanged(function(user){
       .catch(()=>false);
   }
 
-  async function saveGradeToDatabase(userId, newGrade, isLinked){
+  async function saveGradeToDatabase(userId, newGrade, linked){
     const {level, unit} = getParams();
     const ref = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/${TEST_DB_KEY}`);
     const snap = await ref.once('value');
     const existing = snap.val() ?? 0;
 
-    canOverwrite = !isLinked || existing === 0;
-
-    if(isLinked){
+    // linked: só grava se ainda não existir nota (==0)
+    // unlinked: grava a MAIOR nota
+    if(linked){
+      canOverwrite = existing === 0;
       if(existing===0){
         await ref.set(newGrade);
+        console.log("[Linked] Grade saved:", newGrade);
       }else{
-        // professor precisa limpar para permitir novo valor
+        console.log("[Linked] Grade unchanged (teacher reset required).");
       }
     }else{
-      await ref.set(newGrade);
+      const best = Math.max(existing||0, newGrade||0);
+      canOverwrite = true;
+      await ref.set(best);
+      console.log("[Unlinked] Grade saved (max policy):", best);
     }
   }
 
@@ -1179,34 +1183,34 @@ firebase.auth().onAuthStateChanged(function(user){
       const {level, unit}=getParams();
       const ref = firebase.database().ref(`usuarios/${u.uid}/progresso/${level}/${unit}/${TEST_DB_KEY}`);
       try{
+        isLinked = await isStudentLinkedToProfessor(u.uid);
         const snap = await ref.once('value');
-        const linked = await isStudentLinkedToProfessor(u.uid);
-        if(snap.exists()){
-          const g = snap.val();
-          displayGrade(g, linked);
-          canOverwrite = !linked || g===0;
+        const has = snap.exists();
+        const g = has ? (snap.val()||0) : 0;
 
-          if(g>=PASSING_GRADE){
-            window.activityCompleted = true;
-            restartBtn.style.display = 'none';
-            restartNote.style.display = 'none';
+        // política do restart
+        if(isLinked){
+          if(!has || g===0){
+            // professor apagou / sem nota => pode recomeçar
+            restartBtn.disabled = false;
+            restartNote.textContent = "";
           }else{
-            if(linked && g>0){
-              restartBtn.style.display = 'block';
-              restartBtn.disabled = true;
-              restartNote.style.display = 'block';
-              restartNote.textContent = "Your score wasn’t enough to pass. Please contact your teacher to clear your stored grade so you can take a new test.";
+            restartBtn.disabled = true;
+            if(g < PASSING_GRADE){
+              restartNote.textContent = "Your score is below the minimum. Please contact your teacher to clear your current attempt so you can retake the Grammar Test.";
             }else{
-              restartBtn.style.display = 'block';
-              restartBtn.disabled = false;
-              restartNote.style.display = 'block';
-              restartNote.textContent = "Your score wasn’t enough to pass. You can restart the test now.";
+              restartNote.textContent = ""; // aprovado — não precisa mensagem
             }
           }
-        } else {
-          canOverwrite = true;
-          restartBtn.style.display = 'none';
-          restartNote.style.display = 'none';
+        }else{
+          // sem professor: pode refazer sempre (grava maior nota)
+          restartBtn.disabled = false;
+          restartNote.textContent = "";
+        }
+
+        if(has){
+          displayGrade(g, isLinked);
+          if(g>=PASSING_GRADE){ window.activityCompleted = true; }
         }
       }catch(e){ console.error("loadExistingGrade error", e); }
     });
@@ -1216,24 +1220,27 @@ firebase.auth().onAuthStateChanged(function(user){
      Restart Test
   ========================= */
   function resetTest(){
-    // limpa estado
+    // linked: só permite se habilitado (ou seja, professor limpou nota)
+    if(isLinked && restartBtn.disabled){
+      toast("Your teacher needs to clear your grade before you can retake the test.");
+      return;
+    }
+
+    closeModal();
     initTestArrays(questions.length);
     idx = 0;
     answered = false;
     window.activityCompleted = false;
 
-    // UI base
     bar.style.width = '0%';
     gradeEl.style.display = 'none';
-    restartBtn.style.display = 'none';
-    restartNote.style.display = 'none';
 
     renderQuestion();
-    updateFinishEnabled();
 
-    if(!canOverwrite){
+    if(!canOverwrite && isLinked){
       toast('This attempt is for practice only. Your stored grade will not change.');
     }
+
     try{ window.scrollTo({top:0, behavior:'smooth'}); }catch(e){}
   }
 
