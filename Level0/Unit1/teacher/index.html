@@ -140,6 +140,25 @@
             background-color: #e0553c;
         }
 
+        /* Print button (novo) */
+        .modal-print-btn {
+            position: absolute;
+            top: 10px;
+            right: 90px; /* fica à esquerda do Close */
+            background-color: #4CAF50;
+            color: #fff;
+            border: none;
+            padding: 10px 16px;
+            cursor: pointer;
+            border-radius: 30px;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            transition: background-color 0.3s ease;
+        }
+        .modal-print-btn:hover {
+            background-color: #45a049;
+        }
+
         /* Base class for formatted text, now all bold and slightly larger */
         .formatted-text {
             line-height: 1.6;
@@ -298,27 +317,27 @@
          * Go back to the previous level
          */
         function goBackToLevel() {
-    const currentUrl = window.location.href;
-    const url = new URL(currentUrl);
+            const currentUrl = window.location.href;
+            const url = new URL(currentUrl);
 
-    // Remove "teacher" do final da pathname
-    let pathParts = url.pathname.split('/');
-    
-    // Remove string vazia no final se a URL terminar com /
-    if (pathParts[pathParts.length - 1] === "") {
-        pathParts.pop();
-    }
+            // Remove "teacher" do final da pathname
+            let pathParts = url.pathname.split('/');
+            
+            // Remove string vazia no final se a URL terminar com /
+            if (pathParts[pathParts.length - 1] === "") {
+                pathParts.pop();
+            }
 
-    if (pathParts[pathParts.length - 1] === "teacher") {
-        pathParts.pop(); // remove "teacher"
-    }
+            if (pathParts[pathParts.length - 1] === "teacher") {
+                pathParts.pop(); // remove "teacher"
+            }
 
-    // Constrói a nova URL (sem "teacher")
-    const newPath = pathParts.join('/') + '/index.html';
-    const newUrl = `${url.origin}${newPath}`;
+            // Constrói a nova URL (sem "teacher")
+            const newPath = pathParts.join('/') + '/index.html';
+            const newUrl = `${url.origin}${newPath}`;
 
-    window.location.href = newUrl;
-}
+            window.location.href = newUrl;
+        }
 
         /**
          * Convert plain text to basic HTML formatting:
@@ -489,10 +508,10 @@
                 html += `
                     <div style="margin: 10px; text-align: center;">
                         <img 
-                            src="${file}" 
-                            alt="${file}" 
+                            src="\${file}" 
+                            alt="\${file}" 
                             style="width: 100px; cursor: pointer;"
-                            onclick="openImageModal('${file}')"
+                            onclick="openImageModal('\${file}')"
                         >
                     </div>
                 `;
@@ -507,6 +526,7 @@
 
         /**
          * Open modal to show an enlarged image
+         * (ATUALIZADO: adiciona botão Print)
          */
         function openImageModal(imgSrc) {
             const overlay = document.createElement('div');
@@ -514,7 +534,8 @@
             overlay.innerHTML = `
                 <div class="modal-content">
                     <button class="modal-close-btn" onclick="closeModal()">Close</button>
-                    <img src="${imgSrc}" alt="Enlarged">
+                    <button class="modal-print-btn" onclick="printImage('\${imgSrc}')">Print</button>
+                    <img src="\${imgSrc}" alt="Enlarged">
                 </div>
             `;
             document.body.appendChild(overlay);
@@ -527,6 +548,80 @@
             const overlay = document.querySelector('.modal-overlay');
             if (overlay) {
                 document.body.removeChild(overlay);
+            }
+        }
+
+        /**
+         * Print the enlarged image
+         * - Abre uma nova janela com a imagem absoluta
+         * - Chama print() ao carregar
+         * - Fecha a janela após a impressão
+         */
+        function printImage(imgSrc) {
+            try {
+                const absoluteSrc = new URL(imgSrc, window.location.href).href;
+                const printWin = window.open('', '_blank');
+
+                if (!printWin) {
+                    alert('Por favor, permita pop-ups para imprimir a imagem.');
+                    return;
+                }
+
+                printWin.document.open();
+                printWin.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Print Image</title>
+<style>
+  @media print {
+    body, html { margin: 0; }
+  }
+  html, body {
+    height: 100%;
+  }
+  body {
+    margin: 0; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    height: 100vh;
+  }
+  img {
+    max-width: 100%;
+    max-height: 100vh;
+    display: block;
+  }
+</style>
+</head>
+<body>
+  <img src="${absoluteSrc}" alt="Print">
+  <script>
+    (function() {
+      const img = document.querySelector('img');
+      function doPrint() {
+        try {
+          window.focus();
+          window.print();
+        } finally {
+          if ('onafterprint' in window) {
+            window.onafterprint = function(){ window.close(); };
+          } else {
+            setTimeout(function(){ window.close(); }, 300);
+          }
+        }
+      }
+      if (img && !img.complete) {
+        img.onload = doPrint;
+        img.onerror = doPrint; // ainda assim tenta imprimir/fechar
+      } else {
+        doPrint();
+      }
+    })();
+  <\/script>
+</body>
+</html>`);
+                printWin.document.close();
+            } catch (e) {
+                console.error('Erro ao imprimir a imagem:', e);
             }
         }
     </script>
