@@ -303,23 +303,6 @@
         <div id="creativeActivityContent" class="formatted-text"></div>
     </div>
 
-    <!-- Bible Lessons Unit Activity (NOVA SESSÃO) -->
-    <h2>Bible Lessons Unit Activity</h2>
-    <div class="activities">
-        <a href="javascript:void(0);" onclick="showBibleActivityContent('bible_activity.txt')">
-            <img src="../../../imagens/botoes/bible_activity_button.png" alt="Bible Activity">
-        </a>
-        <a href="javascript:void(0);" onclick="showBibleDocuments()">
-            <img src="../../../imagens/botoes/documentos.png" alt="Bible Documents">
-        </a>
-    </div>
-
-    <!-- Bible Activity container -->
-    <div class="content" id="bibleActivityContainer">
-        <button class="close-btn" onclick="closeBibleActivity()">X</button>
-        <div id="bibleActivityContent" class="formatted-text"></div>
-    </div>
-
     <!-- Choose an Activity -->
     <h2>Choose an Activity</h2>
     <div class="activities">
@@ -442,7 +425,6 @@
          */
         function showTeachersGuideContent(fileName) {
             closeCreativeActivity();
-            closeBibleActivity();
             fetch(fileName)
             .then(response => response.text())
             .then(data => {
@@ -474,7 +456,6 @@
          */
         function showCreativeActivityContent(fileName) {
             closeTeachersGuide();
-            closeBibleActivity();
             fetch(fileName)
             .then(response => response.text())
             .then(data => {
@@ -505,7 +486,6 @@
          */
         function showDocuments() {
             closeTeachersGuide();
-            closeBibleActivity();
             const container = document.getElementById('creativeActivityContainer');
             const contentDiv = document.getElementById('creativeActivityContent');
 
@@ -544,81 +524,9 @@
             container.scrollIntoView({ behavior: 'smooth' });
         }
 
-        /* ==================== BIBLE LESSONS UNIT ACTIVITY ==================== */
-
-        /**
-         * Show text file content in the Bible Activity container
-         */
-        function showBibleActivityContent(fileName) {
-            closeTeachersGuide();
-            closeCreativeActivity();
-            fetch(fileName)
-            .then(response => response.text())
-            .then(data => {
-                const container = document.getElementById('bibleActivityContainer');
-                const contentDiv = document.getElementById('bibleActivityContent');
-                const formatted = parsePlainTextToHtml(data);
-                contentDiv.innerHTML = formatted;
-                container.style.display = 'block';
-                container.scrollIntoView({ behavior: 'smooth' });
-            })
-            .catch(error => {
-                console.error('Error loading text file:', error);
-            });
-        }
-
-        /**
-         * Close the Bible Activity container
-         */
-        function closeBibleActivity() {
-            const container = document.getElementById('bibleActivityContainer');
-            const contentDiv = document.getElementById('bibleActivityContent');
-            contentDiv.innerHTML = '';
-            container.style.display = 'none';
-        }
-
-        /**
-         * Show Bible Documents (imagem21, 22, 23)
-         */
-        function showBibleDocuments() {
-            closeTeachersGuide();
-            closeCreativeActivity();
-            const container = document.getElementById('bibleActivityContainer');
-            const contentDiv = document.getElementById('bibleActivityContent');
-
-            const imageFiles = [
-                'imagem21.png',
-                'imagem22.png',
-                'imagem23.png'
-            ];
-
-            let html = `<h3>Bible Documents</h3>`;
-            html += `<p>Click on a thumbnail to enlarge:</p>`;
-            html += `<div style="display: flex; flex-wrap: wrap;">`;
-
-            imageFiles.forEach(file => {
-                html += `
-                    <div style="margin: 10px; text-align: center;">
-                        <img 
-                            src="${file}" 
-                            alt="${file}" 
-                            style="width: 100px; cursor: pointer;"
-                            onclick="openImageModal('${file}')"
-                        >
-                    </div>
-                `;
-            });
-
-            html += `</div>`;
-
-            contentDiv.innerHTML = html;
-            container.style.display = 'block';
-            container.scrollIntoView({ behavior: 'smooth' });
-        }
-
         /**
          * Open modal to show an enlarged image
-         * (com botão Print + fallbacks PWA/iOS)
+         * (ATUALIZADO: adiciona botão Print)
          */
         function openImageModal(imgSrc) {
             const overlay = document.createElement('div');
@@ -670,6 +578,7 @@
                     iframe.style.border = '0';
                     iframe.setAttribute('aria-hidden', 'true');
 
+                    // Usamos srcdoc para centralizar a imagem na página de impressão
                     iframe.srcdoc = `
 <!DOCTYPE html>
 <html>
@@ -707,15 +616,18 @@
 
                     document.body.appendChild(iframe);
 
+                    // Tenta detectar fim da impressão para remover o iframe
                     const cleanup = () => {
                         try { document.body.removeChild(iframe); } catch(e){}
                         resolve();
                     };
-
+                    // onafterprint pode não existir, então removemos com timeout como garantia
                     let printed = false;
                     iframe.onload = () => {
+                        // Se em 2s nada acontecer, ainda assim limpar
                         setTimeout(() => { if (!printed) cleanup(); }, 2000);
                     };
+                    // Tenta escutar o evento no contexto do iframe
                     setTimeout(() => {
                         try {
                             const iw = iframe.contentWindow;
@@ -741,6 +653,7 @@
             const isiOS = isIOS();
 
             // Caminho 1: Popup + window.print (ótimo em Android/desktop, inclusive PWA)
+            // Evitamos em iOS standalone, que costuma bloquear/ignorar.
             if (!(isiOS && inStandalone)) {
                 try {
                     const printWin = window.open('', '_blank');
@@ -791,9 +704,9 @@
                 }
             }
 
-            // Caminho 2: Fallback via IFRAME
+            // Caminho 2: Fallback via IFRAME (bom para PWA Android/desktop; tenta no iOS também)
             printViaIframe(absoluteSrc).catch(() => {}).finally(() => {
-                // Caminho 3: Orientação para iOS standalone, se necessário
+                // Caminho 3: Mensagem de orientação para iOS standalone, se ainda necessário
                 if (isiOS && inStandalone) {
                     alert(
 `On iOS when using the app in standalone (PWA) mode, printing may not open automatically.
