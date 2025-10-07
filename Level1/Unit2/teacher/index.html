@@ -140,6 +140,25 @@
             background-color: #e0553c;
         }
 
+        /* Print button (novo) */
+        .modal-print-btn {
+            position: absolute;
+            top: 10px;
+            right: 90px; /* fica à esquerda do Close */
+            background-color: #4CAF50;
+            color: #fff;
+            border: none;
+            padding: 10px 16px;
+            cursor: pointer;
+            border-radius: 30px;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            transition: background-color 0.3s ease;
+        }
+        .modal-print-btn:hover {
+            background-color: #45a049;
+        }
+
         /* Base class for formatted text, now all bold and slightly larger */
         .formatted-text {
             line-height: 1.6;
@@ -298,27 +317,27 @@
          * Go back to the previous level
          */
         function goBackToLevel() {
-    const currentUrl = window.location.href;
-    const url = new URL(currentUrl);
+            const currentUrl = window.location.href;
+            const url = new URL(currentUrl);
 
-    // Remove "teacher" do final da pathname
-    let pathParts = url.pathname.split('/');
-    
-    // Remove string vazia no final se a URL terminar com /
-    if (pathParts[pathParts.length - 1] === "") {
-        pathParts.pop();
-    }
+            // Remove "teacher" do final da pathname
+            let pathParts = url.pathname.split('/');
+            
+            // Remove string vazia no final se a URL terminar com /
+            if (pathParts[pathParts.length - 1] === "") {
+                pathParts.pop();
+            }
 
-    if (pathParts[pathParts.length - 1] === "teacher") {
-        pathParts.pop(); // remove "teacher"
-    }
+            if (pathParts[pathParts.length - 1] === "teacher") {
+                pathParts.pop(); // remove "teacher"
+            }
 
-    // Constrói a nova URL (sem "teacher")
-    const newPath = pathParts.join('/') + '/index.html';
-    const newUrl = `${url.origin}${newPath}`;
+            // Constrói a nova URL (sem "teacher")
+            const newPath = pathParts.join('/') + '/index.html';
+            const newUrl = `${url.origin}${newPath}`;
 
-    window.location.href = newUrl;
-}
+            window.location.href = newUrl;
+        }
 
         /**
          * Convert plain text to basic HTML formatting:
@@ -474,7 +493,11 @@
             const imageFiles = [
                 'imagem1.png',
                 'imagem2.png',
-                'imagem3.png'
+                'imagem3.png',
+                'imagem4.png',
+                'imagem5.png',
+                'imagem6.png',
+                'imagem7.png'
             ];
 
             let html = `<h3>Documents</h3>`;
@@ -503,6 +526,7 @@
 
         /**
          * Open modal to show an enlarged image
+         * (ATUALIZADO: adiciona botão Print)
          */
         function openImageModal(imgSrc) {
             const overlay = document.createElement('div');
@@ -510,6 +534,7 @@
             overlay.innerHTML = `
                 <div class="modal-content">
                     <button class="modal-close-btn" onclick="closeModal()">Close</button>
+                    <button class="modal-print-btn" onclick="printImage('${imgSrc}')">Print</button>
                     <img src="${imgSrc}" alt="Enlarged">
                 </div>
             `;
@@ -524,6 +549,174 @@
             if (overlay) {
                 document.body.removeChild(overlay);
             }
+        }
+
+        /**
+         * Utilitários de detecção para PWA/iOS
+         */
+        function isStandaloneDisplayMode() {
+            return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+        }
+        function isIOS() {
+            const ua = window.navigator.userAgent;
+            const iOS = /iP(ad|hone|od)/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            return iOS;
+        }
+
+        /**
+         * Fallback por <iframe> oculto (funciona bem em PWA Android/desktop)
+         */
+        function printViaIframe(absoluteSrc) {
+            return new Promise((resolve, reject) => {
+                try {
+                    const iframe = document.createElement('iframe');
+                    iframe.style.position = 'fixed';
+                    iframe.style.right = '0';
+                    iframe.style.bottom = '0';
+                    iframe.style.width = '0';
+                    iframe.style.height = '0';
+                    iframe.style.border = '0';
+                    iframe.setAttribute('aria-hidden', 'true');
+
+                    // Usamos srcdoc para centralizar a imagem na página de impressão
+                    iframe.srcdoc = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Print</title>
+<style>
+  @media print { html, body { margin: 0; } }
+  html, body { height: 100%; }
+  body {
+    margin: 0; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    height: 100vh;
+  }
+  img { max-width: 100%; max-height: 100vh; display: block; }
+</style>
+</head>
+<body>
+  <img src="${absoluteSrc}" alt="Print">
+  <script>
+    (function() {
+      const img = document.querySelector('img');
+      function doPrint() {
+        try { window.focus(); window.print(); }
+        finally {
+          // não fechamos a aba; o host removerá o iframe depois
+        }
+      }
+      if (img && !img.complete) { img.onload = doPrint; img.onerror = doPrint; }
+      else { doPrint(); }
+    })();
+  <\/script>
+</body>
+</html>`;
+
+                    document.body.appendChild(iframe);
+
+                    // Tenta detectar fim da impressão para remover o iframe
+                    const cleanup = () => {
+                        try { document.body.removeChild(iframe); } catch(e){}
+                        resolve();
+                    };
+                    // onafterprint pode não existir, então removemos com timeout como garantia
+                    let printed = false;
+                    iframe.onload = () => {
+                        // Se em 2s nada acontecer, ainda assim limpar
+                        setTimeout(() => { if (!printed) cleanup(); }, 2000);
+                    };
+                    // Tenta escutar o evento no contexto do iframe
+                    setTimeout(() => {
+                        try {
+                            const iw = iframe.contentWindow;
+                            if (iw) {
+                                iw.onafterprint = () => { printed = true; cleanup(); };
+                            } else {
+                                cleanup();
+                            }
+                        } catch { cleanup(); }
+                    }, 100);
+                } catch (err) {
+                    reject(err);
+                }
+            });
+        }
+
+        /**
+         * Print the enlarged image (com fallbacks para PWA/iOS)
+         */
+        function printImage(imgSrc) {
+            const absoluteSrc = new URL(imgSrc, window.location.href).href;
+            const inStandalone = isStandaloneDisplayMode();
+            const isiOS = isIOS();
+
+            // Caminho 1: Popup + window.print (ótimo em Android/desktop, inclusive PWA)
+            // Evitamos em iOS standalone, que costuma bloquear/ignorar.
+            if (!(isiOS && inStandalone)) {
+                try {
+                    const printWin = window.open('', '_blank');
+                    if (printWin) {
+                        printWin.document.open();
+                        printWin.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Print Image</title>
+<style>
+  @media print { body, html { margin: 0; } }
+  html, body { height: 100%; }
+  body {
+    margin: 0; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    height: 100vh;
+  }
+  img { max-width: 100%; max-height: 100vh; display: block; }
+</style>
+</head>
+<body>
+  <img src="${absoluteSrc}" alt="Print">
+  <script>
+    (function() {
+      const img = document.querySelector('img');
+      function doPrint() {
+        try { window.focus(); window.print(); }
+        finally {
+          if ('onafterprint' in window) {
+            window.onafterprint = function(){ window.close(); };
+          } else {
+            setTimeout(function(){ window.close(); }, 300);
+          }
+        }
+      }
+      if (img && !img.complete) { img.onload = doPrint; img.onerror = doPrint; }
+      else { doPrint(); }
+    })();
+  <\/script>
+</body>
+</html>`);
+                        printWin.document.close();
+                        return; // sucesso no caminho 1
+                    }
+                } catch (e) {
+                    // continua para fallback
+                }
+            }
+
+            // Caminho 2: Fallback via IFRAME (bom para PWA Android/desktop; tenta no iOS também)
+            printViaIframe(absoluteSrc).catch(() => {}).finally(() => {
+                // Caminho 3: Mensagem de orientação para iOS standalone, se ainda necessário
+                if (isiOS && inStandalone) {
+                    alert(
+`On iOS when using the app in standalone (PWA) mode, printing may not open automatically.
+Options:
+1) Tap the system "Share" icon and choose "Print".
+2) Open this page in Safari and try again.
+3) Or tap and hold the image, choose "Save Image", and print it from the Photos app.`
+                    );
+                }
+            });
         }
     </script>
 </body>
