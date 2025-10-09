@@ -143,8 +143,9 @@
       measurementId:"G-07VVJG9LRS"
     };
     if(!firebase.apps.length){firebase.initializeApp(firebaseConfig);}
-    // persistência local do login
-    firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(console.error);
+    // Queremos que o login sobreviva a recarregamentos e novas abas
+firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+    .catch(console.error);
 
     /* ---------- Função robusta para detectar standalone ---------- */
     function isInStandaloneMode(){
@@ -160,50 +161,6 @@
     /* ---------- Detecção de ambiente ---------- */
     const ua=navigator.userAgent.toLowerCase();
     const isIOS=/iphone|ipad|ipod/.test(ua);
-
-    /* ---------- Funções utilitárias ---------- */
-    const VALID_LEVELS = ["Level0","Level1","Level2","Level3","Level4"];
-
-    function normalizarNivel(n){
-      if(!n) return null;
-      const m=String(n).trim().toLowerCase();
-      if(m==="level0"||m==="0"||m==="starter") return "Level0";
-      if(m==="level1"||m==="1") return "Level1";
-      if(m==="level2"||m==="2") return "Level2";
-      if(m==="level3"||m==="3") return "Level3";
-      if(m==="level4"||m==="4") return "Level4";
-      return null;
-    }
-
-    function normalizarListaLevels(v){
-      if(Array.isArray(v)){
-        const set=new Set();
-        v.forEach(x=>{const n=normalizarNivel(x); if(n) set.add(n);});
-        return Array.from(set);
-      }
-      const single=normalizarNivel(v);
-      return single ? [single] : [];
-    }
-
-    // Varre progresso/LevelX/UnitY/... e considera liberado se houver qualquer fase true
-    function levelsAPartirDoProgresso(progresso){
-      if(!progresso || typeof progresso!=="object") return [];
-      const liberados=[];
-      VALID_LEVELS.forEach(L=>{
-        const units=progresso[L];
-        if(!units || typeof units!=="object") return;
-        // se existir qualquer valor truthy dentro do unit (qualquer fase)
-        const unitKeys=Object.keys(units);
-        for(const uk of unitKeys){
-          const fases=units[uk];
-          if(fases && typeof fases==="object" && Object.values(fases).some(Boolean)){
-            liberados.push(L);
-            break;
-          }
-        }
-      });
-      return Array.from(new Set(liberados));
-    }
 
     /* ---------- Função: exibir botão instalar ---------- */
     function showInstallButton(){
@@ -225,10 +182,11 @@
         hideInstallButton();
         return; // já está no app
       }
+      // Se temos deferredPrompt -> mostra instalar
       if(deferredPrompt){
         showInstallButton();
       }else{
-        hideInstallButton();
+        hideInstallButton(); // navegadores que já instalaram ou não suportam ainda
       }
     }
 
@@ -241,7 +199,7 @@
 
     /* ---------- Evento beforeinstallprompt ---------- */
     window.addEventListener('beforeinstallprompt',e=>{
-      if(isInStandaloneMode()) return;
+      if(isInStandaloneMode()) return; // ignore se já estiver no app
       e.preventDefault();
       deferredPrompt=e;
       showInstallButton();
@@ -254,6 +212,7 @@
       deferredPrompt.prompt();
       await deferredPrompt.userChoice;
       deferredPrompt=null;
+      // depois de interação, reavaliar visibilidade
       setTimeout(controlPWAButtons,500);
     });
 
@@ -304,29 +263,8 @@
     }
     speechSynthesis.onvoiceschanged=()=>englishVoice=pickVoice();
 
-    /* ---------- Liberação de níveis (UI) ---------- */
-    function bloquearTodosNiveis(){
-      document.querySelectorAll(".level-button").forEach(b=>{
-        b.style.filter="grayscale(100%)";
-        b.style.pointerEvents="none";
-      });
-    }
-    function liberarNiveis(arr){
-      const alvo=new Set(arr||[]);
-      document.querySelectorAll(".level-button").forEach(b=>{
-        if(alvo.has(b.id)){
-          b.style.filter="none";
-          b.style.pointerEvents="auto";
-        }else{
-          b.style.filter="grayscale(100%)";
-          b.style.pointerEvents="none";
-        }
-      });
-    }
-    function enviarNivel(n){ n ? liberarNiveis([n]) : liberarNiveis(["Level1"]); }
-
     /* ---------- Firebase Auth & Níveis ---------- */
-    firebase.auth().onAuthStateChanged(async (user)=>{
+    firebase.auth().onAuthStateChanged(user=>{
       const loginLink=document.getElementById("loginLink");
       const userDropdown=document.getElementById("userDropdown");
       const subtitleLoggedOut=document.getElementById("subtitleLoggedOut");
@@ -340,9 +278,8 @@
         roboContainer.style.display="flex";
         invitationContainer.style.display="flex";
 
-        try{
-          const snap=await firebase.database().ref("usuarios/"+user.uid).once("value");
-          const d=snap.val()||{};
+        firebase.database().ref("usuarios/"+user.uid).once("value").then(s=>{
+          const d=s.val()||{};
           const name=d.nome||user.email;
           const avatar=d.avatar?`imagens/${d.avatar}`:"imagens/bonecologin1.png";
           loginLink.innerHTML=`<img src="${avatar}" class="user-icon"><p class="user-name">${name}</p>`;
@@ -351,60 +288,15 @@
           let dash="";
           if(d.role==="proprietario"||d.role==="professor"){
             dash=`<a href="painel_${d.role==='proprietario'?'proprietario':'professor'}.html" class="dashboard-link">${d.role.toUpperCase()} DASHBOARD</a>`;
-            liberarNiveis(VALID_LEVELS);
+            liberarNiveis(["Level0","Level1","Level2","Level3","Level4"]);
           }else if(d.role==="aluno"){
             dash='<a href="painel_aluno.html" class="dashboard-link">STUDENT DASHBOARD</a>';
-
-            // ===== Estratégia de leitura =====
-            const liberarPorPreferencia = (lista) => {
-              if(Array.isArray(lista) && lista.length){ liberarNiveis(lista); return true; }
-              return false;
-            };
-            const tentarAlunoDireto = () => {
-              // 1) levels_liberados do aluno
-              const arrAluno = normalizarListaLevels(d.levels_liberados);
-              if(liberarPorPreferencia(arrAluno)) return;
-
-              // 2) nivel_em_curso do aluno
-              const nAluno = normalizarNivel(d.nivel_em_curso);
-              if(nAluno){ enviarNivel(nAluno); return; }
-
-              // 3) inferir a partir do progresso
-              const arrFromProg = levelsAPartirDoProgresso(d.progresso);
-              if(liberarPorPreferencia(arrFromProg)) return;
-
-              // 4) fallback padrão
-              enviarNivel();
-            };
-
             if(d.atrelado_professor){
-              try{
-                const turmasSnap = await firebase.database().ref("usuarios/"+d.atrelado_professor+"/turmas").once("value");
-                const turmas = turmasSnap.val() || {};
-                let registroAluno = null;
-                for(const turmaId in turmas){
-                  const st = turmas[turmaId]?.students?.[user.uid];
-                  if(st){ registroAluno = st; break; }
-                }
-                if(registroAluno){
-                  // prioridade: levels_liberados (array) > nivel_em_curso (string)
-                  const arrProf = normalizarListaLevels(registroAluno.levels_liberados);
-                  if(liberarPorPreferencia(arrProf)){} else {
-                    const nProf = normalizarNivel(registroAluno.nivel_em_curso);
-                    if(nProf){ enviarNivel(nProf); } else { tentarAlunoDireto(); }
-                  }
-                }else{
-                  // aluno não encontrado em turmas -> usa dados do próprio aluno
-                  tentarAlunoDireto();
-                }
-              }catch(e){
-                // erro de permissão/caminho -> usa dados do próprio aluno
-                tentarAlunoDireto();
-              }
-            }else{
-              // sem professor -> usa dados do próprio aluno
-              tentarAlunoDireto();
-            }
+              firebase.database().ref("usuarios/"+d.atrelado_professor).once("value").then(p=>{
+                const reg=p.val()?.turmas?.["-O8mdLgStvNqNf6x-O5l"]?.students?.[user.uid];
+                enviarNivel(reg?.nivel_em_curso);
+              }).catch(()=>enviarNivel());
+            }else enviarNivel();
           }
           userDropdown.innerHTML=`${dash}<a href="#" id="logout">LEAVE</a>`;
           document.querySelectorAll(".dashboard-link").forEach(l=>{
@@ -413,11 +305,7 @@
               window.location.href=l.getAttribute("href");
             };
           });
-        }catch(e){
-          console.error(e);
-          // em caso de erro, mantém UI acessível e bloqueia níveis
-          bloquearTodosNiveis();
-        }
+        });
       }else{
         subtitleLoggedOut.style.display="block";
         subtitleLoggedIn.style.display="none";
@@ -427,6 +315,25 @@
         bloquearTodosNiveis();
       }
     });
+
+    function enviarNivel(n){ n ? liberarNiveis([n]) : liberarNiveis(["Level1"]); }
+    function bloquearTodosNiveis(){
+      document.querySelectorAll(".level-button").forEach(b=>{
+        b.style.filter="grayscale(100%)";
+        b.style.pointerEvents="none";
+      });
+    }
+    function liberarNiveis(arr){
+      document.querySelectorAll(".level-button").forEach(b=>{
+        if(arr.includes(b.id)){
+          b.style.filter="none";
+          b.style.pointerEvents="auto";
+        }else{
+          b.style.filter="grayscale(100%)";
+          b.style.pointerEvents="none";
+        }
+      });
+    }
 
     /* ---------- Dropdown & Logout ---------- */
     document.getElementById("loginContainer").onclick=e=>{
@@ -445,7 +352,7 @@
       }
     });
 
-    /* ---------- DOM Ready  com netlify ---------- */
+    /* ---------- DOM Ready  com netfily---------- */
     document.addEventListener("DOMContentLoaded",()=>{
       englishVoice=pickVoice();
       document.getElementById("playTTSBtn").onclick=speakRobot;
