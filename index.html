@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Hannah English - Learning English through Bible Stories</title>
 
-  <!-- ▸▸ FAVICONS ◂◂ -->
+  <!-- FAVICONS -->
   <link rel="icon" type="image/x-icon" href="favicon.ico"/>
   <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png"/>
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png"/>
@@ -13,13 +13,13 @@
   <link rel="icon" type="image/png" sizes="512x512" href="android-chrome-512x512.png"/>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png"/>
 
-  <!-- ▸▸ CSS PRINCIPAL ◂◂ -->
+  <!-- CSS PRINCIPAL -->
   <link rel="stylesheet" href="CSS/styles.css"/>
 
-  <!-- ▸▸ MANIFESTO PWA ◂◂ -->
+  <!-- MANIFESTO PWA -->
   <link rel="manifest" href="manifest.json"/>
 
-  <!-- ▸▸ FIREBASE ◂◂ -->
+  <!-- FIREBASE -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
@@ -41,45 +41,39 @@
     .levelC{background-image:url('imagens/levelC.png');}
     .levelD{background-image:url('imagens/levelD.png');}
 
-    /* ---------- BALÃO LÚDICO “PURO” (sem borda) ---------- */
+    /* ========= AVATAR + NOME (SEM CAIXA) ========= */
     .login-container{
       position:absolute; top:16px; right:14px; z-index:20;
-      width: 96px; /* largura fixa para não esticar com nomes longos */
-      display:flex; flex-direction:column; align-items:center; gap:6px;
-      padding:8px 8px 10px;
-      background: rgba(255,255,255,0.35);           /* translúcido suave */
-      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-      border-radius: 18px;
-      box-shadow: 0 8px 22px rgba(0,0,0,0.18);       /* sombra leve */
+      display:inline-flex; flex-direction:column; align-items:center; gap:4px;
+      /* NENHUM FUNDO, NENHUMA BORDA, NENHUMA SOMBRA */
+      background:none; border:none; box-shadow:none; padding:0;
       cursor:pointer;
     }
+    /* Só a imagem; sem borda, sem sombra, sem máscara */
     .user-icon{
-      width:55px; height:55px; border-radius:50%; object-fit:cover;
-      box-shadow: 0 0 0 2px rgba(255,255,255,0.95), 0 2px 6px rgba(0,0,0,0.18);
+      width:55px; height:auto; display:block;
+      border:none; box-shadow:none; border-radius:0; object-fit:contain;
+      pointer-events:none;
     }
+    /* Nome exatamente embaixo, centralizado */
     .user-name{
       margin:0; line-height:1.05; text-align:center;
-      font-size:13px; font-weight:600; color:#1a5f34;     /* verde escuro */
-      max-width: 84px;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; /* segurança extra */
+      font-size:13px; font-weight:700; color:#1a5f34;
+      white-space:nowrap; max-width:180px; overflow:hidden; text-overflow:ellipsis;
+      text-shadow: 0 1px 1px rgba(255,255,255,0.45), 0 1px 2px rgba(0,0,0,0.18); /* só p/ leitura sobre fundos claros/escuros */
     }
-    .login-caret{ display:none !important; } /* garante que nenhuma seta apareça */
+    /* garante que qualquer caret antigo não apareça */
+    .login-caret{ display:none !important; }
 
-    /* Dropdown em “balão” abaixo do avatar */
+    /* Dropdown padrão (pode ficar como estava) */
     .dropdown{
       display:none; position:absolute; right:0; top:calc(100% + 10px); z-index:25;
-      min-width:220px; background:rgba(255,255,255,0.98);
-      border-radius:14px; box-shadow:0 16px 34px rgba(0,0,0,0.18); overflow:hidden;
-      border: 1px solid rgba(0,0,0,0.06);
-    }
-    .dropdown::before{
-      content:""; position:absolute; top:-8px; right:18px;
-      width:0; height:0; border-left:8px solid transparent; border-right:8px solid transparent;
-      border-bottom:8px solid rgba(255,255,255,0.98);
-      filter: drop-shadow(0 -1px 0 rgba(0,0,0,0.06));
+      min-width:220px; background:#fff; border-radius:12px;
+      box-shadow:0 14px 30px rgba(0,0,0,0.16); overflow:hidden;
+      border:1px solid rgba(0,0,0,0.06);
     }
     .dropdown a{display:block;padding:12px 14px;font-size:15px;color:#222;text-decoration:none;text-align:left;}
-    .dropdown a:hover{background:rgba(0,0,0,0.05);}
+    .dropdown a:hover{background:#f2f2f2;}
 
     /* ---------- robô, play e convites ---------- */
     .robo-container{display:flex;flex-direction:column;align-items:center;margin:20px auto;}
@@ -177,24 +171,17 @@
     if(!firebase.apps.length){firebase.initializeApp(firebaseConfig);}
     firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(console.error);
 
-    /* ---------- Função robusta para detectar standalone ---------- */
+    /* ---------- PWA helpers ---------- */
     function isInStandaloneMode(){
-      return window.matchMedia('(display-mode: standalone)').matches ||
-             window.navigator.standalone === true;
+      return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
     }
-
-    /* ---------- Variáveis globais ---------- */
-    let englishVoice=null;
-    let deferredPrompt=null;
+    let englishVoice=null, deferredPrompt=null;
     const installBtn=document.getElementById("installBtn");
-
-    /* ---------- Detecção de ambiente ---------- */
     const ua=navigator.userAgent.toLowerCase();
     const isIOS=/iphone|ipad|ipod/.test(ua);
 
-    /* ---------- Utilitários de níveis ---------- */
+    /* ---------- Níveis helpers ---------- */
     const VALID_LEVELS=["Level0","Level1","Level2","Level3","Level4"];
-
     function normalizarNivel(n){
       if(!n) return null;
       const m=String(n).trim().toLowerCase();
@@ -206,15 +193,9 @@
       return null;
     }
     function normalizarListaLevels(v){
-      if(Array.isArray(v)){
-        const set=new Set();
-        v.forEach(x=>{const n=normalizarNivel(x); if(n) set.add(n);});
-        return Array.from(set);
-      }
-      const single=normalizarNivel(v);
-      return single ? [single] : [];
+      if(Array.isArray(v)){ const set=new Set(); v.forEach(x=>{const n=normalizarNivel(x); if(n) set.add(n);}); return Array.from(set); }
+      const single=normalizarNivel(v); return single ? [single] : [];
     }
-    // Infere a partir de progresso/LevelX/UnitY/*: se houver qualquer fase true, considera liberado
     function levelsAPartirDoProgresso(progresso){
       if(!progresso||typeof progresso!=="object") return [];
       const liberados=[];
@@ -223,9 +204,7 @@
         if(!units||typeof units!=="object") return;
         for(const uk of Object.keys(units)){
           const fases=units[uk];
-          if(fases && typeof fases==="object" && Object.values(fases).some(Boolean)){
-            liberados.push(L);break;
-          }
+          if(fases && typeof fases==="object" && Object.values(fases).some(Boolean)){ liberados.push(L); break; }
         }
       });
       return Array.from(new Set(liberados));
@@ -234,51 +213,19 @@
     /* ---------- PWA botão instalar ---------- */
     function showInstallButton(){installBtn.disabled=false;installBtn.style.display='flex';installBtn.classList.add('pulse');}
     function hideInstallButton(){installBtn.style.display='none';installBtn.classList.remove('pulse');installBtn.disabled=true;}
-    function controlPWAButtons(){
-      if(isInStandaloneMode()){hideInstallButton();return;}
-      if(deferredPrompt){showInstallButton();}else{hideInstallButton();}
-    }
-    if(isIOS && !isInStandaloneMode()){
-      const iosBanner=document.getElementById("iosInstallBanner");
-      iosBanner.style.display="block";
-      document.getElementById("iosBannerClose").onclick=()=>iosBanner.style.display="none";
-    }
-    window.addEventListener('beforeinstallprompt',e=>{
-      if(isInStandaloneMode()) return;
-      e.preventDefault(); deferredPrompt=e; showInstallButton();
-    });
-    installBtn.addEventListener('click',async ()=>{
-      if(!deferredPrompt) return;
-      hideInstallButton();
-      deferredPrompt.prompt();
-      await deferredPrompt.userChoice;
-      deferredPrompt=null;
-      setTimeout(controlPWAButtons,500);
-    });
+    function controlPWAButtons(){ if(isInStandaloneMode()){hideInstallButton();return;} if(deferredPrompt){showInstallButton();} else {hideInstallButton();}}
+    if(isIOS && !isInStandaloneMode()){ const b=document.getElementById("iosInstallBanner"); b.style.display="block"; document.getElementById("iosBannerClose").onclick=()=>b.style.display="none"; }
+    window.addEventListener('beforeinstallprompt',e=>{ if(isInStandaloneMode()) return; e.preventDefault(); deferredPrompt=e; showInstallButton(); });
+    installBtn.addEventListener('click',async ()=>{ if(!deferredPrompt) return; hideInstallButton(); deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt=null; setTimeout(controlPWAButtons,500); });
     window.addEventListener('appinstalled',()=>{deferredPrompt=null;hideInstallButton();});
-    async function verificarInstalacaoInicial(){
-      if(isInStandaloneMode()){hideInstallButton();return;}
-      if('getInstalledRelatedApps' in navigator){
-        try{
-          const apps=await navigator.getInstalledRelatedApps();
-          if(apps.length>0){hideInstallButton();}
-        }catch(err){console.error(err);}
-      }
-      controlPWAButtons();
-    }
+    async function verificarInstalacaoInicial(){ if(isInStandaloneMode()){hideInstallButton();return;} if('getInstalledRelatedApps' in navigator){ try{ const apps=await navigator.getInstalledRelatedApps(); if(apps.length>0){hideInstallButton();} }catch(e){} } controlPWAButtons(); }
     function updateNetworkStatus(){ if(!navigator.onLine) installBtn.disabled=true; else if(deferredPrompt) installBtn.disabled=false; }
-    window.addEventListener('online',updateNetworkStatus);
-    window.addEventListener('offline',updateNetworkStatus);
+    window.addEventListener('online',updateNetworkStatus); window.addEventListener('offline',updateNetworkStatus);
 
     /* ---------- TTS util ---------- */
-    function pickVoice(){
-      return (speechSynthesis.getVoices()||[])
-        .find(v=>v.lang.toLowerCase().includes('en'))||null;
-    }
+    function pickVoice(){ return (speechSynthesis.getVoices()||[]).find(v=>v.lang.toLowerCase().includes('en'))||null; }
     function speakRobot(){
-      const utt=new SpeechSynthesisUtterance(
-        "Hi, I'm Samuel! Click to discover the best and most fun way to learn English, or join us to play an exciting game!"
-      );
+      const utt=new SpeechSynthesisUtterance("Hi, I'm Samuel! Click to discover the best and most fun way to learn English, or join us to play an exciting game!");
       if(englishVoice) utt.voice=englishVoice;
       utt.onstart=()=>document.getElementById("roboImage").src="imagens/robo_fala.gif";
       utt.onend  =()=>document.getElementById("roboImage").src="imagens/robo_estatico.png";
@@ -286,24 +233,11 @@
     }
     speechSynthesis.onvoiceschanged=()=>englishVoice=pickVoice();
 
-    /* ---------- UI: bloquear/liberar níveis ---------- */
-    function bloquearTodosNiveis(){
-      document.querySelectorAll(".level-button").forEach(b=>{
-        b.style.filter="grayscale(100%)";
-        b.style.pointerEvents="none";
-      });
-    }
+    /* ---------- UI: níveis ---------- */
+    function bloquearTodosNiveis(){ document.querySelectorAll(".level-button").forEach(b=>{ b.style.filter="grayscale(100%)"; b.style.pointerEvents="none"; }); }
     function liberarNiveis(arr){
       const alvo=new Set(arr||[]);
-      document.querySelectorAll(".level-button").forEach(b=>{
-        if(alvo.has(b.id)){
-          b.style.filter="none";
-          b.style.pointerEvents="auto";
-        }else{
-          b.style.filter="grayscale(100%)";
-          b.style.pointerEvents="none";
-        }
-      });
+      document.querySelectorAll(".level-button").forEach(b=>{ if(alvo.has(b.id)){ b.style.filter="none"; b.style.pointerEvents="auto"; } else { b.style.filter="grayscale(100%)"; b.style.pointerEvents="none"; } });
     }
     function enviarNivel(n){ n ? liberarNiveis([n]) : liberarNiveis(["Level1"]); }
 
@@ -326,15 +260,14 @@
         try{
           const snap=await firebase.database().ref("usuarios/"+user.uid).once("value");
           const d=snap.val()||{};
-          const rawName=d.nome||user.email;
-          const formatName=(nm)=>{ // limita a 10 caracteres, inclui reticências se exceder
-            const clean=String(nm||"").trim();
-            return clean.length>10 ? clean.slice(0,10)+"…" : clean;
-          };
-          const name=formatName(rawName);
+
+          // nome limitado a 10 caracteres + '…' se exceder
+          const rawName=d.nome||user.email||"User";
+          const name=(String(rawName).trim().length>10) ? String(rawName).trim().slice(0,10)+"…" : String(rawName).trim();
+
           const avatar=d.avatar?`imagens/${d.avatar}`:"imagens/bonecologin1.png";
 
-          // Monta o balão (avatar 55 + nome centralizado)
+          // só avatar + nome (sem caixa)
           loginLink.innerHTML=""; loginLink.removeAttribute("href");
           const img=document.createElement("img");
           img.className="user-icon"; img.alt="User avatar"; img.src=avatar;
@@ -350,7 +283,6 @@
           }else if(d.role==="aluno"){
             dash='<a href="painel_aluno.html" class="dashboard-link">STUDENT DASHBOARD</a>';
 
-            // ===== Estratégia de leitura =====
             const liberarPorPreferencia=(lista)=>{ if(Array.isArray(lista)&&lista.length){liberarNiveis(lista);return true;} return false; };
             const tentarAlunoDireto=()=>{
               const arrAluno=normalizarListaLevels(d.levels_liberados);
@@ -420,7 +352,8 @@
       }
     });
 
-    /* ---------- DOM Ready (Netlify) ---------- */
+    /* ---------- DOM Ready ---------- */
+    function pickVoice(){ return (speechSynthesis.getVoices()||[]).find(v=>v.lang.toLowerCase().includes('en'))||null; }
     document.addEventListener("DOMContentLoaded",()=>{
       englishVoice=pickVoice();
       document.getElementById("playTTSBtn").onclick=speakRobot;
