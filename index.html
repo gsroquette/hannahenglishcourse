@@ -28,8 +28,10 @@
     /* ---------- layout original ---------- */
     body{margin:0;font-family:Arial, sans-serif;overflow:auto;}
     html,body{height:100%;}
-    .container{width:100%;max-width:1200px;margin:0 auto;padding:20px;text-align:center;position:relative;
-      background-image:url('imagens/fundo.png');background-repeat:repeat;background-size:200%;overflow:auto;}
+    .container{
+      width:100%;max-width:1200px;margin:0 auto;padding:20px;text-align:center;position:relative;
+      background-image:url('imagens/fundo.png');background-repeat:repeat;background-size:200%;overflow:auto;
+    }
     .subtitle{margin-top:40px;font-size:24px;font-weight:bold;color:#333;text-align:center;}
     .levels{display:flex;flex-wrap:wrap;justify-content:center;gap:20px;padding:20px;}
     .level-button{width:200px;height:200px;background-size:cover;background-repeat:no-repeat;display:inline-block;}
@@ -39,14 +41,28 @@
     .levelC{background-image:url('imagens/levelC.png');}
     .levelD{background-image:url('imagens/levelD.png');}
 
-    /* ---------- login box ---------- */
-    .login-container{display:flex;align-items:center;gap:10px;position:absolute;top:20px;right:60px;z-index:10;
-      background:#fff;padding:10px;border-radius:8px;box-shadow:0 4px 8px rgba(0,0,0,.1);cursor:pointer;}
-    .user-icon{width:40px;height:40px;border-radius:50%;}
-    .user-name{font-size:14px;color:#333;margin:0;}
-    .dropdown{display:none;position:absolute;top:60px;right:0;background:#fff;box-shadow:0 4px 8px rgba(0,0,0,.1);
-      z-index:1;border-radius:4px;min-width:150px;}
-    .dropdown a{display:block;padding:10px;text-decoration:none;color:#333;font-size:16px;text-align:left;}
+    /* ---------- login box (VOLTOU AO ORIGINAL: absolute topo-direito) ---------- */
+    .login-container{
+      display:flex;align-items:center;gap:8px;
+      position:absolute;top:20px;right:60px;z-index:10;
+      background:#fff;padding:8px 10px;border-radius:8px;
+      box-shadow:0 4px 8px rgba(0,0,0,.1);cursor:pointer;
+    }
+    .user-icon{width:40px;height:40px;border-radius:50%;object-fit:cover;}
+    .user-name{
+      font-size:14px;color:#333;margin:0;line-height:1;
+      max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    }
+    /* Setinha lateral alinhada ao texto */
+    .login-caret{
+      width:0;height:0;display:inline-block;margin-left:2px;transform:translateY(1px);
+      border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid #666;opacity:.8;
+    }
+    .dropdown{
+      display:none;position:absolute;top:60px;right:0;background:#fff;z-index:11;
+      box-shadow:0 12px 24px rgba(0,0,0,.16);border-radius:8px;min-width:180px;border:1px solid rgba(0,0,0,.08);
+    }
+    .dropdown a{display:block;padding:10px 12px;text-decoration:none;color:#333;font-size:16px;text-align:left;}
     .dropdown a:hover{background:#f2f2f2;}
 
     /* ---------- robô, play e convites ---------- */
@@ -161,8 +177,8 @@
     const ua=navigator.userAgent.toLowerCase();
     const isIOS=/iphone|ipad|ipod/.test(ua);
 
-    /* ---------- Funções utilitárias ---------- */
-    const VALID_LEVELS = ["Level0","Level1","Level2","Level3","Level4"];
+    /* ---------- Utilitários de níveis ---------- */
+    const VALID_LEVELS=["Level0","Level1","Level2","Level3","Level4"];
 
     function normalizarNivel(n){
       if(!n) return null;
@@ -174,7 +190,6 @@
       if(m==="level4"||m==="4") return "Level4";
       return null;
     }
-
     function normalizarListaLevels(v){
       if(Array.isArray(v)){
         const set=new Set();
@@ -184,70 +199,39 @@
       const single=normalizarNivel(v);
       return single ? [single] : [];
     }
-
-    // Varre progresso/LevelX/UnitY/... e considera liberado se houver qualquer fase true
+    // Infere a partir de progresso/LevelX/UnitY/*: se houver qualquer fase true, considera liberado
     function levelsAPartirDoProgresso(progresso){
-      if(!progresso || typeof progresso!=="object") return [];
+      if(!progresso||typeof progresso!=="object") return [];
       const liberados=[];
       VALID_LEVELS.forEach(L=>{
         const units=progresso[L];
-        if(!units || typeof units!=="object") return;
-        // se existir qualquer valor truthy dentro do unit (qualquer fase)
-        const unitKeys=Object.keys(units);
-        for(const uk of unitKeys){
+        if(!units||typeof units!=="object") return;
+        for(const uk of Object.keys(units)){
           const fases=units[uk];
           if(fases && typeof fases==="object" && Object.values(fases).some(Boolean)){
-            liberados.push(L);
-            break;
+            liberados.push(L);break;
           }
         }
       });
       return Array.from(new Set(liberados));
     }
 
-    /* ---------- Função: exibir botão instalar ---------- */
-    function showInstallButton(){
-      installBtn.disabled=false;
-      installBtn.style.display='flex';
-      installBtn.classList.add('pulse');
-    }
-
-    /* ---------- Função: esconder botão instalar ---------- */
-    function hideInstallButton(){
-      installBtn.style.display='none';
-      installBtn.classList.remove('pulse');
-      installBtn.disabled=true;
-    }
-
-    /* ---------- Lógica de controle de botões ---------- */
+    /* ---------- PWA botão instalar ---------- */
+    function showInstallButton(){installBtn.disabled=false;installBtn.style.display='flex';installBtn.classList.add('pulse');}
+    function hideInstallButton(){installBtn.style.display='none';installBtn.classList.remove('pulse');installBtn.disabled=true;}
     function controlPWAButtons(){
-      if(isInStandaloneMode()){
-        hideInstallButton();
-        return; // já está no app
-      }
-      if(deferredPrompt){
-        showInstallButton();
-      }else{
-        hideInstallButton();
-      }
+      if(isInStandaloneMode()){hideInstallButton();return;}
+      if(deferredPrompt){showInstallButton();}else{hideInstallButton();}
     }
-
-    /* ---------- Banner iOS ---------- */
     if(isIOS && !isInStandaloneMode()){
       const iosBanner=document.getElementById("iosInstallBanner");
       iosBanner.style.display="block";
       document.getElementById("iosBannerClose").onclick=()=>iosBanner.style.display="none";
     }
-
-    /* ---------- Evento beforeinstallprompt ---------- */
     window.addEventListener('beforeinstallprompt',e=>{
       if(isInStandaloneMode()) return;
-      e.preventDefault();
-      deferredPrompt=e;
-      showInstallButton();
+      e.preventDefault(); deferredPrompt=e; showInstallButton();
     });
-
-    /* ---------- Clique no botão instalar ---------- */
     installBtn.addEventListener('click',async ()=>{
       if(!deferredPrompt) return;
       hideInstallButton();
@@ -256,35 +240,18 @@
       deferredPrompt=null;
       setTimeout(controlPWAButtons,500);
     });
-
-    /* ---------- appinstalled ---------- */
-    window.addEventListener('appinstalled',()=>{
-      deferredPrompt=null;
-      hideInstallButton();
-    });
-
-    /* ---------- Verificar se PWA já instalado por outros meios ---------- */
+    window.addEventListener('appinstalled',()=>{deferredPrompt=null;hideInstallButton();});
     async function verificarInstalacaoInicial(){
-      if(isInStandaloneMode()){
-        hideInstallButton();
-        return;
-      }
+      if(isInStandaloneMode()){hideInstallButton();return;}
       if('getInstalledRelatedApps' in navigator){
         try{
           const apps=await navigator.getInstalledRelatedApps();
-          if(apps.length>0){
-            hideInstallButton();
-          }
+          if(apps.length>0){hideInstallButton();}
         }catch(err){console.error(err);}
       }
       controlPWAButtons();
     }
-
-    /* ---------- Rede ---------- */
-    function updateNetworkStatus(){
-      if(!navigator.onLine) installBtn.disabled=true;
-      else if(deferredPrompt) installBtn.disabled=false;
-    }
+    function updateNetworkStatus(){ if(!navigator.onLine) installBtn.disabled=true; else if(deferredPrompt) installBtn.disabled=false; }
     window.addEventListener('online',updateNetworkStatus);
     window.addEventListener('offline',updateNetworkStatus);
 
@@ -333,6 +300,7 @@
       const subtitleLoggedIn=document.getElementById("subtitleLoggedIn");
       const roboContainer=document.getElementById("roboContainer");
       const invitationContainer=document.getElementById("invitationContainer");
+      const loginContainer=document.getElementById("loginContainer");
 
       if(user){
         subtitleLoggedOut.style.display="none";
@@ -345,8 +313,17 @@
           const d=snap.val()||{};
           const name=d.nome||user.email;
           const avatar=d.avatar?`imagens/${d.avatar}`:"imagens/bonecologin1.png";
-          loginLink.innerHTML=`<img src="${avatar}" class="user-icon"><p class="user-name">${name}</p>`;
-          loginLink.removeAttribute("href");
+
+          // Monta o chip com segurança (sem innerHTML com dados de BD)
+          loginLink.innerHTML=""; loginLink.removeAttribute("href");
+          const img=document.createElement("img");
+          img.className="user-icon"; img.alt="User avatar"; img.src=avatar;
+          img.onerror=()=>{img.src='imagens/bonecologin1.png';};
+          const p=document.createElement("p");
+          p.className="user-name"; p.textContent=name;
+          const caret=document.createElement("span");
+          caret.className="login-caret";
+          loginLink.append(img,p,caret);
 
           let dash="";
           if(d.role==="proprietario"||d.role==="professor"){
@@ -356,21 +333,18 @@
             dash='<a href="painel_aluno.html" class="dashboard-link">STUDENT DASHBOARD</a>';
 
             // ===== Estratégia de leitura =====
-            const liberarPorPreferencia = (lista) => {
-              if(Array.isArray(lista) && lista.length){ liberarNiveis(lista); return true; }
-              return false;
-            };
-            const tentarAlunoDireto = () => {
+            const liberarPorPreferencia=(lista)=>{ if(Array.isArray(lista)&&lista.length){liberarNiveis(lista);return true;} return false; };
+            const tentarAlunoDireto=()=>{
               // 1) levels_liberados do aluno
-              const arrAluno = normalizarListaLevels(d.levels_liberados);
+              const arrAluno=normalizarListaLevels(d.levels_liberados);
               if(liberarPorPreferencia(arrAluno)) return;
 
               // 2) nivel_em_curso do aluno
-              const nAluno = normalizarNivel(d.nivel_em_curso);
+              const nAluno=normalizarNivel(d.nivel_em_curso);
               if(nAluno){ enviarNivel(nAluno); return; }
 
               // 3) inferir a partir do progresso
-              const arrFromProg = levelsAPartirDoProgresso(d.progresso);
+              const arrFromProg=levelsAPartirDoProgresso(d.progresso);
               if(liberarPorPreferencia(arrFromProg)) return;
 
               // 4) fallback padrão
@@ -379,26 +353,22 @@
 
             if(d.atrelado_professor){
               try{
-                const turmasSnap = await firebase.database().ref("usuarios/"+d.atrelado_professor+"/turmas").once("value");
-                const turmas = turmasSnap.val() || {};
-                let registroAluno = null;
+                const turmasSnap=await firebase.database().ref("usuarios/"+d.atrelado_professor+"/turmas").once("value");
+                const turmas=turmasSnap.val()||{}; let registroAluno=null;
                 for(const turmaId in turmas){
-                  const st = turmas[turmaId]?.students?.[user.uid];
-                  if(st){ registroAluno = st; break; }
+                  const st=turmas[turmaId]?.students?.[user.uid];
+                  if(st){registroAluno=st; break;}
                 }
                 if(registroAluno){
-                  // prioridade: levels_liberados (array) > nivel_em_curso (string)
-                  const arrProf = normalizarListaLevels(registroAluno.levels_liberados);
+                  const arrProf=normalizarListaLevels(registroAluno.levels_liberados);
                   if(liberarPorPreferencia(arrProf)){} else {
-                    const nProf = normalizarNivel(registroAluno.nivel_em_curso);
-                    if(nProf){ enviarNivel(nProf); } else { tentarAlunoDireto(); }
+                    const nProf=normalizarNivel(registroAluno.nivel_em_curso);
+                    if(nProf){enviarNivel(nProf);} else {tentarAlunoDireto();}
                   }
                 }else{
-                  // aluno não encontrado em turmas -> usa dados do próprio aluno
                   tentarAlunoDireto();
                 }
               }catch(e){
-                // erro de permissão/caminho -> usa dados do próprio aluno
                 tentarAlunoDireto();
               }
             }else{
@@ -408,14 +378,21 @@
           }
           userDropdown.innerHTML=`${dash}<a href="#" id="logout">LEAVE</a>`;
           document.querySelectorAll(".dashboard-link").forEach(l=>{
-            l.onclick=e=>{
-              e.preventDefault();
-              window.location.href=l.getAttribute("href");
-            };
+            l.onclick=e=>{ e.preventDefault(); window.location.href=l.getAttribute("href"); };
           });
+
+          // Dropdown simples (sem sticky, sem grid)
+          function toggleDropdown(open){
+            const shouldOpen=(typeof open==="boolean")?open:(userDropdown.style.display!=="block");
+            userDropdown.style.display=shouldOpen?"block":"none";
+          }
+          loginContainer.onclick=(e)=>{ if(!firebase.auth().currentUser) return; e.preventDefault(); toggleDropdown(); };
+          window.addEventListener("click",(e)=>{
+            if(!loginContainer.contains(e.target)) toggleDropdown(false);
+          });
+
         }catch(e){
           console.error(e);
-          // em caso de erro, mantém UI acessível e bloqueia níveis
           bloquearTodosNiveis();
         }
       }else{
@@ -428,24 +405,14 @@
       }
     });
 
-    /* ---------- Dropdown & Logout ---------- */
-    document.getElementById("loginContainer").onclick=e=>{
-      if(!firebase.auth().currentUser) return;
-      e.preventDefault();
-      const d=document.getElementById("userDropdown");
-      d.style.display=(d.style.display==="none"||!d.style.display)?"block":"none";
-    };
-    window.addEventListener("click",e=>{
-      if(!document.getElementById("loginContainer").contains(e.target))
-        document.getElementById("userDropdown").style.display="none";
-    });
+    /* ---------- Logout ---------- */
     document.addEventListener("click",e=>{
-      if(e.target.id==="logout"){
+      if(e.target && e.target.id==="logout"){
         firebase.auth().signOut().then(()=>location.reload());
       }
     });
 
-    /* ---------- DOM Ready  com netlify ---------- */
+    /* ---------- DOM Ready  (Netlify) ---------- */
     document.addEventListener("DOMContentLoaded",()=>{
       englishVoice=pickVoice();
       document.getElementById("playTTSBtn").onclick=speakRobot;
