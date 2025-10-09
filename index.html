@@ -41,42 +41,63 @@
     .levelC{background-image:url('imagens/levelC.png');}
     .levelD{background-image:url('imagens/levelD.png');}
 
-    /* ---------- login chip polido (absolute no topo-direito) ---------- */
+    /* ---------- BALÃO LÚDICO DO USUÁRIO (absolute no topo-direito) ---------- */
     .login-container{
-      position:absolute; top:20px; right:60px; z-index:10;
-      display:flex; align-items:center; gap:10px;
-      background:rgba(255,255,255,0.78);
-      backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
-      padding:6px 10px; border-radius:999px;
-      border:1px solid rgba(0,0,0,0.06);
-      box-shadow:0 6px 18px rgba(0,0,0,0.12);
-      cursor:pointer; transition:box-shadow .15s ease, transform .15s ease;
+      position:absolute; top:12px; right:14px; z-index:20;
+      display:flex; flex-direction:column; align-items:center; gap:6px;
+      width:92px; /* largura fixa pra não “esticar” com nomes longos */
+      padding:8px 10px 10px;
+      background:rgba(255,255,255,0.40);
+      backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+      border:1px solid rgba(43,163,77,0.35);   /* verde suave */
+      border-radius:18px;
+      box-shadow:0 8px 22px rgba(0,0,0,0.15);
+      cursor:pointer;
     }
-    .login-container:hover{ box-shadow:0 10px 24px rgba(0,0,0,0.18); transform:translateY(-1px); }
-
+    /* bolhinhas decorativas (bem discretas) */
+    .login-container::after{
+      content:""; position:absolute; inset:-1px; border-radius:18px; pointer-events:none;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,0.6);
+    }
+    /* avatar maior, circular, com aro branco */
     .user-icon{
-      width:28px; height:28px; border-radius:50%; object-fit:cover;
-      box-shadow:0 0 0 2px rgba(255,255,255,0.9);
+      width:48px; height:48px; border-radius:50%; object-fit:cover;
+      box-shadow:0 0 0 2px rgba(255,255,255,0.95), 0 2px 6px rgba(0,0,0,0.18);
     }
+    /* nome abaixo, centralizado e com ellipsis */
     .user-name{
-      margin:0; line-height:1;
-      font-size:14px; color:#1a1a1a; font-weight:600;
-      max-width:120px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      margin:0; line-height:1.1; text-align:center;
+      font-size:13px; font-weight:600; color:#1a5f34; /* verde escuro */
+      max-width:80px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
     }
-    /* garante que qualquer caret antigo não apareça */
+    /* esconda qualquer caret antigo */
     .login-caret{ display:none !important; }
 
-    /* Dropdown mais limpo */
+    /* Dropdown em balão */
     .dropdown{
-      display:none; position:absolute; top:60px; right:0; z-index:11;
-      min-width:200px; background:rgba(255,255,255,0.98);
-      border:1px solid rgba(0,0,0,0.06); border-radius:12px;
-      box-shadow:0 14px 30px rgba(0,0,0,0.16); overflow:hidden;
+      display:none; position:absolute; right:0; top:calc(100% + 10px); z-index:25;
+      min-width:220px; background:rgba(255,255,255,0.98);
+      border:1px solid rgba(0,0,0,0.06); border-radius:14px;
+      box-shadow:0 16px 34px rgba(0,0,0,0.18); overflow:hidden;
+    }
+    .dropdown::before{
+      content:""; position:absolute; top:-8px; right:18px;
+      width:0; height:0; border-left:8px solid transparent; border-right:8px solid transparent;
+      border-bottom:8px solid rgba(255,255,255,0.98);
+      filter:drop-shadow(0 -1px 0 rgba(0,0,0,0.06));
     }
     .dropdown a{
       display:block; padding:12px 14px; font-size:15px; color:#222; text-decoration:none; text-align:left;
     }
     .dropdown a:hover{ background:rgba(0,0,0,0.05); }
+
+    /* Mobile muito estreito: mostra só o avatar (nome no dropdown) */
+    @media (max-width:360px){
+      .login-container{ width:60px; padding:8px 8px 9px; }
+      .user-icon{ width:46px; height:46px; }
+      .user-name{ display:none; }
+      .dropdown::before{ right:12px; }
+    }
 
     /* ---------- robô, play e convites ---------- */
     .robo-container{display:flex;flex-direction:column;align-items:center;margin:20px auto;}
@@ -172,7 +193,6 @@
       measurementId:"G-07VVJG9LRS"
     };
     if(!firebase.apps.length){firebase.initializeApp(firebaseConfig);}
-    // persistência local do login
     firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(console.error);
 
     /* ---------- Função robusta para detectar standalone ---------- */
@@ -327,14 +347,14 @@
           const name=d.nome||user.email;
           const avatar=d.avatar?`imagens/${d.avatar}`:"imagens/bonecologin1.png";
 
-          // Monta o chip (sem setinha)
+          // Monta o balão lúdico (avatar grande + nome abaixo)
           loginLink.innerHTML=""; loginLink.removeAttribute("href");
           const img=document.createElement("img");
           img.className="user-icon"; img.alt="User avatar"; img.src=avatar;
           img.onerror=()=>{img.src='imagens/bonecologin1.png';};
           const p=document.createElement("p");
           p.className="user-name"; p.textContent=name;
-          loginLink.append(img,p); // sem caret
+          loginLink.append(img,p);
 
           let dash="";
           if(d.role==="proprietario"||d.role==="professor"){
@@ -346,19 +366,12 @@
             // ===== Estratégia de leitura =====
             const liberarPorPreferencia=(lista)=>{ if(Array.isArray(lista)&&lista.length){liberarNiveis(lista);return true;} return false; };
             const tentarAlunoDireto=()=>{
-              // 1) levels_liberados do aluno
               const arrAluno=normalizarListaLevels(d.levels_liberados);
               if(liberarPorPreferencia(arrAluno)) return;
-
-              // 2) nivel_em_curso do aluno
               const nAluno=normalizarNivel(d.nivel_em_curso);
               if(nAluno){ enviarNivel(nAluno); return; }
-
-              // 3) inferir a partir do progresso
               const arrFromProg=levelsAPartirDoProgresso(d.progresso);
               if(liberarPorPreferencia(arrFromProg)) return;
-
-              // 4) fallback padrão
               enviarNivel();
             };
 
@@ -383,7 +396,6 @@
                 tentarAlunoDireto();
               }
             }else{
-              // sem professor -> usa dados do próprio aluno
               tentarAlunoDireto();
             }
           }
@@ -392,15 +404,13 @@
             l.onclick=e=>{ e.preventDefault(); window.location.href=l.getAttribute("href"); };
           });
 
-          // Dropdown simples (unchanged layout)
+          // Dropdown (abre/fecha)
           function toggleDropdown(open){
             const shouldOpen=(typeof open==="boolean")?open:(userDropdown.style.display!=="block");
             userDropdown.style.display=shouldOpen?"block":"none";
           }
           loginContainer.onclick=(e)=>{ if(!firebase.auth().currentUser) return; e.preventDefault(); toggleDropdown(); };
-          window.addEventListener("click",(e)=>{
-            if(!loginContainer.contains(e.target)) toggleDropdown(false);
-          });
+          window.addEventListener("click",(e)=>{ if(!loginContainer.contains(e.target)) toggleDropdown(false); });
 
         }catch(e){
           console.error(e);
@@ -423,7 +433,7 @@
       }
     });
 
-    /* ---------- DOM Ready  (Netlify) ---------- */
+    /* ---------- DOM Ready (Netlify) ---------- */
     document.addEventListener("DOMContentLoaded",()=>{
       englishVoice=pickVoice();
       document.getElementById("playTTSBtn").onclick=speakRobot;
