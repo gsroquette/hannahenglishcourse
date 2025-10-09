@@ -60,7 +60,7 @@
     .user-dropdown {
       display: none; flex-direction: column; position: absolute; top: 70px; right: 0;
       background-color: #fff; border: 1px solid #ccc; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-      z-index: 9999; overflow: hidden; min-width: 200px;
+      z-index: 9999; overflow: hidden; min-width: 220px;
     }
     .dropdown-item { padding: 10px 16px; color: #333; text-decoration: none; font-size: 14px; }
     .dropdown-item:hover { background-color: #f0f0f0; }
@@ -132,6 +132,15 @@
 
   <script>
   /* ==========
+     CONFIG AJUSTÁVEL – caminhos dos dashboards
+  ========== */
+  const DASHBOARD_PATH = {
+    aluno: "../../painel_aluno.html",
+    professor: "../../painel_professor.html",
+    proprietario: "../../painel_professor.html" // proprietario usa o dashboard do professor
+  };
+
+  /* ==========
      Level/Unit da URL (+ normalização para DB)
   ========== */
   const __pathParts = window.location.pathname.split("/");
@@ -171,7 +180,7 @@
   }
 
   /* ==========
-     Construção dos botões (abre tudo travado exceto os livres)
+     Construção dos botões (abre travado exceto os livres)
   ========== */
   document.addEventListener("DOMContentLoaded", () => {
     const container = document.getElementById("activity-buttons");
@@ -235,7 +244,7 @@
   });
 
   /* ==========
-     Leitura do progresso (agora entende chaves tipo "fase8")
+     Leitura do progresso (suporta chaves "fase8", etc.)
   ========== */
   async function getUnlockedInfo(userId, levelDB, unitDB) {
     const db = firebase.database();
@@ -249,12 +258,10 @@
     let lastUnlocked = null;
     const unlockedSet = new Set();
 
-    // Extrai o primeiro número que aparecer na chave (ex.: "fase14" -> 14)
     const keyToNumber = (k) => {
       const m = String(k).match(/(\d+)/);
       return m ? Number(m[1]) : NaN;
     };
-
     const truthy = (v) => (v === true || v === 1 || v === "true" || v === "True");
 
     const absorbPhaseObject = (obj) => {
@@ -279,10 +286,10 @@
           lastUnlocked = Math.max(lastUnlocked ?? -Infinity, val.lastUnlocked);
         }
 
-        // Caso as fases estejam direto como "fase8: true", etc.
+        // fases como "fase8: true"
         absorbPhaseObject(val);
 
-        // E também em sub-objetos comuns:
+        // sub-objetos comuns
         absorbPhaseObject(val.fasesLiberadas);
         absorbPhaseObject(val.liberadas);
         absorbPhaseObject(val.released);
@@ -331,7 +338,26 @@
   }
 
   /* ==========
-     Login + roles + gates
+     Util: render do dropdown por role
+  ========== */
+  function renderDropdown(role) {
+    const userDropdown = document.getElementById("userDropdown");
+    if (!userDropdown) return;
+
+    // Decide rótulo + link do dashboard
+    const isTeacher = (role === "professor" || role === "proprietario");
+    const dashLabel = isTeacher ? "📊 Dashboard do Professor" : "📊 Dashboard do Aluno";
+    const dashHref  = isTeacher ? (DASHBOARD_PATH.professor) : (DASHBOARD_PATH.aluno);
+
+    userDropdown.innerHTML = `
+      <a href="${dashHref}" class="dropdown-item">${dashLabel}</a>
+      <a href="../../index.html" class="dropdown-item">🔁 Select a New Level</a>
+      <a href="../index.html" class="dropdown-item">🔄 Select a New Unit</a>
+    `;
+  }
+
+  /* ==========
+     Login + roles + gates + dropdown dinâmico
   ========== */
   firebase.auth().onAuthStateChanged(async (user) => {
     const loginLink = document.getElementById("loginLink");
@@ -345,6 +371,7 @@
       const displayName = nome.length > 10 ? nome.slice(0, 10) + "…" : nome;
       const avatar = dados.avatar ? `../../imagens/${dados.avatar}` : "../../imagens/bonecologin1.png";
 
+      // Avatar + nome
       loginLink.innerHTML = "";
       loginLink.removeAttribute("href");
       const img = document.createElement("img");
@@ -353,15 +380,22 @@
       const p = document.createElement("p"); p.className = "user-name"; p.textContent = displayName;
       loginLink.append(img, p);
 
-      userDropdown.innerHTML = `
-        <a href="../../painel_aluno.html" class="dropdown-item">🧭 Student Dashboard</a>
-        <a href="../../index.html" class="dropdown-item">🔁 Select a New Level</a>
-        <a href="../index.html" class="dropdown-item">🔄 Select a New Unit</a>
-      `;
-      loginLink.onclick = (e) => { e.preventDefault(); userDropdown.style.display = userDropdown.style.display === "flex" ? "none" : "flex"; };
-      window.addEventListener("click", (e) => { if (!loginLink.contains(e.target)) userDropdown.style.display = "none"; });
-
+      // Role
       const role = dados.role || null;
+
+      // Renderiza dropdown conforme role
+      renderDropdown(role);
+
+      // Toggle dropdown
+      loginLink.onclick = (e) => {
+        e.preventDefault();
+        userDropdown.style.display = (userDropdown.style.display === "flex" ? "none" : "flex");
+      };
+      window.addEventListener("click", (e) => {
+        if (!loginLink.contains(e.target)) userDropdown.style.display = "none";
+      });
+
+      // Teacher Resources + gates
       if (role === "professor" || role === "proprietario") {
         const tr = document.querySelector(".teacher-resources");
         if (tr) tr.style.display = "flex";
@@ -375,13 +409,21 @@
       }
 
     } else {
+      // Usuário não logado
+      const userDropdown = document.getElementById("userDropdown");
+      if (userDropdown) {
+        userDropdown.innerHTML = `
+          <a href="../../index.html" class="dropdown-item">🔁 Select a New Level</a>
+          <a href="../index.html" class="dropdown-item">🔄 Select a New Unit</a>
+        `;
+      }
+      const loginLink = document.getElementById("loginLink");
       loginLink.textContent = "Login";
       loginLink.href = "Formulario/login.html";
-      // Sem login, mantemos travado (seguro)
     }
   });
 
-  // Compat: mostrar Teacher Resources se professor/proprietário
+  // Compat extra: exibe Teacher Resources se professor/proprietário
   firebase.auth().onAuthStateChanged((user) => {
     if (user) {
       const userRoleRef = firebase.database().ref(`/usuarios/${user.uid}/role`);
