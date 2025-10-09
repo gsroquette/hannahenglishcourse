@@ -183,20 +183,6 @@
       width: 100%; height: 100%;
       pointer-events: none; z-index: 0; display: block;
     }
-
-    /* ====== ESTILO DE DESABILITADO (role: aluno, não liberado) ====== */
-    .disabled-btn {
-      filter: grayscale(100%);
-      opacity: 0.55;
-      pointer-events: none;
-      cursor: not-allowed;
-      border-color: #999 !important;
-      box-shadow: none !important;
-      transform: none !important;
-    }
-    .disabled-btn img {
-      filter: grayscale(100%);
-    }
   </style>
 </head>
 
@@ -233,22 +219,17 @@
   </div>
 
   <script>
-  /* ==========
-     Utilidades de rota (level, unit) — calculado uma vez e reutilizado
-  ========== */
-  const __pathParts = window.location.pathname.split("/");
-  const __level = __pathParts[1] || "Level1";
-  const __unit  = __pathParts[2] || "Unit1";
-
   // === Botões de atividade ===
   document.addEventListener("DOMContentLoaded", () => {
+    const pathParts = window.location.pathname.split("/");
+    const level = pathParts[1] || "Level1";
+    const unit  = pathParts[2] || "Unit1";
     const container = document.getElementById("activity-buttons");
 
     // Hannah Video (logo após Teacher Resources)
     const hannahVideo = document.createElement("a");
-    hannahVideo.href = `/Atividades/HannahVideo/index.html?level=${__level}&unit=${__unit}`;
+    hannahVideo.href = `/Atividades/HannahVideo/index.html?level=${level}&unit=${unit}`;
     hannahVideo.className = "activity-button hannah-video";
-    hannahVideo.dataset.kind = "hannahVideo";
     const hvImg = document.createElement("img");
     hvImg.src = "../../imagens/botoes/video_button.png";
     hvImg.alt = "Hannah Video";
@@ -260,30 +241,26 @@
     // Demais botões (trechos)
     const buttonData = [
       { trecho: "trecho1", img: "../../imagens/listening.png", alt: "Listening" },
-      { trecho: "trecho2", img: "../../imagens/grammar.png",   alt: "Grammar" , requiresPhase:  8 },
-      { trecho: "trecho3", img: "../../imagens/speaking.png",  alt: "Speaking", requiresPhase: 14 },
-      { trecho: "trecho4", img: "../../imagens/writing.png",   alt: "Writing" , requiresPhase: 20 },
-      { trecho: "trecho5", img: "../../imagens/Bible.png",     alt: "Bible"   , requiresPhase: 25 },
-      { trecho: "trecho6", img: "../../imagens/test.png",      alt: "Test"    , requiresPhase: 29 }
+      { trecho: "trecho2", img: "../../imagens/grammar.png",   alt: "Grammar" },
+      { trecho: "trecho3", img: "../../imagens/speaking.png",  alt: "Speaking" },
+      { trecho: "trecho4", img: "../../imagens/writing.png",   alt: "Writing" },
+      { trecho: "trecho5", img: "../../imagens/Bible.png",     alt: "Bible" },
+      { trecho: "trecho6", img: "../../imagens/test.png",      alt: "Test" }
     ];
     buttonData.forEach(data => {
       const a = document.createElement("a");
-      a.href = `/${__level}/${__unit}/fases.html?trecho=${data.trecho}`;
+      a.href = `/${level}/${unit}/fases.html?trecho=${data.trecho}`;
       a.className = "activity-button";
-      a.dataset.trecho = data.trecho;
-      if (data.requiresPhase) a.dataset.requiresPhase = String(data.requiresPhase);
       const img = document.createElement("img");
       img.src = data.img; img.alt = data.alt;
       a.appendChild(img);
       container.appendChild(a);
     });
 
-    // Robô Lex (com requisito de fase 27)
+    // Robô Lex
     const robotButton = document.createElement("a");
-    robotButton.href = `../../Atividades/LEX/index.html?level=${__level}&unit=${__unit}`;
+    robotButton.href = `../../Atividades/LEX/index.html?level=${level}&unit=${unit}`;
     robotButton.className = "activity-button robot-lex";
-    robotButton.dataset.kind = "robotLex";
-    robotButton.dataset.requiresPhase = "27";
     const robotImg = document.createElement("img");
     robotImg.src = "../../imagens/botoes/lex_button.png";
     robotImg.alt = "Robot Lex";
@@ -291,132 +268,13 @@
     container.appendChild(robotButton);
   });
 
-  /* ==========
-     Funções de progresso: tenta múltiplos caminhos/formatos
-     Aceita:
-       - ultimaFaseLiberada: number
-       - fasesLiberadas: { [faseNumber]: true }
-       - released / liberadas / fases: objetos equivalentes
-  ========== */
-  async function getUnlockedInfo(userId, level, unit) {
-    const db = firebase.database();
-
-    // Candidatos de caminhos comuns
-    const candidatePaths = [
-      // por usuário fora de /usuarios
-      `/progresso/${userId}/${level}/${unit}`,
-      `/progress/${userId}/${level}/${unit}`,
-      // aninhado em /usuarios
-      `/usuarios/${userId}/progresso/${level}/${unit}`,
-      `/usuarios/${userId}/progress/${level}/${unit}`,
-    ];
-
-    let lastUnlocked = null; // número
-    const unlockedSet = new Set(); // fases com true
-
-    // Helper para absorver objetos de fases
-    const absorbPhaseObject = (obj) => {
-      if (!obj || typeof obj !== 'object') return;
-      Object.keys(obj).forEach(k => {
-        const n = Number(k);
-        const v = obj[k];
-        if (!Number.isNaN(n) && (v === true || v === 1 || v === "true")) {
-          unlockedSet.add(n);
-        }
-      });
-    };
-
-    for (const base of candidatePaths) {
-      try {
-        const snap = await db.ref(base).once("value");
-        const val = snap.val();
-        if (!val) continue;
-
-        // formatos possíveis
-        if (typeof val.ultimaFaseLiberada === "number") {
-          lastUnlocked = Math.max(lastUnlocked ?? -Infinity, val.ultimaFaseLiberada);
-        } else if (typeof val.lastUnlocked === "number") {
-          lastUnlocked = Math.max(lastUnlocked ?? -Infinity, val.lastUnlocked);
-        }
-
-        absorbPhaseObject(val.fasesLiberadas);
-        absorbPhaseObject(val.liberadas);
-        absorbPhaseObject(val.released);
-        absorbPhaseObject(val.fases);
-        absorbPhaseObject(val.unlocked);
-
-      } catch (e) {
-        // silencioso; seguimos tentando outros caminhos
-        console.warn("Falha ao ler", base, e?.message);
-      }
-    }
-
-    return { lastUnlocked, unlockedSet };
-  }
-
-  function isPhaseSatisfied(requiredPhase, lastUnlocked, unlockedSet) {
-    if (!requiredPhase) return true; // sem requisito
-    const req = Number(requiredPhase);
-    if (Number.isNaN(req)) return true;
-    if (lastUnlocked != null && typeof lastUnlocked === "number" && lastUnlocked >= req) return true;
-    if (unlockedSet.has(req)) return true;
-    return false;
-  }
-
-  function markDisabled(anchorEl, requiredPhase) {
-    if (!anchorEl) return;
-    anchorEl.classList.add("disabled-btn");
-    anchorEl.setAttribute("aria-disabled", "true");
-    anchorEl.title = requiredPhase
-      ? `Liberado após concluir a fase ${requiredPhase}.`
-      : `Indisponível.`;
-  }
-
-  function markEnabled(anchorEl) {
-    if (!anchorEl) return;
-    anchorEl.classList.remove("disabled-btn");
-    anchorEl.removeAttribute("aria-disabled");
-    anchorEl.removeAttribute("title");
-  }
-
-  async function applyStudentGates(userId, level, unit) {
-    const { lastUnlocked, unlockedSet } = await getUnlockedInfo(userId, level, unit);
-
-    // Seleciona os botões relevantes
-    const container = document.getElementById("activity-buttons");
-    if (!container) return;
-
-    const allAnchors = Array.from(container.querySelectorAll("a.activity-button, a.robot-lex, a.hannah-video"));
-    for (const a of allAnchors) {
-      // Trechos com requisito
-      const trecho = a.dataset.trecho;
-      const req = a.dataset.requiresPhase;
-
-      // Robô Lex (dataset.kind = robotLex)
-      const kind = a.dataset.kind;
-
-      // Somente controlamos trecho2..6 e robotLex
-      if ((trecho === "trecho2" || trecho === "trecho3" || trecho === "trecho4" || trecho === "trecho5" || trecho === "trecho6") || kind === "robotLex") {
-        if (req && !isPhaseSatisfied(req, lastUnlocked, unlockedSet)) {
-          markDisabled(a, req);
-        } else {
-          markEnabled(a);
-        }
-      } else {
-        // Trecho1 e Hannah Video ficam sempre liberados
-        markEnabled(a);
-      }
-    }
-  }
-
-  // === Login (avatar + nome + dropdown sem "Leave") + Gates por role ===
+  // === Login (avatar + nome + dropdown sem "Leave") ===
   firebase.auth().onAuthStateChanged(async (user) => {
     const loginLink = document.getElementById("loginLink");
     const userDropdown = document.getElementById("userDropdown");
 
     if (user) {
-      const userRef = firebase.database().ref("usuarios/" + user.uid);
-      const snap = await userRef.once("value");
+      const snap = await firebase.database().ref("usuarios/" + user.uid).once("value");
       const dados = snap.val() || {};
       const nome = (dados.nome || user.email || "User").trim();
       const displayName = nome.length > 10 ? nome.slice(0, 10) + "…" : nome;
@@ -452,33 +310,13 @@
       window.addEventListener("click", (e) => {
         if (!loginLink.contains(e.target)) userDropdown.style.display = "none";
       });
-
-      // === Exibe Teacher Resources se for professor/proprietário
-      const role = dados.role || null;
-      if (role === "professor" || role === "proprietario") {
-        const tr = document.querySelector(".teacher-resources");
-        if (tr) tr.style.display = "flex";
-        // Professores/proprietários: tudo liberado
-      } else if (role === "aluno") {
-        // Aplica as travas somente para aluno
-        try {
-          await applyStudentGates(user.uid, __level, __unit);
-        } catch (e) {
-          console.warn("Falha ao aplicar travas de aluno:", e?.message);
-        }
-      } else {
-        // Role desconhecido: não trava nada (comportamento atual)
-      }
-
     } else {
-      // Usuário não logado
       loginLink.textContent = "Login";
       loginLink.href = "Formulario/login.html";
-      // Opcional: poderíamos travar como aluno anônimo, mas você pediu condicional ao role aluno.
     }
   });
 
-  // (Mantido) — listener separado original para mostrar Teacher Resources quando logado e com role de professor/proprietário
+  // === Exibe Teacher Resources se for professor/proprietário ===
   firebase.auth().onAuthStateChanged((user) => {
     if (user) {
       const userId = user.uid;
