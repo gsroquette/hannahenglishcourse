@@ -69,6 +69,7 @@
             box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
             max-width: 90%;
             position: relative;
+            transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease;
         }
 
         .audio-button-container {
@@ -140,6 +141,42 @@
             margin: 20px;
         }
 
+        /* ======== VISUAL PROGRESS (Novo) ======== */
+
+        /* Badge de progresso no canto do balão */
+        .progress-badge {
+          position: absolute;
+          top: -8px;
+          right: -8px;
+          font-size: 12px;
+          padding: 4px 6px;
+          border-radius: 999px;
+          background: #e0e0e0;     /* 0/2 */
+          color: #000;
+          box-shadow: 0 1px 3px rgba(0,0,0,.2);
+        }
+
+        /* estados do badge */
+        .badge-half { background: #ffe08a; }   /* 1/2 */
+        .badge-full { background: #a5d6a7; }   /* 2/2 */
+
+        /* bordas por estado */
+        .bubble-0 { border: 2px dashed #bdbdbd; }
+        .bubble-1 { border: 2px solid #f2b01e; }
+        .bubble-2 {
+          border: 2px solid #2e7d32;
+          box-shadow: 0 0 0 2px rgba(46,125,50,.15);
+        }
+
+        /* Stepper global (opcional) */
+        #stepper{ display:flex; gap:8px; margin:8px 0; }
+        .step-dot{
+          width:10px; height:10px; border-radius:50%;
+          background:#e0e0e0; outline:1px solid #bdbdbd;
+        }
+        .step-dot.half{ background:#f2b01e; }
+        .step-dot.done{ background:#2e7d32; }
+
         @media (max-width: 600px) {
             .back-button {
                 font-size: 14px;
@@ -170,6 +207,8 @@
     <div id="header">
         <button class="back-button" onclick="goBack()">Back</button>
         <h1>Hannah Conversation</h1>
+        <!-- Stepper de progresso global (opcional) -->
+        <div id="stepper" aria-label="Dialogues progress"></div>
     </div>
 
     <div id="dialogue-container">
@@ -229,180 +268,256 @@
         let userName = "";
         let alertDisplayed = false;
 
-      firebase.auth().onAuthStateChanged(function(user) {
-    if (user) {
-        console.log("User authenticated:", user.displayName);
-        fetchUserAvatar(user.uid);
-        fetchUserName(user.uid);
-        initializeDialogue();
-    } else {
-        console.error("User not authenticated. Redirecting to login.");
-        alert("You are not authenticated. Please log in.");
-        window.location.href = '/login.html'; // Redireciona para a página de login
-    }
-});
+        // ======== NOVO: estados de áudio ouvido por bloco ========
+        // Para cada bloco: { robot: false, student: false }
+        let heardStates = [];
 
-        function goBack() {
-    const { level, unit } = getLevelAndUnitFromURL();
-    const currentPhase = getPhaseFromURL();
-    const userId = firebase.auth().currentUser?.uid;
-
-    if (!userId) {
-        console.error("User not authenticated. Redirecting to login.");
-        alert("You are not authenticated. Please log in.");
-        window.location.href = '/login.html'; // Redireciona para a página de login
-        return;
-    }
-
-    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-    const nextPhase = parseInt(currentPhase) + 1;
-
-    dbRef.child(`fase${nextPhase}`).once('value')
-        .then(snapshot => {
-            const isUnlocked = snapshot.val();
-            if (isUnlocked) {
-                console.log(`Next phase (fase${nextPhase}) is unlocked. Navigating back.`);
-                window.history.back(); // Retorna para a página anterior
-            } else {
-                const confirmNavigation = confirm("The current phase has not been completed.\n\nTo finish, listen to BOTH lines (Robot and Student) in EVERY dialogue block. Use the Back/Forward buttons to navigate and play the audio on each line until it finishes.\n\nAre you sure you want to leave?");
-                if (confirmNavigation) {
-                    window.history.back(); // Retorna para a página anterior
-                } else {
-                    console.log("User chose not to navigate back.");
-                }
-            }
-        })
-        .catch(error => {
-            console.error("Error checking next phase progress:", error);
-            alert("An error occurred while checking your progress. Please try again.");
-        });
-}
-
- function speakText(text, callback) {
-    clearTimeout(idleTimer);
-
-    const synth = window.speechSynthesis;
-    let voices = synth.getVoices();
-    let selectedVoice = null;
-
-    console.log("Checking for available voices...");
-
-    function findAndSetVoice() {
-        voices = synth.getVoices();
-        selectedVoice = voices.find(voice => voice.lang === 'en-US'); // Procura a voz "en-US"
-
-        if (!selectedVoice) {
-            if (voices.length === 0) {
-                console.warn("No voices loaded yet. Waiting for voices to load...");
-                synth.onvoiceschanged = findAndSetVoice; // Tenta novamente quando as vozes forem carregadas
-                return;
-            } else if (!alertDisplayed) {
-                alertDisplayed = true; // Marca como exibido para evitar repetições
-                alert("No 'en-US' voice found. Using default voice instead.");
-                console.warn("No 'en-US' voice found. Using default voice.");
-            }
-        } else {
-            console.log("Using voice:", selectedVoice.name, "(", selectedVoice.lang, ")");
+        function initHeardStates() {
+          // 'dialogues' é definida no carregamento do arquivo
+          heardStates = Array.from({ length: dialogues.length }, () => ({ robot: false, student: false }));
+          renderStepper();
         }
 
-        // Criar a fala somente após carregar as vozes
-        createUtterance();
-    }
+        function markHeard(idx, who) {
+          if (!heardStates[idx]) return;
+          if (who === 'robot')  heardStates[idx].robot = true;
+          if (who === 'student') heardStates[idx].student = true;
+          applyVisualState(idx);
+        }
 
-    function createUtterance() {
-        const utterance = new SpeechSynthesisUtterance(text.replace(/usuario_nome/g, userName));
-        utterance.lang = 'en-US'; // Força o idioma para "en-US"
-        utterance.voice = selectedVoice || null; // Usa a voz encontrada ou a padrão
+        function applyVisualState(idx) {
+          const robotBubble   = document.getElementById('robot-text');
+          const studentBubble = document.getElementById('student-text');
 
-        utterance.onstart = function () {
-            robotImg.src = '../../../../../imagens/robo1.gif';
-        };
-        utterance.onend = function () {
-            robotImg.src = '../../../../../imagens/robo1_static.png';
-            if (callback) {
-                callback();
+          // calcula progresso do bloco atual
+          const r = heardStates[idx]?.robot ? 1 : 0;
+          const s = heardStates[idx]?.student ? 1 : 0;
+          const total = r + s; // 0, 1 ou 2
+
+          // limpa classes antigas
+          [robotBubble, studentBubble].forEach(b => {
+            b.classList.remove('bubble-0','bubble-1','bubble-2');
+          });
+
+          // aplica borda conforme o total (mesma borda para os dois balões do bloco atual)
+          const cls = `bubble-${total}`;
+          robotBubble.classList.add(cls);
+          studentBubble.classList.add(cls);
+
+          // cria/atualiza badge no canto direito do balão do robô
+          let badge = robotBubble.querySelector('.progress-badge');
+          if (!badge) {
+            badge = document.createElement('div');
+            badge.className = 'progress-badge';
+            robotBubble.appendChild(badge);
+          }
+          badge.textContent = (total === 2) ? '✓ 2/2' : `${total}/2`;
+          badge.classList.remove('badge-half','badge-full');
+          if (total === 1) badge.classList.add('badge-half');
+          if (total === 2) badge.classList.add('badge-full');
+
+          renderStepper();
+        }
+
+        function renderStepper() {
+          const wrap = document.getElementById('stepper');
+          if (!wrap || !heardStates.length) return;
+          wrap.innerHTML = '';
+          heardStates.forEach(st => {
+            const dot = document.createElement('div');
+            dot.className = 'step-dot';
+            const total = (st.robot?1:0) + (st.student?1:0);
+            if (total === 1) dot.classList.add('half');
+            if (total === 2) dot.classList.add('done');
+            wrap.appendChild(dot);
+          });
+        }
+        // ======== FIM NOVO ========
+
+        firebase.auth().onAuthStateChanged(function(user) {
+            if (user) {
+                console.log("User authenticated:", user.displayName);
+                fetchUserAvatar(user.uid);
+                fetchUserName(user.uid);
+                initializeDialogue();
+            } else {
+                console.error("User not authenticated. Redirecting to login.");
+                alert("You are not authenticated. Please log in.");
+                window.location.href = '/login.html'; // Redireciona para a página de login
             }
-            dialoguesRead++;
-            console.log("Dialogues read:", dialoguesRead);
-            checkCompletion();
-            startIdleTimer();
-        };
-
-        synth.speak(utterance);
-    }
-
-    // Verifica vozes antes de criar o utterance
-    findAndSetVoice();
-}
-
- function initializeDialogue() {
-    const { level, unit } = getLevelAndUnitFromURL();
-    const dialoguePath = `../../${level}/${unit}/DataDialogo/dialogo.txt`;
-
-    console.log("Attempting to load dialogue from:", dialoguePath); // Log para depuração
-
-    fetch(dialoguePath)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Failed to load dialogue from path: ${dialoguePath}`);
-            }
-            return response.text();
-        })
-        .then(text => {
-            console.log("Dialogue file loaded successfully.");
-            dialogues = text.split('\n\n'); // Divide os blocos de diálogo
-            totalDialogues = dialogues.length * 2; // Duas falas por diálogo (robô e aluno)
-            console.log("Total dialogues loaded:", dialogues.length);
-            updateDialogue(0);
-        })
-        .catch(error => {
-            console.error("Error loading dialogue:", error);
-            alert("Failed to load the dialogue. Please check the file path or try again later.");
         });
-}
 
-function getLevelAndUnitFromURL() {
-    const params = new URLSearchParams(window.location.search);
-    const level = params.get('level');
-    const unit = params.get('unit');
+        function goBack() {
+            const { level, unit } = getLevelAndUnitFromURL();
+            const currentPhase = getPhaseFromURL();
+            const userId = firebase.auth().currentUser?.uid;
 
-    if (!level || !unit) {
-        alert("Missing level or unit parameters in the URL.");
-        throw new Error("Missing level or unit parameters.");
-    }
+            if (!userId) {
+                console.error("User not authenticated. Redirecting to login.");
+                alert("You are not authenticated. Please log in.");
+                window.location.href = '/login.html'; // Redireciona para a página de login
+                return;
+            }
 
-    return { level, unit };
-}
+            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+            const nextPhase = parseInt(currentPhase) + 1;
+
+            dbRef.child(`fase${nextPhase}`).once('value')
+                .then(snapshot => {
+                    const isUnlocked = snapshot.val();
+                    if (isUnlocked) {
+                        console.log(`Next phase (fase${nextPhase}) is unlocked. Navigating back.`);
+                        window.history.back(); // Retorna para a página anterior
+                    } else {
+                        const confirmNavigation = confirm(
+                          "The current phase has not been completed.\n\nTo finish, listen to BOTH lines (Robot and Student) in EVERY dialogue block. Use the Back/Forward buttons to navigate and play the audio on each line until it finishes.\n\nAre you sure you want to leave?"
+                        );
+                        if (confirmNavigation) {
+                            window.history.back(); // Retorna para a página anterior
+                        } else {
+                            console.log("User chose not to navigate back.");
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error("Error checking next phase progress:", error);
+                    alert("An error occurred while checking your progress. Please try again.");
+                });
+        }
+
+        function speakText(text, callback) {
+            clearTimeout(idleTimer);
+
+            const synth = window.speechSynthesis;
+            let voices = synth.getVoices();
+            let selectedVoice = null;
+
+            console.log("Checking for available voices...");
+
+            function findAndSetVoice() {
+                voices = synth.getVoices();
+                selectedVoice = voices.find(voice => voice.lang === 'en-US'); // Procura a voz "en-US"
+
+                if (!selectedVoice) {
+                    if (voices.length === 0) {
+                        console.warn("No voices loaded yet. Waiting for voices to load...");
+                        synth.onvoiceschanged = findAndSetVoice; // Tenta novamente quando as vozes forem carregadas
+                        return;
+                    } else if (!alertDisplayed) {
+                        alertDisplayed = true; // Marca como exibido para evitar repetições
+                        alert("No 'en-US' voice found. Using default voice instead.");
+                        console.warn("No 'en-US' voice found. Using default voice.");
+                    }
+                } else {
+                    console.log("Using voice:", selectedVoice.name, "(", selectedVoice.lang, ")");
+                }
+
+                // Criar a fala somente após carregar as vozes
+                createUtterance();
+            }
+
+            function createUtterance() {
+                const utterance = new SpeechSynthesisUtterance(text.replace(/usuario_nome/g, userName));
+                utterance.lang = 'en-US'; // Força o idioma para "en-US"
+                utterance.voice = selectedVoice || null; // Usa a voz encontrada ou a padrão
+
+                utterance.onstart = function () {
+                    robotImg.src = '../../../../../imagens/robo1.gif';
+                };
+                utterance.onend = function () {
+                    robotImg.src = '../../../../../imagens/robo1_static.png';
+                    if (callback) {
+                        callback(); // <- mantém sua lógica original de callback
+                    }
+                    dialoguesRead++;
+                    console.log("Dialogues read:", dialoguesRead);
+                    checkCompletion();
+                    startIdleTimer();
+                };
+
+                synth.speak(utterance);
+            }
+
+            // Verifica vozes antes de criar o utterance
+            findAndSetVoice();
+        }
+
+        function initializeDialogue() {
+            const { level, unit } = getLevelAndUnitFromURL();
+            const dialoguePath = `../../${level}/${unit}/DataDialogo/dialogo.txt`;
+
+            console.log("Attempting to load dialogue from:", dialoguePath); // Log para depuração
+
+            fetch(dialoguePath)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Failed to load dialogue from path: ${dialoguePath}`);
+                    }
+                    return response.text();
+                })
+                .then(text => {
+                    console.log("Dialogue file loaded successfully.");
+                    dialogues = text.split('\n\n'); // Divide os blocos de diálogo
+                    totalDialogues = dialogues.length * 2; // Duas falas por diálogo (robô e aluno)
+                    console.log("Total dialogues loaded:", dialogues.length);
+
+                    // Inicializa estados de ouvido (NOVO)
+                    initHeardStates();
+
+                    updateDialogue(0);
+                })
+                .catch(error => {
+                    console.error("Error loading dialogue:", error);
+                    alert("Failed to load the dialogue. Please check the file path or try again later.");
+                });
+        }
+
+        function getLevelAndUnitFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            const level = params.get('level');
+            const unit = params.get('unit');
+
+            if (!level || !unit) {
+                alert("Missing level or unit parameters in the URL.");
+                throw new Error("Missing level or unit parameters.");
+            }
+
+            return { level, unit };
+        }
 
         let currentDialogueIndex = 0;
 
-      function updateDialogue(index) {
-    if (index < 0 || index >= dialogues.length) {
-        console.error("Invalid dialogue index:", index);
-        return;
-    }
+        function updateDialogue(index) {
+            if (index < 0 || index >= dialogues.length) {
+                console.error("Invalid dialogue index:", index);
+                return;
+            }
 
-    const lines = dialogues[index].split('\n'); // Divide as falas do robô e do aluno
-    const robotText = lines[0].replace(/usuario_nome/g, userName) || '';
-    const studentText = lines[1].replace(/usuario_nome/g, userName) || '';
+            const lines = dialogues[index].split('\n'); // Divide as falas do robô e do aluno
+            const robotText = lines[0].replace(/usuario_nome/g, userName) || '';
+            const studentText = lines[1].replace(/usuario_nome/g, userName) || '';
 
-    console.log(`Updating dialogue [${index}]:`);
-    console.log("Robot says:", robotText);
-    console.log("Student replies:", studentText);
+            console.log(`Updating dialogue [${index}]:`);
+            console.log("Robot says:", robotText);
+            console.log("Student replies:", studentText);
 
-    document.getElementById('robot-text').textContent = robotText;
-    document.getElementById('student-text').textContent = studentText;
+            document.getElementById('robot-text').textContent = robotText;
+            document.getElementById('student-text').textContent = studentText;
 
-    document.getElementById('robot-audio-button').onclick = function () {
-        speakText(robotText);
-    };
+            // Atualiza botões para passar callback que marca quem foi ouvido (NOVO)
+            document.getElementById('robot-audio-button').onclick = function () {
+                speakText(robotText, () => markHeard(index, 'robot'));
+            };
 
-    document.getElementById('student-audio-button').onclick = function () {
-        speakText(studentText);
-    };
+            document.getElementById('student-audio-button').onclick = function () {
+                speakText(studentText, () => markHeard(index, 'student'));
+            };
 
-    startIdleTimer();
-}
+            // Aplica o estado visual do bloco atual (NOVO)
+            applyVisualState(index);
+
+            startIdleTimer();
+        }
 
         function previousDialogue() {
             if (currentDialogueIndex > 0) {
