@@ -194,7 +194,7 @@
   <!-- Hero / Header -->
   <section class="hero">
     <div class="hero-card">
-      <img src="Logo.png" alt="Logo" loading="lazy"/>
+      <img src="Logo.png" alt="Logo" loading="lazy" id="mainLogo"/>
       <div>
         <h1 class="hero-title">Hannah Fine Motor Skills Activities</h1>
         <p class="hero-sub">Create dotted handwriting lines from any word + optional image. Clean print layout, kid‑friendly typography.</p>
@@ -308,6 +308,25 @@
       line.appendChild(wrap);
     }
 
+    // Função para converter imagem em base64
+    function imageToBase64(img) {
+      return new Promise((resolve) => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        ctx.drawImage(img, 0, 0);
+        
+        try {
+          const dataUrl = canvas.toDataURL('image/png');
+          resolve(dataUrl);
+        } catch (e) {
+          // Fallback para uma logo simples em SVG
+          resolve('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMjUiIGZpbGw9IiNmMWY1ZjkiIHN0cm9rZT0iIzNkN2JmZCIgc3Ryb2tlLXdpZHRoPSIyIi8+CjxwYXRoIGQ9Ik0yMCAyNUwzMCAzNUw0MCAyNSIgc3Ryb2tlPSIjM2Q3YmZkIiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8dGV4dCB4PSIzMCIgeT0iMzUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiMzZDdiZmQiIGZvbnQtc2l6ZT0iOCI+SCZsdDtzdCZndDs8L3RleHQ+Cjwvc3ZnPg==');
+        }
+      });
+    }
+
     async function generatePDFPrintOnly(){
       if(typeof html2pdf === 'undefined'){
         alert('PDF engine failed to load. Check your internet connection to Cloudflare CDN.');
@@ -327,7 +346,7 @@
       printRoot.style.padding = '15mm 10mm';
       printRoot.style.fontFamily = 'system-ui, -apple-system, sans-serif';
 
-      // Enhanced Header with better styling - SIMPLIFICADO
+      // Enhanced Header with better styling
       const header = document.createElement('div');
       header.style.display = 'flex';
       header.style.alignItems = 'center';
@@ -343,25 +362,47 @@
       leftHeader.style.gap = '15px';
       leftHeader.style.flex = '1';
 
-      // Logo como base64 para garantir que apareça no PDF
+      // Logo - vamos converter para base64 para garantir que apareça
       const logoContainer = document.createElement('div');
       logoContainer.style.display = 'flex';
       logoContainer.style.alignItems = 'center';
       logoContainer.style.gap = '12px';
       
-      // Tentar carregar a logo do site atual primeiro
       const logo = document.createElement('img');
       logo.alt = 'Logo';
       logo.style.width = '60px';
       logo.style.height = 'auto';
       
-      // Primeiro tenta pegar a logo da página atual
-      const currentLogo = document.querySelector('.hero-card img');
-      if(currentLogo && currentLogo.src){
-        logo.src = currentLogo.src;
+      // Tentar pegar a logo da página e converter para base64
+      const mainLogo = document.getElementById('mainLogo');
+      let logoBase64 = '';
+      
+      if(mainLogo && mainLogo.src){
+        try {
+          // Se a logo já está carregada, converte para base64
+          if(mainLogo.complete && mainLogo.naturalWidth > 0) {
+            logoBase64 = await imageToBase64(mainLogo);
+          } else {
+            // Espera a logo carregar
+            await new Promise((resolve) => {
+              mainLogo.onload = resolve;
+              mainLogo.onerror = resolve;
+              setTimeout(resolve, 500);
+            });
+            if(mainLogo.complete && mainLogo.naturalWidth > 0) {
+              logoBase64 = await imageToBase64(mainLogo);
+            }
+          }
+        } catch (e) {
+          console.log('Error converting logo to base64:', e);
+        }
+      }
+      
+      if(logoBase64) {
+        logo.src = logoBase64;
       } else {
-        // Fallback para uma logo simples em SVG se não encontrar
-        logo.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMjgiIGZpbGw9IiNmMWY1ZjkiIHN0cm9rZT0iIzNkN2JmZCIgc3Ryb2tlLXdpZHRoPSIyIi8+CjxwYXRoIGQ9Ik0yMCAyNUwzMCAzNUw0MCAyNSIgc3Ryb2tlPSIjM2Q3YmZkIiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8L3N2Zz4K';
+        // Fallback para uma logo simples em SVG
+        logo.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMjUiIGZpbGw9IiNmMWY1ZjkiIHN0cm9rZT0iIzNkN2JmZCIgc3Ryb2tlLXdpZHRoPSIyIi8+CjxwYXRoIGQ9Ik0yMCAyNUwzMCAzNUw0MCAyNSIgc3Ryb2tlPSIjM2Q3YmZkIiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8dGV4dCB4PSIzMCIgeT0iMzUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiMzZDdiZmQiIGZvbnQtc2l6ZT0iOCI+SCZsdDtzdCZndDs8L3RleHQ+Cjwvc3ZnPg==';
       }
 
       const titleContainer = document.createElement('div');
@@ -384,12 +425,12 @@
       logoContainer.appendChild(titleContainer);
       leftHeader.appendChild(logoContainer);
 
-      // Right side - Name and Date SIMPLIFICADO
+      // Right side - Name and Date
       const rightHeader = document.createElement('div');
       rightHeader.style.textAlign = 'right';
       rightHeader.style.minWidth = '200px';
       
-      // Name - linha única e limpa
+      // Name
       const nameContainer = document.createElement('div');
       nameContainer.style.display = 'inline-block';
       nameContainer.style.marginBottom = '8px';
@@ -400,7 +441,7 @@
       nameSpan.innerHTML = 'Name: <span style="border-bottom: 1px solid #94a3b8; margin-left: 5px; display: inline-block; min-width: 120px;">&nbsp;</span>';
       nameContainer.appendChild(nameSpan);
 
-      // Date - linha única e limpa  
+      // Date  
       const dateContainer = document.createElement('div');
       dateContainer.style.display = 'inline-block';
       dateContainer.style.marginLeft = '20px';
@@ -457,7 +498,7 @@
           imageContainer.style.gap = '6px';
 
           const cloneImg = document.createElement('img');
-          cloneImg.src = img.src;
+          cloneImg.src = img.src; // Já está em base64 das imagens carregadas
           cloneImg.alt = 'Activity image';
           cloneImg.style.width = '100px';
           cloneImg.style.height = 'auto';
@@ -611,13 +652,10 @@
         const images = printRoot.querySelectorAll('img');
         const imagePromises = Array.from(images).map(img => {
           if(img.complete) return Promise.resolve();
-          return new Promise((resolve, reject) => {
+          return new Promise((resolve) => {
             img.onload = resolve;
-            img.onerror = () => {
-              console.log('Image failed to load:', img.src);
-              resolve(); // Resolve even if image fails
-            };
-            setTimeout(resolve, 500); // Fallback timeout
+            img.onerror = resolve;
+            setTimeout(resolve, 500);
           });
         });
 
