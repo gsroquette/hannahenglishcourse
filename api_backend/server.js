@@ -164,6 +164,45 @@ function validateAndTrimHistory(userId) {
     conversations[userId].push(...trimmedChat);
 }
 
+// ESTRATÉGIA 2: Função para limitar histórico enviado para OpenAI
+function getMessagesForOpenAI(userId) {
+    if (!conversations[userId] || conversations[userId].length === 0) {
+        return [];
+    }
+    
+    const allMessages = conversations[userId];
+    
+    // ESTRATÉGIA 1: System message apenas na primeira chamada
+    // Se já temos mensagens de user/assistant, não reenviar system message
+    const hasUserAssistantMessages = allMessages.some(msg => 
+        msg.role === 'user' || msg.role === 'assistant'
+    );
+    
+    let messagesToSend = [];
+    
+    if (hasUserAssistantMessages) {
+        // ESTRATÉGIA 1: Não reenviar system message após primeira chamada
+        // Filtrar apenas mensagens user/assistant (remover system e meta)
+        messagesToSend = allMessages.filter(msg => 
+            msg.role === 'user' || msg.role === 'assistant'
+        );
+        
+        // ESTRATÉGIA 2: Limitar para últimas 8 mensagens (4 trocas)
+        if (messagesToSend.length > 8) {
+            console.log(`[HISTORY] Limitando histórico de ${messagesToSend.length} para 8 mensagens`);
+            messagesToSend = messagesToSend.slice(-8);
+        }
+    } else {
+        // Primeira chamada: enviar system message + primeira resposta
+        messagesToSend = allMessages.filter(msg => 
+            msg.role === 'system' || msg.role === 'assistant'
+        );
+    }
+    
+    console.log(`[HISTORY] Enviando ${messagesToSend.length} mensagens para OpenAI`);
+    return messagesToSend;
+}
+
 // ======================
 // /api/start
 // ======================
@@ -306,7 +345,7 @@ app.get('/api/start', async (req, res) => {
 });
 
 // ======================
-// /api/chat - VERSÃO CORRIGIDA COM OPÇÃO A E TOKENS OTIMIZADOS
+// /api/chat - VERSÃO CORRIGIDA COM ESTRATÉGIAS 1 E 2
 // ======================
 app.post('/api/chat', async (req, res) => {
     const { uid: userId, message: userMessage, level, unit } = req.body;
@@ -432,9 +471,12 @@ app.post('/api/chat', async (req, res) => {
         conversations[userId].push({ role: 'user', content: userMessage.trim() });
 
         // ------- OPENAI -------
+        // ESTRATÉGIAS 1 E 2: Usar função para limitar mensagens enviadas
+        const messagesForOpenAI = getMessagesForOpenAI(userId);
+        
         const completion = await openai.chat.completions.create({
             model: 'gpt-4o-mini-2024-07-18',
-            messages: conversations[userId],
+            messages: messagesForOpenAI,
             max_tokens: 60, // CORREÇÃO: Reduzido para respostas mais curtas
             temperature: 0.7,
         });
@@ -594,7 +636,7 @@ app.listen(PORT, () => {
     console.log(`🚀 Servidor rodando na porta ${PORT}`);
     console.log(`📊 Controle de tokens: ${TOKENS_CONTROL_ENABLED ? 'ATIVADO' : 'DESATIVADO'}`);
     console.log(`🌐 CORS configurado para: hannahenglishcourse.netlify.app`);
-    console.log(`🔧 Configuração de tokens: max_tokens=60, unitCaps aumentados`);
+    console.log(`🔧 ESTRATÉGIAS 1 e 2 ATIVADAS: System apenas 1x + Histórico limitado a 8 mensagens`);
 });
 
 module.exports = app;
