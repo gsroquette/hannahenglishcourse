@@ -191,8 +191,12 @@ app.get('/api/start', async (req, res) => {
         // ------- TOKENS -------
         let tokenInfo = {};
         if (TOKENS_CONTROL_ENABLED) {
+            // ITEM 3: Normalização das chaves para paths do Firebase
+            const pathLevel = String(rawLevel).toLowerCase();
+            const pathUnit = String(rawUnit).toLowerCase();
+            
             const walletRef = db.ref(`wallet/${userId}`);
-            const usageRef = db.ref(`usage/${userId}/${rawLevel}/${rawUnit}`);
+            const usageRef = db.ref(`usage/${userId}/${pathLevel}/${pathUnit}`);
 
             // Garantir wallet
             const walletSnap = await walletRef.once('value');
@@ -249,6 +253,7 @@ app.get('/api/start', async (req, res) => {
                     });
                     usage = (await usageRef.once('value')).val();
                     wallet = (await walletRef.once('value')).val();
+                    console.log(`[TOKENS] Transferidos ${transferable} tokens da wallet para usage do usuário ${userId}`);
                 } else {
                     canChat = usage.remainingTokens > 0;
                 }
@@ -327,16 +332,17 @@ app.post('/api/chat', async (req, res) => {
         const meta = conversations[userId]?.[1] || {};
         const studentLevel = level || meta.studentLevel || "Level1";
         const studentUnit = unit || meta.studentUnit || "Unit1";
-        
-        // Adiciona mensagem do usuário
-        conversations[userId].push({ role: 'user', content: userMessage.trim() });
 
         // ------- TOKENS: PRECHECK -------
         let tokenInfo = {};
         let usageRef, walletRef;
         
         if (TOKENS_CONTROL_ENABLED) {
-            usageRef = db.ref(`usage/${userId}/${studentLevel}/${studentUnit}`);
+            // ITEM 3: Normalização das chaves para paths do Firebase
+            const pathLevel = String(studentLevel).toLowerCase();
+            const pathUnit = String(studentUnit).toLowerCase();
+            
+            usageRef = db.ref(`usage/${userId}/${pathLevel}/${pathUnit}`);
             walletRef = db.ref(`wallet/${userId}`);
 
             // Garante usage caso não exista (ex.: entrou por /api/chat direto)
@@ -362,6 +368,7 @@ app.post('/api/chat', async (req, res) => {
             const estimated = 80 + tokenConfig.maxOut;
             
             if ((usage.remainingTokens || 0) < estimated) {
+                console.log(`[TOKENS] Bloqueado: usuário ${userId} sem tokens suficientes. Restantes: ${usage.remainingTokens}, Necessários: ${estimated}`);
                 return res.json({
                     response: "You reached your token limit for this unit. Please complete other activities or come back later.",
                     chatHistory: conversations[userId],
@@ -374,6 +381,9 @@ app.post('/api/chat', async (req, res) => {
             }
         }
 
+        // ITEM 1: Só adiciona a mensagem do usuário APÓS o precheck de tokens
+        conversations[userId].push({ role: 'user', content: userMessage.trim() });
+
         // ------- OPENAI -------
         const completion = await openai.chat.completions.create({
             model: 'gpt-4o-mini-2024-07-18',
@@ -381,7 +391,7 @@ app.post('/api/chat', async (req, res) => {
             max_tokens: tokenConfig.maxOut,
         });
 
-        const responseMessage = completion.choices[0].message.content || "I'm sorry, I couldn't generate a response.";
+        const responseMessage = completion.choices[0].message?.content || "I'm sorry, I couldn't generate a response.";
         conversations[userId].push({ role: 'assistant', content: responseMessage });
 
         // ------- TOKENS: DÉBITO -------
@@ -398,11 +408,46 @@ app.post('/api/chat', async (req, res) => {
             const updatedUsage = (await usageRef.once('value')).val();
             const updatedWallet = (await walletRef.once('value')).val() || { balanceTokens: 0 };
             
-            tokenInfo = {
-                remainingUnit: updatedUsage.remainingTokens,
-                walletBalance: updatedWallet.balanceTokens,
-                canChat: updatedUsage.remainingTokens > tokenConfig.minSessionReserve
-            };
+            // ITEM 2: Reabastecer da wallet também no /api/chat
+            if (updatedUsage.remainingTokens < tokenConfig.minSessionReserve) {
+                const need = tokenConfig.minSessionReserve - updatedUsage.remainingTokens;
+                const capLeft = updatedUsage.unitCap - updatedUsage.allowedTokens;
+                const canTransfer = Math.min(need, updatedWallet.balanceTokens || 0, capLeft);
+                
+                if (canTransfer > 0) {
+                    await walletRef.update({ 
+                        balanceTokens: updatedWallet.balanceTokens - canTransfer 
+                    });
+                    await usageRef.update({
+                        allowedTokens: updatedUsage.allowedTokens + canTransfer,
+                        remainingTokens: updatedUsage.remainingTokens + canTransfer
+                    });
+                    
+                    console.log(`[TOKENS] Reabastecimento automático: ${canTransfer} tokens transferidos para usuário ${userId}`);
+                    
+                    // Atualiza os valores após transferência
+                    const finalUsage = (await usageRef.once('value')).val();
+                    const finalWallet = (await walletRef.once('value')).val() || { balanceTokens: 0 };
+                    
+                    tokenInfo = {
+                        remainingUnit: finalUsage.remainingTokens,
+                        walletBalance: finalWallet.balanceTokens,
+                        canChat: finalUsage.remainingTokens > tokenConfig.minSessionReserve
+                    };
+                } else {
+                    tokenInfo = {
+                        remainingUnit: updatedUsage.remainingTokens,
+                        walletBalance: updatedWallet.balanceTokens,
+                        canChat: updatedUsage.remainingTokens > tokenConfig.minSessionReserve
+                    };
+                }
+            } else {
+                tokenInfo = {
+                    remainingUnit: updatedUsage.remainingTokens,
+                    walletBalance: updatedWallet.balanceTokens,
+                    canChat: updatedUsage.remainingTokens > tokenConfig.minSessionReserve
+                };
+            }
         }
 
         console.log(`[SUCCESS] Response generated for user: ${userId}`);
@@ -417,7 +462,7 @@ app.post('/api/chat', async (req, res) => {
         console.error(`❌ Erro em /api/chat: ${error.message}`);
         console.error(error.stack);
         
-        // Remove a última mensagem do usuário em caso de erro
+        // Remove a última mensagem do usuário em caso de erro (agora é seguro pois só foi adicionada após precheck)
         if (conversations[userId] && conversations[userId].length > 0) {
             const lastMessage = conversations[userId][conversations[userId].length - 1];
             if (lastMessage.role === 'user') {
