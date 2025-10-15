@@ -466,5 +466,121 @@
       }
     }
   </script>
+<script>
+(function(){
+  // Failsafe re-bind & safe redefinition without touching earlier blocks
+  const domReady = () => new Promise((resolve)=>{
+    if(document.readyState !== 'loading') return resolve();
+    document.addEventListener('DOMContentLoaded', resolve, { once:true });
+  });
+  const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
+
+  // If addActivity is missing, (re)define minimal version compatible with current DOM
+  if(typeof window.addActivity !== 'function'){
+    window.addActivity = function(){
+      const file = document.getElementById('imageInput').files[0];
+      const word = (document.getElementById('wordInput').value || '').trim();
+      const repeatRaw = document.getElementById('repeatInput').value;
+      const repeat = clamp(parseInt(repeatRaw || '1', 10), 1, 25);
+      if(!word){ alert('Please enter a word.'); return; }
+      if(isNaN(repeat)){ alert('Please enter a valid number of repetitions.'); return; }
+      const container = document.getElementById('activities');
+      const line = document.createElement('div');
+      line.className = 'line';
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'remove-btn no-print';
+      removeBtn.textContent = '×';
+      removeBtn.onclick = () => container.removeChild(line);
+      line.appendChild(removeBtn);
+      const appendWordAndDottedText = (line, word, repeat)=>{
+        const wrap = document.createElement('div');
+        wrap.style.display = 'inline-block';
+        const wordSpan = document.createElement('span');
+        wordSpan.className = 'word';
+        wordSpan.textContent = word;
+        const dotted = document.createElement('span');
+        dotted.className = 'dotted-text';
+        for(let i=0;i<repeat;i++){
+          const span = document.createElement('span');
+          span.textContent = word + (i < repeat-1 ? ' ' : '');
+          dotted.appendChild(span);
+        }
+        wrap.appendChild(wordSpan);
+        wrap.appendChild(dotted);
+        line.appendChild(wrap);
+      };
+      if(file){
+        const reader = new FileReader();
+        reader.onload = (e)=>{ const img = document.createElement('img'); img.src = e.target.result; img.className = 'image-preview'; line.appendChild(img); appendWordAndDottedText(line, word, repeat); };
+        reader.readAsDataURL(file);
+      } else {
+        appendWordAndDottedText(line, word, repeat);
+      }
+      container.appendChild(line);
+      document.getElementById('wordInput').value = '';
+      document.getElementById('repeatInput').value = '';
+      document.getElementById('imageInput').value = '';
+    }
+  }
+
+  async function waitForFonts(ms=3000){
+    if(!(document.fonts && document.fonts.ready)) return;
+    const timer = new Promise(r=>setTimeout(r, ms));
+    try { await Promise.race([document.fonts.ready, timer]); } catch(_){}
+  }
+
+  window.generatePDFPrintOnly = async function(){
+    if(typeof html2pdf === 'undefined'){
+      alert('PDF engine failed to load. Check your internet connection to Cloudflare CDN.');
+      return;
+    }
+    const lines = document.querySelectorAll('#activities .line');
+    if(!lines.length){ alert('Add at least one activity before generating the PDF.'); return; }
+
+    const printRoot = document.createElement('div');
+    printRoot.id = 'print-root';
+    printRoot.style.background = '#ffffff';
+    printRoot.style.padding = '8mm';
+
+    const header = document.createElement('div');
+    header.style.display = 'flex'; header.style.alignItems = 'center'; header.style.gap = '12px'; header.style.marginBottom = '12px';
+    const logo = document.createElement('img'); logo.src = 'Logo.png'; logo.alt = 'Logo'; logo.style.width = '80px'; header.appendChild(logo);
+    const nameDateWrap = document.createElement('div'); nameDateWrap.style.marginLeft = 'auto'; nameDateWrap.style.fontSize = '14px'; nameDateWrap.textContent = 'Name: _________________________________________   Date: _____________'; header.appendChild(nameDateWrap);
+    printRoot.appendChild(header);
+
+    lines.forEach((srcLine)=>{
+      const printLine = document.createElement('div');
+      printLine.style.display = 'grid'; printLine.style.gridTemplateColumns = '150px 1fr'; printLine.style.gap = '12px'; printLine.style.alignItems = 'center'; printLine.style.margin = '10px 0'; printLine.style.pageBreakInside = 'avoid';
+      const img = srcLine.querySelector('img.image-preview');
+      if(img){ const ci = document.createElement('img'); ci.src = img.src; ci.alt='Activity image'; ci.style.width='150px'; printLine.appendChild(ci);} else { const sp=document.createElement('div'); sp.style.width='150px'; sp.style.height='1px'; printLine.appendChild(sp);}    
+      const textWrap = document.createElement('div');
+      const word = (srcLine.querySelector('.word')?.textContent || '').trim();
+      const wordTitle = document.createElement('div'); wordTitle.textContent = word; wordTitle.style.fontSize='36px'; wordTitle.style.fontWeight='700'; wordTitle.style.marginBottom='4px'; textWrap.appendChild(wordTitle);
+      const dotted = document.createElement('div'); dotted.style.fontFamily = '\\'KGPrimaryDots\\', Arial, sans-serif'; dotted.style.fontSize = '48px'; dotted.style.letterSpacing='3px'; dotted.style.lineHeight='1.3';
+      const dottedSource = srcLine.querySelector('.dotted-text');
+      if(dottedSource){ dotted.innerHTML = dottedSource.innerHTML; } else if(word){ dotted.textContent = word + ' '; }
+      textWrap.appendChild(dotted);
+      printLine.appendChild(textWrap);
+      printRoot.appendChild(printLine);
+    });
+
+    document.body.appendChild(printRoot);
+
+    const opt = { filename:'Hannah_Fine_Motor_Skills.pdf', margin:[8,8,12,8], pagebreak:{ mode:['avoid-all','css','legacy'] }, image:{ type:'jpeg', quality:0.98 }, html2canvas:{ scale:2, useCORS:true, letterRendering:true }, jsPDF:{ unit:'mm', format:'a4', orientation:'portrait', compress:true } };
+
+    try{ await waitForFonts(); await html2pdf().from(printRoot).set(opt).save(); } catch(err){ console.error(err); alert('There was an error generating the PDF. See console for details.'); } finally { printRoot.remove(); }
+  }
+
+  domReady().then(()=>{
+    const btn = document.getElementById('pdfBtn');
+    if(btn){
+      btn.replaceWith(btn.cloneNode(true)); // remove stale listeners
+      const fresh = document.getElementById('pdfBtn');
+      fresh.addEventListener('click', window.generatePDFPrintOnly);
+    }
+  });
+})();
+</script>
+
 </body>
 </html>
