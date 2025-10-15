@@ -141,9 +141,8 @@
             margin: 20px;
         }
 
-        /* ======== VISUAL PROGRESS (Novo) ======== */
+        /* ======== VISUAL PROGRESS ======== */
 
-        /* Badge de progresso no canto do balão */
         .progress-badge {
           position: absolute;
           top: -8px;
@@ -155,12 +154,9 @@
           color: #000;
           box-shadow: 0 1px 3px rgba(0,0,0,.2);
         }
-
-        /* estados do badge */
         .badge-half { background: #ffe08a; }   /* 1/2 */
         .badge-full { background: #a5d6a7; }   /* 2/2 */
 
-        /* bordas por estado */
         .bubble-0 { border: 2px dashed #bdbdbd; }
         .bubble-1 { border: 2px solid #f2b01e; }
         .bubble-2 {
@@ -168,7 +164,6 @@
           box-shadow: 0 0 0 2px rgba(46,125,50,.15);
         }
 
-        /* Stepper global (opcional) */
         #stepper{ display:flex; gap:8px; margin:8px 0; }
         .step-dot{
           width:10px; height:10px; border-radius:50%;
@@ -182,21 +177,17 @@
                 font-size: 14px;
                 padding: 8px 16px;
             }
-
             .nav-button {
                 font-size: 14px;
                 padding: 8px 16px;
             }
-
             .character {
                 flex: 1 1 100%;
                 margin: 10px 0;
             }
-
             .character-text {
                 font-size: 16px;
             }
-
             #dialogue-container {
                 flex-wrap: wrap;
             }
@@ -207,7 +198,6 @@
     <div id="header">
         <button class="back-button" onclick="goBack()">Back</button>
         <h1>Hannah Conversation</h1>
-        <!-- Stepper de progresso global (opcional) -->
         <div id="stepper" aria-label="Dialogues progress"></div>
     </div>
 
@@ -246,7 +236,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
     <script>
-        // Configuração do Firebase
+        // Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
             authDomain: "hannahenglishcourse.firebaseapp.com",
@@ -257,23 +247,25 @@
             measurementId: "G-07VVJG9LRS",
             databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
         };
-
         firebase.initializeApp(firebaseConfig);
 
+        // State
         let idleTimer;
         let robotImg = document.getElementById('robot-img');
         let studentImg = document.getElementById('student-img');
-        let totalDialogues;
+
+        let dialogues = [];          // <-- declarado explicitamente
+        let totalDialogues = 0;
         let dialoguesRead = 0;
         let userName = "";
         let alertDisplayed = false;
+        let currentDialogueIndex = 0;
 
-        // ======== NOVO: estados de áudio ouvido por bloco ========
+        // ======== VISUAL PROGRESS STATE ========
         // Para cada bloco: { robot: false, student: false }
         let heardStates = [];
 
         function initHeardStates() {
-          // 'dialogues' é definida no carregamento do arquivo
           heardStates = Array.from({ length: dialogues.length }, () => ({ robot: false, student: false }));
           renderStepper();
         }
@@ -289,22 +281,18 @@
           const robotBubble   = document.getElementById('robot-text');
           const studentBubble = document.getElementById('student-text');
 
-          // calcula progresso do bloco atual
           const r = heardStates[idx]?.robot ? 1 : 0;
           const s = heardStates[idx]?.student ? 1 : 0;
-          const total = r + s; // 0, 1 ou 2
+          const total = r + s; // 0, 1, 2
 
-          // limpa classes antigas
           [robotBubble, studentBubble].forEach(b => {
             b.classList.remove('bubble-0','bubble-1','bubble-2');
           });
 
-          // aplica borda conforme o total (mesma borda para os dois balões do bloco atual)
           const cls = `bubble-${total}`;
           robotBubble.classList.add(cls);
           studentBubble.classList.add(cls);
 
-          // cria/atualiza badge no canto direito do balão do robô
           let badge = robotBubble.querySelector('.progress-badge');
           if (!badge) {
             badge = document.createElement('div');
@@ -332,18 +320,19 @@
             wrap.appendChild(dot);
           });
         }
-        // ======== FIM NOVO ========
+        // =======================================
 
-        firebase.auth().onAuthStateChanged(function(user) {
+        // AUTH: aguarda nome do usuário ANTES de inicializar o diálogo
+        firebase.auth().onAuthStateChanged(async function(user) {
             if (user) {
                 console.log("User authenticated:", user.displayName);
                 fetchUserAvatar(user.uid);
-                fetchUserName(user.uid);
-                initializeDialogue();
+                await fetchUserName(user.uid);   // <-- garante userName preenchido
+                initializeDialogue();            // <-- só então carrega e mostra o diálogo
             } else {
                 console.error("User not authenticated. Redirecting to login.");
                 alert("You are not authenticated. Please log in.");
-                window.location.href = '/login.html'; // Redireciona para a página de login
+                window.location.href = '/login.html';
             }
         });
 
@@ -355,7 +344,7 @@
             if (!userId) {
                 console.error("User not authenticated. Redirecting to login.");
                 alert("You are not authenticated. Please log in.");
-                window.location.href = '/login.html'; // Redireciona para a página de login
+                window.location.href = '/login.html';
                 return;
             }
 
@@ -367,13 +356,13 @@
                     const isUnlocked = snapshot.val();
                     if (isUnlocked) {
                         console.log(`Next phase (fase${nextPhase}) is unlocked. Navigating back.`);
-                        window.history.back(); // Retorna para a página anterior
+                        window.history.back();
                     } else {
                         const confirmNavigation = confirm(
                           "The current phase has not been completed.\n\nTo finish, listen to BOTH lines (Robot and Student) in EVERY dialogue block. Use the Back/Forward buttons to navigate and play the audio on each line until it finishes.\n\nAre you sure you want to leave?"
                         );
                         if (confirmNavigation) {
-                            window.history.back(); // Retorna para a página anterior
+                            window.history.back();
                         } else {
                             console.log("User chose not to navigate back.");
                         }
@@ -392,34 +381,27 @@
             let voices = synth.getVoices();
             let selectedVoice = null;
 
-            console.log("Checking for available voices...");
-
             function findAndSetVoice() {
                 voices = synth.getVoices();
-                selectedVoice = voices.find(voice => voice.lang === 'en-US'); // Procura a voz "en-US"
+                selectedVoice = voices.find(voice => voice.lang === 'en-US');
 
                 if (!selectedVoice) {
                     if (voices.length === 0) {
-                        console.warn("No voices loaded yet. Waiting for voices to load...");
-                        synth.onvoiceschanged = findAndSetVoice; // Tenta novamente quando as vozes forem carregadas
+                        synth.onvoiceschanged = findAndSetVoice;
                         return;
                     } else if (!alertDisplayed) {
-                        alertDisplayed = true; // Marca como exibido para evitar repetições
+                        alertDisplayed = true;
                         alert("No 'en-US' voice found. Using default voice instead.");
-                        console.warn("No 'en-US' voice found. Using default voice.");
                     }
-                } else {
-                    console.log("Using voice:", selectedVoice.name, "(", selectedVoice.lang, ")");
                 }
 
-                // Criar a fala somente após carregar as vozes
                 createUtterance();
             }
 
             function createUtterance() {
                 const utterance = new SpeechSynthesisUtterance(text.replace(/usuario_nome/g, userName));
-                utterance.lang = 'en-US'; // Força o idioma para "en-US"
-                utterance.voice = selectedVoice || null; // Usa a voz encontrada ou a padrão
+                utterance.lang = 'en-US';
+                utterance.voice = selectedVoice || null;
 
                 utterance.onstart = function () {
                     robotImg.src = '../../../../../imagens/robo1.gif';
@@ -427,10 +409,9 @@
                 utterance.onend = function () {
                     robotImg.src = '../../../../../imagens/robo1_static.png';
                     if (callback) {
-                        callback(); // <- mantém sua lógica original de callback
+                        callback(); // marca quem foi ouvido
                     }
                     dialoguesRead++;
-                    console.log("Dialogues read:", dialoguesRead);
                     checkCompletion();
                     startIdleTimer();
                 };
@@ -438,15 +419,12 @@
                 synth.speak(utterance);
             }
 
-            // Verifica vozes antes de criar o utterance
             findAndSetVoice();
         }
 
         function initializeDialogue() {
             const { level, unit } = getLevelAndUnitFromURL();
             const dialoguePath = `../../${level}/${unit}/DataDialogo/dialogo.txt`;
-
-            console.log("Attempting to load dialogue from:", dialoguePath); // Log para depuração
 
             fetch(dialoguePath)
                 .then(response => {
@@ -456,15 +434,10 @@
                     return response.text();
                 })
                 .then(text => {
-                    console.log("Dialogue file loaded successfully.");
-                    dialogues = text.split('\n\n'); // Divide os blocos de diálogo
-                    totalDialogues = dialogues.length * 2; // Duas falas por diálogo (robô e aluno)
-                    console.log("Total dialogues loaded:", dialogues.length);
-
-                    // Inicializa estados de ouvido (NOVO)
+                    dialogues = text.split('\n\n');
+                    totalDialogues = dialogues.length * 2; // duas falas por bloco
                     initHeardStates();
-
-                    updateDialogue(0);
+                    updateDialogue(0);  // agora userName já está carregado
                 })
                 .catch(error => {
                     console.error("Error loading dialogue:", error);
@@ -481,11 +454,8 @@
                 alert("Missing level or unit parameters in the URL.");
                 throw new Error("Missing level or unit parameters.");
             }
-
             return { level, unit };
         }
-
-        let currentDialogueIndex = 0;
 
         function updateDialogue(index) {
             if (index < 0 || index >= dialogues.length) {
@@ -493,29 +463,21 @@
                 return;
             }
 
-            const lines = dialogues[index].split('\n'); // Divide as falas do robô e do aluno
-            const robotText = lines[0].replace(/usuario_nome/g, userName) || '';
-            const studentText = lines[1].replace(/usuario_nome/g, userName) || '';
-
-            console.log(`Updating dialogue [${index}]:`);
-            console.log("Robot says:", robotText);
-            console.log("Student replies:", studentText);
+            const lines = dialogues[index].split('\n');
+            const robotText = (lines[0] || '').replace(/usuario_nome/g, userName);
+            const studentText = (lines[1] || '').replace(/usuario_nome/g, userName);
 
             document.getElementById('robot-text').textContent = robotText;
             document.getElementById('student-text').textContent = studentText;
 
-            // Atualiza botões para passar callback que marca quem foi ouvido (NOVO)
             document.getElementById('robot-audio-button').onclick = function () {
                 speakText(robotText, () => markHeard(index, 'robot'));
             };
-
             document.getElementById('student-audio-button').onclick = function () {
                 speakText(studentText, () => markHeard(index, 'student'));
             };
 
-            // Aplica o estado visual do bloco atual (NOVO)
             applyVisualState(index);
-
             startIdleTimer();
         }
 
@@ -566,12 +528,11 @@
                 .then(snapshot => {
                     const userData = snapshot.val();
                     if (userData && userData.avatar) {
-                        // Ajustar o caminho do avatar considerando que o diretório está um nível abaixo
                         const avatarUrl = `../../../../imagens/${userData.avatar}`;
                         const img = new Image();
                         img.src = avatarUrl;
                         img.onload = function() {
-                            studentImg.src = avatarUrl; // Usa o avatar do usuário se ele existir e estiver acessível
+                            studentImg.src = avatarUrl;
                         };
                         img.onerror = function() {
                             console.error("Erro ao carregar o avatar do usuário. Usando o avatar padrão.");
@@ -585,22 +546,18 @@
                 });
         }
 
-        function fetchUserName(userId) {
-            const userRef = firebase.database().ref(`usuarios/${userId}`);
-            userRef.once('value')
-                .then(snapshot => {
-                    const userData = snapshot.val();
-                    if (userData && userData.nome) {
-                        userName = userData.nome;
-                    } else {
-                        console.log("Usuário não possui nome definido. Usando nome padrão.");
-                        userName = "Aluno";
-                    }
-                })
-                .catch(error => {
-                    console.error("Erro ao buscar o nome do usuário:", error);
-                    userName = "Aluno";
-                });
+        // Agora é async e retorna uma Promise; aguardamos antes de renderizar
+        async function fetchUserName(userId) {
+            try {
+                const snapshot = await firebase.database().ref(`usuarios/${userId}`).once('value');
+                const userData = snapshot.val();
+                userName = (userData && userData.nome) ? userData.nome : "Aluno";
+                return userName;
+            } catch (error) {
+                console.error("Erro ao buscar o nome do usuário:", error);
+                userName = "Aluno";
+                return userName;
+            }
         }
 
         function ensureUserIsAuthenticated(callback) {
