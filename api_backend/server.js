@@ -1,23 +1,21 @@
+// server.js
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const fs = require('fs');
-const path = require('path');
 const OpenAI = require('openai');
 const admin = require('firebase-admin');
-
-// ======================
-//  IMPORT E CONFIG TTS
-// ======================
 const textToSpeech = require('@google-cloud/text-to-speech');
 
+// ======================
+//  GOOGLE TTS
+// ======================
 console.log("GOOGLE_TTS_SERVICE_ACCOUNT:", process.env.GOOGLE_TTS_SERVICE_ACCOUNT ? "DEFINIDO" : "NÃO DEFINIDO");
 const ttsCredentials = JSON.parse(process.env.GOOGLE_TTS_SERVICE_ACCOUNT || '{}');
 const ttsClient = new textToSpeech.TextToSpeechClient({ credentials: ttsCredentials });
 
-// ===================================
-//  CONFIGURAÇÃO FIREBASE ADMIN
-// ===================================
+// ======================
+//  FIREBASE ADMIN
+// ======================
 console.log("FIREBASE_SERVICE_ACCOUNT:", process.env.FIREBASE_SERVICE_ACCOUNT || "NÃO DEFINIDO");
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || '{}');
 
@@ -30,54 +28,60 @@ try {
 } catch (error) {
   console.error("Erro ao inicializar o Firebase:", error.message);
 }
-
 const db = admin.database();
 
-// ===================================
-//  CONFIGURAÇÃO DO EXPRESS
-// ===================================
+// ======================
+//  EXPRESS
+// ======================
 const app = express();
 const PORT = process.env.PORT || 3000;
 app.use(cors({ origin: '*' }));
 app.use(bodyParser.json());
 
-// ===================================
-//  CONFIGURAÇÃO OPENAI
-// ===================================
+// ======================
+//  OPENAI
+// ======================
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// ===================================
-//  CONFIGURAÇÃO DE TOKENS
-// ===================================
+// ======================
+//  CONTROLE DE TOKENS
+// ======================
 const TOKENS_CONTROL_ENABLED = true;
 
+// Preços / limites pensados para gpt-4o-mini-2024-07-18
 const tokenConfig = {
-  wallet: { seed: 325000 },
+  wallet: { seed: 325000 }, // saldo global inicial
   unitCaps: { Level0: 1000, Level1: 2000, Level2: 3000, Level3: 4000, Level4: 5000 },
-  minSessionReserve: 300,
-  maxOut: 120
+  minSessionReserve: 300,   // reserva mínima para não travar no meio da resposta
+  maxOut: 120               // limite de tokens de saída por resposta
 };
 
-// ===================================
-//  ARMAZENAMENTO EM MEMÓRIA
-// ===================================
+// ======================
+//  ESTADO EM MEMÓRIA
+// ======================
 const conversations = {};
 
-// ===================================
-//  FUNÇÕES AUXILIARES
-// ===================================
+// ======================
+//  HELPERS
+// ======================
+function normalizeLevelForCap(level) {
+  if (!level) return 'Level1';
+  const low = String(level).toLowerCase();
+  const map = { level0: 'Level0', level1: 'Level1', level2: 'Level2', level3: 'Level3', level4: 'Level4' };
+  return map[low] || level; // se já veio "LevelX", mantém
+}
 
-function createInitialContext(studentName, studentLevel, studentUnit, conversationDetails, conversationFullContent) {
+function createInitialContext(studentName, studentLevel, studentUnit, topic, fullContent) {
   return {
     role: "system",
     content: `
 You are Samuel, a friendly, patient, and motivating virtual robot.
 Help ${studentName} practice English, always addressing him/her by name.
 They are at ${studentLevel} level.
-Keep the conversation centered on ${conversationFullContent}.
+Keep the conversation centered on ${fullContent || topic}.
 
 Start by saying: "Let's begin the lesson, ${studentName}!" and begin the class.
-After covering all of ${conversationFullContent}, thank, congratulate, and say goodbye, affirming that he/she is ready for the next stage. Then, stop interacting. If the student insists, politely refuse and ask to go to the next class and say: press the black button to go back.
+After covering all of ${fullContent || topic}, thank, congratulate, and say goodbye, affirming that he/she is ready for the next stage. Then, stop interacting. If the student insists, politely refuse and ask to go to the next class and say: press the black button to go back.
 
 Adapt the language according to the level (CEFR):
 Level 0: little children, 1–2 very simple sentences.
@@ -95,92 +99,123 @@ Text only (no emojis).
   };
 }
 
-// Lê conversa.txt da unidade
+// Carrega conversa.txt da unidade
 async function loadConversationDetails(level, unit) {
   console.log(`[loadConversationDetails] level="${level}", unit="${unit}"`);
   const url = `https://hannahenglishcourse.netlify.app/${level}/${unit}/DataIA/conversa.txt`;
   try {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Status ${response.status}`);
-    const fileContent = await response.text();
-    const lines = fileContent.split('\n').filter(line => line.trim() !== '');
+    const fetchRes = await fetch(url);
+    if (!fetchRes.ok) throw new Error(`HTTP ${fetchRes.status}`);
+    const fileContent = await fetchRes.text();
+    const lines = fileContent.split('\n').filter(l => l.trim() !== '');
     const topic = lines[0]?.trim() || 'General conversation';
     const sanitizedContent = fileContent.replace(/###|\d+\.\s/g, '').trim();
-    console.log("✅ conversa.txt carregado com sucesso via HTTP.");
+    console.log("✅ conversa.txt carregado via HTTP.");
     return { topic, fullContent: sanitizedContent };
   } catch (err) {
-    console.warn(`⚠️ Falha ao buscar conversa.txt: ${err.message}`);
+    console.warn(`⚠️ Falha ao buscar conversa.txt (${url}): ${err.message}`);
     return { topic: 'General conversation', fullContent: '' };
   }
 }
 
 function validateAndTrimHistory(userId) {
   if (!Array.isArray(conversations[userId])) conversations[userId] = [];
-  conversations[userId] = conversations[userId].filter(m => m?.role && m?.content);
+  conversations[userId] = conversations[userId].filter(m => m && typeof m.role === 'string' && typeof m.content === 'string');
   if (conversations[userId].length > 20) conversations[userId] = conversations[userId].slice(-20);
 }
 
-// ===================================
-//  ENDPOINT /api/start
-// ===================================
+// ======================
+//  /api/start
+// ======================
 app.get('/api/start', async (req, res) => {
   try {
     const userId = req.query.uid;
-    const studentLevel = req.query.level || "Level1";
-    const studentUnit = req.query.unit || "Unit1";
+    const rawLevel = req.query.level || "Level1";
+    const rawUnit  = req.query.unit  || "Unit1";
     if (!userId) return res.status(400).json({ error: "User ID is required." });
 
-    console.log(`[GET /api/start] userId="${userId}", level="${studentLevel}", unit="${studentUnit}"`);
+    console.log(`[GET /api/start] uid="${userId}", level="${rawLevel}", unit="${rawUnit}"`);
 
-    const { topic, fullContent } = await loadConversationDetails(studentLevel, studentUnit);
+    // Dados do aluno
     const nameSnap = await db.ref(`usuarios/${userId}/nome`).once('value');
     if (!nameSnap.exists()) return res.status(404).json({ error: "Usuário não encontrado." });
     const studentName = nameSnap.val();
 
-    const context = createInitialContext(studentName, studentLevel, studentUnit, topic, fullContent);
-    const initialMessage = `Hello ${studentName}! Today's topic is: ${topic}. I'm ready to help you at your ${studentLevel}, in ${studentUnit}. Shall we begin?`;
-    conversations[userId] = [context, { studentName, studentLevel, studentUnit }, { role: "assistant", content: initialMessage }];
+    // Carrega conteúdo da unidade
+    const { topic, fullContent } = await loadConversationDetails(rawLevel, rawUnit);
+
+    // Cria contexto + primeira fala
+    const context = createInitialContext(studentName, rawLevel, rawUnit, topic, fullContent);
+    const initialMessage = `Hello ${studentName}! Today's topic is: ${topic}. I'm ready to help you at your ${rawLevel}, in ${rawUnit}. Shall we begin?`;
+
+    conversations[userId] = [
+      context,
+      { studentName, studentLevel: rawLevel, studentUnit: rawUnit }, // META para recuperar depois
+      { role: "assistant", content: initialMessage },
+    ];
     validateAndTrimHistory(userId);
 
-    // 🔹 TOKEN CONTROL
+    // ------- TOKENS -------
     let tokenInfo = {};
     if (TOKENS_CONTROL_ENABLED) {
       const walletRef = db.ref(`wallet/${userId}`);
-      const usageRef = db.ref(`usage/${userId}/${studentLevel}/${studentUnit}`);
-      const walletSnap = await walletRef.once('value');
-      const usageSnap = await usageRef.once('value');
+      const usageRef  = db.ref(`usage/${userId}/${rawLevel}/${rawUnit}`);
 
+      // Garantir wallet
+      const walletSnap = await walletRef.once('value');
       if (!walletSnap.exists()) {
         await walletRef.set({
           balanceTokens: tokenConfig.wallet.seed,
           createdAt: Date.now(),
-          ledger: { init: { type: "credit", amount: tokenConfig.wallet.seed, reason: "initial_seed", timestamp: Date.now() } }
+          ledger: {
+            init: {
+              type: "credit",
+              amount: tokenConfig.wallet.seed,
+              reason: "initial_seed",
+              timestamp: Date.now()
+            }
+          }
         });
       }
 
+      // Garantir usage (cap depende do level normalizado)
+      const capKey = normalizeLevelForCap(rawLevel);
+      const unitCap = tokenConfig.unitCaps[capKey] || 1000;
+      const usageSnap = await usageRef.once('value');
       if (!usageSnap.exists()) {
-        const unitCap = tokenConfig.unitCaps[studentLevel] || 1000;
         await usageRef.set({
-          unitCap, allowedTokens: unitCap, usedTokens: 0,
-          remainingTokens: unitCap, minSessionReserve: tokenConfig.minSessionReserve,
-          createdAt: Date.now(), ledger: {}
+          unitCap,
+          allowedTokens: unitCap,
+          usedTokens: 0,
+          remainingTokens: unitCap,
+          minSessionReserve: tokenConfig.minSessionReserve,
+          createdAt: Date.now()
         });
       }
 
-      const usage = (await usageRef.once('value')).val();
-      const wallet = (await walletRef.once('value')).val();
+      // Reserva mínima (pull da carteira, se fizer sentido)
+      let usage = (await usageRef.once('value')).val();
+      let wallet = (await walletRef.once('value')).val();
       let canChat = true;
 
       if (usage.remainingTokens < tokenConfig.minSessionReserve) {
         const needed = tokenConfig.minSessionReserve - usage.remainingTokens;
-        const transferable = Math.min(needed, wallet.balanceTokens, usage.unitCap - usage.allowedTokens);
+        const transferable = Math.min(
+          needed,
+          wallet.balanceTokens || 0,
+          usage.unitCap - usage.allowedTokens
+        );
         if (transferable > 0) {
-          await walletRef.update({ balanceTokens: wallet.balanceTokens - transferable });
+          await walletRef.update({ balanceTokens: (wallet.balanceTokens || 0) - transferable });
           await usageRef.update({
             allowedTokens: usage.allowedTokens + transferable,
             remainingTokens: usage.remainingTokens + transferable
           });
-        } else canChat = false;
+          usage  = (await usageRef.once('value')).val();
+          wallet = (await walletRef.once('value')).val();
+        } else {
+          canChat = usage.remainingTokens > 0;
+        }
       }
 
       tokenInfo = {
@@ -195,80 +230,109 @@ app.get('/api/start', async (req, res) => {
 
     return res.json({
       response: initialMessage,
-      studentInfo: { name: studentName, level: studentLevel, unit: studentUnit, fullContent },
+      studentInfo: { name: studentName, level: rawLevel, unit: rawUnit, fullContent },
       chatHistory: conversations[userId],
       tokenInfo
     });
   } catch (error) {
     console.error(`❌ Erro em /api/start: ${error.message}`);
-    res.status(500).json({ error: "Erro ao inicializar a conversa.", details: error.message });
+    return res.status(500).json({ error: "Erro ao inicializar a conversa.", details: error.message });
   }
 });
 
-// ===================================
-//  ENDPOINT /api/chat
-// ===================================
+// ======================
+//  /api/chat
+// ======================
 app.post('/api/chat', async (req, res) => {
   const { uid: userId, message: userMessage, level, unit } = req.body;
-  if (!userId || !userMessage) return res.status(400).json({ response: "User ID and message required." });
+  if (!userId || !userMessage) {
+    return res.status(400).json({ response: "User ID and message required." });
+  }
 
   try {
+    // Se não existir contexto (edge case: chamaram /api/chat antes do /api/start)
     if (!conversations[userId]) {
       const nameSnap = await db.ref(`usuarios/${userId}/nome`).once('value');
       const studentName = nameSnap.exists() ? nameSnap.val() : "Student";
-      const studentLevel = level || "Level1";
-      const studentUnit = unit || "Unit1";
-      const { topic, fullContent } = await loadConversationDetails(studentLevel, studentUnit);
-      const context = createInitialContext(studentName, studentLevel, studentUnit, topic, fullContent);
-      conversations[userId] = [context];
+      const fallbackLevel = level || "Level1";
+      const fallbackUnit  = unit  || "Unit1";
+      const { topic, fullContent } = await loadConversationDetails(fallbackLevel, fallbackUnit);
+      const context = createInitialContext(studentName, fallbackLevel, fallbackUnit, topic, fullContent);
+      conversations[userId] = [context, { studentName, studentLevel: fallbackLevel, studentUnit: fallbackUnit }];
     }
 
     validateAndTrimHistory(userId);
+
+    // Recupera level/unit do contexto se não vier no body
+    const meta = conversations[userId]?.[1] || {};
+    const studentLevel = level || meta.studentLevel || "Level1";
+    const studentUnit  = unit  || meta.studentUnit  || "Unit1";
+
     conversations[userId].push({ role: 'user', content: userMessage });
 
-    // 🔹 TOKEN PRE-CHECK
-    let usageRef, usage, walletRef, wallet;
-    if (TOKENS_CONTROL_ENABLED) {
-      const studentLevel = level || "Level1";
-      const studentUnit = unit || "Unit1";
-      usageRef = db.ref(`usage/${userId}/${studentLevel}/${studentUnit}`);
-      walletRef = db.ref(`wallet/${userId}`);
-      usage = (await usageRef.once('value')).val();
-      wallet = (await walletRef.once('value')).val();
+    // ------- TOKENS: PRECHECK -------
+    let tokenInfo = {};
+    let usageRef, walletRef;
 
+    if (TOKENS_CONTROL_ENABLED) {
+      usageRef  = db.ref(`usage/${userId}/${studentLevel}/${studentUnit}`);
+      walletRef = db.ref(`wallet/${userId}`);
+
+      // Garante usage caso não exista (ex.: entrou por /api/chat direto)
+      let usageSnap = await usageRef.once('value');
+      if (!usageSnap.exists()) {
+        const capKey = normalizeLevelForCap(studentLevel);
+        const unitCap = tokenConfig.unitCaps[capKey] || 1000;
+        await usageRef.set({
+          unitCap,
+          allowedTokens: unitCap,
+          usedTokens: 0,
+          remainingTokens: unitCap,
+          minSessionReserve: tokenConfig.minSessionReserve,
+          createdAt: Date.now()
+        });
+        usageSnap = await usageRef.once('value');
+      }
+
+      const usage  = usageSnap.val();
+      const wallet = (await walletRef.once('value')).val() || { balanceTokens: 0 };
+
+      // Estimativa conservadora: ~80 input + maxOut output
       const estimated = 80 + tokenConfig.maxOut;
-      if (usage.remainingTokens < estimated) {
+      if ((usage.remainingTokens || 0) < estimated) {
         return res.json({
           response: "You reached your token limit for this unit.",
           chatHistory: conversations[userId],
           tokenInfo: {
-            remainingUnit: usage.remainingTokens,
-            walletBalance: wallet.balanceTokens,
+            remainingUnit: usage.remainingTokens || 0,
+            walletBalance: wallet.balanceTokens || 0,
             canChat: false
           }
         });
       }
     }
 
+    // ------- OPENAI -------
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini-2024-07-18',
       messages: conversations[userId],
+      // max_tokens: tokenConfig.maxOut, // opcional; você pode forçar
     });
-    const responseMessage = completion.choices[0].message.content;
+    const responseMessage = completion.choices[0].message.content || "";
     conversations[userId].push({ role: 'assistant', content: responseMessage });
 
-    // 🔹 TOKEN DEBIT
-    let tokenInfo = {};
+    // ------- TOKENS: DÉBITO -------
     if (TOKENS_CONTROL_ENABLED && completion.usage) {
-      const totalUsed = completion.usage.total_tokens;
+      const totalUsed = completion.usage.total_tokens || 0;
       await usageRef.transaction(current => {
         if (!current) return current;
-        current.usedTokens += totalUsed;
-        current.remainingTokens = Math.max(0, current.allowedTokens - current.usedTokens);
+        current.usedTokens = (current.usedTokens || 0) + totalUsed;
+        current.remainingTokens = Math.max(0, (current.allowedTokens || 0) - current.usedTokens);
         return current;
       });
-      const updatedUsage = (await usageRef.once('value')).val();
-      const updatedWallet = (await walletRef.once('value')).val();
+
+      const updatedUsage  = (await usageRef.once('value')).val();
+      const updatedWallet = (await walletRef.once('value')).val() || { balanceTokens: 0 };
       tokenInfo = {
         remainingUnit: updatedUsage.remainingTokens,
         walletBalance: updatedWallet.balanceTokens,
@@ -276,7 +340,7 @@ app.post('/api/chat', async (req, res) => {
       };
     }
 
-    res.json({
+    return res.json({
       response: responseMessage,
       chatHistory: conversations[userId],
       usage: completion.usage,
@@ -285,13 +349,13 @@ app.post('/api/chat', async (req, res) => {
 
   } catch (error) {
     console.error(`❌ Erro em /api/chat: ${error.message}`);
-    res.status(500).json({ response: "Erro ao processar a mensagem.", details: error.message });
+    return res.status(500).json({ response: "Erro ao processar a mensagem.", details: error.message });
   }
 });
 
-// ===================================
-//  ENDPOINT /api/tts (Google TTS)
-// ===================================
+// ======================
+//  /api/tts
+// ======================
 app.post('/api/tts', async (req, res) => {
   try {
     const { text, speakingRate } = req.body;
@@ -310,13 +374,13 @@ app.post('/api/tts', async (req, res) => {
     return res.json({ audioContent });
   } catch (error) {
     console.error("[/api/tts] Erro:", error);
-    res.status(500).json({ error: "Erro ao gerar áudio TTS.", details: error.message });
+    return res.status(500).json({ error: "Erro ao gerar áudio TTS.", details: error.message });
   }
 });
 
-// ===================================
-//  TESTE E START
-// ===================================
-app.get('/', (req, res) => res.send("Servidor rodando com sucesso!"));
+// ======================
+//  ROOT & START
+// ======================
+app.get('/', (_req, res) => res.send("Servidor rodando com sucesso!"));
 app.listen(PORT, () => console.log(`🚀 Servidor rodando na porta ${PORT}`));
 module.exports = app;
