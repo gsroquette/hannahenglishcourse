@@ -39,7 +39,21 @@ const db = admin.database();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors({ origin: '*' }));
+// CORREÇÃO DO CORS - Configuração mais específica
+app.use(cors({
+    origin: [
+        'https://hannahenglishcourse.netlify.app',
+        'http://localhost:3000',
+        'http://127.0.0.1:3000'
+    ],
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
+}));
+
+// Middleware para lidar com requisições OPTIONS (preflight)
+app.options('*', cors());
+
 app.use(bodyParser.json());
 
 // ======================
@@ -567,6 +581,7 @@ app.get('/', (_req, res) => {
 app.listen(PORT, () => {
     console.log(`🚀 Servidor rodando na porta ${PORT}`);
     console.log(`📊 Controle de tokens: ${TOKENS_CONTROL_ENABLED ? 'ATIVADO' : 'DESATIVADO'}`);
+    console.log(`🌐 CORS configurado para: hannahenglishcourse.netlify.app`);
 });
 
 module.exports = app;
