@@ -191,7 +191,7 @@ app.get('/api/start', async (req, res) => {
         // ------- TOKENS -------
         let tokenInfo = {};
         if (TOKENS_CONTROL_ENABLED) {
-            // ITEM 3: Normalização das chaves para paths do Firebase
+            // Normalização das chaves para paths do Firebase
             const pathLevel = String(rawLevel).toLowerCase();
             const pathUnit = String(rawUnit).toLowerCase();
             
@@ -292,7 +292,7 @@ app.get('/api/start', async (req, res) => {
 });
 
 // ======================
-// /api/chat
+// /api/chat - VERSÃO CORRIGIDA
 // ======================
 app.post('/api/chat', async (req, res) => {
     const { uid: userId, message: userMessage, level, unit } = req.body;
@@ -328,26 +328,45 @@ app.post('/api/chat', async (req, res) => {
         // Valida e limpa o histórico
         validateAndTrimHistory(userId);
         
-        // Recupera level/unit do contexto se não vier no body
+        // CORREÇÃO: SEMPRE usar os valores do contexto, NUNCA fallback para "Level1"
         const meta = conversations[userId]?.[1] || {};
-        const studentLevel = level || meta.studentLevel || "Level1";
-        const studentUnit = unit || meta.studentUnit || "Unit1";
+        
+        // DEBUG: Log para verificar o que está no meta
+        console.log(`[DEBUG] Meta do usuário ${userId}:`, meta);
+        
+        // Usar APENAS os valores do contexto, sem fallback genérico
+        const studentLevel = meta.studentLevel;
+        const studentUnit = meta.studentUnit;
+        
+        if (!studentLevel || !studentUnit) {
+            console.error(`❌ Nível ou unidade não encontrados no contexto para usuário ${userId}`);
+            return res.status(500).json({ 
+                response: "Configuration error. Please restart the conversation.",
+                error: "MISSING_LEVEL_UNIT" 
+            });
+        }
+
+        console.log(`[INFO] Usando level: ${studentLevel}, unit: ${studentUnit} para usuário ${userId}`);
 
         // ------- TOKENS: PRECHECK -------
         let tokenInfo = {};
         let usageRef, walletRef;
         
         if (TOKENS_CONTROL_ENABLED) {
-            // ITEM 3: Normalização das chaves para paths do Firebase
+            // Normalização das chaves para paths do Firebase
             const pathLevel = String(studentLevel).toLowerCase();
             const pathUnit = String(studentUnit).toLowerCase();
             
             usageRef = db.ref(`usage/${userId}/${pathLevel}/${pathUnit}`);
             walletRef = db.ref(`wallet/${userId}`);
 
+            // DEBUG: Log do path que está sendo usado
+            console.log(`[DEBUG] Path do Firebase: usage/${userId}/${pathLevel}/${pathUnit}`);
+
             // Garante usage caso não exista (ex.: entrou por /api/chat direto)
             let usageSnap = await usageRef.once('value');
             if (!usageSnap.exists()) {
+                console.log(`[INFO] Criando usage para ${userId}/${pathLevel}/${pathUnit}`);
                 const capKey = normalizeLevelForCap(studentLevel);
                 const unitCap = tokenConfig.unitCaps[capKey] || 1000;
                 await usageRef.set({
@@ -363,6 +382,9 @@ app.post('/api/chat', async (req, res) => {
 
             const usage = usageSnap.val();
             const wallet = (await walletRef.once('value')).val() || { balanceTokens: 0 };
+
+            // DEBUG: Log do saldo atual
+            console.log(`[DEBUG] Tokens restantes: ${usage.remainingTokens}, Carteira: ${wallet.balanceTokens}`);
 
             // Estimativa conservadora: ~80 input + maxOut output
             const estimated = 80 + tokenConfig.maxOut;
@@ -381,7 +403,7 @@ app.post('/api/chat', async (req, res) => {
             }
         }
 
-        // ITEM 1: Só adiciona a mensagem do usuário APÓS o precheck de tokens
+        // Só adiciona a mensagem do usuário APÓS o precheck de tokens
         conversations[userId].push({ role: 'user', content: userMessage.trim() });
 
         // ------- OPENAI -------
@@ -408,7 +430,10 @@ app.post('/api/chat', async (req, res) => {
             const updatedUsage = (await usageRef.once('value')).val();
             const updatedWallet = (await walletRef.once('value')).val() || { balanceTokens: 0 };
             
-            // ITEM 2: Reabastecer da wallet também no /api/chat
+            // DEBUG: Log após débito
+            console.log(`[DEBUG] Após débito - Tokens usados: ${totalUsed}, Restantes: ${updatedUsage.remainingTokens}`);
+            
+            // Reabastecer da wallet também no /api/chat
             if (updatedUsage.remainingTokens < tokenConfig.minSessionReserve) {
                 const need = tokenConfig.minSessionReserve - updatedUsage.remainingTokens;
                 const capLeft = updatedUsage.unitCap - updatedUsage.allowedTokens;
@@ -450,7 +475,7 @@ app.post('/api/chat', async (req, res) => {
             }
         }
 
-        console.log(`[SUCCESS] Response generated for user: ${userId}`);
+        console.log(`[SUCCESS] Response generated for user: ${userId} (Level: ${studentLevel}, Unit: ${studentUnit})`);
         return res.json({
             response: responseMessage,
             chatHistory: conversations[userId],
