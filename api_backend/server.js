@@ -73,14 +73,14 @@ const tokenConfig = {
         seed: 325000
     }, // saldo global inicial
     unitCaps: {
-        Level0: 1000,
-        Level1: 2000,
-        Level2: 3000,
-        Level3: 4000,
-        Level4: 5000
+        Level0: 2000,  // Aumentado
+        Level1: 3000,  // Aumentado  
+        Level2: 4000,  // Aumentado
+        Level3: 5000,  // Aumentado
+        Level4: 6000   // Aumentado
     },
-    minSessionReserve: 300, // reserva mínima para não travar no meio da resposta
-    maxOut: 120 // limite de tokens de saída por resposta
+    minSessionReserve: 200,  // Reduzido
+    maxOut: 60  // Reduzido significativamente para respostas mais curtas
 };
 
 // ======================
@@ -231,7 +231,7 @@ app.get('/api/start', async (req, res) => {
 
             // Garantir usage (cap depende do level normalizado)
             const capKey = normalizeLevelForCap(rawLevel);
-            const unitCap = tokenConfig.unitCaps[capKey] || 1000;
+            const unitCap = tokenConfig.unitCaps[capKey] || 2000;
             const usageSnap = await usageRef.once('value');
             if (!usageSnap.exists()) {
                 await usageRef.set({
@@ -306,7 +306,7 @@ app.get('/api/start', async (req, res) => {
 });
 
 // ======================
-// /api/chat - VERSÃO CORRIGIDA COM OPÇÃO A
+// /api/chat - VERSÃO CORRIGIDA COM OPÇÃO A E TOKENS OTIMIZADOS
 // ======================
 app.post('/api/chat', async (req, res) => {
     const { uid: userId, message: userMessage, level, unit } = req.body;
@@ -393,7 +393,7 @@ app.post('/api/chat', async (req, res) => {
             if (!usageSnap.exists()) {
                 console.log(`[INFO] Criando usage para ${userId}/${pathLevel}/${pathUnit}`);
                 const capKey = normalizeLevelForCap(studentLevel);
-                const unitCap = tokenConfig.unitCaps[capKey] || 1000;
+                const unitCap = tokenConfig.unitCaps[capKey] || 2000;
                 await usageRef.set({
                     unitCap,
                     allowedTokens: unitCap,
@@ -411,8 +411,8 @@ app.post('/api/chat', async (req, res) => {
             // DEBUG: Log do saldo atual
             console.log(`[DEBUG] Tokens restantes: ${usage.remainingTokens}, Carteira: ${wallet.balanceTokens}`);
 
-            // Estimativa conservadora: ~80 input + maxOut output
-            const estimated = 80 + tokenConfig.maxOut;
+            // CORREÇÃO: Estimativa mais conservadora - máximo 100 tokens ou 25% do saldo
+            const estimated = Math.min(100, Math.max(50, usage.remainingTokens * 0.25));
             
             if ((usage.remainingTokens || 0) < estimated) {
                 console.log(`[TOKENS] Bloqueado: usuário ${userId} sem tokens suficientes. Restantes: ${usage.remainingTokens}, Necessários: ${estimated}`);
@@ -435,7 +435,8 @@ app.post('/api/chat', async (req, res) => {
         const completion = await openai.chat.completions.create({
             model: 'gpt-4o-mini-2024-07-18',
             messages: conversations[userId],
-            max_tokens: tokenConfig.maxOut,
+            max_tokens: 60, // CORREÇÃO: Reduzido para respostas mais curtas
+            temperature: 0.7,
         });
 
         const responseMessage = completion.choices[0].message?.content || "I'm sorry, I couldn't generate a response.";
@@ -500,7 +501,7 @@ app.post('/api/chat', async (req, res) => {
             }
         }
 
-        console.log(`[SUCCESS] Response generated for user: ${userId} (Level: ${studentLevel}, Unit: ${studentUnit})`);
+        console.log(`[SUCCESS] Response generated for user: ${userId} (Level: ${studentLevel}, Unit: ${studentUnit}) - Tokens used: ${completion.usage?.total_tokens || 'N/A'}`);
         return res.json({
             response: responseMessage,
             chatHistory: conversations[userId],
@@ -593,6 +594,7 @@ app.listen(PORT, () => {
     console.log(`🚀 Servidor rodando na porta ${PORT}`);
     console.log(`📊 Controle de tokens: ${TOKENS_CONTROL_ENABLED ? 'ATIVADO' : 'DESATIVADO'}`);
     console.log(`🌐 CORS configurado para: hannahenglishcourse.netlify.app`);
+    console.log(`🔧 Configuração de tokens: max_tokens=60, unitCaps aumentados`);
 });
 
 module.exports = app;
