@@ -210,8 +210,8 @@
             tokenWarning.textContent = "";
             tokenLimit.textContent = "";
 
-            if (info.remainingUnit < 80 && info.remainingUnit > 0) {
-                tokenWarning.textContent = "⚠️ Almost finished! About 2 replies left.";
+            if (info.remainingUnit < 200 && info.remainingUnit > 0) {
+                tokenWarning.textContent = "⚠️ Almost finished! About 3-4 replies left.";
             }
 
             if (!info.canChat || info.remainingUnit <= 0) {
@@ -299,8 +299,8 @@
                             uid: userId,
                             message: userSpeech,
                             chatHistory,
-                            level: currentLevel,  // ← SEMPRE enviar
-                            unit: currentUnit     // ← SEMPRE enviar
+                            level: currentLevel,
+                            unit: currentUnit
                         })
                     });
                     
@@ -311,9 +311,17 @@
                     messageElement.innerText = data.response;
                     
                     if (data.tokenInfo) updateTokenUI(data.tokenInfo);
-                    if (data.tokenInfo && data.tokenInfo.canChat === false) return;
                     
-                    speakUsingGoogleTTS(data.response);
+                    // CORREÇÃO: Sempre tentar falar, exceto se for mensagem de limite de tokens
+                    if (data.response && !data.response.includes("token limit") && !data.response.includes("Please complete other activities")) {
+                        speakUsingGoogleTTS(data.response);
+                    }
+                    
+                    // Se não pode mais falar, mostrar mensagem clara
+                    if (data.tokenInfo && data.tokenInfo.canChat === false) {
+                        messageElement.innerText = data.response + "\n\nPlease complete other activities to earn more tokens.";
+                    }
+                    
                 } catch (e) {
                     console.error(e);
                     messageElement.innerText = "Error communicating with the server.";
@@ -339,21 +347,32 @@
         // TTS
         async function speakUsingGoogleTTS(text) {
             try {
+                // Limitar o texto para TTS (evitar textos muito longos)
+                const shortText = text.length > 200 ? text.substring(0, 200) + "..." : text;
                 const playbackSpeed = parseFloat(speedSlider.value) || 1.0;
+                
+                console.log("Enviando para TTS:", shortText);
+                
                 const resp = await fetch('https://hannah-backend.onrender.com/api/tts', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        text,
+                        text: shortText,
                         speakingRate: playbackSpeed
                     })
                 });
                 
-                if (!resp.ok) return;
+                if (!resp.ok) {
+                    console.error("Erro no TTS response:", resp.status);
+                    return;
+                }
                 
                 const data = await resp.json();
                 const audioBase64 = data.audioContent;
-                if (!audioBase64) return;
+                if (!audioBase64) {
+                    console.error("Sem conteúdo de áudio no TTS response");
+                    return;
+                }
                 
                 const audio = new Audio(URL.createObjectURL(base64ToBlob(audioBase64, 'audio/mp3')));
                 
@@ -371,9 +390,28 @@
                     speakButton.innerText = "Press to Speak";
                 };
                 
-                await audio.play();
+                audio.onerror = (e) => {
+                    console.error("Erro no áudio TTS:", e);
+                    isSpeaking = false;
+                    robotImg.src = ROBOT_STATIC;
+                    speakButton.disabled = false;
+                    speakButton.innerText = "Press to Speak";
+                };
+                
+                await audio.play().catch(e => {
+                    console.error("Erro ao reproduzir áudio:", e);
+                    isSpeaking = false;
+                    robotImg.src = ROBOT_STATIC;
+                    speakButton.disabled = false;
+                    speakButton.innerText = "Press to Speak";
+                });
+                
             } catch (e) {
                 console.error("TTS error:", e);
+                isSpeaking = false;
+                robotImg.src = ROBOT_STATIC;
+                speakButton.disabled = false;
+                speakButton.innerText = "Press to Speak";
             }
         }
 
@@ -409,8 +447,8 @@
                                 uid: userId,
                                 message: userMessage,
                                 chatHistory,
-                                level: currentLevel,  // ← SEMPRE enviar
-                                unit: currentUnit     // ← SEMPRE enviar
+                                level: currentLevel,
+                                unit: currentUnit
                             })
                         });
                         
@@ -419,7 +457,11 @@
                             chatHistory = data.chatHistory;
                             messageElement.innerText = data.response;
                             if (data.tokenInfo) updateTokenUI(data.tokenInfo);
-                            speakUsingGoogleTTS(data.response);
+                            
+                            // CORREÇÃO: Sempre tentar falar, exceto se for mensagem de limite de tokens
+                            if (data.response && !data.response.includes("token limit") && !data.response.includes("Please complete other activities")) {
+                                speakUsingGoogleTTS(data.response);
+                            }
                         }
                     } catch (e) {
                         console.error(e);
@@ -480,6 +522,8 @@
                             if (speakButton.innerText === "Press to Start") {
                                 messageElement.style.visibility = "visible";
                                 messageElement.innerText = initialGreeting;
+                                
+                                // CORREÇÃO: Garantir que a saudação inicial seja falada
                                 speakUsingGoogleTTS(initialGreeting);
                                 speakButton.innerText = "Press to Speak";
                             } 
