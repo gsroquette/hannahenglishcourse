@@ -224,7 +224,7 @@
         </div>
         <div class="actions" style="margin-top:12px;">
           <button id="addBtn" class="btn" onclick="addActivity()">Add Activity</button>
-          <button id="pdfBtn" class="btn btn-secondary" onclick="generatePDF()">Generate PDF</button>
+          <button id="pdfBtn" class="btn btn-secondary" onclick="generatePDFPrintOnly()">Generate PDF</button>
         </div>
       </aside>
 
@@ -237,7 +237,117 @@
   </main>
 
   <!-- html2pdf -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js">
+    function generatePDFPrintOnly(){
+      // Build a clean, print-only document: Logo + Name/Date + Activities
+      const printRoot = document.createElement('div');
+      printRoot.id = 'print-root';
+      printRoot.style.background = '#ffffff';
+      printRoot.style.padding = '8mm';
+
+      // Header (Logo + Name/Date)
+      const header = document.createElement('div');
+      header.style.display = 'flex';
+      header.style.alignItems = 'center';
+      header.style.gap = '12px';
+      header.style.marginBottom = '12px';
+
+      const logo = document.createElement('img');
+      logo.src = 'Logo.png';
+      logo.alt = 'Logo';
+      logo.style.width = '80px';
+      logo.style.height = 'auto';
+      header.appendChild(logo);
+
+      const nameDateWrap = document.createElement('div');
+      nameDateWrap.style.marginLeft = 'auto';
+      nameDateWrap.style.fontSize = '14px';
+      nameDateWrap.textContent = 'Name: _________________________________________   Date: _____________';
+      header.appendChild(nameDateWrap);
+
+      printRoot.appendChild(header);
+
+      // Activities -> clone each line into a print-friendly row
+      const lines = document.querySelectorAll('#activities .line');
+      lines.forEach((srcLine)=>{
+        const printLine = document.createElement('div');
+        printLine.style.display = 'grid';
+        printLine.style.gridTemplateColumns = '150px 1fr';
+        printLine.style.gap = '12px';
+        printLine.style.alignItems = 'center';
+        printLine.style.margin = '10px 0';
+        printLine.style.pageBreakInside = 'avoid';
+
+        // Image (optional)
+        const img = srcLine.querySelector('img.image-preview');
+        if(img){
+          const cloneImg = document.createElement('img');
+          cloneImg.src = img.src;
+          cloneImg.alt = 'Activity image';
+          cloneImg.style.width = '150px';
+          cloneImg.style.height = 'auto';
+          printLine.appendChild(cloneImg);
+        } else {
+          const spacer = document.createElement('div');
+          spacer.style.width = '150px';
+          spacer.style.height = '1px';
+          printLine.appendChild(spacer);
+        }
+
+        // Text (Word + Dotted repetitions)
+        const textWrap = document.createElement('div');
+        const word = (srcLine.querySelector('.word')?.textContent || '').trim();
+
+        const wordTitle = document.createElement('div');
+        wordTitle.textContent = word;
+        wordTitle.style.fontSize = '36px';
+        wordTitle.style.fontWeight = '700';
+        wordTitle.style.marginBottom = '4px';
+        textWrap.appendChild(wordTitle);
+
+        const dotted = document.createElement('div');
+        dotted.style.fontFamily = '\'KGPrimaryDots\', Arial, sans-serif';
+        dotted.style.fontSize = '48px';
+        dotted.style.letterSpacing = '3px';
+        dotted.style.lineHeight = '1.3';
+
+        const dottedSource = srcLine.querySelector('.dotted-text');
+        if(dottedSource){
+          // clone dotted content (spans) so it prints exactly like on screen
+          dotted.innerHTML = dottedSource.innerHTML;
+        } else if(word){
+          dotted.textContent = word + ' ';
+        }
+
+        textWrap.appendChild(dotted);
+        printLine.appendChild(textWrap);
+        printRoot.appendChild(printLine);
+      });
+
+      document.body.appendChild(printRoot);
+
+      const opt = {
+        filename: 'Hannah_Fine_Motor_Skills.pdf',
+        margin: [8,8,12,8],
+        pagebreak: { mode: ['avoid-all','css','legacy'] },
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true }
+      };
+
+      (async ()=>{
+        try{
+          if(document.fonts && document.fonts.ready){ await document.fonts.ready; }
+          await html2pdf().from(printRoot).set(opt).save();
+        } catch(err){
+          console.error(err);
+          alert('There was an error generating the PDF. Please try again.');
+        } finally {
+          printRoot.remove();
+        }
+      })();
+    }
+  </script>
 
   <script>
     function clamp(val, min, max){ return Math.max(min, Math.min(max, val)); }
