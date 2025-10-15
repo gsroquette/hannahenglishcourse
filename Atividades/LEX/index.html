@@ -184,6 +184,10 @@
         let recognition, isSpeaking = false, userId = null, chatHistory = [];
         let initialGreeting = null;
         let audioUnlocked = false;
+        
+        // OPÇÃO A: Variáveis para guardar level/unit atual
+        let currentLevel = null;
+        let currentUnit = null;
 
         // UI helpers
         function updateSliderBackground() {
@@ -287,13 +291,16 @@
                 }
 
                 try {
+                    // OPÇÃO A: Sempre enviar level e unit no body
                     const resp = await fetch('https://hannah-backend.onrender.com/api/chat', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             uid: userId,
                             message: userSpeech,
-                            chatHistory
+                            chatHistory,
+                            level: currentLevel,  // ← SEMPRE enviar
+                            unit: currentUnit     // ← SEMPRE enviar
                         })
                     });
                     
@@ -394,13 +401,16 @@
                     if (!userId) return;
                     
                     try {
+                        // OPÇÃO A: Sempre enviar level e unit no body
                         const resp = await fetch('https://hannah-backend.onrender.com/api/chat', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 uid: userId,
                                 message: userMessage,
-                                chatHistory
+                                chatHistory,
+                                level: currentLevel,  // ← SEMPRE enviar
+                                unit: currentUnit     // ← SEMPRE enviar
                             })
                         });
                         
@@ -431,19 +441,27 @@
 
                 userId = user.uid;
                 const params = new URLSearchParams(window.location.search);
-                const level = params.get('level') || 'Level1';
-                const unit = params.get('unit') || 'Unit1';
+                
+                // OPÇÃO A: Inicializar currentLevel e currentUnit da URL
+                currentLevel = params.get('level') || 'Level1';
+                currentUnit = params.get('unit') || 'Unit1';
 
                 try {
                     loaderMessage.style.display = "block";
                     loaderMessage.innerText = "Waking up Robot Samuel...";
                     
-                    const r = await fetch(`https://hannah-backend.onrender.com/api/start?uid=${userId}&level=${level}&unit=${unit}`);
+                    const r = await fetch(`https://hannah-backend.onrender.com/api/start?uid=${userId}&level=${currentLevel}&unit=${currentUnit}`);
                     if (!r.ok) throw new Error("Failed to initialize conversation.");
                     
                     const data = await r.json();
                     chatHistory = data.chatHistory || [];
                     initialGreeting = data.response || "Hello! Shall we begin?";
+                    
+                    // OPÇÃO A: Atualizar com os valores do backend (caso tenha normalização)
+                    if (data.studentInfo) {
+                        currentLevel = data.studentInfo.level || currentLevel;
+                        currentUnit = data.studentInfo.unit || currentUnit;
+                    }
                     
                     messageElement.innerText = initialGreeting;
                     loaderMessage.style.display = "none";
