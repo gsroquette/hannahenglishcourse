@@ -306,7 +306,7 @@ app.get('/api/start', async (req, res) => {
 });
 
 // ======================
-// /api/chat - VERSÃO CORRIGIDA
+// /api/chat - VERSÃO CORRIGIDA COM OPÇÃO A
 // ======================
 app.post('/api/chat', async (req, res) => {
     const { uid: userId, message: userMessage, level, unit } = req.body;
@@ -319,7 +319,7 @@ app.post('/api/chat', async (req, res) => {
     }
 
     try {
-        console.log(`[POST /api/chat] User: ${userId}, Message: "${userMessage.substring(0, 50)}..."`);
+        console.log(`[POST /api/chat] User: ${userId}, Message: "${userMessage.substring(0, 50)}...", Level: ${level}, Unit: ${unit}`);
         
         // Se não existir contexto (edge case: chamaram /api/chat antes do /api/start)
         if (!conversations[userId] || conversations[userId].length === 0) {
@@ -342,23 +342,34 @@ app.post('/api/chat', async (req, res) => {
         // Valida e limpa o histórico
         validateAndTrimHistory(userId);
         
-        // CORREÇÃO: SEMPRE usar os valores do contexto, NUNCA fallback para "Level1"
+        // CORREÇÃO COM OPÇÃO A: PRIORIZAR os valores do body (frontend) e sincronizar com contexto
         const meta = conversations[userId]?.[1] || {};
         
-        // DEBUG: Log para verificar o que está no meta
-        console.log(`[DEBUG] Meta do usuário ${userId}:`, meta);
+        // OPÇÃO A: Usar level/unit do body (frontend) como fonte primária
+        const requestedLevel = level || meta.studentLevel;
+        const requestedUnit = unit || meta.studentUnit;
         
-        // Usar APENAS os valores do contexto, sem fallback genérico
-        const studentLevel = meta.studentLevel;
-        const studentUnit = meta.studentUnit;
-        
-        if (!studentLevel || !studentUnit) {
-            console.error(`❌ Nível ou unidade não encontrados no contexto para usuário ${userId}`);
+        if (!requestedLevel || !requestedUnit) {
+            console.error(`❌ Nível ou unidade não encontrados para usuário ${userId}`);
             return res.status(500).json({ 
                 response: "Configuration error. Please restart the conversation.",
                 error: "MISSING_LEVEL_UNIT" 
             });
         }
+
+        // Sincronizar contexto com os valores do frontend (se necessário)
+        if (!meta.studentLevel || !meta.studentUnit || 
+            meta.studentLevel !== requestedLevel || meta.studentUnit !== requestedUnit) {
+            console.log(`[SYNC] Sincronizando contexto: ${meta.studentLevel}->${requestedLevel}, ${meta.studentUnit}->${requestedUnit}`);
+            conversations[userId][1] = { 
+                ...meta, 
+                studentLevel: requestedLevel, 
+                studentUnit: requestedUnit 
+            };
+        }
+
+        const studentLevel = requestedLevel;
+        const studentUnit = requestedUnit;
 
         console.log(`[INFO] Usando level: ${studentLevel}, unit: ${studentUnit} para usuário ${userId}`);
 
