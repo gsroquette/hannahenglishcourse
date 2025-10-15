@@ -164,7 +164,7 @@ function validateAndTrimHistory(userId) {
     conversations[userId].push(...trimmedChat);
 }
 
-// ESTRATÉGIA 2: Função para limitar histórico enviado para OpenAI
+// ESTRATÉGIA INTELIGENTE: Função para limitar histórico enviado para OpenAI
 function getMessagesForOpenAI(userId) {
     if (!conversations[userId] || conversations[userId].length === 0) {
         return [];
@@ -172,32 +172,33 @@ function getMessagesForOpenAI(userId) {
     
     const allMessages = conversations[userId];
     
-    // ESTRATÉGIA 1: System message apenas na primeira chamada
-    // Se já temos mensagens de user/assistant, não reenviar system message
-    const hasUserAssistantMessages = allMessages.some(msg => 
+    // SEMPRE incluir system message (contexto essencial)
+    const systemMessage = allMessages.find(msg => msg.role === "system");
+    
+    // Filtrar apenas user/assistant messages para histórico
+    const chatMessages = allMessages.filter(msg => 
         msg.role === 'user' || msg.role === 'assistant'
     );
     
+    // ESTRATÉGIA INTELIGENTE: Incluir system message apenas nas primeiras 3 trocas
+    // (até ~6 mensagens de chat: user1 + assistant1 + user2 + assistant2 + user3 + assistant3)
+    const shouldIncludeSystem = chatMessages.length <= 6;
+    
     let messagesToSend = [];
     
-    if (hasUserAssistantMessages) {
-        // ESTRATÉGIA 1: Não reenviar system message após primeira chamada
-        // Filtrar apenas mensagens user/assistant (remover system e meta)
-        messagesToSend = allMessages.filter(msg => 
-            msg.role === 'user' || msg.role === 'assistant'
-        );
-        
-        // ESTRATÉGIA 2: Limitar para últimas 8 mensagens (4 trocas)
-        if (messagesToSend.length > 8) {
-            console.log(`[HISTORY] Limitando histórico de ${messagesToSend.length} para 8 mensagens`);
-            messagesToSend = messagesToSend.slice(-8);
-        }
+    // Incluir system message quando necessário
+    if (shouldIncludeSystem && systemMessage) {
+        messagesToSend.push(systemMessage);
+        console.log(`[HISTORY] Incluindo system message (chat messages: ${chatMessages.length})`);
     } else {
-        // Primeira chamada: enviar system message + primeira resposta
-        messagesToSend = allMessages.filter(msg => 
-            msg.role === 'system' || msg.role === 'assistant'
-        );
+        console.log(`[HISTORY] Removendo system message (chat messages: ${chatMessages.length})`);
     }
+    
+    // ESTRATÉGIA 2: Limitar para últimas 8 mensagens de chat (4 trocas)
+    const limitedChatMessages = chatMessages.slice(-8);
+    
+    // Combinar system message (se aplicável) + histórico limitado
+    messagesToSend = [...messagesToSend, ...limitedChatMessages];
     
     console.log(`[HISTORY] Enviando ${messagesToSend.length} mensagens para OpenAI`);
     return messagesToSend;
@@ -345,7 +346,7 @@ app.get('/api/start', async (req, res) => {
 });
 
 // ======================
-// /api/chat - VERSÃO CORRIGIDA COM ESTRATÉGIAS 1 E 2
+// /api/chat - VERSÃO CORRIGIDA COM ESTRATÉGIA INTELIGENTE
 // ======================
 app.post('/api/chat', async (req, res) => {
     const { uid: userId, message: userMessage, level, unit } = req.body;
@@ -471,7 +472,7 @@ app.post('/api/chat', async (req, res) => {
         conversations[userId].push({ role: 'user', content: userMessage.trim() });
 
         // ------- OPENAI -------
-        // ESTRATÉGIAS 1 E 2: Usar função para limitar mensagens enviadas
+        // ESTRATÉGIA INTELIGENTE: Usar função para limitar mensagens enviadas
         const messagesForOpenAI = getMessagesForOpenAI(userId);
         
         const completion = await openai.chat.completions.create({
@@ -636,7 +637,7 @@ app.listen(PORT, () => {
     console.log(`🚀 Servidor rodando na porta ${PORT}`);
     console.log(`📊 Controle de tokens: ${TOKENS_CONTROL_ENABLED ? 'ATIVADO' : 'DESATIVADO'}`);
     console.log(`🌐 CORS configurado para: hannahenglishcourse.netlify.app`);
-    console.log(`🔧 ESTRATÉGIAS 1 e 2 ATIVADAS: System apenas 1x + Histórico limitado a 8 mensagens`);
+    console.log(`🔧 ESTRATÉGIA INTELIGENTE: System message nas primeiras 3 trocas + Histórico limitado a 8 mensagens`);
 });
 
 module.exports = app;
