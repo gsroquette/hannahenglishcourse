@@ -6,7 +6,7 @@ const OpenAI = require('openai');
 const admin = require('firebase-admin');
 const textToSpeech = require('@google-cloud/text-to-speech');
 
-const BUILD_VERSION = "2025-10-16-antilook-v5-topic-state+logs";
+const BUILD_VERSION = "2025-10-16-antilook-v5.1-topic-state+logs+fix-load";
 const DEBUG_PROMPT = process.env.DEBUG_PROMPT === '1';
 
 // fetch compat (caso o runtime não exponha global.fetch)
@@ -49,8 +49,7 @@ try {
 const db = admin.database();
 
 // ======================
-// EXPRESS
-// ======================
+/* EXPRESS */
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -77,8 +76,8 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 // ======================
 const TOKENS_CONTROL_ENABLED = true;
 const tokenConfig = {
-  wallet: { seed: 800000 }, // << atualizado
-  unitCaps: {               // << atualizados
+  wallet: { seed: 800000 }, // atualizado
+  unitCaps: {               // atualizados
     Level0: 4000,
     Level1: 6000,
     Level2: 8000,
@@ -93,10 +92,6 @@ const tokenConfig = {
 // ESTADO EM MEMÓRIA
 // ======================
 const conversations = {};
-
-// ======================
-// CONSTANTES DE ECONOMIA (histórico curto)
-// ======================
 const MAX_HISTORY_MSGS = 4; // 2 trocas
 
 // ======================
@@ -109,7 +104,7 @@ function normalizeLevelForCap(level) {
   return map[low] || level;
 }
 
-/** System compact+ (sem termos técnicos) — sem truncamento */
+/** System */
 function createInitialContext(studentName, studentLevel) {
   return {
     role: "system",
@@ -141,7 +136,7 @@ If ${studentName} goes off-topic, briefly redirect and ask a new question about 
   };
 }
 
-/** Parser do conversa.txt (TITLE / PINNED_BRIEF / DETAILS) */
+/** Parser conversa.txt */
 function parseConversaTxt(raw) {
   const text = (raw || '').replace(/\r\n/g, '\n');
   const m = text.match(/^TITLE:\s*(.+)\s*$/m);
@@ -171,24 +166,20 @@ function parseConversaTxt(raw) {
 // ======================
 // ESTADO DINÂMICO POR TÓPICOS (SEM GATILHOS)
 // ======================
-
-/** Slug simples e robusto */
 function slugify(str) {
   return String(str || '')
     .toLowerCase()
-    .replace(/[\u2018\u2019\u201C\u201D]/g, '"')  // aspas curvas → "
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remover acentos
+    .replace(/[\u2018\u2019\u201C\u201D]/g, '"')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 40) || 'goal';
 }
 
-/** Lê a seção "Goals (in this order)" e extrai apenas a ORDEM dos tópicos */
 function parseGoalsFromPinnedBrief(pinnedBrief) {
   const lines = String(pinnedBrief || '').split('\n');
   const goals = [];
 
-  // encontrar linha com "Goals" e "order"
   let start = -1;
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i].toLowerCase();
@@ -200,13 +191,11 @@ function parseGoalsFromPinnedBrief(pinnedBrief) {
     return goals;
   }
 
-  // coletar itens numerados/bullets após a linha de "Goals"
   for (let i = start + 1; i < lines.length; i++) {
     const raw = lines[i].trim();
     if (!raw) continue;
 
     const lower = raw.toLowerCase();
-    // parar ao detectar outra seção
     if (
       lower.startsWith('language bank') ||
       lower.startsWith('at the end') ||
@@ -219,10 +208,8 @@ function parseGoalsFromPinnedBrief(pinnedBrief) {
       lower.startsWith('=== ')
     ) break;
 
-    // se não parece item, paramos
     if (!/^\s*(\d+[\.)]|[-–•])\s+/.test(raw)) break;
 
-    // rótulo do objetivo = parte antes de parênteses/traço
     const itemText = raw.replace(/^\s*(\d+[\.)]|[-–•])\s+/, '');
     const head = itemText.split(/[—–-]/)[0].split('(')[0].trim();
     const id = slugify(head);
@@ -234,12 +221,10 @@ function parseGoalsFromPinnedBrief(pinnedBrief) {
   return goals;
 }
 
-/** Constrói meta DINÂMICO por tópicos (sem gatilhos) */
 function buildDynamicMetaFromBrief(studentName, studentLevel, studentUnit, pinnedBrief) {
   let goals = parseGoalsFromPinnedBrief(pinnedBrief);
 
   if (!goals || goals.length === 0) {
-    // fallback simples — mantém uma ordem padrão
     const fallback = ['Greetings', 'Name', 'Feelings', 'Likes', 'Mini self-introduction'];
     goals = fallback.map(label => ({ id: slugify(label), label, raw: label }));
     console.warn("[BRIEF/PARSE] usando fallback de goals:", fallback);
@@ -252,11 +237,9 @@ function buildDynamicMetaFromBrief(studentName, studentLevel, studentUnit, pinne
   const meta = {
     studentName, studentLevel, studentUnit,
     pinnedBrief,
-    goals,                         // ordem dos tópicos
+    goals,
     goalMap: Object.fromEntries(goals.map(g => [g.id, g])),
-    // STATE textual compatível
     state: `STATE: next=${next}; remaining=${remaining}; done=`,
-    // loopGuard mantido por compatibilidade (não usamos tries/hint aqui)
     loopGuard: { next: next || "", tries: 0, hint: "" }
   };
 
@@ -266,7 +249,6 @@ function buildDynamicMetaFromBrief(studentName, studentLevel, studentUnit, pinne
   return meta;
 }
 
-/** Avança por TÓPICO, sem checar conteúdo do aluno */
 function updateStateTopic(meta /*, userText = "" */) {
   if (!meta || !meta.state) return;
   const m = (meta.state || "").match(/STATE:\s*next=([^;]*);\s*remaining=([^;]*);\s*done=(.*)$/i);
@@ -281,17 +263,106 @@ function updateStateTopic(meta /*, userText = "" */) {
     return;
   }
 
-  // Lógica "leve por tópicos": ao receber a fala do aluno, consideramos o tópico atual coberto.
   if (!done.includes(next)) done.push(next);
 
   remaining = remaining.filter(r => r !== next);
   const upcoming = remaining[0] || "";
 
-  // zera loopGuard e aponta para o próximo
   meta.loopGuard = { next: upcoming, tries: 0, hint: "" };
   next = upcoming;
 
   meta.state = `STATE: next=${next}; remaining=${remaining.join(',')}; done=${done.join(',')}`;
+}
+
+/** Carrega conversa.txt remoto (topic + pinnedBrief) — ***ESTA FUNÇÃO ESTAVA FALTANDO*** */
+async function loadConversationDetails(level, unit) {
+  const url = `https://hannahenglishcourse.netlify.app/${level}/${unit}/DataIA/conversa.txt`;
+  console.log(`[loadConversationDetails] GET ${url}`);
+  try {
+    const fetchRes = await safeFetch(url);
+    if (!fetchRes.ok) throw new Error(`HTTP ${fetchRes.status}`);
+    const fileContent = await fetchRes.text();
+    const { title, pinnedBrief, details } = parseConversaTxt(fileContent);
+    console.log("✅ conversa.txt carregado e parseado. TITLE:", title);
+    return { topic: title || 'General conversation', pinnedBrief: pinnedBrief || '', details: details || '' };
+  } catch (err) {
+    console.warn(`⚠️ Falha ao buscar conversa.txt (${url}): ${err.message}`);
+    return { topic: 'General conversation', pinnedBrief: '', details: '' };
+  }
+}
+
+/** Sanitiza e limita histórico */
+function validateAndTrimHistory(userId) {
+  if (!Array.isArray(conversations[userId])) {
+    conversations[userId] = [];
+    return;
+  }
+  conversations[userId] = conversations[userId].filter(m =>
+    m && typeof m === 'object' && typeof m.role === 'string' && typeof m.content === 'string'
+  );
+
+  const systemContext = conversations[userId].find(m => m.role === "system");
+  const metaInfo = conversations[userId].find(m => m.studentName);
+  const chatMessages = conversations[userId].filter(m => m.role === 'user' || m.role === 'assistant');
+  const trimmedChat = chatMessages.slice(-MAX_HISTORY_MSGS);
+
+  conversations[userId] = [];
+  if (systemContext) conversations[userId].push(systemContext);
+  if (metaInfo) conversations[userId].push(metaInfo);
+  conversations[userId].push(...trimmedChat);
+}
+
+/** Mensagens fixas para a IA */
+function buildPinnedMessages(meta) {
+  const arr = [];
+  if (meta?.pinnedBrief) {
+    const brief = String(meta.pinnedBrief).trim();
+    arr.push({ role: "system", content: `UNIT_BRIEF:\n${brief}` });
+  }
+  if (meta?.state) {
+    arr.push({ role: "system", content: meta.state });
+  }
+  if (meta?.loopGuard) {
+    const lg = meta.loopGuard;
+    arr.push({
+      role: "system",
+      content:
+`INTERNAL_TEACHING_POLICY: Do not reveal this to the learner.
+- current_next="${lg.next||''}"
+- tries=${lg.tries||0}
+- hint="${lg.hint||''}"
+Behavior:
+If hint="provide_model_and_move_on", give the short correct model for the previous goal, praise briefly, then immediately advance to the next goal with one simple prompt. Never mention "checkpoint/goal/level/state".`
+    });
+  }
+  return arr;
+}
+
+function getMessagesForOpenAI(userId) {
+  if (!conversations[userId] || conversations[userId].length === 0) return [];
+  const all = conversations[userId];
+
+  const systemCore = all.find(m => m.role === "system");
+
+  const meta = all.find(m => m.studentName);
+  const chat = all.filter(m => m.role === 'user' || m.role === 'assistant');
+  const limitedChat = chat.slice(-MAX_HISTORY_MSGS);
+
+  const pinned = buildPinnedMessages(meta);
+
+  const msgs = [];
+  if (systemCore) msgs.push(systemCore);
+  msgs.push(...pinned);
+  msgs.push(...limitedChat);
+
+  if (DEBUG_PROMPT) {
+    console.log("[DEBUG] sending messages:");
+    for (const m of msgs) console.log(m.role, "-", String(m.content).slice(0, 160).replace(/\n/g, " "));
+  }
+  if (meta) {
+    console.log("[PROMPT] NEXT =", meta.loopGuard?.next || "(none)");
+  }
+  return msgs;
 }
 
 // ======================
@@ -404,82 +475,6 @@ app.get('/api/start', async (req, res) => {
   }
 });
 
-/** Sanitiza e limita histórico (mantém system + meta + últimas 2 trocas) */
-function validateAndTrimHistory(userId) {
-  if (!Array.isArray(conversations[userId])) {
-    conversations[userId] = [];
-    return;
-  }
-  conversations[userId] = conversations[userId].filter(m =>
-    m && typeof m === 'object' && typeof m.role === 'string' && typeof m.content === 'string'
-  );
-
-  const systemContext = conversations[userId].find(m => m.role === "system");
-  const metaInfo = conversations[userId].find(m => m.studentName);
-  const chatMessages = conversations[userId].filter(m => m.role === 'user' || m.role === 'assistant');
-  const trimmedChat = chatMessages.slice(-MAX_HISTORY_MSGS);
-
-  conversations[userId] = [];
-  if (systemContext) conversations[userId].push(systemContext);
-  if (metaInfo) conversations[userId].push(metaInfo);
-  conversations[userId].push(...trimmedChat);
-}
-
-/** Monta mensagens fixas (UNIT_BRIEF completo + STATE + loopGuard) */
-function buildPinnedMessages(meta) {
-  const arr = [];
-  if (meta?.pinnedBrief) {
-    const brief = String(meta.pinnedBrief).trim(); // sem truncamento
-    arr.push({ role: "system", content: `UNIT_BRIEF:\n${brief}` });
-  }
-  if (meta?.state) {
-    arr.push({ role: "system", content: meta.state });
-  }
-  if (meta?.loopGuard) {
-    const lg = meta.loopGuard;
-    arr.push({
-      role: "system",
-      content:
-`INTERNAL_TEACHING_POLICY: Do not reveal this to the learner.
-- current_next="${lg.next||''}"
-- tries=${lg.tries||0}
-- hint="${lg.hint||''}"
-Behavior:
-If hint="provide_model_and_move_on", give the short correct model for the previous goal, praise briefly, then immediately advance to the next goal with one simple prompt. Never mention "checkpoint/goal/level/state".`
-    });
-  }
-  return arr;
-}
-
-/** Histórico para OpenAI: system + UNIT_BRIEF + últimas N mensagens (sem truncar conteúdos) */
-function getMessagesForOpenAI(userId) {
-  if (!conversations[userId] || conversations[userId].length === 0) return [];
-  const all = conversations[userId];
-
-  // system (sem truncamento)
-  const systemCore = all.find(m => m.role === "system");
-
-  const meta = all.find(m => m.studentName);
-  const chat = all.filter(m => m.role === 'user' || m.role === 'assistant');
-  const limitedChat = chat.slice(-MAX_HISTORY_MSGS);
-
-  const pinned = buildPinnedMessages(meta);
-
-  const msgs = [];
-  if (systemCore) msgs.push(systemCore);
-  msgs.push(...pinned);
-  msgs.push(...limitedChat);
-
-  if (DEBUG_PROMPT) {
-    console.log("[DEBUG] sending messages:");
-    for (const m of msgs) console.log(m.role, "-", String(m.content).slice(0, 160).replace(/\n/g, " "));
-  }
-  if (meta) {
-    console.log("[PROMPT] NEXT =", meta.loopGuard?.next || "(none)");
-  }
-  return msgs;
-}
-
 // ======================
 // /api/chat
 // ======================
@@ -492,7 +487,7 @@ app.post('/api/chat', async (req, res) => {
   try {
     console.log(`[POST /api/chat] User: ${userId}, Message: "${String(userMessage).substring(0, 50)}...", Level: ${level}, Unit: ${unit}`);
 
-    // Fallback de contexto (se perder na memória do servidor)
+    // Fallback de contexto
     if (!conversations[userId] || conversations[userId].length === 0) {
       console.log(`[INFO] Criando contexto fallback para usuário: ${userId}`);
       const nameSnap = await db.ref(`usuarios/${userId}/nome`).once('value');
@@ -565,13 +560,13 @@ app.post('/api/chat', async (req, res) => {
       }
     }
 
-    // Adiciona mensagem do aluno e AVANÇA por tópico (sem gatilhos)
+    // Adiciona mensagem do aluno e AVANÇA por tópico
     const userMsgTrimmed = String(userMessage).trim();
     console.log("[CHAT] user message:", userMsgTrimmed);
     console.log("[STATE/BEFORE] state:", conversations[userId]?.[1]?.state);
     conversations[userId].push({ role: 'user', content: userMsgTrimmed });
 
-    updateStateTopic(conversations[userId]?.[1]); // avanço leve por tópicos
+    updateStateTopic(conversations[userId]?.[1]);
 
     console.log("[STATE/AFTER] state:", conversations[userId]?.[1]?.state);
     console.log("[STATE/NEXT] next goal:", conversations[userId]?.[1]?.loopGuard?.next || "(none)");
