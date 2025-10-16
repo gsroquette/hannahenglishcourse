@@ -104,7 +104,7 @@ function parseConversaTxt(raw) {
   const titleMatch = text.match(/^TITLE:\s*(.+)\s*$/m);
   const title = titleMatch ? titleMatch[1].trim() : 'Untitled';
 
-  const pinnedRegex = /PINNED_BRIEF(?:\s*\(UNIT_BRIEF\))?:\s*([\s\S]*?)(?:\n===\s*DETAILS\s*===|\n*$/i);
+  const pinnedRegex = /PINNED_BRIEF(?:\s*\(UNIT_BRIEF\))?:\s*([\s\S]*?)(?:\n===\s*DETAILS\s*===|\n*$)/i;
   const pinnedMatch = text.match(pinnedRegex);
   const pinnedBrief = pinnedMatch ? pinnedMatch[1].trim() : '';
 
