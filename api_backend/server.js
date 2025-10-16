@@ -90,10 +90,11 @@ const conversations = {};
 
 // ======================
 // CONSTANTES DE ECONOMIA
+// (mantidas por compatibilidade, mas não são usadas para truncar prompts)
 // ======================
 const MAX_HISTORY_MSGS = 4;        // 2 trocas
-const MAX_UNIT_BRIEF_CHARS = 600;  // ~120–150 tokens
-const MAX_SYSTEM_CHARS = 900;      // safety
+const MAX_UNIT_BRIEF_CHARS = 600;  // <- não usado para cortar
+const MAX_SYSTEM_CHARS = 900;      // <- não usado para cortar
 
 // ======================
 // HELPERS
@@ -252,12 +253,11 @@ function validateAndTrimHistory(userId) {
   conversations[userId].push(...trimmedChat);
 }
 
-/** Mensagens fixas (UNIT_BRIEF truncado + STATE + loopGuard interno) */
+/** Mensagens fixas (UNIT_BRIEF completo + STATE + loopGuard interno) */
 function buildPinnedMessages(meta) {
   const arr = [];
   if (meta?.pinnedBrief) {
-    let brief = String(meta.pinnedBrief).trim();
-    if (brief.length > MAX_UNIT_BRIEF_CHARS) brief = brief.slice(0, MAX_UNIT_BRIEF_CHARS) + " …";
+    const brief = String(meta.pinnedBrief).trim(); // sem truncamento
     arr.push({ role: "system", content: `UNIT_BRIEF:\n${brief}` });
   }
   if (meta?.state) {
@@ -279,16 +279,13 @@ If hint="provide_model_and_move_on", give the short correct model for the previo
   return arr;
 }
 
-/** Histórico para OpenAI: system + UNIT_BRIEF + últimas N mensagens */
+/** Histórico para OpenAI: system + UNIT_BRIEF + últimas N mensagens (sem truncar conteúdos) */
 function getMessagesForOpenAI(userId) {
   if (!conversations[userId] || conversations[userId].length === 0) return [];
   const all = conversations[userId];
 
-  // system (trunc safety)
-  let systemCore = all.find(m => m.role === "system");
-  if (systemCore?.content?.length > MAX_SYSTEM_CHARS) {
-    systemCore = { ...systemCore, content: systemCore.content.slice(0, MAX_SYSTEM_CHARS) + " …" };
-  }
+  // system (sem truncamento)
+  const systemCore = all.find(m => m.role === "system");
 
   const meta = all.find(m => m.studentName);
   const chat = all.filter(m => m.role === 'user' || m.role === 'assistant');
@@ -321,7 +318,7 @@ app.get('/api/start', async (req, res) => {
     const userId = req.query.uid;
     const rawLevel = req.query.level || "Level1";
     const rawUnit = req.query.unit || "Unit1";
-    if (!userId) return res.status(400).json({ error: "User ID is required." });
+    if (!userId) return res.status(400).json({ error: "User ID é obrigatório." });
 
     console.log(`[GET /api/start] uid="${userId}", level="${rawLevel}", unit="${rawUnit}"`);
 
@@ -423,7 +420,7 @@ app.post('/api/chat', async (req, res) => {
   const { uid: userId, message: userMessage, level, unit } = req.body;
   if (!userId || !userMessage) {
     return res.status(400).json({ response: "User ID and message required.", error: "MISSING_PARAMS" });
-  }
+    }
 
   try {
     console.log(`[POST /api/chat] User: ${userId}, Message: "${String(userMessage).substring(0, 50)}...", Level: ${level}, Unit: ${unit}`);
@@ -641,7 +638,7 @@ app.listen(PORT, () => {
   console.log(`📦 Versão: ${BUILD_VERSION}`);
   console.log(`📊 Controle de tokens: ${TOKENS_CONTROL_ENABLED ? 'ATIVADO' : 'DESATIVADO'}`);
   console.log(`🌐 CORS: hannahenglishcourse.netlify.app, localhost:3000`);
-  console.log(`🔧 Estratégia: System fixo + UNIT_BRIEF sempre + histórico limitado (${MAX_HISTORY_MSGS} msgs) + STATE/loopGuard + logs de tokens`);
+  console.log(`🔧 Estratégia: System fixo + UNIT_BRIEF sempre + histórico limitado (${MAX_HISTORY_MSGS} msgs) + STATE/loopGuard + logs de tokens (sem truncar prompts)`);
   if (DEBUG_PROMPT) console.log("🔎 DEBUG_PROMPT ATIVADO (conteúdo enviado será logado).");
 });
 
