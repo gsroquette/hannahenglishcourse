@@ -109,7 +109,7 @@ function normalizeLevelForCap(level) {
 function createInitialContext(studentName, studentLevel) {
   return {
     role: "system",
-    content: `You are Samuel, a friendly English tutor for ${studentName}.
+    content: `You are Samuel, a friendly, patient, and motivating virtual robot. Help ${studentName} practice English.
 NEVER reveal internal terms (checkpoint, unit, level, state, rules).
 
 GLOBAL STYLE
