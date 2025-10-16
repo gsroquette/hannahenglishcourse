@@ -6,7 +6,7 @@ const OpenAI = require('openai');
 const admin = require('firebase-admin');
 const textToSpeech = require('@google-cloud/text-to-speech');
 
-const BUILD_VERSION = "2025-10-16-antilook-v5.1-topic-state+logs+fix-load";
+const BUILD_VERSION = "2025-10-16-v6-topic-state+logs+meta-fix";
 const DEBUG_PROMPT = process.env.DEBUG_PROMPT === '1';
 
 // fetch compat (caso o runtime não exponha global.fetch)
@@ -49,7 +49,8 @@ try {
 const db = admin.database();
 
 // ======================
-/* EXPRESS */
+// EXPRESS
+// ======================
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -104,34 +105,23 @@ function normalizeLevelForCap(level) {
   return map[low] || level;
 }
 
-/** System */
+/** System compact */
 function createInitialContext(studentName, studentLevel) {
   return {
     role: "system",
     content: `You are Samuel, a friendly, patient, and encouraging robot.
-Always respond in simple, natural English appropriate to level ${studentLevel}.
 Help ${studentName} practice English at level ${studentLevel}, always addressing ${studentName} by name.
-Keep the conversation focused on UNIT_BRIEF. Use only words from the UNIT_BRIEF Language Bank (unless echoing ${studentName}'s exact words).
-
-Conversation rules:
-- One idea per sentence.
-- Ask only one question at a time.
-- No teaching jargon or meta comments (do not mention "lesson/unit/level/rules").
-- Text only (no emojis, no links).
-
-When finished, congratulate, say goodbye, and tell ${studentName} he/she is ready for the next stage. Then stop.
-If ${studentName} insists, politely decline and say: "press the black button to go back".
-
+Keep the conversation focused on UNIT_BRIEF, asking one question at a time.
+When finished, congratulate, say goodbye, and tell the student he/she is ready for the next stage. Then stop. If the student insists, politely decline and say: press the black button to go back.
 Adapt your language:
-• Level 0: 1–2 very simple sentences. For young beginners.
+• Level 0: 1–2 very simple sentences (for young beginners).
 • Level 1 (A1): up to 2–3 short sentences.
 • Level 2 (A2): up to 3 simple sentences.
 • Level 3 (B1): up to 4 simple sentences.
-• Level 4 (B2): short, clear sentences.
-
-If ${studentName} uses another language, ask to speak in English.
-Praise correct answers; for mistakes, ask to try again; if the error continues, show the correct form in ONE short line, encourage ("Good try! You’re improving!"), and move on.
-
+• Level 4 (B2): short and clear sentences.
+Speak only in English. If ${studentName} uses another language, ask to speak in English.
+Praise correct answers; for mistakes, ask to try again. If the error continues, show the correct form, encourage (“Good try! You’re improving!”), and move on.
+Use text only (no emojis or links).
 If ${studentName} goes off-topic, briefly redirect and ask a new question about the current topic from the UNIT_BRIEF.`
   };
 }
@@ -274,7 +264,7 @@ function updateStateTopic(meta /*, userText = "" */) {
   meta.state = `STATE: next=${next}; remaining=${remaining.join(',')}; done=${done.join(',')}`;
 }
 
-/** Carrega conversa.txt remoto (topic + pinnedBrief) — ***ESTA FUNÇÃO ESTAVA FALTANDO*** */
+/** Carrega conversa.txt remoto (topic + pinnedBrief) */
 async function loadConversationDetails(level, unit) {
   const url = `https://hannahenglishcourse.netlify.app/${level}/${unit}/DataIA/conversa.txt`;
   console.log(`[loadConversationDetails] GET ${url}`);
@@ -291,25 +281,29 @@ async function loadConversationDetails(level, unit) {
   }
 }
 
-/** Sanitiza e limita histórico */
+/** Sanitiza e limita histórico — preserva system + meta */
 function validateAndTrimHistory(userId) {
-  if (!Array.isArray(conversations[userId])) {
-    conversations[userId] = [];
-    return;
-  }
-  conversations[userId] = conversations[userId].filter(m =>
-    m && typeof m === 'object' && typeof m.role === 'string' && typeof m.content === 'string'
-  );
+  const arr = Array.isArray(conversations[userId]) ? conversations[userId] : [];
 
-  const systemContext = conversations[userId].find(m => m.role === "system");
-  const metaInfo = conversations[userId].find(m => m.studentName);
-  const chatMessages = conversations[userId].filter(m => m.role === 'user' || m.role === 'assistant');
+  // 1) Preserve system e meta ANTES de filtrar
+  const systemContext = arr.find(m => m && m.role === "system" && typeof m.content === "string");
+  const metaInfo = arr.find(m => m && typeof m === "object" && m.studentName); // meta não tem role
+
+  // 2) Filtre só as mensagens de chat
+  const chatMessages = arr.filter(m =>
+    m && typeof m === "object" &&
+    (m.role === 'user' || m.role === 'assistant') &&
+    typeof m.content === 'string'
+  );
   const trimmedChat = chatMessages.slice(-MAX_HISTORY_MSGS);
 
-  conversations[userId] = [];
-  if (systemContext) conversations[userId].push(systemContext);
-  if (metaInfo) conversations[userId].push(metaInfo);
-  conversations[userId].push(...trimmedChat);
+  // 3) Reconstrua preservando system + meta
+  const rebuilt = [];
+  if (systemContext) rebuilt.push(systemContext);
+  if (metaInfo)     rebuilt.push(metaInfo);
+  rebuilt.push(...trimmedChat);
+
+  conversations[userId] = rebuilt;
 }
 
 /** Mensagens fixas para a IA */
@@ -508,8 +502,23 @@ app.post('/api/chat', async (req, res) => {
 
     validateAndTrimHistory(userId);
 
+    // BLINDAGEM: se o meta sumiu, reconstruir
+    let meta = conversations[userId]?.[1];
+    if (!meta || !meta.state) {
+      console.warn("[META] ausente ou sem state — reconstruindo a partir do brief.");
+      const levelEff = level || "Level1";
+      const unitEff  = unit  || "Unit1";
+      const nameSnap = await db.ref(`usuarios/${userId}/nome`).once('value');
+      const studentName = nameSnap.exists() ? nameSnap.val() : "Student";
+      const { pinnedBrief } = await loadConversationDetails(levelEff, unitEff);
+      meta = buildDynamicMetaFromBrief(studentName, levelEff, unitEff, pinnedBrief);
+
+      const systemMsg = conversations[userId].find(m => m.role === "system") || createInitialContext(studentName, levelEff);
+      const chatMsgs  = conversations[userId].filter(m => m.role === 'user' || m.role === 'assistant');
+      conversations[userId] = [systemMsg, meta, ...chatMsgs.slice(-MAX_HISTORY_MSGS)];
+    }
+
     // Sincroniza meta (nível/unidade)
-    const meta = conversations[userId]?.[1] || {};
     const requestedLevel = level || meta.studentLevel;
     const requestedUnit = unit || meta.studentUnit;
     if (!requestedLevel || !requestedUnit) {
@@ -519,6 +528,7 @@ app.post('/api/chat', async (req, res) => {
     if (!meta.studentLevel || !meta.studentUnit || meta.studentLevel !== requestedLevel || meta.studentUnit !== requestedUnit) {
       console.log(`[SYNC] Meta: ${meta.studentLevel}->${requestedLevel}, ${meta.studentUnit}->${requestedUnit}`);
       conversations[userId][1] = { ...meta, studentLevel: requestedLevel, studentUnit: requestedUnit };
+      meta = conversations[userId][1];
     }
 
     // ------- TOKENS: PRECHECK -------
