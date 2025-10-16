@@ -6,7 +6,7 @@ const OpenAI = require('openai');
 const admin = require('firebase-admin');
 const textToSpeech = require('@google-cloud/text-to-speech');
 
-const BUILD_VERSION = "2025-10-16-antilook-v2";
+const BUILD_VERSION = "2025-10-16-antilook-v3-dynamic-state";
 const DEBUG_PROMPT = process.env.DEBUG_PROMPT === '1';
 
 // fetch compat (caso o runtime não exponha global.fetch)
@@ -89,12 +89,9 @@ const tokenConfig = {
 const conversations = {};
 
 // ======================
-// CONSTANTES DE ECONOMIA
-// (mantidas por compatibilidade, mas não são usadas para truncar prompts)
+// CONSTANTES DE ECONOMIA (histórico curto)
 // ======================
-const MAX_HISTORY_MSGS = 4;        // 2 trocas
-const MAX_UNIT_BRIEF_CHARS = 600;  // <- não usado para cortar
-const MAX_SYSTEM_CHARS = 900;      // <- não usado para cortar
+const MAX_HISTORY_MSGS = 4; // 2 trocas
 
 // ======================
 // HELPERS
@@ -106,77 +103,39 @@ function normalizeLevelForCap(level) {
   return map[low] || level;
 }
 
-/** System compact+ anti-loop (sem termos técnicos) */
+/** System compact+ anti-loop (sem termos técnicos) — sem truncamento */
 function createInitialContext(studentName, studentLevel) {
   return {
     role: "system",
     content: `You are Samuel, a friendly, patient, and encouraging robot.
-Help ${studentName} practice English at level ${studentLevel}, always addressing him/her by name.
-Keep the conversation focused on UNIT_BRIEF, asking one question at a time.
-When finished, congratulate, say goodbye, and tell the student he/she is ready for the next stage. Then stop. If the student insists, politely decline and say: press the black button to go back.
+Always respond in simple, natural English appropriate to level ${studentLevel}.
+Help ${studentName} practice English at level ${studentLevel}, always addressing ${studentName} by name.
+Keep the conversation focused on UNIT_BRIEF. Use only words from the UNIT_BRIEF Language Bank (unless echoing ${studentName}'s exact words).
+
+Conversation rules:
+- One idea per sentence.
+- Ask only one question at a time.
+- No teaching jargon or meta comments (do not mention "lesson/unit/level/rules").
+- Text only (no emojis, no links).
+
+When finished, congratulate, say goodbye, and tell ${studentName} he/she is ready for the next stage. Then stop.
+If ${studentName} insists, politely decline and say: "press the black button to go back".
+
 Adapt your language:
-• Level 0: 1–2 very simple sentences (for young beginners).
+• Level 0: 1–2 very simple sentences. For young beginners.
 • Level 1 (A1): up to 2–3 short sentences.
 • Level 2 (A2): up to 3 simple sentences.
 • Level 3 (B1): up to 4 simple sentences.
-• Level 4 (B2): short and clear sentences.
-Speak only in English. If ${studentName} uses another language, ask to speak in English.
-Praise correct answers; for mistakes, ask to try again. If the error continues, show the correct form, encourage (“Good try! You’re improving!”), and move on.
-Use text only (no emojis or links).
-If ${studentName} goes off-topic, briefly redirect and ask a new question about the lesson.`
+• Level 4 (B2): short, clear sentences.
+
+If ${studentName} uses another language, ask to speak in English.
+Praise correct answers; for mistakes, ask to try again; if the error continues, show the correct form in ONE short line, encourage ("Good try! You’re improving!"), and move on.
+
+If ${studentName} goes off-topic, briefly redirect and ask a new question about the current topic from the UNIT_BRIEF.`
   };
 }
 
-/** STATE inicial + loopGuard interno */
-function initState() {
-  return "STATE: next=greetings; remaining=name,feelings,likes,self-intro; done=";
-}
-function updateState(meta, userText = "") {
-  if (!meta) return;
-
-  const hits = [];
-  const t = String(userText).toLowerCase();
-  if (/(^|\b)(hello|hi|good (morning|night))(\b|!|\.|,)/i.test(userText)) hits.push("greetings");
-  if (/my name is\b/i.test(userText)) hits.push("name");
-  if (/\bi am (happy|sad)\b/i.test(userText)) hits.push("feelings");
-  if (/\bi like\b/i.test(userText)) hits.push("likes");
-  if (/hello.*my name is.*i am .*i like/i.test(t)) hits.push("self-intro");
-
-  const m = (meta.state || "").match(/STATE:\s*next=([^;]*);\s*remaining=([^;]*);\s*done=(.*)$/i);
-  if (!m) return;
-  let next = m[1].trim();
-  let remaining = m[2].split(',').map(s => s.trim()).filter(Boolean);
-  let done = m[3].split(',').map(s => s.trim()).filter(Boolean);
-
-  // inicia loopGuard se não existir
-  if (!meta.loopGuard) meta.loopGuard = { next: next || "", tries: 0, hint: "" };
-  const lg = meta.loopGuard;
-
-  if (hits.includes(next)) {
-    if (!done.includes(next)) done.push(next);
-    remaining = remaining.filter(r => r !== next);
-    next = remaining[0] || "";
-    meta.loopGuard = { next: next || "", tries: 0, hint: "" };
-  } else {
-    const sameGoal = lg.next === (next || "");
-    lg.tries = sameGoal ? (lg.tries + 1) : 1;
-    lg.next = next || lg.next;
-    if (lg.tries >= 2 && next) {
-      // após 2 tentativas, sinaliza para dar o modelo e seguir
-      if (!done.includes(next)) done.push(next);
-      remaining = remaining.filter(r => r !== next);
-      const upcoming = remaining[0] || "";
-      meta.loopGuard = { next: upcoming, tries: 0, hint: "provide_model_and_move_on" };
-      next = upcoming;
-    } else {
-      meta.loopGuard = lg;
-    }
-  }
-
-  meta.state = `STATE: next=${next}; remaining=${remaining.join(',')}; done=${done.join(',')}`;
-}
-
-/** Parser do conversa.txt sem regex frágil */
+/** Parser do conversa.txt (TITLE / PINNED_BRIEF / DETAILS) */
 function parseConversaTxt(raw) {
   const text = (raw || '').replace(/\r\n/g, '\n');
   const m = text.match(/^TITLE:\s*(.+)\s*$/m);
@@ -203,7 +162,202 @@ function parseConversaTxt(raw) {
   return { title, pinnedBrief, details };
 }
 
-/** Carrega conversa.txt (apenas topic + pinnedBrief; DETAILS não vai para a IA) */
+// ======================
+// ESTADO DINÂMICO A PARTIR DO PINNED_BRIEF
+// ======================
+
+/** Slug simples e robusto */
+function slugify(str) {
+  return String(str || '')
+    .toLowerCase()
+    .replace(/[\u2018\u2019\u201C\u201D]/g, '"')  // aspas curvas → "
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remover acentos
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40) || 'goal';
+}
+
+/** Extrai frases entre aspas (curvas ou retas) para usar como gatilhos */
+function extractQuotedPhrases(text) {
+  const res = new Set();
+  const s = String(text || '');
+
+  // aspas curvas “...”
+  const reCurly = /“([^”]+)”/g;
+  let m;
+  while ((m = reCurly.exec(s)) !== null) res.add(m[1].trim());
+
+  // aspas retas "..."
+  const reStraight = /"([^"]+)"/g;
+  while ((m = reStraight.exec(s)) !== null) res.add(m[1].trim());
+
+  // casos simples: Hello!, Good morning!, etc. (sem aspas mas com !)
+  const exclam = s.match(/\b([A-Z][a-z]+(?: [a-z]+)*)!\b/g);
+  if (exclam) exclam.forEach(p => res.add(p.replace(/!+$/, '').trim()));
+
+  return Array.from(res).filter(Boolean);
+}
+
+/** Tenta localizar a seção "Goals (in this order)" e seus itens numerados */
+function parseGoalsFromPinnedBrief(pinnedBrief) {
+  const lines = String(pinnedBrief || '').split('\n');
+  const goals = [];
+
+  // encontrar o índice da linha "Goals" (aceita variações)
+  let start = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i].toLowerCase();
+    if (l.includes('goals') && l.includes('order')) { start = i; break; }
+  }
+  if (start === -1) return goals;
+
+  // coletar linhas subsequentes que pareçam itens (começam com número/bullet)
+  for (let i = start + 1; i < lines.length; i++) {
+    const raw = lines[i].trim();
+    if (!raw) {
+      // linha em branco: pode marcar fim da lista (mas toleramos blocos com espaços)
+      // vamos continuar até encontrar outra seção típica
+      continue;
+    }
+    // parar se começarmos outra seção comum
+    const lower = raw.toLowerCase();
+    if (
+      lower.startsWith('language bank') ||
+      lower.startsWith('at the end') ||
+      lower.startsWith('then ') ||
+      lower.startsWith('exit') ||
+      lower.startsWith('success') ||
+      lower.startsWith('materials') ||
+      lower.startsWith('tips') ||
+      lower.startsWith('notes')
+    ) break;
+
+    // item se começar com "1." / "1)" / "-" / "•"
+    if (!/^\s*(\d+[\.)]|[-–•])\s+/.test(raw)) {
+      // pode ser que os itens estejam sem numerador — paramos quando algo não bater com padrão
+      // mas se a linha tem ":", ainda pode ser a cabeça do item
+      if (!raw.includes(':')) break;
+    }
+
+    // extrai "título" do objetivo (parte antes de "(" ou "—")
+    const itemText = raw.replace(/^\s*(\d+[\.)]|[-–•])\s+/, '');
+    const head = itemText.split(/[—–-]/)[0].split('(')[0].trim();
+    const id = slugify(head);
+
+    // gatilhos por aspas no item inteiro
+    const triggers = extractQuotedPhrases(raw);
+
+    goals.push({
+      id,
+      label: head,
+      raw: raw,
+      triggers
+    });
+  }
+
+  // fallback: se não achou nada, retorna vazio; o chamador decide como tratar
+  return goals;
+}
+
+/** Constroi meta dinâmico a partir do brief: goals, estado, triggers normalizados */
+function buildDynamicMetaFromBrief(studentName, studentLevel, studentUnit, pinnedBrief) {
+  // 1) parse goals do brief
+  let goals = parseGoalsFromPinnedBrief(pinnedBrief);
+
+  // 2) fallback elegante se brief não listar objetivos
+  if (!goals || goals.length === 0) {
+    // padrão minimalista — ainda dinâmico (ids pelo rótulo)
+    const fallback = [
+      { label: 'Greetings', triggers: ['Hello', 'Good morning', 'Good night'] },
+      { label: 'Name', triggers: ['My name is'] },
+      { label: 'Feelings', triggers: ['I am happy', 'I am sad'] },
+      { label: 'Likes', triggers: ['I like'] },
+      { label: 'Self-introduction', triggers: ['Hello! My name is', 'I am happy', 'I like'] },
+    ];
+    goals = fallback.map(g => ({ id: slugify(g.label), label: g.label, raw: g.label, triggers: g.triggers }));
+  }
+
+  // 3) normaliza triggers em regex simples (case-insensitive, contém)
+  const triggerMap = {};
+  goals.forEach(g => {
+    const arr = Array.isArray(g.triggers) ? g.triggers : [];
+    triggerMap[g.id] = arr
+      .map(t => String(t || '').trim())
+      .filter(Boolean)
+      .map(t => new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')); // match por “contém”
+  });
+
+  // 4) estado inicial dinâmico
+  const ids = goals.map(g => g.id);
+  const next = ids[0] || '';
+  const remaining = ids.slice(1).join(',');
+
+  // 5) meta que será guardada em conversations[userId][1]
+  return {
+    studentName, studentLevel, studentUnit,
+    pinnedBrief,
+    goals,                       // array na ordem
+    goalMap: Object.fromEntries(goals.map(g => [g.id, g])),
+    triggers: triggerMap,        // id -> [regex...]
+    state: `STATE: next=${next}; remaining=${remaining}; done=`,
+    loopGuard: { next: next || "", tries: 0, hint: "" }
+  };
+}
+
+/** Atualiza STATE/loop de forma dinâmica com base nos gatilhos do objetivo atual */
+function updateStateDynamic(meta, userText = "") {
+  if (!meta || !meta.state) return;
+
+  // extrair next/remaining/done do STATE textual
+  const m = (meta.state || "").match(/STATE:\s*next=([^;]*);\s*remaining=([^;]*);\s*done=(.*)$/i);
+  if (!m) return;
+  let next = (m[1] || '').trim();
+  let remaining = (m[2] || '').split(',').map(s => s.trim()).filter(Boolean);
+  let done = (m[3] || '').split(',').map(s => s.trim()).filter(Boolean);
+
+  // garantir loopGuard
+  if (!meta.loopGuard) meta.loopGuard = { next: next || "", tries: 0, hint: "" };
+  const lg = meta.loopGuard;
+
+  // se não há "next" (acabaram os objetivos), não faz nada
+  if (!next) {
+    meta.state = `STATE: next=; remaining=${remaining.join(',')}; done=${done.join(',')}`;
+    return;
+  }
+
+  const text = String(userText || '');
+  const rexs = meta.triggers?.[next] || [];
+
+  // HIT: se qualquer trigger do objetivo atual aparecer na fala do aluno
+  const hit = rexs.length > 0 ? rexs.some(rx => rx.test(text)) : false;
+
+  if (hit) {
+    if (!done.includes(next)) done.push(next);
+    remaining = remaining.filter(r => r !== next);
+    const upcoming = remaining[0] || "";
+    meta.loopGuard = { next: upcoming, tries: 0, hint: "" };
+    next = upcoming;
+  } else {
+    const sameGoal = lg.next === (next || "");
+    lg.tries = sameGoal ? (lg.tries + 1) : 1;
+    lg.next = next || lg.next;
+
+    if (lg.tries >= 2 && next) {
+      // Após 2 tentativas: dar modelo e avançar
+      if (!done.includes(next)) done.push(next);
+      remaining = remaining.filter(r => r !== next);
+      const upcoming = remaining[0] || "";
+      meta.loopGuard = { next: upcoming, tries: 0, hint: "provide_model_and_move_on" };
+      next = upcoming;
+    } else {
+      meta.loopGuard = lg;
+    }
+  }
+
+  meta.state = `STATE: next=${next}; remaining=${remaining.join(',')}; done=${done.join(',')}`;
+}
+
+/** Carrega conversa.txt remoto (topic + pinnedBrief) */
 async function loadConversationDetails(level, unit) {
   console.log(`[loadConversationDetails] level="${level}", unit="${unit}"`);
   const url = `https://hannahenglishcourse.netlify.app/${level}/${unit}/DataIA/conversa.txt`;
@@ -220,6 +374,7 @@ async function loadConversationDetails(level, unit) {
   }
 }
 
+/** Sanitiza e limita histórico (mantém system + meta + últimas 2 trocas) */
 function validateAndTrimHistory(userId) {
   if (!Array.isArray(conversations[userId])) {
     conversations[userId] = [];
@@ -232,7 +387,7 @@ function validateAndTrimHistory(userId) {
   const systemContext = conversations[userId].find(m => m.role === "system");
   const metaInfo = conversations[userId].find(m => m.studentName);
   const chatMessages = conversations[userId].filter(m => m.role === 'user' || m.role === 'assistant');
-  const trimmedChat = chatMessages.slice(-20);
+  const trimmedChat = chatMessages.slice(-MAX_HISTORY_MSGS);
 
   conversations[userId] = [];
   if (systemContext) conversations[userId].push(systemContext);
@@ -240,7 +395,7 @@ function validateAndTrimHistory(userId) {
   conversations[userId].push(...trimmedChat);
 }
 
-/** Mensagens fixas (UNIT_BRIEF completo + STATE + loopGuard interno) */
+/** Monta mensagens fixas (UNIT_BRIEF completo + STATE + loopGuard) */
 function buildPinnedMessages(meta) {
   const arr = [];
   if (meta?.pinnedBrief) {
@@ -316,11 +471,13 @@ app.get('/api/start', async (req, res) => {
     const { topic, pinnedBrief } = await loadConversationDetails(rawLevel, rawUnit);
 
     const context = createInitialContext(studentName, rawLevel);
+    const meta = buildDynamicMetaFromBrief(studentName, rawLevel, rawUnit, pinnedBrief);
+
     const initialMessage = `Hello ${studentName}! Today's topic is: ${topic}. I'm ready to help you at your ${rawLevel}, in ${rawUnit}. Shall we begin?`;
 
     conversations[userId] = [
       context,
-      { studentName, studentLevel: rawLevel, studentUnit: rawUnit, pinnedBrief, state: initState(), loopGuard: { next: "greetings", tries: 0, hint: "" } },
+      meta,
       { role: "assistant", content: initialMessage },
     ];
 
@@ -407,12 +564,12 @@ app.post('/api/chat', async (req, res) => {
   const { uid: userId, message: userMessage, level, unit } = req.body;
   if (!userId || !userMessage) {
     return res.status(400).json({ response: "User ID and message required.", error: "MISSING_PARAMS" });
-    }
+  }
 
   try {
     console.log(`[POST /api/chat] User: ${userId}, Message: "${String(userMessage).substring(0, 50)}...", Level: ${level}, Unit: ${unit}`);
 
-    // Fallback de contexto
+    // Fallback de contexto (se perder na memória do servidor)
     if (!conversations[userId] || conversations[userId].length === 0) {
       console.log(`[INFO] Criando contexto fallback para usuário: ${userId}`);
       const nameSnap = await db.ref(`usuarios/${userId}/nome`).once('value');
@@ -422,17 +579,18 @@ app.post('/api/chat', async (req, res) => {
 
       const { topic, pinnedBrief } = await loadConversationDetails(fallbackLevel, fallbackUnit);
       const context = createInitialContext(studentName, fallbackLevel);
+      const meta = buildDynamicMetaFromBrief(studentName, fallbackLevel, fallbackUnit, pinnedBrief);
 
       conversations[userId] = [
         context,
-        { studentName, studentLevel: fallbackLevel, studentUnit: fallbackUnit, pinnedBrief, state: initState(), loopGuard: { next: "greetings", tries: 0, hint: "" } },
+        meta,
         { role: 'assistant', content: `Hello ${studentName}! Let's begin our conversation about: ${topic}.` }
       ];
     }
 
     validateAndTrimHistory(userId);
 
-    // Sincroniza meta
+    // Sincroniza meta (nível/unidade)
     const meta = conversations[userId]?.[1] || {};
     const requestedLevel = level || meta.studentLevel;
     const requestedUnit = unit || meta.studentUnit;
@@ -445,16 +603,13 @@ app.post('/api/chat', async (req, res) => {
       conversations[userId][1] = { ...meta, studentLevel: requestedLevel, studentUnit: requestedUnit };
     }
 
-    const studentLevel = requestedLevel;
-    const studentUnit = requestedUnit;
-
     // ------- TOKENS: PRECHECK -------
     let tokenInfo = {};
     let usageRef, walletRef;
 
     if (TOKENS_CONTROL_ENABLED) {
-      const pathLevel = String(studentLevel).toLowerCase();
-      const pathUnit = String(studentUnit).toLowerCase();
+      const pathLevel = String(requestedLevel).toLowerCase();
+      const pathUnit = String(requestedUnit).toLowerCase();
 
       usageRef = db.ref(`usage/${userId}/${pathLevel}/${pathUnit}`);
       walletRef = db.ref(`wallet/${userId}`);
@@ -462,7 +617,7 @@ app.post('/api/chat', async (req, res) => {
       let usageSnap = await usageRef.once('value');
       if (!usageSnap.exists()) {
         console.log(`[INFO] Criando usage para ${userId}/${pathLevel}/${pathUnit}`);
-        const capKey = normalizeLevelForCap(studentLevel);
+        const capKey = normalizeLevelForCap(requestedLevel);
         const unitCap = tokenConfig.unitCaps[capKey] || 2000;
         await usageRef.set({
           unitCap, allowedTokens: unitCap, usedTokens: 0, remainingTokens: unitCap,
@@ -487,9 +642,9 @@ app.post('/api/chat', async (req, res) => {
       }
     }
 
-    // Adiciona mensagem do usuário e atualiza STATE/loop
+    // Adiciona mensagem do aluno e atualiza STATE dinâmico
     conversations[userId].push({ role: 'user', content: String(userMessage).trim() });
-    updateState(conversations[userId]?.[1], userMessage);
+    updateStateDynamic(conversations[userId]?.[1], userMessage);
 
     // ------- OPENAI -------
     const messagesForOpenAI = getMessagesForOpenAI(userId);
@@ -506,7 +661,7 @@ app.post('/api/chat', async (req, res) => {
 
     // ------- LOG DE TOKENS -------
     const u = completion.usage || {};
-    console.log(`[TOKENS] uid=${userId} lvl=${studentLevel} unit=${studentUnit} | prompt=${u.prompt_tokens||0} completion=${u.completion_tokens||0} total=${u.total_tokens||0}`);
+    console.log(`[TOKENS] uid=${userId} lvl=${requestedLevel} unit=${requestedUnit} | prompt=${u.prompt_tokens||0} completion=${u.completion_tokens||0} total=${u.total_tokens||0}`);
 
     // ------- TOKENS: DÉBITO -------
     if (TOKENS_CONTROL_ENABLED && completion.usage) {
@@ -625,7 +780,7 @@ app.listen(PORT, () => {
   console.log(`📦 Versão: ${BUILD_VERSION}`);
   console.log(`📊 Controle de tokens: ${TOKENS_CONTROL_ENABLED ? 'ATIVADO' : 'DESATIVADO'}`);
   console.log(`🌐 CORS: hannahenglishcourse.netlify.app, localhost:3000`);
-  console.log(`🔧 Estratégia: System fixo + UNIT_BRIEF sempre + histórico limitado (${MAX_HISTORY_MSGS} msgs) + STATE/loopGuard + logs de tokens (sem truncar prompts)`);
+  console.log(`🔧 Estratégia: System fixo + UNIT_BRIEF dinâmico + STATE/loopGuard dinâmicos por unidade + histórico limitado (${MAX_HISTORY_MSGS} msgs)`);
   if (DEBUG_PROMPT) console.log("🔎 DEBUG_PROMPT ATIVADO (conteúdo enviado será logado).");
 });
 
