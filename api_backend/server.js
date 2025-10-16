@@ -6,7 +6,7 @@ const OpenAI = require('openai');
 const admin = require('firebase-admin');
 const textToSpeech = require('@google-cloud/text-to-speech');
 
-const BUILD_VERSION = "2025-10-16-antilook-v3-dynamic-state";
+const BUILD_VERSION = "2025-10-16-antilook-v4-topic-state";
 const DEBUG_PROMPT = process.env.DEBUG_PROMPT === '1';
 
 // fetch compat (caso o runtime não exponha global.fetch)
@@ -103,7 +103,7 @@ function normalizeLevelForCap(level) {
   return map[low] || level;
 }
 
-/** System compact+ anti-loop (sem termos técnicos) — sem truncamento */
+/** System compact+ (sem termos técnicos) — sem truncamento */
 function createInitialContext(studentName, studentLevel) {
   return {
     role: "system",
@@ -163,7 +163,7 @@ function parseConversaTxt(raw) {
 }
 
 // ======================
-// ESTADO DINÂMICO A PARTIR DO PINNED_BRIEF
+// ESTADO DINÂMICO POR TÓPICOS (SEM GATILHOS)
 // ======================
 
 /** Slug simples e robusto */
@@ -177,33 +177,12 @@ function slugify(str) {
     .slice(0, 40) || 'goal';
 }
 
-/** Extrai frases entre aspas (curvas ou retas) para usar como gatilhos */
-function extractQuotedPhrases(text) {
-  const res = new Set();
-  const s = String(text || '');
-
-  // aspas curvas “...”
-  const reCurly = /“([^”]+)”/g;
-  let m;
-  while ((m = reCurly.exec(s)) !== null) res.add(m[1].trim());
-
-  // aspas retas "..."
-  const reStraight = /"([^"]+)"/g;
-  while ((m = reStraight.exec(s)) !== null) res.add(m[1].trim());
-
-  // casos simples: Hello!, Good morning!, etc. (sem aspas mas com !)
-  const exclam = s.match(/\b([A-Z][a-z]+(?: [a-z]+)*)!\b/g);
-  if (exclam) exclam.forEach(p => res.add(p.replace(/!+$/, '').trim()));
-
-  return Array.from(res).filter(Boolean);
-}
-
-/** Tenta localizar a seção "Goals (in this order)" e seus itens numerados */
+/** Lê a seção "Goals (in this order)" e extrai apenas a ORDEM dos tópicos */
 function parseGoalsFromPinnedBrief(pinnedBrief) {
   const lines = String(pinnedBrief || '').split('\n');
   const goals = [];
 
-  // encontrar o índice da linha "Goals" (aceita variações)
+  // encontrar linha com "Goals" e "order"
   let start = -1;
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i].toLowerCase();
@@ -211,16 +190,13 @@ function parseGoalsFromPinnedBrief(pinnedBrief) {
   }
   if (start === -1) return goals;
 
-  // coletar linhas subsequentes que pareçam itens (começam com número/bullet)
+  // coletar itens numerados/bullets após a linha de "Goals"
   for (let i = start + 1; i < lines.length; i++) {
     const raw = lines[i].trim();
-    if (!raw) {
-      // linha em branco: pode marcar fim da lista (mas toleramos blocos com espaços)
-      // vamos continuar até encontrar outra seção típica
-      continue;
-    }
-    // parar se começarmos outra seção comum
+    if (!raw) continue;
+
     const lower = raw.toLowerCase();
+    // parar ao detectar outra seção
     if (
       lower.startsWith('language bank') ||
       lower.startsWith('at the end') ||
@@ -229,130 +205,75 @@ function parseGoalsFromPinnedBrief(pinnedBrief) {
       lower.startsWith('success') ||
       lower.startsWith('materials') ||
       lower.startsWith('tips') ||
-      lower.startsWith('notes')
+      lower.startsWith('notes') ||
+      lower.startsWith('=== ')
     ) break;
 
-    // item se começar com "1." / "1)" / "-" / "•"
-    if (!/^\s*(\d+[\.)]|[-–•])\s+/.test(raw)) {
-      // pode ser que os itens estejam sem numerador — paramos quando algo não bater com padrão
-      // mas se a linha tem ":", ainda pode ser a cabeça do item
-      if (!raw.includes(':')) break;
-    }
+    // se não parece item, paramos
+    if (!/^\s*(\d+[\.)]|[-–•])\s+/.test(raw)) break;
 
-    // extrai "título" do objetivo (parte antes de "(" ou "—")
+    // rótulo do objetivo = parte antes de parênteses/traço
     const itemText = raw.replace(/^\s*(\d+[\.)]|[-–•])\s+/, '');
     const head = itemText.split(/[—–-]/)[0].split('(')[0].trim();
     const id = slugify(head);
 
-    // gatilhos por aspas no item inteiro
-    const triggers = extractQuotedPhrases(raw);
-
-    goals.push({
-      id,
-      label: head,
-      raw: raw,
-      triggers
-    });
+    goals.push({ id, label: head, raw });
   }
 
-  // fallback: se não achou nada, retorna vazio; o chamador decide como tratar
   return goals;
 }
 
-/** Constroi meta dinâmico a partir do brief: goals, estado, triggers normalizados */
+/** Constrói meta DINÂMICO por tópicos (sem gatilhos) */
 function buildDynamicMetaFromBrief(studentName, studentLevel, studentUnit, pinnedBrief) {
-  // 1) parse goals do brief
   let goals = parseGoalsFromPinnedBrief(pinnedBrief);
 
-  // 2) fallback elegante se brief não listar objetivos
   if (!goals || goals.length === 0) {
-    // padrão minimalista — ainda dinâmico (ids pelo rótulo)
-    const fallback = [
-      { label: 'Greetings', triggers: ['Hello', 'Good morning', 'Good night'] },
-      { label: 'Name', triggers: ['My name is'] },
-      { label: 'Feelings', triggers: ['I am happy', 'I am sad'] },
-      { label: 'Likes', triggers: ['I like'] },
-      { label: 'Self-introduction', triggers: ['Hello! My name is', 'I am happy', 'I like'] },
-    ];
-    goals = fallback.map(g => ({ id: slugify(g.label), label: g.label, raw: g.label, triggers: g.triggers }));
+    // fallback simples — mantém uma ordem padrão
+    const fallback = ['Greetings', 'Name', 'Feelings', 'Likes', 'Self-introduction'];
+    goals = fallback.map(label => ({ id: slugify(label), label, raw: label }));
   }
 
-  // 3) normaliza triggers em regex simples (case-insensitive, contém)
-  const triggerMap = {};
-  goals.forEach(g => {
-    const arr = Array.isArray(g.triggers) ? g.triggers : [];
-    triggerMap[g.id] = arr
-      .map(t => String(t || '').trim())
-      .filter(Boolean)
-      .map(t => new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')); // match por “contém”
-  });
-
-  // 4) estado inicial dinâmico
   const ids = goals.map(g => g.id);
   const next = ids[0] || '';
   const remaining = ids.slice(1).join(',');
 
-  // 5) meta que será guardada em conversations[userId][1]
   return {
     studentName, studentLevel, studentUnit,
     pinnedBrief,
-    goals,                       // array na ordem
+    goals,                         // ordem dos tópicos
     goalMap: Object.fromEntries(goals.map(g => [g.id, g])),
-    triggers: triggerMap,        // id -> [regex...]
+    // STATE textual compatível
     state: `STATE: next=${next}; remaining=${remaining}; done=`,
+    // loopGuard mantido por compatibilidade (não usamos tries/hint aqui)
     loopGuard: { next: next || "", tries: 0, hint: "" }
   };
 }
 
-/** Atualiza STATE/loop de forma dinâmica com base nos gatilhos do objetivo atual */
-function updateStateDynamic(meta, userText = "") {
+/** Avança por TÓPICO, sem checar conteúdo do aluno */
+function updateStateTopic(meta /*, userText = "" */) {
   if (!meta || !meta.state) return;
-
-  // extrair next/remaining/done do STATE textual
   const m = (meta.state || "").match(/STATE:\s*next=([^;]*);\s*remaining=([^;]*);\s*done=(.*)$/i);
   if (!m) return;
+
   let next = (m[1] || '').trim();
   let remaining = (m[2] || '').split(',').map(s => s.trim()).filter(Boolean);
   let done = (m[3] || '').split(',').map(s => s.trim()).filter(Boolean);
 
-  // garantir loopGuard
-  if (!meta.loopGuard) meta.loopGuard = { next: next || "", tries: 0, hint: "" };
-  const lg = meta.loopGuard;
-
-  // se não há "next" (acabaram os objetivos), não faz nada
   if (!next) {
+    // nada a avançar
     meta.state = `STATE: next=; remaining=${remaining.join(',')}; done=${done.join(',')}`;
     return;
   }
 
-  const text = String(userText || '');
-  const rexs = meta.triggers?.[next] || [];
+  // Lógica "leve por tópicos": ao receber a fala do aluno, consideramos o tópico atual coberto.
+  if (!done.includes(next)) done.push(next);
 
-  // HIT: se qualquer trigger do objetivo atual aparecer na fala do aluno
-  const hit = rexs.length > 0 ? rexs.some(rx => rx.test(text)) : false;
+  remaining = remaining.filter(r => r !== next);
+  const upcoming = remaining[0] || "";
 
-  if (hit) {
-    if (!done.includes(next)) done.push(next);
-    remaining = remaining.filter(r => r !== next);
-    const upcoming = remaining[0] || "";
-    meta.loopGuard = { next: upcoming, tries: 0, hint: "" };
-    next = upcoming;
-  } else {
-    const sameGoal = lg.next === (next || "");
-    lg.tries = sameGoal ? (lg.tries + 1) : 1;
-    lg.next = next || lg.next;
-
-    if (lg.tries >= 2 && next) {
-      // Após 2 tentativas: dar modelo e avançar
-      if (!done.includes(next)) done.push(next);
-      remaining = remaining.filter(r => r !== next);
-      const upcoming = remaining[0] || "";
-      meta.loopGuard = { next: upcoming, tries: 0, hint: "provide_model_and_move_on" };
-      next = upcoming;
-    } else {
-      meta.loopGuard = lg;
-    }
-  }
+  // zera loopGuard e aponta para o próximo
+  meta.loopGuard = { next: upcoming, tries: 0, hint: "" };
+  next = upcoming;
 
   meta.state = `STATE: next=${next}; remaining=${remaining.join(',')}; done=${done.join(',')}`;
 }
@@ -642,9 +563,9 @@ app.post('/api/chat', async (req, res) => {
       }
     }
 
-    // Adiciona mensagem do aluno e atualiza STATE dinâmico
+    // Adiciona mensagem do aluno e AVANÇA por tópico (sem gatilhos)
     conversations[userId].push({ role: 'user', content: String(userMessage).trim() });
-    updateStateDynamic(conversations[userId]?.[1], userMessage);
+    updateStateTopic(conversations[userId]?.[1]); // avanço leve por tópicos
 
     // ------- OPENAI -------
     const messagesForOpenAI = getMessagesForOpenAI(userId);
@@ -780,7 +701,7 @@ app.listen(PORT, () => {
   console.log(`📦 Versão: ${BUILD_VERSION}`);
   console.log(`📊 Controle de tokens: ${TOKENS_CONTROL_ENABLED ? 'ATIVADO' : 'DESATIVADO'}`);
   console.log(`🌐 CORS: hannahenglishcourse.netlify.app, localhost:3000`);
-  console.log(`🔧 Estratégia: System fixo + UNIT_BRIEF dinâmico + STATE/loopGuard dinâmicos por unidade + histórico limitado (${MAX_HISTORY_MSGS} msgs)`);
+  console.log(`🔧 Estratégia: System fixo + UNIT_BRIEF + STATE por tópicos (sem gatilhos) + histórico limitado (${MAX_HISTORY_MSGS} msgs)`);
   if (DEBUG_PROMPT) console.log("🔎 DEBUG_PROMPT ATIVADO (conteúdo enviado será logado).");
 });
 
