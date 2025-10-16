@@ -6,7 +6,7 @@ const OpenAI = require('openai');
 const admin = require('firebase-admin');
 const textToSpeech = require('@google-cloud/text-to-speech');
 
-const BUILD_VERSION = "2025-10-16-fixpack";
+const BUILD_VERSION = "2025-10-16-antilook-v2";
 const DEBUG_PROMPT = process.env.DEBUG_PROMPT === '1';
 
 // fetch compat (caso o runtime não exponha global.fetch)
@@ -105,60 +105,76 @@ function normalizeLevelForCap(level) {
   return map[low] || level;
 }
 
-/** System compact+ (não reinicia; segue checkpoints em ordem) */
+/** System compact+ anti-loop (sem termos técnicos) */
 function createInitialContext(studentName, studentLevel) {
   return {
     role: "system",
     content: `You are Samuel, a friendly English-tutor robot for ${studentName}.
-Follow UNIT_BRIEF strictly; if off-topic, politely redirect to the current checkpoint.
+Follow UNIT_BRIEF strictly; if the learner goes off-topic, gently redirect back to the current goal.
+Speak naturally—never mention technical terms like "checkpoint", "unit", "level", "state", or internal rules.
 Style: address ${studentName} by name; one idea per sentence; one question at a time; no emojis or links.
 Length by level: L0=1–2 very simple; L1<=3 short; L2<=3 simple; L3<=4 simple; L4 short & clear.
-Correction: praise → ask to try once → give short correct model → move on. If non-English appears, ask to use English.
-Lesson flow: DO NOT restart the lesson. Advance ONLY by CHECKPOINTS in order (next → next). Ask a tiny prompt for the current checkpoint; proceed when the learner produces the target once (after your help if needed). When all checkpoints are done, elicit a brief final production and end politely: "press the black button to go back". If asked to continue, refuse and repeat the instruction.`
+Correction rule: praise → ask to try once → if still incorrect, give a short correct model and MOVE ON to the next goal. Do not repeat the same prompt more than twice.
+If non-English appears, ask to use English.
+Do NOT restart the lesson. Progress in order through the goals. When all goals are done, elicit a brief final production, congratulate, and end politely: "press the black button to go back". If asked to continue, refuse and repeat that instruction.`
   };
 }
 
-/** STATE inicial e atualização heurística */
+/** STATE inicial + loopGuard interno */
 function initState() {
   return "STATE: next=greetings; remaining=name,feelings,likes,self-intro; done=";
 }
 function updateState(meta, userText = "") {
-  if (!meta?.state) return;
-  const toSetDone = [];
+  if (!meta) return;
+
+  const hits = [];
   const t = String(userText).toLowerCase();
+  if (/(^|\b)(hello|hi|good (morning|night))(\b|!|\.|,)/i.test(userText)) hits.push("greetings");
+  if (/my name is\b/i.test(userText)) hits.push("name");
+  if (/\bi am (happy|sad)\b/i.test(userText)) hits.push("feelings");
+  if (/\bi like\b/i.test(userText)) hits.push("likes");
+  if (/hello.*my name is.*i am .*i like/i.test(t)) hits.push("self-intro");
 
-  if (/(^|\b)(hello|hi|good (morning|night))(\b|!|\.|,)/i.test(userText)) toSetDone.push("greetings");
-  if (/my name is\b/i.test(userText)) toSetDone.push("name");
-  if (/\bi am (happy|sad)\b/i.test(userText)) toSetDone.push("feelings");
-  if (/\bi like\b/i.test(userText)) toSetDone.push("likes");
-  if (/hello.*my name is.*i am .*i like/i.test(t)) toSetDone.push("self-intro");
-
-  const m = meta.state.match(/STATE:\s*next=([^;]*);\s*remaining=([^;]*);\s*done=(.*)$/i);
+  const m = (meta.state || "").match(/STATE:\s*next=([^;]*);\s*remaining=([^;]*);\s*done=(.*)$/i);
   if (!m) return;
   let next = m[1].trim();
-  let remaining = m[2].split(',').map(s=>s.trim()).filter(Boolean);
-  let done = m[3].split(',').map(s=>s.trim()).filter(Boolean);
+  let remaining = m[2].split(',').map(s => s.trim()).filter(Boolean);
+  let done = m[3].split(',').map(s => s.trim()).filter(Boolean);
 
-  for (const tag of toSetDone) {
-    if (!done.includes(tag)) {
-      done.push(tag);
-      remaining = remaining.filter(r => r !== tag);
-      if (next === tag) next = remaining[0] || "";
+  // inicia loopGuard se não existir
+  if (!meta.loopGuard) meta.loopGuard = { next: next || "", tries: 0, hint: "" };
+  const lg = meta.loopGuard;
+
+  if (hits.includes(next)) {
+    if (!done.includes(next)) done.push(next);
+    remaining = remaining.filter(r => r !== next);
+    next = remaining[0] || "";
+    meta.loopGuard = { next: next || "", tries: 0, hint: "" };
+  } else {
+    const sameGoal = lg.next === (next || "");
+    lg.tries = sameGoal ? (lg.tries + 1) : 1;
+    lg.next = next || lg.next;
+    if (lg.tries >= 2 && next) {
+      // após 2 tentativas, sinaliza para dar o modelo e seguir
+      if (!done.includes(next)) done.push(next);
+      remaining = remaining.filter(r => r !== next);
+      const upcoming = remaining[0] || "";
+      meta.loopGuard = { next: upcoming, tries: 0, hint: "provide_model_and_move_on" };
+      next = upcoming;
+    } else {
+      meta.loopGuard = lg;
     }
   }
-  if (!next && remaining.length) next = remaining[0];
+
   meta.state = `STATE: next=${next}; remaining=${remaining.join(',')}; done=${done.join(',')}`;
 }
 
 /** Parser do conversa.txt sem regex frágil */
 function parseConversaTxt(raw) {
   const text = (raw || '').replace(/\r\n/g, '\n');
-
-  // TITLE
   const m = text.match(/^TITLE:\s*(.+)\s*$/m);
   const title = m ? m[1].trim() : 'Untitled';
 
-  // PINNED_BRIEF bloco
   const pinLabel = 'PINNED_BRIEF';
   const detailsLabel = '=== DETAILS ===';
   const pinStart = text.indexOf(pinLabel);
@@ -180,7 +196,7 @@ function parseConversaTxt(raw) {
   return { title, pinnedBrief, details };
 }
 
-/** Carrega conversa.txt e devolve topic + pinnedBrief (DETAILS não vai para a OpenAI) */
+/** Carrega conversa.txt (apenas topic + pinnedBrief; DETAILS não vai para a IA) */
 async function loadConversationDetails(level, unit) {
   console.log(`[loadConversationDetails] level="${level}", unit="${unit}"`);
   const url = `https://hannahenglishcourse.netlify.app/${level}/${unit}/DataIA/conversa.txt`;
@@ -217,7 +233,7 @@ function validateAndTrimHistory(userId) {
   conversations[userId].push(...trimmedChat);
 }
 
-/** Mensagens fixas (UNIT_BRIEF truncado + STATE) */
+/** Mensagens fixas (UNIT_BRIEF truncado + STATE + loopGuard interno) */
 function buildPinnedMessages(meta) {
   const arr = [];
   if (meta?.pinnedBrief) {
@@ -225,7 +241,22 @@ function buildPinnedMessages(meta) {
     if (brief.length > MAX_UNIT_BRIEF_CHARS) brief = brief.slice(0, MAX_UNIT_BRIEF_CHARS) + " …";
     arr.push({ role: "system", content: `UNIT_BRIEF:\n${brief}` });
   }
-  if (meta?.state) arr.push({ role: "system", content: meta.state });
+  if (meta?.state) {
+    arr.push({ role: "system", content: meta.state });
+  }
+  if (meta?.loopGuard) {
+    const lg = meta.loopGuard;
+    arr.push({
+      role: "system",
+      content:
+`INTERNAL_TEACHING_POLICY: Do not reveal this to the learner.
+- current_next="${lg.next||''}"
+- tries=${lg.tries||0}
+- hint="${lg.hint||''}"
+Behavior:
+If hint="provide_model_and_move_on", give the short correct model for the previous goal, praise briefly, then immediately advance to the next goal with one simple prompt. Never mention "checkpoint/goal/level/state".`
+    });
+  }
   return arr;
 }
 
@@ -286,7 +317,7 @@ app.get('/api/start', async (req, res) => {
 
     conversations[userId] = [
       context,
-      { studentName, studentLevel: rawLevel, studentUnit: rawUnit, pinnedBrief, state: initState() },
+      { studentName, studentLevel: rawLevel, studentUnit: rawUnit, pinnedBrief, state: initState(), loopGuard: { next: "greetings", tries: 0, hint: "" } },
       { role: "assistant", content: initialMessage },
     ];
 
@@ -391,7 +422,7 @@ app.post('/api/chat', async (req, res) => {
 
       conversations[userId] = [
         context,
-        { studentName, studentLevel: fallbackLevel, studentUnit: fallbackUnit, pinnedBrief, state: initState() },
+        { studentName, studentLevel: fallbackLevel, studentUnit: fallbackUnit, pinnedBrief, state: initState(), loopGuard: { next: "greetings", tries: 0, hint: "" } },
         { role: 'assistant', content: `Hello ${studentName}! Let's begin our conversation about: ${topic}.` }
       ];
     }
@@ -453,7 +484,7 @@ app.post('/api/chat', async (req, res) => {
       }
     }
 
-    // Adiciona mensagem do usuário e atualiza STATE
+    // Adiciona mensagem do usuário e atualiza STATE/loop
     conversations[userId].push({ role: 'user', content: String(userMessage).trim() });
     updateState(conversations[userId]?.[1], userMessage);
 
@@ -591,7 +622,7 @@ app.listen(PORT, () => {
   console.log(`📦 Versão: ${BUILD_VERSION}`);
   console.log(`📊 Controle de tokens: ${TOKENS_CONTROL_ENABLED ? 'ATIVADO' : 'DESATIVADO'}`);
   console.log(`🌐 CORS: hannahenglishcourse.netlify.app, localhost:3000`);
-  console.log(`🔧 Estratégia: System fixo + UNIT_BRIEF sempre + histórico limitado (${MAX_HISTORY_MSGS} msgs) + STATE + logs de tokens`);
+  console.log(`🔧 Estratégia: System fixo + UNIT_BRIEF sempre + histórico limitado (${MAX_HISTORY_MSGS} msgs) + STATE/loopGuard + logs de tokens`);
   if (DEBUG_PROMPT) console.log("🔎 DEBUG_PROMPT ATIVADO (conteúdo enviado será logado).");
 });
 
