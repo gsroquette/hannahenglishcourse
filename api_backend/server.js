@@ -6,7 +6,7 @@ const OpenAI = require('openai');
 const admin = require('firebase-admin');
 const textToSpeech = require('@google-cloud/text-to-speech');
 
-const BUILD_VERSION = "2025-10-16-antilook-v4-topic-state";
+const BUILD_VERSION = "2025-10-16-antilook-v5-topic-state+logs";
 const DEBUG_PROMPT = process.env.DEBUG_PROMPT === '1';
 
 // fetch compat (caso o runtime não exponha global.fetch)
@@ -77,8 +77,14 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 // ======================
 const TOKENS_CONTROL_ENABLED = true;
 const tokenConfig = {
-  wallet: { seed: 325000 },
-  unitCaps: { Level0: 2000, Level1: 3000, Level2: 4000, Level3: 5000, Level4: 6000 },
+  wallet: { seed: 800000 }, // << atualizado
+  unitCaps: {               // << atualizados
+    Level0: 4000,
+    Level1: 6000,
+    Level2: 8000,
+    Level3: 10000,
+    Level4: 12000
+  },
   minSessionReserve: 200,
   maxOut: 60
 };
@@ -188,7 +194,11 @@ function parseGoalsFromPinnedBrief(pinnedBrief) {
     const l = lines[i].toLowerCase();
     if (l.includes('goals') && l.includes('order')) { start = i; break; }
   }
-  if (start === -1) return goals;
+  if (start === -1) {
+    console.warn("[BRIEF/PARSE] 'Goals (in this order)' não encontrado.");
+    console.log("[BRIEF/PARSE] conteúdo do PINNED_BRIEF (primeiras linhas):", lines.slice(0, 10));
+    return goals;
+  }
 
   // coletar itens numerados/bullets após a linha de "Goals"
   for (let i = start + 1; i < lines.length; i++) {
@@ -220,6 +230,7 @@ function parseGoalsFromPinnedBrief(pinnedBrief) {
     goals.push({ id, label: head, raw });
   }
 
+  console.log("[BRIEF/PARSE] found goals:", goals.map(g => g.label));
   return goals;
 }
 
@@ -229,15 +240,16 @@ function buildDynamicMetaFromBrief(studentName, studentLevel, studentUnit, pinne
 
   if (!goals || goals.length === 0) {
     // fallback simples — mantém uma ordem padrão
-    const fallback = ['Greetings', 'Name', 'Feelings', 'Likes', 'Self-introduction'];
+    const fallback = ['Greetings', 'Name', 'Feelings', 'Likes', 'Mini self-introduction'];
     goals = fallback.map(label => ({ id: slugify(label), label, raw: label }));
+    console.warn("[BRIEF/PARSE] usando fallback de goals:", fallback);
   }
 
   const ids = goals.map(g => g.id);
   const next = ids[0] || '';
   const remaining = ids.slice(1).join(',');
 
-  return {
+  const meta = {
     studentName, studentLevel, studentUnit,
     pinnedBrief,
     goals,                         // ordem dos tópicos
@@ -247,6 +259,11 @@ function buildDynamicMetaFromBrief(studentName, studentLevel, studentUnit, pinne
     // loopGuard mantido por compatibilidade (não usamos tries/hint aqui)
     loopGuard: { next: next || "", tries: 0, hint: "" }
   };
+
+  console.log("[STATE/INIT] goals:", meta.goals.map(g => g.label));
+  console.log("[STATE/INIT] state:", meta.state);
+
+  return meta;
 }
 
 /** Avança por TÓPICO, sem checar conteúdo do aluno */
@@ -260,7 +277,6 @@ function updateStateTopic(meta /*, userText = "" */) {
   let done = (m[3] || '').split(',').map(s => s.trim()).filter(Boolean);
 
   if (!next) {
-    // nada a avançar
     meta.state = `STATE: next=; remaining=${remaining.join(',')}; done=${done.join(',')}`;
     return;
   }
@@ -276,96 +292,6 @@ function updateStateTopic(meta /*, userText = "" */) {
   next = upcoming;
 
   meta.state = `STATE: next=${next}; remaining=${remaining.join(',')}; done=${done.join(',')}`;
-}
-
-/** Carrega conversa.txt remoto (topic + pinnedBrief) */
-async function loadConversationDetails(level, unit) {
-  console.log(`[loadConversationDetails] level="${level}", unit="${unit}"`);
-  const url = `https://hannahenglishcourse.netlify.app/${level}/${unit}/DataIA/conversa.txt`;
-  try {
-    const fetchRes = await safeFetch(url);
-    if (!fetchRes.ok) throw new Error(`HTTP ${fetchRes.status}`);
-    const fileContent = await fetchRes.text();
-    const { title, pinnedBrief, details } = parseConversaTxt(fileContent);
-    console.log("✅ conversa.txt carregado e parseado.");
-    return { topic: title || 'General conversation', pinnedBrief: pinnedBrief || '', details: details || '' };
-  } catch (err) {
-    console.warn(`⚠️ Falha ao buscar conversa.txt (${url}): ${err.message}`);
-    return { topic: 'General conversation', pinnedBrief: '', details: '' };
-  }
-}
-
-/** Sanitiza e limita histórico (mantém system + meta + últimas 2 trocas) */
-function validateAndTrimHistory(userId) {
-  if (!Array.isArray(conversations[userId])) {
-    conversations[userId] = [];
-    return;
-  }
-  conversations[userId] = conversations[userId].filter(m =>
-    m && typeof m === 'object' && typeof m.role === 'string' && typeof m.content === 'string'
-  );
-
-  const systemContext = conversations[userId].find(m => m.role === "system");
-  const metaInfo = conversations[userId].find(m => m.studentName);
-  const chatMessages = conversations[userId].filter(m => m.role === 'user' || m.role === 'assistant');
-  const trimmedChat = chatMessages.slice(-MAX_HISTORY_MSGS);
-
-  conversations[userId] = [];
-  if (systemContext) conversations[userId].push(systemContext);
-  if (metaInfo) conversations[userId].push(metaInfo);
-  conversations[userId].push(...trimmedChat);
-}
-
-/** Monta mensagens fixas (UNIT_BRIEF completo + STATE + loopGuard) */
-function buildPinnedMessages(meta) {
-  const arr = [];
-  if (meta?.pinnedBrief) {
-    const brief = String(meta.pinnedBrief).trim(); // sem truncamento
-    arr.push({ role: "system", content: `UNIT_BRIEF:\n${brief}` });
-  }
-  if (meta?.state) {
-    arr.push({ role: "system", content: meta.state });
-  }
-  if (meta?.loopGuard) {
-    const lg = meta.loopGuard;
-    arr.push({
-      role: "system",
-      content:
-`INTERNAL_TEACHING_POLICY: Do not reveal this to the learner.
-- current_next="${lg.next||''}"
-- tries=${lg.tries||0}
-- hint="${lg.hint||''}"
-Behavior:
-If hint="provide_model_and_move_on", give the short correct model for the previous goal, praise briefly, then immediately advance to the next goal with one simple prompt. Never mention "checkpoint/goal/level/state".`
-    });
-  }
-  return arr;
-}
-
-/** Histórico para OpenAI: system + UNIT_BRIEF + últimas N mensagens (sem truncar conteúdos) */
-function getMessagesForOpenAI(userId) {
-  if (!conversations[userId] || conversations[userId].length === 0) return [];
-  const all = conversations[userId];
-
-  // system (sem truncamento)
-  const systemCore = all.find(m => m.role === "system");
-
-  const meta = all.find(m => m.studentName);
-  const chat = all.filter(m => m.role === 'user' || m.role === 'assistant');
-  const limitedChat = chat.slice(-MAX_HISTORY_MSGS);
-
-  const pinned = buildPinnedMessages(meta);
-
-  const msgs = [];
-  if (systemCore) msgs.push(systemCore);
-  msgs.push(...pinned);
-  msgs.push(...limitedChat);
-
-  if (DEBUG_PROMPT) {
-    console.log("[DEBUG] sending messages:");
-    for (const m of msgs) console.log(m.role, "-", String(m.content).slice(0, 160).replace(/\n/g, " "));
-  }
-  return msgs;
 }
 
 // ======================
@@ -478,6 +404,82 @@ app.get('/api/start', async (req, res) => {
   }
 });
 
+/** Sanitiza e limita histórico (mantém system + meta + últimas 2 trocas) */
+function validateAndTrimHistory(userId) {
+  if (!Array.isArray(conversations[userId])) {
+    conversations[userId] = [];
+    return;
+  }
+  conversations[userId] = conversations[userId].filter(m =>
+    m && typeof m === 'object' && typeof m.role === 'string' && typeof m.content === 'string'
+  );
+
+  const systemContext = conversations[userId].find(m => m.role === "system");
+  const metaInfo = conversations[userId].find(m => m.studentName);
+  const chatMessages = conversations[userId].filter(m => m.role === 'user' || m.role === 'assistant');
+  const trimmedChat = chatMessages.slice(-MAX_HISTORY_MSGS);
+
+  conversations[userId] = [];
+  if (systemContext) conversations[userId].push(systemContext);
+  if (metaInfo) conversations[userId].push(metaInfo);
+  conversations[userId].push(...trimmedChat);
+}
+
+/** Monta mensagens fixas (UNIT_BRIEF completo + STATE + loopGuard) */
+function buildPinnedMessages(meta) {
+  const arr = [];
+  if (meta?.pinnedBrief) {
+    const brief = String(meta.pinnedBrief).trim(); // sem truncamento
+    arr.push({ role: "system", content: `UNIT_BRIEF:\n${brief}` });
+  }
+  if (meta?.state) {
+    arr.push({ role: "system", content: meta.state });
+  }
+  if (meta?.loopGuard) {
+    const lg = meta.loopGuard;
+    arr.push({
+      role: "system",
+      content:
+`INTERNAL_TEACHING_POLICY: Do not reveal this to the learner.
+- current_next="${lg.next||''}"
+- tries=${lg.tries||0}
+- hint="${lg.hint||''}"
+Behavior:
+If hint="provide_model_and_move_on", give the short correct model for the previous goal, praise briefly, then immediately advance to the next goal with one simple prompt. Never mention "checkpoint/goal/level/state".`
+    });
+  }
+  return arr;
+}
+
+/** Histórico para OpenAI: system + UNIT_BRIEF + últimas N mensagens (sem truncar conteúdos) */
+function getMessagesForOpenAI(userId) {
+  if (!conversations[userId] || conversations[userId].length === 0) return [];
+  const all = conversations[userId];
+
+  // system (sem truncamento)
+  const systemCore = all.find(m => m.role === "system");
+
+  const meta = all.find(m => m.studentName);
+  const chat = all.filter(m => m.role === 'user' || m.role === 'assistant');
+  const limitedChat = chat.slice(-MAX_HISTORY_MSGS);
+
+  const pinned = buildPinnedMessages(meta);
+
+  const msgs = [];
+  if (systemCore) msgs.push(systemCore);
+  msgs.push(...pinned);
+  msgs.push(...limitedChat);
+
+  if (DEBUG_PROMPT) {
+    console.log("[DEBUG] sending messages:");
+    for (const m of msgs) console.log(m.role, "-", String(m.content).slice(0, 160).replace(/\n/g, " "));
+  }
+  if (meta) {
+    console.log("[PROMPT] NEXT =", meta.loopGuard?.next || "(none)");
+  }
+  return msgs;
+}
+
 // ======================
 // /api/chat
 // ======================
@@ -564,8 +566,15 @@ app.post('/api/chat', async (req, res) => {
     }
 
     // Adiciona mensagem do aluno e AVANÇA por tópico (sem gatilhos)
-    conversations[userId].push({ role: 'user', content: String(userMessage).trim() });
+    const userMsgTrimmed = String(userMessage).trim();
+    console.log("[CHAT] user message:", userMsgTrimmed);
+    console.log("[STATE/BEFORE] state:", conversations[userId]?.[1]?.state);
+    conversations[userId].push({ role: 'user', content: userMsgTrimmed });
+
     updateStateTopic(conversations[userId]?.[1]); // avanço leve por tópicos
+
+    console.log("[STATE/AFTER] state:", conversations[userId]?.[1]?.state);
+    console.log("[STATE/NEXT] next goal:", conversations[userId]?.[1]?.loopGuard?.next || "(none)");
 
     // ------- OPENAI -------
     const messagesForOpenAI = getMessagesForOpenAI(userId);
@@ -670,20 +679,31 @@ app.post('/api/tts', async (req, res) => {
     const { text, speakingRate } = req.body;
     if (!text || typeof text !== 'string') return res.status(400).json({ error: "Texto inválido ou ausente." });
 
+    const trimmed = String(text).trim();
+    if (!trimmed) {
+      console.warn("[TTS] texto vazio/espaço — ignorado");
+      return res.status(200).json({ audioContent: null });
+    }
+
+    console.log("[TTS] len:", trimmed.length, "rate:", speakingRate || 1.0);
+
     const request = {
-      input: { text },
+      input: { text: trimmed },
       voice: { languageCode: 'en-US', name: 'en-US-Standard-I', ssmlGender: 'MALE' },
       audioConfig: { audioEncoding: 'MP3', speakingRate: speakingRate || 1.0 },
     };
 
     const [response] = await ttsClient.synthesizeSpeech(request);
     const audioContent = response.audioContent ? response.audioContent.toString('base64') : null;
-    if (!audioContent) return res.status(500).json({ error: "Falha ao gerar o áudio." });
+    if (!audioContent) {
+      console.error("[TTS] Falha ao gerar áudio: audioContent null/undefined");
+      return res.status(500).json({ error: "Falha ao gerar o áudio." });
+    }
 
     return res.json({ audioContent });
 
   } catch (error) {
-    console.error("[/api/tts] Erro:", error);
+    console.error("[TTS] erro:", error?.message);
     return res.status(500).json({ error: "Erro ao gerar áudio TTS.", details: error.message });
   }
 });
