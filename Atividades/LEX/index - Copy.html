@@ -184,12 +184,10 @@
         let recognition, isSpeaking = false, userId = null, chatHistory = [];
         let initialGreeting = null;
         let audioUnlocked = false;
-
+        
+        // OPÇÃO A: Variáveis para guardar level/unit atual
         let currentLevel = null;
         let currentUnit = null;
-
-        // 🔒 Cache do CAP da unidade (fix para /api/chat que não retorna unitCap)
-        let tokenCapCache = null;
 
         // UI helpers
         function updateSliderBackground() {
@@ -204,47 +202,19 @@
         backButton.addEventListener("click", () => window.history.back());
 
         function updateTokenUI(info) {
-            // Mostra barra apenas se houver alguma info útil
-            if (!info) return;
-
-            // Atualiza cache do CAP quando vier do /api/start (unitCap) ou se vier allowedUnit
-            if (typeof info.unitCap === 'number' && info.unitCap > 0) {
-                tokenCapCache = info.unitCap;
-            } else if (typeof info.allowedUnit === 'number' && info.allowedUnit > 0) {
-                tokenCapCache = info.allowedUnit;
-            }
-
-            // Se ainda não sabemos o CAP, mostramos os números e evitamos divisão por zero
-            const cap = (typeof tokenCapCache === 'number' && tokenCapCache > 0)
-                ? tokenCapCache
-                : (typeof info.unitCap === 'number' && info.unitCap > 0 ? info.unitCap : null);
-
-            const remaining = Math.max(0, Number(info.remainingUnit) || 0);
-
+            if (!info || !info.unitCap) return;
             tokenBar.style.display = "block";
-
-            // Percentual seguro
-            let pct = 0;
-            if (cap) {
-                pct = Math.max(0, Math.min(100, (remaining / cap) * 100));
-            } else {
-                // Sem CAP conhecido ainda → mantém 100% até conhecermos
-                pct = 100;
-            }
-
+            const pct = Math.max(0, (info.remainingUnit / info.unitCap) * 100);
             tokenProgressFill.style.width = pct + "%";
-
-            // Texto informativo
-            const capText = cap || info.unitCap || info.allowedUnit || "?";
-            tokenInfoText.textContent = `Remaining: ${remaining}/${capText} | Wallet: ${info.walletBalance ?? "-"}`;
-
-            // Avisos
+            tokenInfoText.textContent = `Remaining: ${info.remainingUnit}/${info.unitCap} | Wallet: ${info.walletBalance}`;
             tokenWarning.textContent = "";
             tokenLimit.textContent = "";
-            if (remaining < 200 && remaining > 0) {
+
+            if (info.remainingUnit < 200 && info.remainingUnit > 0) {
                 tokenWarning.textContent = "⚠️ Almost finished! About 3-4 replies left.";
             }
-            if (info.canChat === false || remaining <= 0) {
+
+            if (!info.canChat || info.remainingUnit <= 0) {
                 tokenLimit.textContent = "You reached the limit for this unit. Do another activity or come back later.";
                 speakButton.disabled = true;
             } else {
@@ -321,7 +291,7 @@
                 }
 
                 try {
-                    // Sempre enviar level e unit no body
+                    // OPÇÃO A: Sempre enviar level e unit no body
                     const resp = await fetch('https://hannah-backend.onrender.com/api/chat', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -340,14 +310,14 @@
                     chatHistory = data.chatHistory;
                     messageElement.innerText = data.response;
                     
-                    // ✅ Atualiza a barra de tokens ANTES do TTS (dinâmico a cada resposta)
                     if (data.tokenInfo) updateTokenUI(data.tokenInfo);
                     
-                    // TTS (mantido original)
+                    // CORREÇÃO: Sempre tentar falar, exceto se for mensagem de limite de tokens
                     if (data.response && !data.response.includes("token limit") && !data.response.includes("Please complete other activities")) {
                         speakUsingGoogleTTS(data.response);
                     }
                     
+                    // Se não pode mais falar, mostrar mensagem clara
                     if (data.tokenInfo && data.tokenInfo.canChat === false) {
                         messageElement.innerText = data.response + "\n\nPlease complete other activities to earn more tokens.";
                     }
@@ -380,6 +350,8 @@
                 // Limitar o texto para TTS (evitar textos muito longos)
                 const shortText = text.length > 200 ? text.substring(0, 200) + "..." : text;
                 const playbackSpeed = parseFloat(speedSlider.value) || 1.0;
+                
+                console.log("Enviando para TTS:", shortText);
                 
                 const resp = await fetch('https://hannah-backend.onrender.com/api/tts', {
                     method: 'POST',
@@ -467,7 +439,7 @@
                     if (!userId) return;
                     
                     try {
-                        // Sempre enviar level e unit no body
+                        // OPÇÃO A: Sempre enviar level e unit no body
                         const resp = await fetch('https://hannah-backend.onrender.com/api/chat', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -484,11 +456,9 @@
                         if (data.response) {
                             chatHistory = data.chatHistory;
                             messageElement.innerText = data.response;
-
-                            // ✅ Atualiza a barra de tokens ANTES do TTS (dinâmico a cada resposta)
                             if (data.tokenInfo) updateTokenUI(data.tokenInfo);
                             
-                            // TTS (mantido original)
+                            // CORREÇÃO: Sempre tentar falar, exceto se for mensagem de limite de tokens
                             if (data.response && !data.response.includes("token limit") && !data.response.includes("Please complete other activities")) {
                                 speakUsingGoogleTTS(data.response);
                             }
@@ -513,13 +483,15 @@
 
                 userId = user.uid;
                 const params = new URLSearchParams(window.location.search);
+                
+                // OPÇÃO A: Inicializar currentLevel e currentUnit da URL
                 currentLevel = params.get('level') || 'Level1';
                 currentUnit = params.get('unit') || 'Unit1';
 
                 try {
                     loaderMessage.style.display = "block";
                     loaderMessage.innerText = "Waking up Robot Samuel...";
-
+                    
                     const r = await fetch(`https://hannah-backend.onrender.com/api/start?uid=${userId}&level=${currentLevel}&unit=${currentUnit}`);
                     if (!r.ok) throw new Error("Failed to initialize conversation.");
                     
@@ -527,7 +499,7 @@
                     chatHistory = data.chatHistory || [];
                     initialGreeting = data.response || "Hello! Shall we begin?";
                     
-                    // Atualiza possíveis normalizações do backend
+                    // OPÇÃO A: Atualizar com os valores do backend (caso tenha normalização)
                     if (data.studentInfo) {
                         currentLevel = data.studentInfo.level || currentLevel;
                         currentUnit = data.studentInfo.unit || currentUnit;
@@ -538,22 +510,25 @@
                     messageElement.style.visibility = "hidden";
                     speakButton.style.display = "block";
                     
-                    // ✅ Atualiza barra com CAP inicial (guarda no cache)
                     if (data.tokenInfo) updateTokenUI(data.tokenInfo);
 
+                    // Botão corrigido - fluxo simplificado
                     if (!speakButton.hasAttribute('data-initialized')) {
                         speakButton.setAttribute('data-initialized', 'true');
                         speakButton.addEventListener("click", async () => {
                             await unlockAudioOnce();
                             
+                            // Se for o primeiro clique (botão diz "Press to Start")
                             if (speakButton.innerText === "Press to Start") {
                                 messageElement.style.visibility = "visible";
                                 messageElement.innerText = initialGreeting;
                                 
-                                // Garante que a saudação inicial seja falada
+                                // CORREÇÃO: Garantir que a saudação inicial seja falada
                                 speakUsingGoogleTTS(initialGreeting);
                                 speakButton.innerText = "Press to Speak";
-                            } else if (!isSpeaking) {
+                            } 
+                            // Se já inicializou e não está ouvindo/falando
+                            else if (!isSpeaking) {
                                 try {
                                     if (recognition) {
                                         recognition.start();
