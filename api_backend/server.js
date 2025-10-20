@@ -77,13 +77,13 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 // ======================
 const TOKENS_CONTROL_ENABLED = true;
 const tokenConfig = {
-  wallet: { seed: 800000 }, // atualizado
+  wallet: { seed: 1600000 }, // atualizado
   unitCaps: {               // atualizados
-    Level0: 4000,
-    Level1: 6000,
-    Level2: 8000,
-    Level3: 10000,
-    Level4: 12000
+    Level0: 8000,
+    Level1: 12000,
+    Level2: 16000,
+    Level3: 20000,
+    Level4: 24000
   },
   minSessionReserve: 200,
   maxOut: 60
