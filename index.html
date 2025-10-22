@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
@@ -34,7 +34,11 @@
     }
     .subtitle{margin-top:40px;font-size:24px;font-weight:bold;color:#333;text-align:center;}
     .levels{display:flex;flex-wrap:wrap;justify-content:center;gap:20px;padding:20px;}
-    .level-button{width:200px;height:200px;background-size:cover;background-repeat:no-repeat;display:inline-block;}
+    .level-button{
+      width:200px;height:200px;background-size:cover;background-repeat:no-repeat;display:inline-block;
+      /* NEW: estado pessimista por padrão (bloqueado) */
+      filter:grayscale(100%); pointer-events:none;
+    }
     .level0{background-image:url('imagens/Level0_button.png');}
     .levelA{background-image:url('imagens/levelA.png');}
     .levelB{background-image:url('imagens/levelB.png');}
@@ -45,27 +49,22 @@
     .login-container{
       position:absolute; top:16px; right:14px; z-index:20;
       display:inline-flex; flex-direction:column; align-items:center; gap:4px;
-      /* NENHUM FUNDO, NENHUMA BORDA, NENHUMA SOMBRA */
       background:none; border:none; box-shadow:none; padding:0;
       cursor:pointer;
     }
-    /* Só a imagem; sem borda, sem sombra, sem máscara */
     .user-icon{
       width:55px; height:auto; display:block;
       border:none; box-shadow:none; border-radius:0; object-fit:contain;
       pointer-events:none;
     }
-    /* Nome exatamente embaixo, centralizado */
     .user-name{
       margin:0; line-height:1.05; text-align:center;
       font-size:13px; font-weight:700; color:#1a5f34;
       white-space:nowrap; max-width:180px; overflow:hidden; text-overflow:ellipsis;
-      text-shadow: 0 1px 1px rgba(255,255,255,0.45), 0 1px 2px rgba(0,0,0,0.18); /* só p/ leitura sobre fundos claros/escuros */
+      text-shadow: 0 1px 1px rgba(255,255,255,0.45), 0 1px 2px rgba(0,0,0,0.18);
     }
-    /* garante que qualquer caret antigo não apareça */
     .login-caret{ display:none !important; }
 
-    /* Dropdown padrão (pode ficar como estava) */
     .dropdown{
       display:none; position:absolute; right:0; top:calc(100% + 10px); z-index:25;
       min-width:220px; background:#fff; border-radius:12px;
@@ -101,6 +100,18 @@
     #iosInstallBanner{display:none;position:fixed;bottom:0;left:0;right:0;background:#fffbe8;border-top:1px solid #ccc;
       padding:12px 16px;text-align:center;font-size:16px;z-index:10000;}
     #iosInstallBanner button{margin-left:10px;background:#ff5722;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;}
+
+    /* NEW: overlay de permissões (UX + bloqueio de clique) */
+    #permOverlay{
+      position:fixed; inset:0; background:rgba(255,255,255,.6);
+      display:none; z-index:30; /* acima dos botões de level, abaixo do dropdown (25)? Vamos sobrepor tudo */
+      backdrop-filter:saturate(180%) blur(2px);
+    }
+    #permOverlay .inner{
+      position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+      background:#fff; border:1px solid rgba(0,0,0,.08); border-radius:12px; padding:12px 16px;
+      box-shadow:0 10px 24px rgba(0,0,0,.15); font-weight:600; color:#333;
+    }
   </style>
 </head>
 
@@ -146,6 +157,11 @@
     </main>
   </div>
 
+  <!-- NEW: Overlay de carregamento de permissões -->
+  <div id="permOverlay" aria-hidden="true">
+    <div class="inner">Loading your permissions…</div>
+  </div>
+
   <!-- Botão flutuante PWA -->
   <button id="installBtn" disabled>Install App</button>
 
@@ -176,12 +192,14 @@
       return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
     }
     let englishVoice=null, deferredPrompt=null;
+
     const installBtn=document.getElementById("installBtn");
     const ua=navigator.userAgent.toLowerCase();
     const isIOS=/iphone|ipad|ipod/.test(ua);
 
     /* ---------- Níveis helpers ---------- */
     const VALID_LEVELS=["Level0","Level1","Level2","Level3","Level4"];
+
     function normalizarNivel(n){
       if(!n) return null;
       const m=String(n).trim().toLowerCase();
@@ -193,8 +211,13 @@
       return null;
     }
     function normalizarListaLevels(v){
-      if(Array.isArray(v)){ const set=new Set(); v.forEach(x=>{const n=normalizarNivel(x); if(n) set.add(n);}); return Array.from(set); }
-      const single=normalizarNivel(v); return single ? [single] : [];
+      if(Array.isArray(v)){
+        const set=new Set();
+        v.forEach(x=>{const n=normalizarNivel(x); if(n) set.add(n);});
+        return Array.from(set);
+      }
+      const single=normalizarNivel(v);
+      return single ? [single] : [];
     }
     function levelsAPartirDoProgresso(progresso){
       if(!progresso||typeof progresso!=="object") return [];
@@ -204,23 +227,58 @@
         if(!units||typeof units!=="object") return;
         for(const uk of Object.keys(units)){
           const fases=units[uk];
-          if(fases && typeof fases==="object" && Object.values(fases).some(Boolean)){ liberados.push(L); break; }
+          if(fases && typeof fases==="object" && Object.values(fases).some(Boolean)){
+            liberados.push(L); break;
+          }
         }
       });
       return Array.from(new Set(liberados));
+    }
+
+    /* ---------- Estado de permissões + overlay (NEW) ---------- */
+    let permissionsReady=false;
+    let allowedLevels=new Set();
+
+    const permOverlay=document.getElementById('permOverlay');
+    function setPermOverlay(show){
+      permOverlay.style.display=show?'block':'none';
+      permOverlay.setAttribute('aria-hidden', show ? 'false' : 'true');
     }
 
     /* ---------- PWA botão instalar ---------- */
     function showInstallButton(){installBtn.disabled=false;installBtn.style.display='flex';installBtn.classList.add('pulse');}
     function hideInstallButton(){installBtn.style.display='none';installBtn.classList.remove('pulse');installBtn.disabled=true;}
     function controlPWAButtons(){ if(isInStandaloneMode()){hideInstallButton();return;} if(deferredPrompt){showInstallButton();} else {hideInstallButton();}}
-    if(isIOS && !isInStandaloneMode()){ const b=document.getElementById("iosInstallBanner"); b.style.display="block"; document.getElementById("iosBannerClose").onclick=()=>b.style.display="none"; }
-    window.addEventListener('beforeinstallprompt',e=>{ if(isInStandaloneMode()) return; e.preventDefault(); deferredPrompt=e; showInstallButton(); });
-    installBtn.addEventListener('click',async ()=>{ if(!deferredPrompt) return; hideInstallButton(); deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt=null; setTimeout(controlPWAButtons,500); });
+    if(isIOS && !isInStandaloneMode()){
+      const b=document.getElementById("iosInstallBanner");
+      b.style.display="block";
+      document.getElementById("iosBannerClose").onclick=()=>b.style.display="none";
+    }
+    window.addEventListener('beforeinstallprompt',e=>{
+      if(isInStandaloneMode()) return;
+      e.preventDefault();
+      deferredPrompt=e; showInstallButton();
+    });
+    installBtn.addEventListener('click',async ()=>{
+      if(!deferredPrompt) return; hideInstallButton();
+      deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt=null; setTimeout(controlPWAButtons,500);
+    });
     window.addEventListener('appinstalled',()=>{deferredPrompt=null;hideInstallButton();});
-    async function verificarInstalacaoInicial(){ if(isInStandaloneMode()){hideInstallButton();return;} if('getInstalledRelatedApps' in navigator){ try{ const apps=await navigator.getInstalledRelatedApps(); if(apps.length>0){hideInstallButton();} }catch(e){} } controlPWAButtons(); }
-    function updateNetworkStatus(){ if(!navigator.onLine) installBtn.disabled=true; else if(deferredPrompt) installBtn.disabled=false; }
-    window.addEventListener('online',updateNetworkStatus); window.addEventListener('offline',updateNetworkStatus);
+    async function verificarInstalacaoInicial(){
+      if(isInStandaloneMode()){hideInstallButton();return;}
+      if('getInstalledRelatedApps' in navigator){
+        try{
+          const apps=await navigator.getInstalledRelatedApps();
+          if(apps.length>0){hideInstallButton();}
+        }catch(e){}
+      }
+      controlPWAButtons();
+    }
+    function updateNetworkStatus(){
+      if(!navigator.onLine) installBtn.disabled=true; else if(deferredPrompt) installBtn.disabled=false;
+    }
+    window.addEventListener('online',updateNetworkStatus);
+    window.addEventListener('offline',updateNetworkStatus);
 
     /* ---------- TTS util ---------- */
     function pickVoice(){ return (speechSynthesis.getVoices()||[]).find(v=>v.lang.toLowerCase().includes('en'))||null; }
@@ -234,12 +292,52 @@
     speechSynthesis.onvoiceschanged=()=>englishVoice=pickVoice();
 
     /* ---------- UI: níveis ---------- */
-    function bloquearTodosNiveis(){ document.querySelectorAll(".level-button").forEach(b=>{ b.style.filter="grayscale(100%)"; b.style.pointerEvents="none"; }); }
+    function bloquearTodosNiveis(){
+      // NEW: estado interno + UI pessimista
+      permissionsReady=false;
+      allowedLevels = new Set();
+      document.querySelectorAll(".level-button").forEach(b=>{
+        b.style.filter="grayscale(100%)";
+        b.style.pointerEvents="none";
+      });
+    }
     function liberarNiveis(arr){
       const alvo=new Set(arr||[]);
-      document.querySelectorAll(".level-button").forEach(b=>{ if(alvo.has(b.id)){ b.style.filter="none"; b.style.pointerEvents="auto"; } else { b.style.filter="grayscale(100%)"; b.style.pointerEvents="none"; } });
+      allowedLevels = new Set(alvo);       // NEW: estado interno
+      permissionsReady=true;               // NEW: estado pronto
+
+      document.querySelectorAll(".level-button").forEach(b=>{
+        if(alvo.has(b.id)){
+          b.style.filter="none";
+          b.style.pointerEvents="auto";
+        } else {
+          b.style.filter="grayscale(100%)";
+          b.style.pointerEvents="none";
+        }
+      });
+
+      // NEW: some overlay quando pelo menos 1 nível foi aplicado
+      const hasAny=alvo.size>0;
+      if(hasAny) setPermOverlay(false);
     }
     function enviarNivel(n){ n ? liberarNiveis([n]) : liberarNiveis(["Level1"]); }
+
+    /* ---------- Guard de clique (NEW): impede navegação sem permissão ---------- */
+    document.addEventListener('click', (e)=>{
+      const a = e.target.closest && e.target.closest('.level-button');
+      if(!a) return;
+      const levelId = a.id;
+      // Se ainda não carregou permissões ou o nível não está permitido, cancela
+      if(!permissionsReady || !allowedLevels.has(levelId)){
+        e.preventDefault();
+        // Overlay curto se ainda carregando; se já carregou e não tem permissão, só ignora o clique.
+        if(!permissionsReady){
+          setPermOverlay(true);
+          // overlay será fechado por liberarNiveis() ao finalizar
+        }
+        return false;
+      }
+    }, true); // capture = true para pegar antes de event handlers padrão
 
     /* ---------- Firebase Auth & Níveis ---------- */
     firebase.auth().onAuthStateChanged(async (user)=>{
@@ -251,11 +349,15 @@
       const invitationContainer=document.getElementById("invitationContainer");
       const loginContainer=document.getElementById("loginContainer");
 
+      // NEW: sempre começar bloqueado e overlay on quando logado
+      bloquearTodosNiveis();
+
       if(user){
         subtitleLoggedOut.style.display="none";
         subtitleLoggedIn.style.display="block";
         roboContainer.style.display="flex";
         invitationContainer.style.display="flex";
+        setPermOverlay(true); // NEW: mostra overlay enquanto busca permissões
 
         try{
           const snap=await firebase.database().ref("usuarios/"+user.uid).once("value");
@@ -279,7 +381,7 @@
           let dash="";
           if(d.role==="proprietario"||d.role==="professor"){
             dash=`<a href="painel_${d.role==='proprietario'?'proprietario':'professor'}.html" class="dashboard-link">${d.role.toUpperCase()} DASHBOARD</a>`;
-            liberarNiveis(VALID_LEVELS);
+            liberarNiveis(VALID_LEVELS); // libera TODOS
           }else if(d.role==="aluno"){
             dash='<a href="painel_aluno.html" class="dashboard-link">STUDENT DASHBOARD</a>';
 
@@ -291,7 +393,7 @@
               if(nAluno){ enviarNivel(nAluno); return; }
               const arrFromProg=levelsAPartirDoProgresso(d.progresso);
               if(liberarPorPreferencia(arrFromProg)) return;
-              enviarNivel();
+              enviarNivel(); // default: Level1
             };
 
             if(d.atrelado_professor){
@@ -331,17 +433,25 @@
           loginContainer.onclick=(e)=>{ if(!firebase.auth().currentUser) return; e.preventDefault(); toggleDropdown(); };
           window.addEventListener("click",(e)=>{ if(!loginContainer.contains(e.target)) toggleDropdown(false); });
 
+          // NEW: se por algum motivo ninguém liberou nada (dados vazios), overlay some no enviarNivel/default
+          if(!permissionsReady){
+            // assegura que overlay não fique preso caso nenhum dado válido chegue
+            setPermOverlay(false);
+          }
+
         }catch(e){
           console.error(e);
           bloquearTodosNiveis();
+          setPermOverlay(false); // evita overlay eterno em erro
         }
       }else{
         subtitleLoggedOut.style.display="block";
         subtitleLoggedIn.style.display="none";
         roboContainer.style.display="flex";
         invitationContainer.style.display="flex";
-        loginLink.setAttribute("href","Formulario/login.html");
+        document.getElementById("loginLink").setAttribute("href","Formulario/login.html");
         bloquearTodosNiveis();
+        setPermOverlay(false);
       }
     });
 
@@ -355,6 +465,9 @@
     /* ---------- DOM Ready ---------- */
     function pickVoice(){ return (speechSynthesis.getVoices()||[]).find(v=>v.lang.toLowerCase().includes('en'))||null; }
     document.addEventListener("DOMContentLoaded",()=>{
+      // NEW: garante bloqueio inicial antes de qualquer interação
+      bloquearTodosNiveis();
+
       englishVoice=pickVoice();
       document.getElementById("playTTSBtn").onclick=speakRobot;
       document.getElementById("invitationButton").onclick=()=>location.href="Apresentacao/propaganda.html";
@@ -371,6 +484,11 @@
         .then(r=>console.log("SW registrado:",r.scope))
         .catch(err=>console.error("SW erro:",err));
     }
+
+    /* ---------- Futuro (opcional): custom claims ----------
+      // TODO (backend): mover "levels_liberados/nivel_em_curso" para custom claims.
+      // Vantagem: permissões chegam no token, reduzindo 1 leitura ao DB e a latência.
+    */
   </script>
 </body>
 </html>

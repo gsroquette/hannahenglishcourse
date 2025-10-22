@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Hannah English - Learning English through Bible Stories</title>
 
-  <!-- ▸▸ FAVICONS ◂◂ -->
+  <!-- FAVICONS -->
   <link rel="icon" type="image/x-icon" href="favicon.ico"/>
   <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png"/>
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png"/>
@@ -13,13 +13,13 @@
   <link rel="icon" type="image/png" sizes="512x512" href="android-chrome-512x512.png"/>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png"/>
 
-  <!-- ▸▸ CSS PRINCIPAL ◂◂ -->
+  <!-- CSS PRINCIPAL -->
   <link rel="stylesheet" href="CSS/styles.css"/>
 
-  <!-- ▸▸ MANIFESTO PWA ◂◂ -->
+  <!-- MANIFESTO PWA -->
   <link rel="manifest" href="manifest.json"/>
 
-  <!-- ▸▸ FIREBASE ◂◂ -->
+  <!-- FIREBASE -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
@@ -28,8 +28,10 @@
     /* ---------- layout original ---------- */
     body{margin:0;font-family:Arial, sans-serif;overflow:auto;}
     html,body{height:100%;}
-    .container{width:100%;max-width:1200px;margin:0 auto;padding:20px;text-align:center;position:relative;
-      background-image:url('imagens/fundo.png');background-repeat:repeat;background-size:200%;overflow:auto;}
+    .container{
+      width:100%;max-width:1200px;margin:0 auto;padding:20px;text-align:center;position:relative;
+      background-image:url('imagens/fundo.png');background-repeat:repeat;background-size:200%;overflow:auto;
+    }
     .subtitle{margin-top:40px;font-size:24px;font-weight:bold;color:#333;text-align:center;}
     .levels{display:flex;flex-wrap:wrap;justify-content:center;gap:20px;padding:20px;}
     .level-button{width:200px;height:200px;background-size:cover;background-repeat:no-repeat;display:inline-block;}
@@ -39,14 +41,38 @@
     .levelC{background-image:url('imagens/levelC.png');}
     .levelD{background-image:url('imagens/levelD.png');}
 
-    /* ---------- login box ---------- */
-    .login-container{display:flex;align-items:center;gap:10px;position:absolute;top:20px;right:60px;z-index:10;
-      background:#fff;padding:10px;border-radius:8px;box-shadow:0 4px 8px rgba(0,0,0,.1);cursor:pointer;}
-    .user-icon{width:40px;height:40px;border-radius:50%;}
-    .user-name{font-size:14px;color:#333;margin:0;}
-    .dropdown{display:none;position:absolute;top:60px;right:0;background:#fff;box-shadow:0 4px 8px rgba(0,0,0,.1);
-      z-index:1;border-radius:4px;min-width:150px;}
-    .dropdown a{display:block;padding:10px;text-decoration:none;color:#333;font-size:16px;text-align:left;}
+    /* ========= AVATAR + NOME (SEM CAIXA) ========= */
+    .login-container{
+      position:absolute; top:16px; right:14px; z-index:20;
+      display:inline-flex; flex-direction:column; align-items:center; gap:4px;
+      /* NENHUM FUNDO, NENHUMA BORDA, NENHUMA SOMBRA */
+      background:none; border:none; box-shadow:none; padding:0;
+      cursor:pointer;
+    }
+    /* Só a imagem; sem borda, sem sombra, sem máscara */
+    .user-icon{
+      width:55px; height:auto; display:block;
+      border:none; box-shadow:none; border-radius:0; object-fit:contain;
+      pointer-events:none;
+    }
+    /* Nome exatamente embaixo, centralizado */
+    .user-name{
+      margin:0; line-height:1.05; text-align:center;
+      font-size:13px; font-weight:700; color:#1a5f34;
+      white-space:nowrap; max-width:180px; overflow:hidden; text-overflow:ellipsis;
+      text-shadow: 0 1px 1px rgba(255,255,255,0.45), 0 1px 2px rgba(0,0,0,0.18); /* só p/ leitura sobre fundos claros/escuros */
+    }
+    /* garante que qualquer caret antigo não apareça */
+    .login-caret{ display:none !important; }
+
+    /* Dropdown padrão (pode ficar como estava) */
+    .dropdown{
+      display:none; position:absolute; right:0; top:calc(100% + 10px); z-index:25;
+      min-width:220px; background:#fff; border-radius:12px;
+      box-shadow:0 14px 30px rgba(0,0,0,0.16); overflow:hidden;
+      border:1px solid rgba(0,0,0,0.06);
+    }
+    .dropdown a{display:block;padding:12px 14px;font-size:15px;color:#222;text-decoration:none;text-align:left;}
     .dropdown a:hover{background:#f2f2f2;}
 
     /* ---------- robô, play e convites ---------- */
@@ -143,119 +169,63 @@
       measurementId:"G-07VVJG9LRS"
     };
     if(!firebase.apps.length){firebase.initializeApp(firebaseConfig);}
-    // Queremos que o login sobreviva a recarregamentos e novas abas
-firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL)
-    .catch(console.error);
+    firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(console.error);
 
-    /* ---------- Função robusta para detectar standalone ---------- */
+    /* ---------- PWA helpers ---------- */
     function isInStandaloneMode(){
-      return window.matchMedia('(display-mode: standalone)').matches ||
-             window.navigator.standalone === true;
+      return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
     }
-
-    /* ---------- Variáveis globais ---------- */
-    let englishVoice=null;
-    let deferredPrompt=null;
+    let englishVoice=null, deferredPrompt=null;
     const installBtn=document.getElementById("installBtn");
-
-    /* ---------- Detecção de ambiente ---------- */
     const ua=navigator.userAgent.toLowerCase();
     const isIOS=/iphone|ipad|ipod/.test(ua);
 
-    /* ---------- Função: exibir botão instalar ---------- */
-    function showInstallButton(){
-      installBtn.disabled=false;
-      installBtn.style.display='flex';
-      installBtn.classList.add('pulse');
+    /* ---------- Níveis helpers ---------- */
+    const VALID_LEVELS=["Level0","Level1","Level2","Level3","Level4"];
+    function normalizarNivel(n){
+      if(!n) return null;
+      const m=String(n).trim().toLowerCase();
+      if(m==="level0"||m==="0"||m==="starter") return "Level0";
+      if(m==="level1"||m==="1") return "Level1";
+      if(m==="level2"||m==="2") return "Level2";
+      if(m==="level3"||m==="3") return "Level3";
+      if(m==="level4"||m==="4") return "Level4";
+      return null;
+    }
+    function normalizarListaLevels(v){
+      if(Array.isArray(v)){ const set=new Set(); v.forEach(x=>{const n=normalizarNivel(x); if(n) set.add(n);}); return Array.from(set); }
+      const single=normalizarNivel(v); return single ? [single] : [];
+    }
+    function levelsAPartirDoProgresso(progresso){
+      if(!progresso||typeof progresso!=="object") return [];
+      const liberados=[];
+      VALID_LEVELS.forEach(L=>{
+        const units=progresso[L];
+        if(!units||typeof units!=="object") return;
+        for(const uk of Object.keys(units)){
+          const fases=units[uk];
+          if(fases && typeof fases==="object" && Object.values(fases).some(Boolean)){ liberados.push(L); break; }
+        }
+      });
+      return Array.from(new Set(liberados));
     }
 
-    /* ---------- Função: esconder botão instalar ---------- */
-    function hideInstallButton(){
-      installBtn.style.display='none';
-      installBtn.classList.remove('pulse');
-      installBtn.disabled=true;
-    }
-
-    /* ---------- Lógica de controle de botões ---------- */
-    function controlPWAButtons(){
-      if(isInStandaloneMode()){
-        hideInstallButton();
-        return; // já está no app
-      }
-      // Se temos deferredPrompt -> mostra instalar
-      if(deferredPrompt){
-        showInstallButton();
-      }else{
-        hideInstallButton(); // navegadores que já instalaram ou não suportam ainda
-      }
-    }
-
-    /* ---------- Banner iOS ---------- */
-    if(isIOS && !isInStandaloneMode()){
-      const iosBanner=document.getElementById("iosInstallBanner");
-      iosBanner.style.display="block";
-      document.getElementById("iosBannerClose").onclick=()=>iosBanner.style.display="none";
-    }
-
-    /* ---------- Evento beforeinstallprompt ---------- */
-    window.addEventListener('beforeinstallprompt',e=>{
-      if(isInStandaloneMode()) return; // ignore se já estiver no app
-      e.preventDefault();
-      deferredPrompt=e;
-      showInstallButton();
-    });
-
-    /* ---------- Clique no botão instalar ---------- */
-    installBtn.addEventListener('click',async ()=>{
-      if(!deferredPrompt) return;
-      hideInstallButton();
-      deferredPrompt.prompt();
-      await deferredPrompt.userChoice;
-      deferredPrompt=null;
-      // depois de interação, reavaliar visibilidade
-      setTimeout(controlPWAButtons,500);
-    });
-
-    /* ---------- appinstalled ---------- */
-    window.addEventListener('appinstalled',()=>{
-      deferredPrompt=null;
-      hideInstallButton();
-    });
-
-    /* ---------- Verificar se PWA já instalado por outros meios ---------- */
-    async function verificarInstalacaoInicial(){
-      if(isInStandaloneMode()){
-        hideInstallButton();
-        return;
-      }
-      if('getInstalledRelatedApps' in navigator){
-        try{
-          const apps=await navigator.getInstalledRelatedApps();
-          if(apps.length>0){
-            hideInstallButton();
-          }
-        }catch(err){console.error(err);}
-      }
-      controlPWAButtons();
-    }
-
-    /* ---------- Rede ---------- */
-    function updateNetworkStatus(){
-      if(!navigator.onLine) installBtn.disabled=true;
-      else if(deferredPrompt) installBtn.disabled=false;
-    }
-    window.addEventListener('online',updateNetworkStatus);
-    window.addEventListener('offline',updateNetworkStatus);
+    /* ---------- PWA botão instalar ---------- */
+    function showInstallButton(){installBtn.disabled=false;installBtn.style.display='flex';installBtn.classList.add('pulse');}
+    function hideInstallButton(){installBtn.style.display='none';installBtn.classList.remove('pulse');installBtn.disabled=true;}
+    function controlPWAButtons(){ if(isInStandaloneMode()){hideInstallButton();return;} if(deferredPrompt){showInstallButton();} else {hideInstallButton();}}
+    if(isIOS && !isInStandaloneMode()){ const b=document.getElementById("iosInstallBanner"); b.style.display="block"; document.getElementById("iosBannerClose").onclick=()=>b.style.display="none"; }
+    window.addEventListener('beforeinstallprompt',e=>{ if(isInStandaloneMode()) return; e.preventDefault(); deferredPrompt=e; showInstallButton(); });
+    installBtn.addEventListener('click',async ()=>{ if(!deferredPrompt) return; hideInstallButton(); deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt=null; setTimeout(controlPWAButtons,500); });
+    window.addEventListener('appinstalled',()=>{deferredPrompt=null;hideInstallButton();});
+    async function verificarInstalacaoInicial(){ if(isInStandaloneMode()){hideInstallButton();return;} if('getInstalledRelatedApps' in navigator){ try{ const apps=await navigator.getInstalledRelatedApps(); if(apps.length>0){hideInstallButton();} }catch(e){} } controlPWAButtons(); }
+    function updateNetworkStatus(){ if(!navigator.onLine) installBtn.disabled=true; else if(deferredPrompt) installBtn.disabled=false; }
+    window.addEventListener('online',updateNetworkStatus); window.addEventListener('offline',updateNetworkStatus);
 
     /* ---------- TTS util ---------- */
-    function pickVoice(){
-      return (speechSynthesis.getVoices()||[])
-        .find(v=>v.lang.toLowerCase().includes('en'))||null;
-    }
+    function pickVoice(){ return (speechSynthesis.getVoices()||[]).find(v=>v.lang.toLowerCase().includes('en'))||null; }
     function speakRobot(){
-      const utt=new SpeechSynthesisUtterance(
-        "Hi, I'm Samuel! Click to discover the best and most fun way to learn English, or join us to play an exciting game!"
-      );
+      const utt=new SpeechSynthesisUtterance("Hi, I'm Samuel! Click to discover the best and most fun way to learn English, or join us to play an exciting game!");
       if(englishVoice) utt.voice=englishVoice;
       utt.onstart=()=>document.getElementById("roboImage").src="imagens/robo_fala.gif";
       utt.onend  =()=>document.getElementById("roboImage").src="imagens/robo_estatico.png";
@@ -263,14 +233,23 @@ firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL)
     }
     speechSynthesis.onvoiceschanged=()=>englishVoice=pickVoice();
 
+    /* ---------- UI: níveis ---------- */
+    function bloquearTodosNiveis(){ document.querySelectorAll(".level-button").forEach(b=>{ b.style.filter="grayscale(100%)"; b.style.pointerEvents="none"; }); }
+    function liberarNiveis(arr){
+      const alvo=new Set(arr||[]);
+      document.querySelectorAll(".level-button").forEach(b=>{ if(alvo.has(b.id)){ b.style.filter="none"; b.style.pointerEvents="auto"; } else { b.style.filter="grayscale(100%)"; b.style.pointerEvents="none"; } });
+    }
+    function enviarNivel(n){ n ? liberarNiveis([n]) : liberarNiveis(["Level1"]); }
+
     /* ---------- Firebase Auth & Níveis ---------- */
-    firebase.auth().onAuthStateChanged(user=>{
+    firebase.auth().onAuthStateChanged(async (user)=>{
       const loginLink=document.getElementById("loginLink");
       const userDropdown=document.getElementById("userDropdown");
       const subtitleLoggedOut=document.getElementById("subtitleLoggedOut");
       const subtitleLoggedIn=document.getElementById("subtitleLoggedIn");
       const roboContainer=document.getElementById("roboContainer");
       const invitationContainer=document.getElementById("invitationContainer");
+      const loginContainer=document.getElementById("loginContainer");
 
       if(user){
         subtitleLoggedOut.style.display="none";
@@ -278,34 +257,84 @@ firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL)
         roboContainer.style.display="flex";
         invitationContainer.style.display="flex";
 
-        firebase.database().ref("usuarios/"+user.uid).once("value").then(s=>{
-          const d=s.val()||{};
-          const name=d.nome||user.email;
+        try{
+          const snap=await firebase.database().ref("usuarios/"+user.uid).once("value");
+          const d=snap.val()||{};
+
+          // nome limitado a 10 caracteres + '…' se exceder
+          const rawName=d.nome||user.email||"User";
+          const name=(String(rawName).trim().length>10) ? String(rawName).trim().slice(0,10)+"…" : String(rawName).trim();
+
           const avatar=d.avatar?`imagens/${d.avatar}`:"imagens/bonecologin1.png";
-          loginLink.innerHTML=`<img src="${avatar}" class="user-icon"><p class="user-name">${name}</p>`;
-          loginLink.removeAttribute("href");
+
+          // só avatar + nome (sem caixa)
+          loginLink.innerHTML=""; loginLink.removeAttribute("href");
+          const img=document.createElement("img");
+          img.className="user-icon"; img.alt="User avatar"; img.src=avatar;
+          img.onerror=()=>{img.src='imagens/bonecologin1.png';};
+          const p=document.createElement("p");
+          p.className="user-name"; p.textContent=name;
+          loginLink.append(img,p);
 
           let dash="";
           if(d.role==="proprietario"||d.role==="professor"){
             dash=`<a href="painel_${d.role==='proprietario'?'proprietario':'professor'}.html" class="dashboard-link">${d.role.toUpperCase()} DASHBOARD</a>`;
-            liberarNiveis(["Level0","Level1","Level2","Level3","Level4"]);
+            liberarNiveis(VALID_LEVELS);
           }else if(d.role==="aluno"){
             dash='<a href="painel_aluno.html" class="dashboard-link">STUDENT DASHBOARD</a>';
+
+            const liberarPorPreferencia=(lista)=>{ if(Array.isArray(lista)&&lista.length){liberarNiveis(lista);return true;} return false; };
+            const tentarAlunoDireto=()=>{
+              const arrAluno=normalizarListaLevels(d.levels_liberados);
+              if(liberarPorPreferencia(arrAluno)) return;
+              const nAluno=normalizarNivel(d.nivel_em_curso);
+              if(nAluno){ enviarNivel(nAluno); return; }
+              const arrFromProg=levelsAPartirDoProgresso(d.progresso);
+              if(liberarPorPreferencia(arrFromProg)) return;
+              enviarNivel();
+            };
+
             if(d.atrelado_professor){
-              firebase.database().ref("usuarios/"+d.atrelado_professor).once("value").then(p=>{
-                const reg=p.val()?.turmas?.["-O8mdLgStvNqNf6x-O5l"]?.students?.[user.uid];
-                enviarNivel(reg?.nivel_em_curso);
-              }).catch(()=>enviarNivel());
-            }else enviarNivel();
+              try{
+                const turmasSnap=await firebase.database().ref("usuarios/"+d.atrelado_professor+"/turmas").once("value");
+                const turmas=turmasSnap.val()||{}; let registroAluno=null;
+                for(const turmaId in turmas){
+                  const st=turmas[turmaId]?.students?.[user.uid];
+                  if(st){registroAluno=st; break;}
+                }
+                if(registroAluno){
+                  const arrProf=normalizarListaLevels(registroAluno.levels_liberados);
+                  if(liberarPorPreferencia(arrProf)){} else {
+                    const nProf=normalizarNivel(registroAluno.nivel_em_curso);
+                    if(nProf){enviarNivel(nProf);} else {tentarAlunoDireto();}
+                  }
+                }else{
+                  tentarAlunoDireto();
+                }
+              }catch(e){
+                tentarAlunoDireto();
+              }
+            }else{
+              tentarAlunoDireto();
+            }
           }
           userDropdown.innerHTML=`${dash}<a href="#" id="logout">LEAVE</a>`;
           document.querySelectorAll(".dashboard-link").forEach(l=>{
-            l.onclick=e=>{
-              e.preventDefault();
-              window.location.href=l.getAttribute("href");
-            };
+            l.onclick=e=>{ e.preventDefault(); window.location.href=l.getAttribute("href"); };
           });
-        });
+
+          // Dropdown abre/fecha
+          function toggleDropdown(open){
+            const shouldOpen=(typeof open==="boolean")?open:(userDropdown.style.display!=="block");
+            userDropdown.style.display=shouldOpen?"block":"none";
+          }
+          loginContainer.onclick=(e)=>{ if(!firebase.auth().currentUser) return; e.preventDefault(); toggleDropdown(); };
+          window.addEventListener("click",(e)=>{ if(!loginContainer.contains(e.target)) toggleDropdown(false); });
+
+        }catch(e){
+          console.error(e);
+          bloquearTodosNiveis();
+        }
       }else{
         subtitleLoggedOut.style.display="block";
         subtitleLoggedIn.style.display="none";
@@ -316,43 +345,15 @@ firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL)
       }
     });
 
-    function enviarNivel(n){ n ? liberarNiveis([n]) : liberarNiveis(["Level1"]); }
-    function bloquearTodosNiveis(){
-      document.querySelectorAll(".level-button").forEach(b=>{
-        b.style.filter="grayscale(100%)";
-        b.style.pointerEvents="none";
-      });
-    }
-    function liberarNiveis(arr){
-      document.querySelectorAll(".level-button").forEach(b=>{
-        if(arr.includes(b.id)){
-          b.style.filter="none";
-          b.style.pointerEvents="auto";
-        }else{
-          b.style.filter="grayscale(100%)";
-          b.style.pointerEvents="none";
-        }
-      });
-    }
-
-    /* ---------- Dropdown & Logout ---------- */
-    document.getElementById("loginContainer").onclick=e=>{
-      if(!firebase.auth().currentUser) return;
-      e.preventDefault();
-      const d=document.getElementById("userDropdown");
-      d.style.display=(d.style.display==="none"||!d.style.display)?"block":"none";
-    };
-    window.addEventListener("click",e=>{
-      if(!document.getElementById("loginContainer").contains(e.target))
-        document.getElementById("userDropdown").style.display="none";
-    });
+    /* ---------- Logout ---------- */
     document.addEventListener("click",e=>{
-      if(e.target.id==="logout"){
+      if(e.target && e.target.id==="logout"){
         firebase.auth().signOut().then(()=>location.reload());
       }
     });
 
-    /* ---------- DOM Ready  com netfily---------- */
+    /* ---------- DOM Ready ---------- */
+    function pickVoice(){ return (speechSynthesis.getVoices()||[]).find(v=>v.lang.toLowerCase().includes('en'))||null; }
     document.addEventListener("DOMContentLoaded",()=>{
       englishVoice=pickVoice();
       document.getElementById("playTTSBtn").onclick=speakRobot;
