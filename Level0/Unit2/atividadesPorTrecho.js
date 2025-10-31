@@ -27,12 +27,12 @@ function getActivitiesByTrecho(trecho, level, unit) {
 
     case "trecho3":
       return [
-        { id: 16, name: "Missing Word", path: `/Atividades/Missing Word/index.html?level=${level}&unit=${unit}&fase=16`, img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
-        { id: 17, name: "Missing Word2", path: `/Atividades/Missing Word2/index.html?level=${level}&unit=${unit}&fase=17`, img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
-        { id: 18, name: "Missing Word3", path: `/Atividades/Missing Word3/index.html?level=${level}&unit=${unit}&fase=18`, img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
-        { id: 19, name: "Mixed Letters starter", path: `/Atividades/Mixed Letters starter/index.html?level=${level}&unit=${unit}&fase=19`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
-        { id: 20, name: "Mixed Letters starter2", path: `/Atividades/Mixed Letters starter2/index.html?level=${level}&unit=${unit}&fase=20`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
-        { id: 21, name: "Mixed Letters starter3", path: `/Atividades/Mixed Letters starter3/index.html?level=${level}&unit=${unit}&fase=21`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
+        { id: 16, name: "Missing Word", path: `/Atividades/Missing%20Word/index.html?level=${level}&unit=${unit}&fase=16`, img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
+        { id: 17, name: "Missing Word2", path: `/Atividades/Missing%20Word2/index.html?level=${level}&unit=${unit}&fase=17`, img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
+        { id: 18, name: "Missing Word3", path: `/Atividades/Missing%20Word3/index.html?level=${level}&unit=${unit}&fase=18`, img: "../../imagens/botoes/missing_word_button.png", unlocked: false },
+        { id: 19, name: "Mixed Letters starter", path: `/Atividades/Mixed%20Letters%20starter/index.html?level=${level}&unit=${unit}&fase=19`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
+        { id: 20, name: "Mixed Letters starter2", path: `/Atividades/Mixed%20Letters%20starter2/index.html?level=${level}&unit=${unit}&fase=20`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
+        { id: 21, name: "Mixed Letters starter3", path: `/Atividades/Mixed%20Letters%20starter3/index.html?level=${level}&unit=${unit}&fase=21`, img: "../../imagens/botoes/mixed_letters_students.png", unlocked: false },
         { id: 22, name: "Perguntas Starter4", path: `/Atividades/perguntas%20starter4/index.html?level=${level}&unit=${unit}&fase=22`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
         { id: 23, name: "Perguntas Starter5", path: `/Atividades/perguntas%20starter5/index.html?level=${level}&unit=${unit}&fase=23`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
       ];
@@ -63,8 +63,6 @@ function getActivitiesByTrecho(trecho, level, unit) {
       ];
 
     default:
-      return []; // ou um fallback
+      return []; // fallback
   }
 }
-
-export { getActivitiesByTrecho };
