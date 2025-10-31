@@ -1,0 +1,183 @@
+
+GUIA: Como gerar `syllables.json` a partir de `words.txt`
+=========================================================
+
+Este guia explica como transformar um arquivo `words.txt` (uma palavra por linha)
+em um `syllables.json` adequado para o seu app (com blocos/sílabas e "speak"
+amigáveis ao TTS do navegador).
+
+
+0) Entradas e saídas
+--------------------
+- Entrada: `words.txt` (uma palavra por linha; pode estar em MAIÚSCULAS ou minúsculas).
+- Saída: `syllables.json` (JSON “amigável para TTS”). 
+- Local do arquivo: coloque o `syllables.json` na MESMA pasta da unidade onde está o `words.txt`
+  (ex.: `.../Level0/Unit1/data1/` ou `data2/`, conforme o projeto).
+- O app também lê um arquivo GLOBAL opcional: `/shared/syllables.json`.
+  O arquivo LOCAL da unidade sobrescreve (override) o que houver no GLOBAL.
+
+
+1) Formato do `syllables.json`
+------------------------------
+Exemplo de estrutura:
+
+{
+  "pronunciations": {
+    "wel": "well",
+    "hel": "hell",
+    "tion": "shun",
+    "igh": "eye",
+    "a_e": "ay"
+  },
+
+  "hello":   { "units": ["hel","lo"],     "speak": ["hell","loh"] },
+  "welcome": { "units": ["wel","come"],   "speak": ["well","kum"] },
+  "name":    { "units": ["name"],         "speak": ["naym"] }
+}
+
+Regras do formato:
+- Chaves de palavra SEMPRE em minúsculas (o app normaliza internamente).
+- "units": lista de blocos (sílabas ou pedaços didáticos) na ordem correta.
+- "speak": lista da MESMA quantidade de itens que "units", com proxy de pronúncia
+  amigável ao TTS (evitar grafias que virem sigla).
+- "pronunciations" (opcional): dicionário de blocos reutilizáveis -> pronúncia.
+  Se existir "speak" específico da palavra, ele tem prioridade sobre "pronunciations".
+- O app exibe os blocos em CAIXA ALTA automaticamente; NÃO escreva em maiúsculas no JSON.
+
+
+2) Pipeline (passo a passo)
+---------------------------
+1. Ler `words.txt`:
+   - Remover linhas vazias e espaços; normalizar para minúsculas.
+2. Carregar o GLOBAL `/shared/syllables.json` (se existir):
+   - Guardar dois mapas:
+     - globalPron[unit] = fala
+     - globalWord[word] = { units, speak? }
+3. Iniciar os mapas locais:
+   - localPron = {}  (novos blocos reutilizáveis da unidade)
+   - localWord = {}
+4. Para cada palavra do `words.txt`:
+   - Se já existir no GLOBAL com units/speak, você pode NÃO repetir no local (ou copiar se quiser override).
+   - Caso contrário:
+     - Gerar "units" (ver seção 3) e "speak" (ver seção 4).
+     - Salvar em localWord[word] = { "units": [...], "speak": [...] }.
+5. Salvar `syllables.json`:
+   - Juntar { "pronunciations": localPron, ...localWord }.
+   - Usar indentação de 2 espaços.
+
+
+3) Como dividir em unidades (sílabas/blocos)
+--------------------------------------------
+Objetivo: blocos curtos e naturais para crianças, mas que soem bem no TTS.
+
+Regras básicas:
+- CVCe (magic e): geralmente 1 sílaba (ex.: name -> ["name"]).
+  Se quiser “pedaços didáticos” sem quebrar a sílaba: onset+rime (ex.: ["n","ame"]). Evite ["na","me"].
+- R-controlled: "ar", "er", "ir", "or", "ur" tendem a ficar no mesmo bloco (ex.: bird -> ["bird"]). 
+- Consonant + le: vira sílaba final (ex.: table -> ["ta","ble"]). 
+- Vowel teams: "ee", "ea", "ai", "ay", "oa", "ow", "oi", "oy", "igh", "oo" devem permanecer juntos
+  (ex.: rain -> ["rain"]; boat -> ["bo","at"] ou ["boat"]). 
+- Sufixos fonéticos: "tion", "sion", "ture" ficam como um bloco (ex.: nation -> ["na","tion"]). 
+- Sílabas iniciais muito curtas que viram sigla no TTS: prefira blocos que formem PALAVRAS REAIS no "speak"
+  (ex.: "wel" -> "well", "hel" -> "hell").
+
+Dica: priorize 2–3 blocos por palavra e evite unidades de 1 letra (TTS lê como sigla).
+
+
+4) Como gerar "speak" (proxies de pronúncia para TTS)
+-----------------------------------------------------
+Para cada unidade:
+1. Se existir em "pronunciations" (global ou local), use.
+2. Caso contrário, aplique mapeamentos amigáveis (minúsculas; grafia simples):
+   - Padrões/magic-e:
+     a_e -> "ay" (make), i_e -> "eye", e_e -> "ee", o_e -> "oh", u_e -> "yoo".
+   - Vowel teams:
+     igh -> "eye"; ai/ay -> "ay"; ee/ea/ie -> "ee"; oa/oe -> "oh"; oo -> "oo";
+     oi/oy -> "oy"; au/aw -> "aw".
+   - R-controlled:
+     er/ir/ur -> "uh" (ou "ər", se sua voz render bem); ar -> "ar"; or -> "or".
+   - Sufixos:
+     tion -> "shun"; sion -> "zhun"; ture -> "cher".
+3. Evite strings "não-palavra" que o TTS soletra (ex.: "wel", "hel", "ih"). Prefira:
+   - "wel" -> "well", "hel" -> "hell", schwa -> "uh" ou "zuh".
+4. Garanta que speak.length === units.length.
+
+Tabela útil para "pronunciations" (reutilizáveis):
+{
+  "sh":"sh","ch":"tch","th":"th","ph":"f","wh":"w","ng":"ng",
+  "tion":"shun","sion":"zhun","ture":"cher",
+  "le":"l","re":"uh","er":"uh","ir":"uh","ur":"uh","or":"or","ar":"ar",
+  "ow":"oh","oa":"oh","oe":"oh",
+  "a_e":"ay","i_e":"eye","e_e":"ee","o_e":"oh","u_e":"yoo",
+  "ai":"ay","ay":"ay","ee":"ee","ea":"ee","ie":"ee","igh":"eye",
+  "oo":"oo","ou":"ow","oi":"oy","oy":"oy","au":"aw","aw":"aw",
+  "wel":"well","hel":"hell"
+}
+
+
+5) Exemplos prontos
+-------------------
+Básico:
+{
+  "hello":   { "units": ["hel","lo"],     "speak": ["hell","loh"] },
+  "welcome": { "units": ["wel","come"],   "speak": ["well","kum"] },
+  "name":    { "units": ["name"],         "speak": ["naym"] }
+}
+
+Com sufixos/teams:
+{
+  "table":   { "units": ["ta","ble"],   "speak": ["tay","buhl"] },
+  "teacher": { "units": ["tea","cher"], "speak": ["tee","cher"] },
+  "rain":    { "units": ["rain"],       "speak": ["rayn"] },
+  "night":   { "units": ["night"],      "speak": ["nite"] }
+}
+
+Palavra com schwa (ex.: Elizabeth):
+{
+  "elizabeth": { "units": ["e","li","za","beth"], "speak": ["eh","liz","zuh","beth"] }
+}
+
+
+6) Pseudocódigo (para automatizar)
+----------------------------------
+ler words.txt -> words[]
+carregar global = /shared/syllables.json (se existir)
+
+localPron = {}
+localWord = {}
+
+para cada word em words:
+  w = word.lower().trim()
+  se globalWord[w] existe:
+    // opcional: copiar para local se quiser override
+    continue
+  units = dividir_em_blocos(w)   // usar regras da seção 3
+  speak = []
+  para cada u em units:
+    key = u.lower()
+    se globalPron[key] existe: speak_u = globalPron[key]
+    senão se localPron[key] existe: speak_u = localPron[key]
+    senão: speak_u = gerar_proxy(key) // regras da seção 4
+    speak.push(speak_u)
+  localWord[w] = { "units": units, "speak": speak }
+
+syllables.json = { "pronunciations": localPron, ...localWord }
+salvar com indent=2
+
+
+7) Testes e depuração
+---------------------
+- Forçar inglês no TTS: u.lang = 'en-US' (ou a voz EN selecionada).
+- Evitar cache: fetch('.../syllables.json?v=1', { cache: 'no-cache' }).
+- Conferir DevTools -> Network (200 OK) e Console (logs de carregamento).
+- Teste manual no console:
+  speak(getSpeakText('wel'))  // deve falar "well"
+  speak(getSpeakText('hel'))  // deve falar "hell"
+
+
+8) Quando preferir áudio em vez de TTS
+--------------------------------------
+Se, mesmo com proxies, alguma unidade continuar soando estranha:
+- Suporte a áudio por unidade: tocar "audio/<unit>.mp3" se existir; 
+  se não existir, cair no TTS com a pronúncia do JSON.
+- Mantém a estrutura do `syllables.json`; só muda a lógica de reprodução.
