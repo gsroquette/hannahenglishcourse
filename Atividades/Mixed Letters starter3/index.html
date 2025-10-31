@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hannah Mixed Letters</title>
+
+    <!-- Fonte legível e com boa distinção de formas -->
+    <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root{
+            --brand: #ff4500;
+            --bg-soft: #ffe7d1;
+            --ok: #2e7d32;
+            --focus: #1e88e5;
+            --tile: #fff;
+            --tile-border: #333;
+            --err: #e53935;
+        }
+        * { box-sizing: border-box }
+        body {
+            font-family: 'Atkinson Hyperlegible', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+            margin: 0;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-image: url('../../../imagens/fundo.png');
+            background-repeat: repeat;
+            background-size: auto;
+            -webkit-tap-highlight-color: transparent;
+        }
+        h1 {
+            text-align: center;
+            color: var(--brand);
+            font-size: clamp(1.8rem, 4vw, 3rem);
+            margin: 12px 0 8px;
+        }
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 8px;
+        }
+        .btn {
+            background: #000;
+            color: #fff;
+            border: 0;
+            border-radius: 12px;
+            padding: 12px 18px;
+            font-size: 1.05rem;
+            cursor: pointer;
+        }
+        .btn--pdf { background: var(--ok) }
+        .btn:focus-visible { outline: 3px solid var(--focus) }
+        .activity-container { margin-top: 8px; width: 100%; max-width: 960px }
+        .activity {
+            display: grid;
+            grid-template-columns: 140px 1fr;
+            gap: 16px;
+            align-items: center;
+            position: relative;
+            padding: 16px;
+            background-color: var(--bg-soft);
+            border-radius: 16px;
+            box-shadow: 0 6px 12px rgba(0,0,0,.08);
+            margin-bottom: 18px;
+        }
+        .activity img {
+            width: 120px;
+            height: 120px;
+            object-fit: contain;
+            border-radius: 12px;
+            background: #fff;
+            border: 2px solid #eee;
+            justify-self: center;
+        }
+        .word-area { display: grid; gap: 12px }
+        .drop-zone {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            min-height: 64px;
+        }
+        .slot {
+            width: 56px;
+            height: 64px;
+            border: 3px dashed #999;
+            border-radius: 12px;
+            background: #fff;
+            display: grid;
+            place-items: center;
+            position: relative;
+            outline: none;
+        }
+        .slot:focus, .slot:focus-visible { outline: none }
+        .slot.correct { border-style: solid; border-color: var(--ok) }
+        .slot.wrong   { border-style: solid; border-color: var(--err) }
+        .slot.empty   { border-style: dashed; border-color: #999 }
+
+        .slot[data-ghost]::after{
+            content: attr(data-ghost);
+            position: absolute;
+            color: #bbb;
+            font-weight: 700;
+            font-size: 1.35rem;
+            pointer-events: none;
+        }
+        .tray {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            background: rgba(255,255,255,.8);
+            border: 2px solid #eee;
+            border-radius: 12px;
+            padding: 8px;
+        }
+        .tile {
+            width: 56px;
+            height: 64px;
+            border: 3px solid var(--tile-border);
+            border-radius: 12px;
+            background: var(--tile);
+            display: grid;
+            place-items: center;
+            font-size: 1.6rem;
+            font-weight: 700;
+            cursor: grab;
+            user-select: none;
+            touch-action: none;
+            transition: transform 0.2s ease;
+            outline: none;
+        }
+        .tile:active { cursor: grabbing }
+        .tile:focus, .tile:focus-visible { outline: none }
+        .tile.dragging,
+        .tile[aria-grabbed="true"] {
+            outline: 3px solid var(--focus);
+            transform: scale(1.1);
+            z-index: 100;
+        }
+        .controls { display: flex; gap: 8px; flex-wrap: wrap }
+        .pill {
+            background: #fff;
+            border: 2px solid #ddd;
+            border-radius: 999px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: .95rem;
+        }
+        .pill:focus-visible { outline: 3px solid var(--focus) }
+        .status {
+            font-size: .95rem;
+            color: #444;
+        }
+        .good { color: var(--ok); font-weight: 700 }
+
+        /* Modal */
+        #overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,.6);
+            display: none; z-index: 1000;
+        }
+        #completion-modal {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+            background: #fff; padding: 28px; border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,.25);
+            text-align: center; display: none; z-index: 1001; width: min(92vw,520px);
+        }
+        #completion-modal h2 { margin: 0; font-size: 1.8rem; color: var(--ok) }
+        #completion-modal p { font-size: 1rem; margin: 8px 0 0 }
+        #completion-modal button {
+            margin-top: 16px; padding: 10px 16px; font-size: 1rem; cursor: pointer;
+            border: none; border-radius: 10px; background: var(--ok); color: #fff;
+        }
+
+        /* Confete */
+        .confetti {
+            position: fixed; /* importante para ficar na viewport */
+            pointer-events: none;
+            z-index: 1200;
+            width: 8px; height: 12px; background: #ffd54f;
+            animation: fall 900ms ease-out forwards;
+        }
+        @keyframes fall {
+            to { transform: translateY(120vh) rotate(540deg); opacity: 0 }
+        }
+
+        @media (max-width: 700px) {
+            .activity { grid-template-columns: 1fr; justify-items: center }
+            .activity img { width: 140px; height: 140px }
+            .slot, .tile { width: 52px; height: 60px }
+        }
+        .tile.dragging { position: fixed; pointer-events: none; }
+    </style>
+</head>
+<body>
+    <div class="toolbar" aria-label="Toolbar">
+        <button id="backButton" class="btn">Back</button>
+        <button id="pdfButton" class="btn btn--pdf" style="display:none" onclick="generatePDF()">Generate PDF</button>
+    </div>
+
+    <h1>Hannah Mixed Letters</h1>
+    <p class="status" id="sessionStatus" aria-live="polite"></p>
+
+    <div id="activity-container" class="activity-container"></div>
+
+    <!-- Modal de conclusão -->
+    <div id="overlay" role="presentation"></div>
+    <div id="completion-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <h2 id="modal-title">Phase Completed!</h2>
+        <p>Great job! You finished this phase.</p>
+        <button onclick="closeModal()">Close</button>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+
+    <script>
+    // ================== Firebase (mantido) ==================
+    const firebaseConfig = {
+        apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+        authDomain: "hannahenglishcourse.firebaseapp.com",
+        projectId: "hannahenglishcourse",
+        storageBucket: "hannahenglishcourse.appspot.com",
+        messagingSenderId: "449818788486",
+        appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+        measurementId: "G-07VVJG9LRS",
+        databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+    };
+    firebase.initializeApp(firebaseConfig);
+
+    document.getElementById('backButton').addEventListener('click', async function () {
+        const { level, unit } = getLevelAndUnitFromURL();
+        const currentPhase = parseInt(getPhaseFromURL());
+        const nextPhase = currentPhase + 1;
+        const user = firebase.auth().currentUser;
+        if (!user) { alert("You must be logged in to perform this action."); return; }
+        const userId = user.uid;
+        const progressRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/fase${nextPhase}`);
+        try {
+            const snapshot = await progressRef.once('value');
+            const isUnlocked = snapshot.val();
+            if (isUnlocked) { history.back(); }
+            else {
+                if (confirm("The next phase is still locked. Leave this page before finishing it?")) history.back();
+            }
+        } catch (e) { alert("Error checking phase progress."); }
+    });
+
+    firebase.auth().onAuthStateChanged((user) => {
+        if (user) {
+            const userId = user.uid;
+            const userRoleRef = firebase.database().ref(`usuarios/${userId}/role`);
+            userRoleRef.once('value').then((snapshot) => {
+                const role = snapshot.val();
+                if (role === 'professor' || role === 'proprietário') {
+                    document.getElementById("pdfButton").style.display = "inline-block";
+                }
+            });
+        }
+    });
+
+    // ================== TTS ==================
+    let selectedVoice = null, alertDisplayed = false;
+    function initializeVoices() {
+        const synth = window.speechSynthesis;
+        const voices = synth.getVoices();
+        selectedVoice = voices.find(v => v.lang.startsWith("en-")) || voices[0];
+        if (!selectedVoice && !alertDisplayed) { alertDisplayed = true; alert("No English voice found. Using default voice."); }
+    }
+    window.speechSynthesis.onvoiceschanged = initializeVoices;
+    function speak(text) {
+        const synth = window.speechSynthesis;
+        synth.cancel();
+        if (!selectedVoice) initializeVoices();
+        const u = new SpeechSynthesisUtterance(text);
+        u.voice = selectedVoice || synth.getVoices()[0];
+        synth.speak(u);
+    }
+
+    // ================== Estado e sessão ==================
+    const SESSION_LIMIT = 6; // limite de atividades por sessão para reduzir fadiga
+    let activities = [];
+    let completedWords = 0;
+    const sessionStatus = document.getElementById('sessionStatus');
+    
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initializeVoices();
+        loadActivities();
+    });
+
+    function getPhaseFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('fase');
+    }
+    function getLevelAndUnitFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        return { level: params.get('level'), unit: params.get('unit') };
+    }
+
+    // ================== Core da atividade (Drag & Drop) ==================
+    function createActivity(imageUrl, word) {
+        const container = document.getElementById('activity-container');
+        const div = document.createElement('div');
+        div.className = 'activity';
+        div.dataset.completed = "false";
+
+        const img = document.createElement('img');
+        img.src = imageUrl;
+        img.alt = `Image hint for ${word}`;
+        img.onerror = () => img.style.display = 'none';
+        div.appendChild(img);
+
+        const area = document.createElement('div');
+        area.className = 'word-area';
+        div.appendChild(area);
+
+        // DROP ZONE
+        const dropZone = document.createElement('div');
+        dropZone.className = 'drop-zone';
+        area.appendChild(dropZone);
+
+        // Bandeja (definida cedo para os handlers poderem usar)
+        const tray = document.createElement('div');
+        tray.className = 'tray';
+
+        // Cria slots
+        const slots = [];
+        for (let i = 0; i < word.length; i++) {
+            const s = document.createElement('div');
+            s.className = 'slot empty';
+            s.setAttribute('aria-label', `Position ${i+1}`);
+            s.setAttribute('role', 'button');
+            s.tabIndex = 0;
+            s.addEventListener('dragover', (e) => e.preventDefault());
+            s.addEventListener('drop', (e) => handleDrop(e, s));
+            
+            if (isTouchDevice) {
+                s.addEventListener('touchstart', (e) => handleTouchStart(e, s), { passive: false });
+                s.addEventListener('touchmove', (e) => handleTouchMove(e, s), { passive: false });
+                s.addEventListener('touchend', (e) => handleTouchEnd(e, s), { passive: false });
+                s.addEventListener('touchcancel', (e) => handleTouchCancel(e, s));
+            }
+            
+            s.addEventListener('click', () => {
+                const child = s.querySelector('.tile');
+                if (child) {
+                    child.setAttribute('draggable', 'true');
+                    child.setAttribute('aria-grabbed', 'false');
+                    child.style.outline = 'none';
+                    tray.appendChild(child);
+                    s.innerHTML = '';
+                    s.classList.remove('correct','wrong');
+                    s.classList.add('empty');
+                    if (i === 0 && revealHintBtn.disabled) s.dataset.ghost = word[0].toUpperCase();
+                    updatePerSlotFeedback();
+                }
+            });
+            slots.push(s);
+            dropZone.appendChild(s);
+        }
+
+        // Hint e reset
+        const revealHintBtn = document.createElement('button');
+        revealHintBtn.className = 'pill';
+        revealHintBtn.textContent = 'Hint (1st letter)';
+        revealHintBtn.addEventListener('click', () => {
+            if (!slots[0].dataset.ghost) {
+                slots[0].dataset.ghost = word[0].toUpperCase();
+                revealHintBtn.disabled = true;
+            }
+        });
+
+        const resetBtn = document.createElement('button');
+        resetBtn.className = 'pill';
+        resetBtn.textContent = 'Reset';
+        resetBtn.addEventListener('click', () => resetActivity());
+
+        const controls = document.createElement('div');
+        controls.className = 'controls';
+        controls.appendChild(revealHintBtn);
+        controls.appendChild(resetBtn);
+        area.appendChild(controls);
+
+        // Agora, de fato, adiciona a bandeja à UI (depois dos controles)
+        area.appendChild(tray);
+
+        // Letras embaralhadas
+        const shuffled = shuffleWord(word);
+        const finalShuffle = (shuffled.toUpperCase() === word.toUpperCase()) ? forcedShuffle(word) : shuffled;
+
+        for (const ch of finalShuffle.toUpperCase()) {
+            const tile = document.createElement('div');
+            tile.className = 'tile';
+            tile.textContent = ch;
+            tile.setAttribute('draggable', 'true');
+            tile.setAttribute('role', 'button');
+            tile.setAttribute('aria-grabbed', 'false');
+            tile.tabIndex = 0;
+
+            tile.addEventListener('dragstart', () => {
+                tile.setAttribute('aria-grabbed', 'true');
+                tile.classList.add('dragging');
+                speak(ch);
+            });
+            tile.addEventListener('dragend', () => {
+                tile.setAttribute('aria-grabbed', 'false');
+                tile.classList.remove('dragging');
+                tile.style.outline = 'none';
+            });
+            tile.addEventListener('click', () => speak(ch));
+            
+            if (isTouchDevice) {
+                tile.addEventListener('touchstart', (e) => handleTileTouchStart(e, tile), { passive: false });
+                tile.addEventListener('touchmove', (e) => handleTileTouchMove(e, tile), { passive: false });
+                tile.addEventListener('touchend', (e) => handleTileTouchEnd(e, tile), { passive: false });
+                tile.addEventListener('touchcancel', (e) => handleTileTouchCancel(e, tile));
+            }
+
+            tray.appendChild(tile);
+        }
+
+        function handleDrop(e, slotEl) {
+            e.preventDefault();
+            const tile = document.querySelector('.tile[aria-grabbed="true"]');
+            if (!tile) return;
+            if (slotEl.firstElementChild) {
+                tray.appendChild(slotEl.firstElementChild);
+            }
+            slotEl.innerHTML = '';
+            if (slotEl.dataset.ghost) delete slotEl.dataset.ghost;
+
+            tile.setAttribute('draggable', 'false');
+            tile.setAttribute('aria-grabbed', 'false');
+            tile.classList.remove('dragging');
+            tile.style.outline = 'none';
+            slotEl.appendChild(tile);
+
+            updatePerSlotFeedback();
+            checkAnswer();
+        }
+        
+        // ===== Touch DnD =====
+        let activeTile = null;
+        let touchOffsetX = 0;
+        let touchOffsetY = 0;
+        
+        function handleTileTouchStart(e, tile) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = tile.getBoundingClientRect();
+            touchOffsetX = touch.clientX - rect.left;
+            touchOffsetY = touch.clientY - rect.top;
+            activeTile = tile;
+            tile.setAttribute('aria-grabbed', 'true');
+            tile.classList.add('dragging');
+            speak(tile.textContent);
+        }
+        
+        function handleTileTouchMove(e, tile) {
+            if (!activeTile) return;
+            e.preventDefault();
+            const touch = e.touches[0];
+            const currentX = touch.clientX - touchOffsetX;
+            const currentY = touch.clientY - touchOffsetY;
+            activeTile.style.left = currentX + 'px';
+            activeTile.style.top = currentY + 'px';
+
+            const slotsEls = dropZone.querySelectorAll('.slot');
+            slotsEls.forEach(slot => {
+                const rect = slot.getBoundingClientRect();
+                if (touch.clientX >= rect.left && touch.clientX <= rect.right && touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+                    slot.style.backgroundColor = '#f0f0f0';
+                } else {
+                    slot.style.backgroundColor = '';
+                }
+            });
+        }
+        
+        function handleTileTouchEnd(e, tile) {
+            if (!activeTile) return;
+            e.preventDefault();
+            const touch = e.changedTouches[0];
+            const slotsEls = dropZone.querySelectorAll('.slot');
+            let dropped = false;
+            
+            slotsEls.forEach((slot) => {
+                const rect = slot.getBoundingClientRect();
+                if (touch.clientX >= rect.left && touch.clientX <= rect.right && touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+                    if (slot.firstElementChild) {
+                        const existingTile = slot.firstElementChild;
+                        existingTile.setAttribute('draggable', 'true');
+                        existingTile.setAttribute('aria-grabbed', 'false');
+                        existingTile.classList.remove('dragging');
+                        existingTile.style.left = '';
+                        existingTile.style.top = '';
+                        existingTile.style.outline = 'none';
+                        tray.appendChild(existingTile);
+                    }
+                    slot.innerHTML = '';
+                    if (slot.dataset.ghost) delete slot.dataset.ghost;
+                    
+                    tile.setAttribute('draggable', 'false');
+                    tile.setAttribute('aria-grabbed', 'false');
+                    tile.classList.remove('dragging');
+                    tile.style.left = '';
+                    tile.style.top = '';
+                    tile.style.outline = 'none';
+                    slot.appendChild(tile);
+                    
+                    dropped = true;
+                    updatePerSlotFeedback();
+                    checkAnswer();
+                }
+                slot.style.backgroundColor = '';
+            });
+            
+            if (!dropped) {
+                tray.appendChild(tile);
+                tile.classList.remove('dragging');
+                tile.setAttribute('aria-grabbed', 'false');
+                tile.style.left = '';
+                tile.style.top = '';
+                tile.style.outline = 'none';
+                updatePerSlotFeedback();
+            }
+            activeTile = null;
+        }
+        
+        function handleTileTouchCancel(e, tile) {
+            if (activeTile) {
+                tile.classList.remove('dragging');
+                tile.setAttribute('aria-grabbed', 'false');
+                tile.style.left = '';
+                tile.style.top = '';
+                tile.style.outline = 'none';
+                activeTile = null;
+            }
+        }
+        
+        function handleTouchStart(e, slot) { e.preventDefault(); }
+        function handleTouchMove(e, slot)  { e.preventDefault(); }
+        function handleTouchEnd(e, slot) {
+            if (!activeTile) {
+                const child = slot.querySelector('.tile');
+                if (child) {
+                    child.setAttribute('draggable', 'true');
+                    child.setAttribute('aria-grabbed', 'false');
+                    child.style.outline = 'none';
+                    tray.appendChild(child);
+                    slot.innerHTML = '';
+                    slot.classList.remove('correct','wrong');
+                    slot.classList.add('empty');
+                    const index = Array.from(slots).indexOf(slot);
+                    if (index === 0 && revealHintBtn.disabled) slot.dataset.ghost = word[0].toUpperCase();
+                    updatePerSlotFeedback();
+                }
+            }
+        }
+        function handleTouchCancel(e, slot) {}
+
+        function currentAnswer(){
+            return slots.map(s => (s.querySelector('.tile')?.textContent || '')).join('');
+        }
+
+        // Feedback imediato por letra
+        function updatePerSlotFeedback(){
+            slots.forEach((s, idx) => {
+                const t = s.querySelector('.tile');
+                if (!t) {
+                    s.classList.remove('correct','wrong');
+                    s.classList.add('empty');
+                    return;
+                }
+                const correct = word[idx].toUpperCase() === t.textContent;
+                s.classList.remove('empty');
+                s.classList.toggle('correct', !!t && correct);
+                s.classList.toggle('wrong', !!t && !correct);
+            });
+        }
+
+        function checkAnswer(){
+            const ans = currentAnswer();
+            if (ans.length !== word.length || slots.some(s => !s.querySelector('.tile'))) return;
+
+            if (ans.toUpperCase() === word.toUpperCase()){
+                if (div.dataset.completed === "false") {
+                    div.dataset.completed = "true";
+                    celebrate(div);   // ⬅️ cai purpurina SEMPRE que esta palavra for concluída
+                    speak(word);
+                    completedWords++;
+                    updateSessionStatus();
+                }
+                slots.forEach(s => {
+                    const t = s.querySelector('.tile');
+                    if (t) t.setAttribute('draggable','false');
+                    s.classList.remove('wrong','empty');
+                    s.classList.add('correct');
+                });
+
+                if (completedWords === activities.length) {
+                    showCompletionModal();
+                    firebase.auth().onAuthStateChanged((user) => { if (user) updateNextPhase(user.uid); });
+                }
+            } else {
+                updatePerSlotFeedback();
+            }
+        }
+
+        function resetActivity(){
+            slots.forEach((s, i) => {
+                const t = s.querySelector('.tile');
+                if (t) {
+                    t.setAttribute('draggable','true');
+                    t.setAttribute('aria-grabbed','false');
+                    t.classList.remove('dragging');
+                    t.style.left = '';
+                    t.style.top = '';
+                    t.style.outline = 'none';
+                    tray.appendChild(t);
+                }
+                s.innerHTML = '';
+                s.classList.remove('correct','wrong');
+                s.classList.add('empty');
+                if (i === 0 && !revealHintBtn.disabled) delete s.dataset.ghost;
+                if (i === 0 && revealHintBtn.disabled) s.dataset.ghost = word[0].toUpperCase();
+            });
+            updatePerSlotFeedback();
+        }
+
+        container.appendChild(div);
+    }
+
+    // Confete: corrigido para coordenadas da viewport (sem somar scrollY)
+    function celebrate(host){
+        const rect = host.getBoundingClientRect();
+        const baseY = Math.max(0, rect.top + 10); // viewport Y
+        const minX = Math.max(0, rect.left - 50);
+        const maxX = Math.min(window.innerWidth, rect.right + 50);
+        for (let i=0;i<18;i++){
+            const c = document.createElement('div');
+            c.className = 'confetti';
+            const x = Math.random() * (maxX - minX) + minX;
+            c.style.left = `${x}px`;
+            c.style.top  = `${baseY}px`;
+            c.style.background = ['#ffd54f','#4fc3f7','#ce93d8','#81c784','#ff8a65'][i%5];
+            document.body.appendChild(c);
+            setTimeout(()=>c.remove(), 1000);
+        }
+    }
+
+    // ================== Progresso (mantido) ==================
+    async function updateNextPhase(userId) {
+        const currentPhase = getPhaseFromURL();
+        const { level, unit } = getLevelAndUnitFromURL();
+        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+        try {
+            if (currentPhase === "last") {
+                const nextUnit = `Unit${parseInt(unit.replace('Unit','')) + 1}`;
+                await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
+            } else if (currentPhase === "end") {
+                const nextLevel = `Level${parseInt(level.replace('Level','')) + 1}`;
+                await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+            } else {
+                const nextPhase = parseInt(currentPhase) + 1;
+                await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
+            }
+        } catch (error) { console.error("Erro ao atualizar o progresso da fase:", error); }
+    }
+
+    // ================== Carregamento / sessão ==================
+    async function loadActivities() {
+        const { level, unit } = getLevelAndUnitFromURL();
+        try {
+            const wordsPath = `../../${level}/${unit}/data3/words.txt`;
+            const resp = await fetch(wordsPath);
+            if (!resp.ok) throw new Error(`Erro ao buscar palavras. Status: ${resp.status}`);
+            const text = await resp.text();
+            let words = text.trim().split('\n').map(w => w.trim()).filter(Boolean);
+
+            if (words.length > SESSION_LIMIT) words = words.slice(0, SESSION_LIMIT);
+
+            words.forEach((word, index) => {
+                const imageUrl = `../../${level}/${unit}/data3/imagens/imagem${index + 1}.png`;
+                activities.push(word);
+                createActivity(imageUrl, word);
+            });
+
+            updateSessionStatus();
+        } catch (e) {
+            console.error('Erro ao carregar palavras ou imagens:', e);
+        }
+    }
+
+    function updateSessionStatus(){
+        const total = activities.length;
+        const done = completedWords;
+        if (total === 0) {
+            sessionStatus.textContent = '';
+            return;
+        }
+        sessionStatus.textContent = `Activities: ${done}/${total}`;
+        if (done === total) {
+            sessionStatus.innerHTML = `<span class="good">All done! Great job!</span>`;
+        }
+    }
+
+    // Embaralhador estável
+    function shuffleWord(word) {
+        const arr = word.toUpperCase().split('');
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr.join('');
+    }
+    function forcedShuffle(word){
+        const arr = word.toUpperCase().split('');
+        if (arr.length < 2) return arr.join('');
+        [arr[0], arr[1]] = [arr[1], arr[0]];
+        return arr.join('');
+    }
+
+    function showCompletionModal() {
+        document.getElementById('overlay').style.display = 'block';
+        document.getElementById('completion-modal').style.display = 'block';
+    }
+    function closeModal() {
+        document.getElementById('overlay').style.display = 'none';
+        document.getElementById('completion-modal').style.display = 'none';
+    }
+
+    // ================== PDF (mantido) ==================
+    async function generatePDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const logo = new Image();
+        logo.src = 'Logo.png';
+
+        function header(){
+            doc.setFontSize(12);
+            doc.text("Name: __________________________________________ Date: ____________", 50, 20);
+            doc.setFontSize(16);
+            doc.text("Hannah Mixed Letters", 10, 50);
+        }
+
+        function drawActivity(activityEl, y){
+            const imgEl = activityEl.querySelector('img');
+            if (imgEl) {
+                try {
+                    const cv = document.createElement('canvas');
+                    const ctx = cv.getContext('2d');
+                    cv.width = imgEl.naturalWidth || 120;
+                    cv.height = imgEl.naturalHeight || 120;
+                    ctx.drawImage(imgEl, 0, 0, cv.width, cv.height);
+                    const data = cv.toDataURL('image/png');
+                    doc.addImage(data, 'PNG', 10, y, 24, 24);
+                } catch {}
+            }
+            const slotsCount = activityEl.querySelectorAll('.slot').length;
+            let x = 50;
+            doc.setFontSize(14);
+            for (let i=0;i<slotsCount;i++){
+                doc.text("_____", x, y + 10);
+                x += 16;
+            }
+            const trayTiles = [...activityEl.querySelectorAll('.tray .tile')].map(t => t.textContent).join(' ');
+            const filledTiles = [...activityEl.querySelectorAll('.slot .tile')].map(t => t.textContent).join(' ');
+            const mixed = (trayTiles || filledTiles || '').trim();
+            if (mixed) {
+                doc.setFontSize(11);
+                doc.text(`Letters (mixed): ${mixed}`, 50, y + 20);
+            }
+        }
+
+        logo.onload = function(){
+            try { doc.addImage(logo, 'PNG', 10, 10, 30, 30); } catch {}
+            header();
+
+            let y = 60;
+            document.querySelectorAll('.activity').forEach((a) => {
+                if (y > 270) { doc.addPage(); y = 20; }
+                drawActivity(a, y);
+                y += 36;
+            });
+            doc.save("Hannah_Mixed_Letters.pdf");
+        };
+        logo.onerror = function(){
+            header();
+            doc.save("Hannah_Mixed_Letters.pdf");
+        };
+    }
+    </script>
+</body>
+</html>
