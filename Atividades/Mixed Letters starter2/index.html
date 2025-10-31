@@ -141,6 +141,10 @@
             transform: scale(1.1);
             z-index: 100;
         }
+
+        /* A posição fixa do tile arrastado só é aplicada em dispositivos touch */
+        body.touch .tile.dragging { position: fixed; pointer-events: none; }
+
         .controls { display: flex; gap: 8px; flex-wrap: wrap }
         .pill {
             background: #fff;
@@ -177,7 +181,7 @@
 
         /* Confete */
         .confetti {
-            position: fixed; /* importante para ficar na viewport */
+            position: fixed;
             pointer-events: none;
             z-index: 1200;
             width: 8px; height: 12px; background: #ffd54f;
@@ -192,7 +196,6 @@
             .activity img { width: 140px; height: 140px }
             .slot, .tile { width: 52px; height: 60px }
         }
-        .tile.dragging { position: fixed; pointer-events: none; }
     </style>
 </head>
 <body>
@@ -292,6 +295,7 @@
     const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
     document.addEventListener('DOMContentLoaded', () => {
+        if (isTouchDevice) document.body.classList.add('touch');
         initializeVoices();
         loadActivities();
     });
@@ -339,9 +343,13 @@
             s.setAttribute('aria-label', `Position ${i+1}`);
             s.setAttribute('role', 'button');
             s.tabIndex = 0;
-            s.addEventListener('dragover', (e) => e.preventDefault());
+
+            // Desktop DnD nativo — garantir compatibilidade
+            s.addEventListener('dragenter', (e) => e.preventDefault());
+            s.addEventListener('dragover',  (e) => e.preventDefault());
             s.addEventListener('drop', (e) => handleDrop(e, s));
             
+            // Touch helpers
             if (isTouchDevice) {
                 s.addEventListener('touchstart', (e) => handleTouchStart(e, s), { passive: false });
                 s.addEventListener('touchmove', (e) => handleTouchMove(e, s), { passive: false });
@@ -405,18 +413,26 @@
             tile.setAttribute('aria-grabbed', 'false');
             tile.tabIndex = 0;
 
-            tile.addEventListener('dragstart', () => {
+            // ===== Desktop Drag & Drop =====
+            tile.addEventListener('dragstart', (e) => {
+                // Necessário para o drop funcionar em alguns navegadores
+                try {
+                    e.dataTransfer.setData('text/plain', tile.textContent);
+                    e.dataTransfer.effectAllowed = 'move';
+                } catch (_) {}
                 tile.setAttribute('aria-grabbed', 'true');
                 tile.classList.add('dragging');
                 speak(ch);
             });
-            tile.addEventListener('dragend', () => {
+            tile.addEventListener('dragend', (e) => {
                 tile.setAttribute('aria-grabbed', 'false');
                 tile.classList.remove('dragging');
                 tile.style.outline = 'none';
             });
+
             tile.addEventListener('click', () => speak(ch));
             
+            // ===== Touch DnD =====
             if (isTouchDevice) {
                 tile.addEventListener('touchstart', (e) => handleTileTouchStart(e, tile), { passive: false });
                 tile.addEventListener('touchmove', (e) => handleTileTouchMove(e, tile), { passive: false });
@@ -429,6 +445,7 @@
 
         function handleDrop(e, slotEl) {
             e.preventDefault();
+            // Em desktop, o item sendo arrastado é o .dragging com aria-grabbed="true"
             const tile = document.querySelector('.tile[aria-grabbed="true"]');
             if (!tile) return;
             if (slotEl.firstElementChild) {
