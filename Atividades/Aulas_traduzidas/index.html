@@ -208,7 +208,14 @@
           <span style="display:inline-flex;width:10px;height:10px;background:var(--brand);border-radius:50%;"></span>
           <h2>Professor Samuel</h2>
         </div>
-        <span class="tiny" id="langBadge">en-US</span>
+        <!-- Botão SAIR deslocado para o cabeçalho (substitui o badge de idiomas) -->
+        <button class="btn btn-outline" id="exitBtn" onclick="exitLesson()" aria-label="Sair">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M6 2a1 1 0 0 0-1 1v2h2V4h6v8H7v-1H5v2a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H6z"/>
+            <path d="M.146 8.354a.5.5 0 0 1 0-.708L3.793 3.999 4.5 4.706 1.707 7.5H10v1H1.707L4.5 11.293l-.707.707L.146 8.354z"/>
+          </svg>
+          <span id="exitLabel">Sair</span>
+        </button>
       </div>
 
       <div class="robot-wrap">
@@ -244,15 +251,6 @@
           </span>
           <span id="muteLabel">Mute</span>
         </button>
-
-        <!-- Sair -->
-        <button class="btn btn-outline" id="exitBtn" onclick="exitLesson()" aria-label="Sair">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M6 2a1 1 0 0 0-1 1v2h2V4h6v8H7v-1H5v2a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H6z"/>
-            <path d="M.146 8.354a.5.5 0 0 1 0-.708L3.793 3.999 4.5 4.706 1.707 7.5H10v1H1.707L4.5 11.293l-.707.707L.146 8.354z"/>
-          </svg>
-          <span id="exitLabel">Sair</span>
-        </button>
       </div>
 
       <div class="tiny" id="hintText">
@@ -270,7 +268,7 @@
       static: '../../../../../imagens/robo1_static.png',
       idle:  '../../../../../imagens/robo2.gif'
     };
-    const IDLE_DELAY_MS = 10000; // <<< 10 segundos para entrar em idle
+    const IDLE_DELAY_MS = 10000; // 10 segundos para entrar em idle
 
     let robotState = 'static';
     let idleTimer;
@@ -361,7 +359,7 @@
       start: 'ចាប់ផ្តើមមេរៀន',
       pause: 'ផ្អាក',
       repeat: 'ធ្វើម្ដងទៀត',
-      hint: 'គន្លឹះ៖ ចុចលើបន្ទាត់ណាមួយ ដើម្បីចាប់ផ្តើមពីចំណុចនោះ។',
+      hint: 'គន្លឹះ៖ ចុចលើបន្ទាត់ណាពីចំណុចនោះ។',
       badge: (studentLang) => `en-US / km`,
       mute: 'បិទសំឡេង',
       unmute: 'បើកសំឡេង',
@@ -400,7 +398,7 @@
     let currentIndex = 0;
     let pauseTimeout;
     let studentLang = 'en-US'; // detectaremos a seguir
-    let isMuted = false;       // <<< novo: controle de mute
+    let isMuted = false;       // controle de mute
 
     /* =========================================================
        Detecção de língua do aluno
@@ -436,16 +434,11 @@
        Aplicar traduções na UI
        ========================================================= */
     function applyUITranslations() {
-      const langBadge   = document.getElementById('langBadge');
       const status      = document.getElementById('statusBadge');
-      const mainBtn     = document.getElementById('toggleButton'); // inexistente: mantemos update via painel
       const panelIcon   = document.getElementById('panelPlayIcon');
       const panelLabel  = document.getElementById('panelPlayLabel');
-      const repeatLabel = document.getElementById('repeatLabel');  // não existe mais fora; mantemos compat
+      const muteLabel   = document.getElementById('muteLabel');
       const hintText    = document.getElementById('hintText');
-
-      // badge
-      langBadge.textContent = (studentLang === 'en-US') ? 'en-US' : `en-US / ${studentLang}`;
 
       // status inicial
       status.innerHTML = `
@@ -464,10 +457,8 @@
       panelLabel.textContent = t('start');
 
       // mute label
-      updateMuteUI();
-
-      // exit label
       document.getElementById('exitLabel').textContent = t('exit');
+      muteLabel.textContent = t('mute');
 
       // hint
       hintText.textContent = t('hint');
@@ -616,6 +607,8 @@
     }
 
     function toggleMute() {
+      // cancela fala atual e alterna flag
+      speechSynthesis.cancel();
       isMuted = !isMuted;
       updateMuteUI();
     }
@@ -653,7 +646,7 @@
       const svgPlay = `
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
              viewBox="0 0 16 16" aria-hidden="true" fill="currentColor">
-          <path d="M11.596 8.697l-6.363 3.692A.5.5 0 0 1 4.5 12.846V3.154a.5.5 0 0 1 .733-.442ল6.363 3.692a.5.5 0 0 1 0 .884z"/>
+          <path d="M11.596 8.697l-6.363 3.692A.5.5 0 0 1 4.5 12.846V3.154a.5.5 0 0 1 .733-.442l6.363 3.692a.5.5 0 0 1 0 .884z"/>
         </svg>`;
       const svgPause = `
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
@@ -681,9 +674,31 @@
     }
 
     /* =========================================================
-       Leitura com micro-pausa entre linhas/células
+       Falar (TTS real) vs Simular fala (mute) — mantém cadência
        ========================================================= */
     const GAP_BETWEEN_LINES_MS = 300; // fração de segundo entre falas
+
+    function estimateDurationMs(text) {
+      const words = (text.trim().match(/\S+/g) || []).length;
+      // ~450 ms por palavra, com limites para frases curtas/longas
+      return Math.max(600, Math.min(6000, words * 450));
+    }
+
+    function speakChunk(text, lang, onend) {
+      if (isMuted) {
+        // Simula fala: mantém animação/ritmo, mas sem som
+        setRobot('talk');
+        const ms = estimateDurationMs(text);
+        setTimeout(() => { onend && onend(); }, ms);
+        return;
+      }
+      const u = new SpeechSynthesisUtterance(text);
+      if (lang) u.lang = lang;
+      u.volume = 1; // som normal quando não muted
+      u.onend = () => { onend && onend(); };
+      speechSynthesis.cancel();
+      speechSynthesis.speak(u);
+    }
 
     function speakEntry(i) {
       if (i >= texts.length) return pauseLesson();
@@ -723,13 +738,9 @@
 
           const s = spans[c];
           s.classList.add('highlight');
-
-          const u = new SpeechSynthesisUtterance(s.textContent);
           const cellLang = s.getAttribute('lang');
-          if (cellLang) u.lang = cellLang;
-          u.volume = isMuted ? 0 : 1; // <<< respeita mute
 
-          u.onend = () => {
+          speakChunk(s.textContent, cellLang, () => {
             if (myToken !== speakToken) return;
             s.classList.remove('highlight');
             setRobot('static');
@@ -741,20 +752,11 @@
               speechSynthesis.cancel();
               speakCell();
             }, GAP_BETWEEN_LINES_MS);
-          };
-
-          speechSynthesis.cancel();
-          speechSynthesis.speak(u);
+          });
         }
         speakCell();
       } else {
-        const u = new SpeechSynthesisUtterance(entry.text);
-        if (entry.lang) u.lang = entry.lang;
-        u.volume = isMuted ? 0 : 1; // <<< respeita mute
-        u.onend = finish;
-
-        speechSynthesis.cancel();
-        speechSynthesis.speak(u);
+        speakChunk(entry.text, entry.lang, finish);
       }
     }
 
@@ -788,8 +790,7 @@
         const ph = panel.getBoundingClientRect().height;
         // define um topo equivalente à altura do painel
         wrapper.style.marginTop = ph + 'px';
-        // tenta reservar espaço vertical adequado
-        // 48px ~ altura da barra "GRAMMAR"
+        // 48px ~ altura aproximada da barra "GRAMMAR"
         wrapper.style.height = `calc(100vh - ${ph}px - 48px)`;
       } else {
         wrapper.style.marginTop = '';
