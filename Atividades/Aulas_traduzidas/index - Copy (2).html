@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
@@ -258,44 +258,7 @@
   </div>
 
   <script>
-    /* =========================================================
-       CONTROLE DO ROBÔ (CENTRALIZADO)
-       ========================================================= */
-    const ROBOT = {
-      talk:  '../../../../../imagens/robo1.gif',
-      static: '../../../../../imagens/robo1_static.png',
-      idle:  '../../../../../imagens/robo2.gif'
-    };
-    let robotState = 'static';
-    let idleTimer;
-    let speakToken = 0; // protege contra callbacks antigos
-
-    (function preloadRobotImages(){
-      [ROBOT.talk, ROBOT.static, ROBOT.idle].forEach(src => {
-        const img = new Image();
-        img.src = src;
-      });
-    })();
-
-    function setRobot(state){
-      if (state === robotState) return;
-      robotState = state;
-      const robot = document.getElementById('robotImage');
-      if (robot) robot.src = ROBOT[state];
-    }
-
-    function goIdleSoon(ms = 5000){
-      clearTimeout(idleTimer);
-      idleTimer = setTimeout(() => {
-        if (!speechSynthesis.speaking && !isPlaying){
-          setRobot('idle');
-        }
-      }, ms);
-    }
-
-    /* =========================================================
-       Idiomas suportados e traduções
-       ========================================================= */
+    // ====== Idiomas suportados e traduções ======
     const SUPPORTED_STUDENT_LANGS = ['pt-BR','th','my','km','zh-CN']; // ignoramos 'en-US' como principal
     const T = {
       'en-US': {
@@ -316,6 +279,7 @@
         hint: 'Dica: toque em qualquer linha do texto para ouvir a partir daquele ponto.',
         badge: (studentLang) => `en-US / pt-BR`
       },
+      // Thai
       'th': {
         ready: 'พร้อมเริ่ม',
         explaining: 'ซามูเอลกำลังอธิบาย',
@@ -325,16 +289,21 @@
         hint: 'เคล็ดลับ: แตะบรรทัดใดก็ได้เพื่อเริ่มเล่นจากส่วนนั้น',
         badge: (studentLang) => `en-US / th`
       },
+      // Burmese
       'my': {
         ready: 'စတင်ရန်အဆင်သင့်',
         explaining: 'ဆမ်မြူးအယ်လ် ဆက်သွယ်ရှင်းလင်းနေသည်',
         start: 'သင်ခန်းစာ စတင်မည်',
         pause: 'ခဏရပ်မည်',
-        repeat: 'ထပ်မံဖတ်ပြ',
-        hint: 'အကြံပြုချက် - မည်သည့် စာကြောင်းမဆို ကိုထိနှိပ်ပြီး ထိုနေရာမှ စတင်နားထောင်နိုင်သည်',
-        badge: (studentLang) => `en-US / my`
-      }
+        repeat: 'ထပ်မံဖspielen', // fallback mixed word avoided => better Burmese word:
+      },
     };
+
+    // corrigir a tabela de birmanês (string simples, sem caracteres problemáticos)
+    T['my'].repeat = 'ထပ်မံဖတ်ပြ';
+    T['my'].hint = 'အကြံပြုချက် - မည်သည့် စာကြောင်းမဆို ကိုထိနှိပ်ပြီး ထိုနေရာမှ စတင်နားထောင်နိုင်သည်';
+    T['my'].badge = (studentLang) => `en-US / my`;
+    T['my'].pause = 'ခန့်ခန့်အေး';
 
     // Khmer
     T['km'] = {
@@ -358,28 +327,26 @@
       badge: (studentLang) => `en-US / zh-CN`
     };
 
+    // Fallback seguro: se alguma chave faltar, cai para inglês
     function t(key) {
       const pack = T[studentLang] || T['en-US'];
       return (pack && pack[key]) || T['en-US'][key] || key;
     }
 
-    /* =========================================================
-       Utilitários / Estado
-       ========================================================= */
+    // ====== Utilitários ======
     function getURLParam(name) {
       const params = new URLSearchParams(window.location.search);
       return params.get(name) || '';
     }
 
+    // ====== Estado ======
     let texts = [];
     let isPlaying = false;
     let currentIndex = 0;
     let pauseTimeout;
     let studentLang = 'en-US'; // detectaremos a seguir
 
-    /* =========================================================
-       Detecção de língua do aluno
-       ========================================================= */
+    // ====== Detecção de língua do aluno ======
     function detectStudentLangFromLines(lines) {
       // 1) tentar pelo segundo campo |lang| das linhas
       for (const line of lines) {
@@ -407,9 +374,7 @@
       return 'en-US';
     }
 
-    /* =========================================================
-       Aplicar traduções na UI fixa
-       ========================================================= */
+    // ====== Aplicar traduções na UI fixa ======
     function applyUITranslations() {
       const langBadge = document.getElementById('langBadge');
       const status = document.getElementById('statusBadge');
@@ -442,9 +407,7 @@
       hintText.textContent = t('hint');
     }
 
-    /* =========================================================
-       Carregar lesson
-       ========================================================= */
+    // ====== Carregar lesson ======
     async function loadTextFile() {
       const path = getURLParam('lessonPath') || 'lesson.txt';
       try {
@@ -550,9 +513,7 @@
       });
     }
 
-    /* =========================================================
-       Interação
-       ========================================================= */
+    // ====== Interação ======
     function handleTextClick(idx) {
       speechSynthesis.cancel();
       currentIndex = texts.findIndex(t => t.id === idx);
@@ -562,19 +523,19 @@
       speakEntry(currentIndex);
     }
 
+    function toggleLesson() {
+      isPlaying = !isPlaying;
+      updateControls();
+      if (isPlaying) speakEntry(currentIndex);
+      else pauseLesson();
+    }
+
     function replayCurrent() {
       if (!texts.length) return;
       speechSynthesis.cancel();
       isPlaying = true;
       updateControls();
       speakEntry(currentIndex);
-    }
-
-    function toggleLesson() {
-      isPlaying = !isPlaying;
-      updateControls();
-      if (isPlaying) speakEntry(currentIndex);
-      else pauseLesson();
     }
 
     function updateControls() {
@@ -615,68 +576,39 @@
       }
     }
 
-    /* =========================================================
-       Leitura com micro-pausa entre linhas/células
-       ========================================================= */
-    const GAP_BETWEEN_LINES_MS = 300; // fração de segundo entre falas
-
     function speakEntry(i) {
       if (i >= texts.length) return pauseLesson();
 
       const entry = texts[i];
       const el = entry.el;
-      const myToken = ++speakToken;
 
       document.querySelectorAll('.highlight').forEach(e => e.classList.remove('highlight'));
       el.classList.add('highlight');
 
-      setRobot('talk');
-      clearTimeout(idleTimer);
-
-      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-
-      function finish() {
-        if (myToken !== speakToken) return;
-        el.classList.remove('highlight');
-        setRobot('static');
-        setTimeout(() => {
-          if (myToken !== speakToken) return;
-          currentIndex++;
-          isPlaying ? speakEntry(currentIndex) : pauseLesson();
-        }, GAP_BETWEEN_LINES_MS);
-      }
+      const robot = document.getElementById('robotImage');
+      robot.src = '../../../../../imagens/robo1.gif';
 
       if (entry.type === 'table-row') {
         const spans = Array.from(el.querySelectorAll('.cell'));
         let c = 0;
 
         function speakCell() {
-          if (!isPlaying || myToken !== speakToken) return;
+          if (!isPlaying) return;
           if (c >= spans.length) {
-            return finish();
+            el.classList.remove('highlight');
+            currentIndex++;
+            return isPlaying ? speakEntry(currentIndex) : pauseLesson();
           }
-
           const s = spans[c];
           s.classList.add('highlight');
-
           const u = new SpeechSynthesisUtterance(s.textContent);
           const cellLang = s.getAttribute('lang');
           if (cellLang) u.lang = cellLang;
-
           u.onend = () => {
-            if (myToken !== speakToken) return;
             s.classList.remove('highlight');
-            setRobot('static');
-            setTimeout(() => {
-              if (myToken !== speakToken) return;
-              c++;
-              if (!isPlaying) return;
-              setRobot('talk');
-              speechSynthesis.cancel();
-              speakCell();
-            }, GAP_BETWEEN_LINES_MS);
+            c++;
+            speakCell();
           };
-
           speechSynthesis.cancel();
           speechSynthesis.speak(u);
         }
@@ -684,12 +616,16 @@
       } else {
         const u = new SpeechSynthesisUtterance(entry.text);
         if (entry.lang) u.lang = entry.lang;
-
-        u.onend = finish;
-
+        u.onend = () => {
+          el.classList.remove('highlight');
+          currentIndex++;
+          isPlaying ? speakEntry(currentIndex) : pauseLesson();
+        };
         speechSynthesis.cancel();
         speechSynthesis.speak(u);
       }
+
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
 
     function pauseLesson() {
@@ -697,25 +633,17 @@
       isPlaying = false;
       updateControls();
 
-      setRobot('static');
-      clearTimeout(idleTimer);
-      goIdleSoon(5000);
+      const robot = document.getElementById('robotImage');
+      robot.src = '../../../../../imagens/robo1_static.png';
+
+      clearTimeout(pauseTimeout);
+      pauseTimeout = setTimeout(() => {
+        if (!isPlaying) robot.src = '../../../../../imagens/robo2.gif';
+      }, 5000);
     }
 
-    /* =========================================================
-       Pausar quando a aba perde foco
-       ========================================================= */
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden && isPlaying) toggleLesson();
-    });
-
-    /* =========================================================
-       Boot
-       ========================================================= */
     window.onload = () => {
-      // “Acorda” a engine de voz em alguns navegadores
-      speechSynthesis.getVoices();
-      applyUITranslations();
+      applyUITranslations(); // mostra algo coerente mesmo antes do load
       updateControls();
       loadTextFile();
     };
