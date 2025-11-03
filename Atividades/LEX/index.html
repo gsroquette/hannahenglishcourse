@@ -180,6 +180,50 @@
         const ROBOT_STATIC = "../../imagens/robo1_static.png";
         const ROBOT_ALTERNATE = "../../imagens/robo2.gif";
 
+        // ===== [NOVO] Módulo de ociosidade / idle =====
+        const IDLE_DELAY_MS = 15000; // 15s sem atividade -> alterna para robo2.gif
+        let idleTimer = null;
+
+        // Pré-carregar imagens para evitar flicker
+        ['../../imagens/robo1_static.png', '../../imagens/robo1.gif', '../../imagens/robo2.gif']
+          .forEach(src => { const img = new Image(); img.src = src; });
+
+        function setRobotImage(src) {
+            // evita reflows desnecessários
+            const current = robotImg.getAttribute('src');
+            if (current === src) return;
+            robotImg.src = src;
+        }
+
+        function scheduleIdle() {
+            clearTimeout(idleTimer);
+            // Só agenda idle se NÃO estiver falando e NÃO estiver ouvindo
+            const isListening = speakButton.classList.contains('listening');
+            if (!isSpeaking && !isListening) {
+                idleTimer = setTimeout(() => {
+                    const stillListening = speakButton.classList.contains('listening');
+                    if (!isSpeaking && !stillListening) {
+                        setRobotImage(ROBOT_ALTERNATE);
+                    }
+                }, IDLE_DELAY_MS);
+            }
+        }
+
+        function userActivity() {
+            clearTimeout(idleTimer);
+            const isListening = speakButton.classList.contains('listening');
+            if (!isSpeaking && !isListening) {
+                setRobotImage(ROBOT_STATIC);
+            }
+            scheduleIdle();
+        }
+
+        ['mousemove', 'keydown', 'touchstart', 'click'].forEach(evt =>
+          document.addEventListener(evt, userActivity, { passive: true })
+        );
+
+        // ===== fim módulo idle =====
+
         // State
         let recognition, isSpeaking = false, userId = null, chatHistory = [];
         let initialGreeting = null;
@@ -277,12 +321,18 @@
                 isSpeaking = true;
                 speakButton.classList.add("listening");
                 speakButton.innerText = "Listening...";
+                // ===== [NOVO] integração idle: ao começar a ouvir, cancela idle e mantém static
+                clearTimeout(idleTimer);
+                setRobotImage(ROBOT_STATIC);
             };
 
             recognition.onend = () => {
                 isSpeaking = false;
                 speakButton.classList.remove("listening");
                 speakButton.innerText = "Press to Speak";
+                // ===== [NOVO] integração idle: ao parar de ouvir, agenda idle
+                setRobotImage(ROBOT_STATIC);
+                scheduleIdle();
             };
 
             recognition.onerror = (event) => {
@@ -308,6 +358,8 @@
                 
                 messageElement.style.visibility = "visible";
                 messageElement.innerText = errorMessage;
+                // ===== [NOVO] mesmo em erro, re-agendar idle
+                scheduleIdle();
             };
 
             recognition.onresult = async (event) => {
@@ -374,6 +426,35 @@
             audioUnlocked = true;
         }
 
+        // ===== [NOVO] Hook para integrar idle sem alterar sua lógica original
+        function hookAudioIdle(audio) {
+            const origOnPlaying = audio.onplaying;
+            const origOnEnded   = audio.onended;
+            const origOnError   = audio.onerror;
+
+            audio.onplaying = (...args) => {
+                // ao iniciar áudio, cancela idle e garante gif de fala
+                clearTimeout(idleTimer);
+                setRobotImage(ROBOT_GIF);
+                isSpeaking = true;
+                return typeof origOnPlaying === 'function' ? origOnPlaying.apply(audio, args) : undefined;
+            };
+            audio.onended = (...args) => {
+                // ao terminar, volta pro static e agenda idle
+                isSpeaking = false;
+                setRobotImage(ROBOT_STATIC);
+                scheduleIdle();
+                return typeof origOnEnded === 'function' ? origOnEnded.apply(audio, args) : undefined;
+            };
+            audio.onerror = (...args) => {
+                // em erro, também retoma ciclo de idle
+                isSpeaking = false;
+                setRobotImage(ROBOT_STATIC);
+                scheduleIdle();
+                return typeof origOnError === 'function' ? origOnError.apply(audio, args) : undefined;
+            };
+        }
+
         // TTS
         async function speakUsingGoogleTTS(text) {
             try {
@@ -403,6 +484,9 @@
                 }
                 
                 const audio = new Audio(URL.createObjectURL(base64ToBlob(audioBase64, 'audio/mp3')));
+
+                // ===== [NOVO] integrar idle sem mexer na sua lógica
+                hookAudioIdle(audio);
                 
                 audio.onplaying = () => {
                     isSpeaking = true;
@@ -506,7 +590,7 @@
             firebase.auth().onAuthStateChanged(async (user) => {
                 if (!user) {
                     messageElement.innerText = "Redirecting to login page...";
-                    messageElement.style.visibility = "visible";
+                    messageElement.style.visibility = 'visible';
                     window.location.href = "https://hannahenglishcourse.vercel.app/Formulario/login.html";
                     return;
                 }
@@ -579,6 +663,9 @@
         window.onload = () => {
             setupSpeechRecognition();
             initializeConversation();
+            // ===== [NOVO] garantir estado inicial e agendar primeiro idle
+            setRobotImage(ROBOT_STATIC);
+            scheduleIdle();
         };
     </script>
 </body>
