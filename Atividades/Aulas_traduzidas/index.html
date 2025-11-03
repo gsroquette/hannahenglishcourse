@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
@@ -211,32 +211,57 @@
 
   <script>
     /* =========================================================
-       ROBÔ
+       AVATARES (Samuel + Hannah)
        ========================================================= */
     const ROBOT = {
       talk:  '../../../../../imagens/robo1.gif',
       static: '../../../../../imagens/robo1_static.png',
       idle:  '../../../../../imagens/robo2.gif'
     };
+
+    // Hannah com os seus 3 arquivos
+    const HANNAH = {
+      talk:  '../../../../../imagens/hannah_talk.gif',
+      static:'../../../../../imagens/hannah_static.png',
+      idle:  '../../../../../imagens/hannah_idle.gif'
+    };
+
     const IDLE_DELAY_MS = 10000;
     let robotState = 'static';
     let idleTimer;
 
-    (function preloadRobotImages(){
-      [ROBOT.talk, ROBOT.static, ROBOT.idle].forEach(src => { const i=new Image(); i.src=src; });
+    // Quem está "no palco": 'samuel' (inglês) ou 'hannah' (outras línguas)
+    let currentActor = 'samuel';
+
+    (function preloadAvatars(){
+      [ROBOT.talk, ROBOT.static, ROBOT.idle,
+       HANNAH.talk, HANNAH.static, HANNAH.idle]
+       .forEach(src => { const i=new Image(); i.src=src; });
     })();
 
-    function setRobot(state){
+    function actorPack(){ return currentActor === 'samuel' ? ROBOT : HANNAH; }
+
+    function setActorByLang(lang){
+      currentActor = (lang === 'en-US') ? 'samuel' : 'hannah';
+      const titleEl = document.querySelector('.teacher-title h2');
+      if (titleEl) titleEl.textContent = (currentActor === 'samuel') ? 'Professor Samuel' : 'Hannah';
+      const img = document.getElementById('robotImage');
+      if (img) img.alt = (currentActor === 'samuel') ? 'Robô Professor Samuel' : 'Hannah';
+    }
+
+    function setAvatar(state){
       if (state === robotState) return;
       robotState = state;
-      const robot = document.getElementById('robotImage');
-      if (robot) robot.src = ROBOT[state];
+      const img = document.getElementById('robotImage');
+      const pack = actorPack();
+      if (img) img.src = pack[state] || pack.talk;
     }
+
     function goIdleSoon(ms = IDLE_DELAY_MS){
       clearTimeout(idleTimer);
       idleTimer = setTimeout(() => {
         if (audio.paused && !isPlaying){
-          setRobot('idle');
+          setAvatar('idle');
         }
       }, ms);
     }
@@ -283,33 +308,24 @@
 
     function basename(p){ return p.split('/').pop().split('\\').pop(); }
 
-    // tenta achar item por texto+lang; retorna {hash, lang, urlPreferred}
     function findAudioFor(text, lang){
       if (!manifestItems.length || !text) return null;
       const tnorm = (text||'').trim();
-      // match exato por texto e idioma
       let item = manifestItems.find(i => (i.text||'').trim() === tnorm && i.lang === lang);
       if (!item) {
-        // fallback: se não achou, tenta qualquer idioma igual ao texto
         item = manifestItems.find(i => (i.text||'').trim() === tnorm);
       }
       if (!item) return null;
-      // construir URL local pelo hash
-      // construir URL local a partir do manifest
-if (item.file) {
-  // Manifesto novo: já traz o nome exato (ex.: "pt-br-....mp3")
-  const localUrl = `${audioBase}/${item.file}`;
-  return { url: localUrl, lang: item.lang, hash: null, fallbackUrl: '' };
-}
 
-if (item.hash) {
-  // Compatibilidade com manifestos antigos (se algum ainda vier com "hash")
-  const localUrl = `${audioBase}/${(item.lang || '').toLowerCase()}-${item.hash}.mp3`;
-  return { url: localUrl, lang: item.lang, hash: item.hash, fallbackUrl: item.url || '' };
-}
-
-// Último recurso: usar URL externa, se existir
-return { url: item.url || '', lang: item.lang, hash: null, fallbackUrl: '' };
+      if (item.file) {
+        const localUrl = `${audioBase}/${item.file}`;
+        return { url: localUrl, lang: item.lang, hash: null, fallbackUrl: '' };
+      }
+      if (item.hash) {
+        const localUrl = `${audioBase}/${(item.lang || '').toLowerCase()}-${item.hash}.mp3`;
+        return { url: localUrl, lang: item.lang, hash: item.hash, fallbackUrl: item.url || '' };
+      }
+      return { url: item.url || '', lang: item.lang, hash: null, fallbackUrl: '' };
     }
 
     /* =========================================================
@@ -344,18 +360,15 @@ return { url: item.url || '', lang: item.lang, hash: null, fallbackUrl: '' };
        ========================================================= */
     async function loadTextFile() {
       const lessonPath = getURLParam('lessonPath') || 'lesson.txt';
-      // diretório onde está a lesson
       const parts = lessonPath.split('/');
       lessonDir = parts.slice(0, -1).join('/');
-      audioBase = `${lessonDir}/audio`; // onde estão manifest.json, en-US, pt-BR
+      audioBase = `${lessonDir}/audio`;
 
       try {
-        // 1) carrega lesson
         const resp = await fetch(lessonPath);
         if (!resp.ok) { alert('Não foi possível carregar a lição.'); return; }
         const data = await resp.text();
 
-        // 2) carrega manifest do mesmo local
         try {
           const mres = await fetch(`${audioBase}/manifest.json`);
           if (mres.ok) {
@@ -368,7 +381,6 @@ return { url: item.url || '', lang: item.lang, hash: null, fallbackUrl: '' };
           console.warn('Falha ao ler manifest.json:', e);
         }
 
-        // Detecta língua do aluno pela lesson
         const rawLines = data.split('\n');
         studentLang = detectStudentLangFromLines(rawLines);
 
@@ -592,14 +604,13 @@ return { url: item.url || '', lang: item.lang, hash: null, fallbackUrl: '' };
       document.querySelectorAll('.highlight').forEach(e => e.classList.remove('highlight'));
       el.classList.add('highlight');
 
-      setRobot('talk');
       clearTimeout(idleTimer);
       el.scrollIntoView({ block: 'center', behavior: 'smooth' });
 
       const finish = () => {
         if (playEntry._marker !== myMarker) return;
         el.classList.remove('highlight');
-        setRobot('static');
+        setAvatar('static');
         setTimeout(() => {
           if (playEntry._marker !== myMarker) return;
           currentIndex++;
@@ -616,6 +627,9 @@ return { url: item.url || '', lang: item.lang, hash: null, fallbackUrl: '' };
             s.classList.add('highlight');
 
             const cellLang = s.getAttribute('lang') || 'en-US';
+            setActorByLang(cellLang);
+            setAvatar('talk');
+
             const audioInfo = findAudioFor(s.textContent, cellLang);
             if (!audioInfo) { s.classList.remove('highlight'); continue; }
 
@@ -626,13 +640,16 @@ return { url: item.url || '', lang: item.lang, hash: null, fallbackUrl: '' };
             }
 
             s.classList.remove('highlight');
-            setRobot('static');
+            setAvatar('static');
             await new Promise(r => setTimeout(r, GAP_BETWEEN_LINES_MS));
-            setRobot('talk');
+            // próximo loop definirá o ator/cena correto novamente
           }
           finish();
         } else {
           const lang = entry.lang || 'en-US';
+          setActorByLang(lang);
+          setAvatar('talk');
+
           const audioInfo = findAudioFor(entry.text, lang);
           if (audioInfo) {
             try {
@@ -653,7 +670,7 @@ return { url: item.url || '', lang: item.lang, hash: null, fallbackUrl: '' };
       audio.pause();
       isPlaying = false;
       updateControls();
-      setRobot('static');
+      setAvatar('static');
       clearTimeout(idleTimer);
       goIdleSoon(IDLE_DELAY_MS);
     }
@@ -692,6 +709,8 @@ return { url: item.url || '', lang: item.lang, hash: null, fallbackUrl: '' };
       applyUITranslations();
       updateControls();
       loadTextFile();
+      // opcional: mostrar estado idle se o usuário não iniciar a aula
+      goIdleSoon(IDLE_DELAY_MS);
     };
   </script>
 </body>
