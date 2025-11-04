@@ -22,20 +22,17 @@
       cursor: pointer;
       transition: transform 0.3s;
     }
-    .thumbnail:hover {
-      transform: scale(1.1);
-    }
+    .thumbnail:hover { transform: scale(1.1); }
     .gallery {
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
     }
     #selectedImageContainer {
-      display: flex;
+      display: none; /* começa oculto */
       flex-direction: column;
       align-items: center;
       margin-top: 20px;
-      display: none;
     }
     #selectedImage {
       max-width: 80%;
@@ -51,9 +48,7 @@
       cursor: pointer;
       font-size: 16px;
     }
-    #generatePdfBtn:hover {
-      opacity: 0.9;
-    }
+    #generatePdfBtn:hover { opacity: 0.9; }
     #backBtn {
       position: fixed;
       top: 10px;
@@ -73,17 +68,32 @@
 <h1>Hannah Coloring</h1>
 <p>Choose a drawing to color</p>
 
-<div class="gallery">
-  <img src="imagens/imagem1.png" alt="Drawing 1" class="thumbnail" onclick="selectImage('imagens/imagem1.png')">
-  <img src="imagens/imagem2.png" alt="Drawing 2" class="thumbnail" onclick="selectImage('imagens/imagem2.png')">
-  <img src="imagens/imagem3.png" alt="Drawing 3" class="thumbnail" onclick="selectImage('imagens/imagem3.png')">
-  <img src="imagens/imagem4.png" alt="Drawing 4" class="thumbnail" onclick="selectImage('imagens/imagem4.png')">
-  <img src="imagens/imagem5.png" alt="Drawing 5" class="thumbnail" onclick="selectImage('imagens/imagem5.png')">
-  <img src="imagens/imagem6.png" alt="Drawing 6" class="thumbnail" onclick="selectImage('imagens/imagem6.png')">
+<div class="gallery" id="gallery">
+  <!-- Thumbnails (somem se a imagem não existir) -->
+  <img src="imagens/imagem1.png"  alt="Drawing 1"  class="thumbnail" loading="lazy"
+       onclick="selectImage('imagens/imagem1.png')"  onerror="hideIfBroken(this)">
+  <img src="imagens/imagem2.png"  alt="Drawing 2"  class="thumbnail" loading="lazy"
+       onclick="selectImage('imagens/imagem2.png')"  onerror="hideIfBroken(this)">
+  <img src="imagens/imagem3.png"  alt="Drawing 3"  class="thumbnail" loading="lazy"
+       onclick="selectImage('imagens/imagem3.png')"  onerror="hideIfBroken(this)">
+  <img src="imagens/imagem4.png"  alt="Drawing 4"  class="thumbnail" loading="lazy"
+       onclick="selectImage('imagens/imagem4.png')"  onerror="hideIfBroken(this)">
+  <img src="imagens/imagem5.png"  alt="Drawing 5"  class="thumbnail" loading="lazy"
+       onclick="selectImage('imagens/imagem5.png')"  onerror="hideIfBroken(this)">
+  <img src="imagens/imagem6.png"  alt="Drawing 6"  class="thumbnail" loading="lazy"
+       onclick="selectImage('imagens/imagem6.png')"  onerror="hideIfBroken(this)">
+  <img src="imagens/imagem7.png"  alt="Drawing 7"  class="thumbnail" loading="lazy"
+       onclick="selectImage('imagens/imagem7.png')"  onerror="hideIfBroken(this)">
+  <img src="imagens/imagem8.png"  alt="Drawing 8"  class="thumbnail" loading="lazy"
+       onclick="selectImage('imagens/imagem8.png')"  onerror="hideIfBroken(this)">
+  <img src="imagens/imagem9.png"  alt="Drawing 9"  class="thumbnail" loading="lazy"
+       onclick="selectImage('imagens/imagem9.png')"  onerror="hideIfBroken(this)">
+  <img src="imagens/imagem10.png" alt="Drawing 10" class="thumbnail" loading="lazy"
+       onclick="selectImage('imagens/imagem10.png')" onerror="hideIfBroken(this)">
 </div>
 
 <div id="selectedImageContainer">
-  <img id="selectedImage" src="" alt="Selected Drawing">
+  <img id="selectedImage" src="" alt="Selected Drawing" onerror="handleSelectedError()">
   <button id="generatePdfBtn" onclick="generatePDF()">Generate PDF</button>
 </div>
 
@@ -93,49 +103,91 @@
     window.history.back();
   }
 
+  // Esconde thumbnails quebrados
+  function hideIfBroken(imgEl) {
+    imgEl.style.display = 'none';
+    imgEl.onclick = null;
+  }
+
+  // Se a imagem grande falhar, some com o container e botão
+  function handleSelectedError() {
+    const selectedImageContainer = document.getElementById("selectedImageContainer");
+    const generateBtn = document.getElementById("generatePdfBtn");
+    selectedImageContainer.style.display = "none";
+    generateBtn.style.display = "none";
+  }
+
   function selectImage(src) {
     const selectedImage = document.getElementById("selectedImage");
     const selectedImageContainer = document.getElementById("selectedImageContainer");
-    selectedImage.src = src;
-    selectedImageContainer.style.display = "flex";
-    document.getElementById("generatePdfBtn").style.display = "inline-block";
+    const generateBtn = document.getElementById("generatePdfBtn");
 
-    // Rolar para o final da página após a seleção
-    selectedImageContainer.scrollIntoView({ behavior: "smooth", block: "end" });
+    // Limpa estado anterior
+    selectedImage.removeAttribute('src'); // previne mostrar estado antigo
+    generateBtn.style.display = "none";
+
+    // Define handlers para este carregamento
+    selectedImage.onload = function () {
+      selectedImageContainer.style.display = "flex";
+      generateBtn.style.display = "inline-block";
+      selectedImageContainer.scrollIntoView({ behavior: "smooth", block: "end" });
+    };
+    selectedImage.onerror = handleSelectedError;
+
+    // Dispara o carregamento
+    selectedImage.src = src;
   }
 
   function generatePDF() {
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF();
 
+    const selectedImage = document.getElementById("selectedImage");
+    if (!selectedImage || !selectedImage.src) {
+      alert("No image selected for the PDF.");
+      return;
+    }
+
+    // Tenta carregar o logo; se falhar, segue sem ele
     const logo = new Image();
+    let logoLoaded = false;
     logo.src = "../../../../imagens/hannah_logo.png";
 
     logo.onload = function () {
-      pdf.addImage(logo, "PNG", 10, 10, 20, 20);
+      logoLoaded = true;
+      buildPdfWithAssets();
+    };
+    logo.onerror = function () {
+      logoLoaded = false;
+      buildPdfWithAssets();
+    };
+
+    function buildPdfWithAssets() {
+      if (logoLoaded) {
+        pdf.addImage(logo, "PNG", 10, 10, 20, 20);
+      }
       pdf.setFontSize(12);
       pdf.text("Name:_________________________________________Date:_______", 40, 20);
 
       pdf.setFontSize(18);
       pdf.text("Hannah Coloring", 105, 40, { align: "center" });
 
-      const selectedImage = document.getElementById("selectedImage");
-      if (selectedImage.src) {
-        const img = new Image();
-        img.src = selectedImage.src;
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = selectedImage.src;
 
-        img.onload = function () {
-          pdf.addImage(img, "PNG", 10, 60, 190, 190 * (img.height / img.width));
-          pdf.save("Coloring_Page.pdf");
-        };
-      } else {
-        alert("No image selected for the PDF.");
-      }
-    };
-
-    logo.onerror = function() {
-      alert("Failed to load the logo image.");
-    };
+      img.onload = function () {
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const marginX = 10;
+        const maxW = pageWidth - marginX * 2;
+        const scaledH = maxW * (img.height / img.width);
+        pdf.addImage(img, "PNG", marginX, 60, maxW, scaledH);
+        pdf.save("Coloring_Page.pdf");
+      };
+      img.onerror = function () {
+        alert("Failed to load the selected image for the PDF.");
+      };
+    }
   }
 </script>
 
