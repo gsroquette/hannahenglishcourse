@@ -111,7 +111,7 @@
         }
 
         .card-back {
-            background-color: #c4ff00;
+            background-color: #c4ff00;       
             transform: rotateY(180deg);
         }
 
@@ -207,7 +207,7 @@
     </div>
     <button id="restart-button" onclick="restartGame()">Restart Game</button>
 
-    <!-- Modal de conclusão -->
+    <!-- Modal de conclusão --> 
     <div id="overlay"></div>
     <div id="completion-modal">
         <h2>Phase Completed!</h2>
@@ -271,30 +271,22 @@
                     return response.text();
                 })
                 .then(text => {
-                    // mantém a ordem e remove linhas vazias/ espaços
-                    const words = text
-                        .split('\n')
-                        .map(w => w.trim())
-                        .filter(Boolean);
-
+                    const words = text.trim().split('\n');
                     const cardsArray = [];
 
                     words.forEach((word, index) => {
                         const imagePath = `${imagePathTemplate}${index + 1}.png`;
 
-                        // card de imagem
                         cardsArray.push({
                             type: 'image',
                             src: imagePath,
                             pair: `pair${index + 1}`,
                         });
 
-                        // card de palavra (amarra índice para somN.mp3)
                         cardsArray.push({
                             type: 'word',
-                            text: word,
+                            text: word.trim(),
                             pair: `pair${index + 1}`,
-                            wordIndex: index, // <- importante para som{index+1}.mp3
                         });
                     });
 
@@ -352,10 +344,6 @@
                 word.classList.add('word');
                 word.textContent = cardData.text;
                 cardBack.appendChild(word);
-                // armazena o índice da palavra (0-based)
-                if (typeof cardData.wordIndex === 'number') {
-                    card.dataset.wordIndex = String(cardData.wordIndex);
-                }
             }
 
             cardInner.appendChild(cardFront);
@@ -372,12 +360,9 @@
 
             this.classList.add('flipped');
 
-            // Se for a carta de PALAVRA, toca somN.mp3 com fallback para TTS
-            const wordEl = this.querySelector('.word');
-            if (wordEl) {
-                const word = wordEl.textContent;
-                const idx = parseInt(this.dataset.wordIndex || '-1', 10);
-                playMp3OrSpeak(idx, word);
+            if (this.querySelector('.word')) {
+                const word = this.querySelector('.word').textContent;
+                speakText(word);
             }
 
             if (!firstCard) {
@@ -559,40 +544,6 @@
         function restartGame() {
             gameContainer.innerHTML = '';
             loadCardsData(initGame);
-        }
-
-        /** PRIORIDADE MP3 → fallback TTS (mantém speakText original) */
-        function playMp3OrSpeak(wordIndex, text, onEnded) {
-            // índice inválido? cai direto no TTS
-            if (typeof wordIndex !== 'number' || wordIndex < 0) {
-                speakText(text);
-                if (typeof onEnded === 'function') onEnded();
-                return;
-            }
-
-            const { level, unit } = getParamsFromURL();
-            const src = `../../${level}/${unit}/data1/sounds/som${wordIndex + 1}.mp3`;
-
-            const audio = new Audio();
-            audio.src = src;
-            audio.preload = 'auto';
-
-            let fellBack = false;
-            const useTTS = () => {
-                if (fellBack) return;
-                fellBack = true;
-                speakText(text);
-                if (typeof onEnded === 'function') {
-                    // SpeechSynthesis não dispara um onended global aqui; deixamos simples
-                    setTimeout(onEnded, 0);
-                }
-            };
-
-            audio.oncanplaythrough = () => {
-                audio.play().catch(() => useTTS());
-            };
-            audio.onerror = () => useTTS();
-            audio.onended = () => { if (typeof onEnded === 'function') onEnded(); };
         }
 
         function speakText(text) {
