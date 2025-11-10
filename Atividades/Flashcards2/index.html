@@ -63,6 +63,11 @@
             perspective: 1000px;
             margin: 20px;
             position: relative;
+            transition: box-shadow .2s ease;
+        }
+
+        .card.completed {
+            box-shadow: 0 0 0 3px rgba(34,197,94,.35);
         }
 
         .card-inner {
@@ -114,11 +119,63 @@
             position: absolute;
             top: 10px;
             right: 10px;
-            width: 24px;
-            height: 24px;
+            width: 26px;
+            height: 26px;
             cursor: pointer;
         }
 
+        /* Chips de status (Flip/Listen) */
+        .status-chips {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            display: flex;
+            gap: 6px;
+            z-index: 2;
+        }
+        .chip {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            display: grid;
+            place-items: center;
+            box-shadow: 0 0 0 1px rgba(255,255,255,.85);
+            background: #e5e7eb;           /* cinza claro = pendente */
+            opacity: .9;
+        }
+        .chip svg {
+            width: 14px;
+            height: 14px;
+        }
+        .chip.done {
+            background: #22c55e;           /* verde = concluído */
+        }
+        .chip.done svg path {
+            fill: #fff;
+        }
+        .chip:not(.done) svg path {
+            fill: #94a3b8; /* cinza do check quando pendente */
+        }
+
+        /* Estrela de conclusão */
+        .star-badge {
+            position: absolute;
+            top: 8px;
+            right: 42px; /* deixa espaço para o botão play/pause */
+            width: 24px;
+            height: 24px;
+            opacity: 0;
+            transform: scale(.8);
+            pointer-events: none;
+            transition: opacity .18s ease, transform .18s ease;
+            z-index: 2;
+        }
+        .star-badge.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        /* Modal de conclusão */
         #completion-modal {
             display: none;
             position: fixed;
@@ -157,17 +214,22 @@
             z-index: 999;
         }
 
+        /* Animação "pop" ao concluir 2/2 */
+        @keyframes pop {
+            0%   { transform: scale(1); }
+            50%  { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
         @media (max-width: 600px) {
             .header-container {
                 flex-direction: column;
                 align-items: flex-start;
             }
-
             h1 {
                 text-align: center;
                 margin-top: 10px;
             }
-
             .back-button {
                 margin-bottom: 10px;
             }
@@ -208,8 +270,14 @@
 
         let totalCards = 0;
         let interactedCards = [];
-        let soundPlayed = 0;
-        let alertDisplayed = false; // Nova variável para controle de alertas
+        let soundPlayed = 0; // substituído por array na geração
+        let alertDisplayed = false;
+
+        // Guardaremos referências dos elementos visuais por índice:
+        const chipsFlip = [];    // chip de "virou"
+        const chipsListen = [];  // chip de "ouviu"
+        const starBadges = [];   // estrela
+        const cardNodes = [];    // cards (para tocar a animação)
 
         async function loadWords() {
             try {
@@ -223,144 +291,245 @@
             }
         }
 
-      async function generateFlashcards() {
-    const { level, unit } = getLevelAndUnitFromURL();
-    const words = await loadWords();
-    totalCards = words.length;
-    interactedCards = new Array(totalCards).fill(false);
-    soundPlayed = new Array(totalCards).fill(false); // Inicializa o controle de áudios
+        async function generateFlashcards() {
+            const { level, unit } = getLevelAndUnitFromURL();
+            const words = await loadWords();
+            totalCards = words.length;
+            interactedCards = new Array(totalCards).fill(false);
+            soundPlayed = new Array(totalCards).fill(false);
 
-    const container = document.getElementById('flashcards-container');
+            const container = document.getElementById('flashcards-container');
 
-    if (words.length === 0) {
-        container.innerHTML = "Não foi possível carregar os flash cards.";
-        return;
-    }
-
-    words.forEach((word, index) => {
-        const card = document.createElement('div');
-        card.classList.add('card');
-
-        const cardInner = document.createElement('div');
-        cardInner.classList.add('card-inner');
-
-        const cardFront = document.createElement('div');
-        cardFront.classList.add('card-front');
-        const img = document.createElement('img');
-
-        img.src = `../../${level}/${unit}/data2/imagens/imagem${index + 1}.png`;
-        console.log(`Tentando carregar imagem em: ${img.src}`);
-        img.onerror = function() {
-            console.error(`Erro ao carregar a imagem: ${img.src}`);
-        };
-        cardFront.appendChild(img);
-
-        const cardBack = document.createElement('div');
-        cardBack.classList.add('card-back');
-        cardBack.textContent = word;
-
-        // Evento para virar o cartão
-        card.addEventListener('click', function () {
-            card.classList.toggle('rotated');
-            interactedCards[index] = true; // Marca o cartão como interagido
-            console.log(`Card ${index + 1} virado. Estado: ${interactedCards}`);
-            checkCompletion(); // Verifica a conclusão
-        });
-
-        // Ícone de reprodução de áudio
-        const playSoundIcon = document.createElement('img');
-        playSoundIcon.classList.add('play-sound');
-        playSoundIcon.src = 'businessman.png';
-        playSoundIcon.alt = "Play Sound";
-
-        // Evento de reprodução de áudio
-        playSoundIcon.onclick = (event) => {
-            event.stopPropagation();
-
-            // Marca o áudio como reproduzido, se ainda não foi
-            if (!soundPlayed[index]) {
-                soundPlayed[index] = true;
-                console.log(`Áudio reproduzido para o card ${index + 1}. Total de áudios: ${soundPlayed}`);
+            if (words.length === 0) {
+                container.innerHTML = "Não foi possível carregar os flash cards.";
+                return;
             }
 
-            toggleSpeech(word, playSoundIcon, index);
-            checkCompletion(); // Verifica a conclusão após o som
-        };
+            words.forEach((word, index) => {
+                const card = document.createElement('div');
+                card.classList.add('card');
 
-        cardInner.appendChild(cardFront);
-        cardInner.appendChild(cardBack);
-        card.appendChild(cardInner);
-        card.appendChild(playSoundIcon);
-        container.appendChild(card);
-    });
-}
+                const cardInner = document.createElement('div');
+                cardInner.classList.add('card-inner');
 
-        function toggleSpeech(text, buttonElement, index) {
-    if (!('speechSynthesis' in window)) {
-        alert("Your browser does not support speech synthesis. Please enable it or use a compatible browser.");
-        return;
-    }
+                const cardFront = document.createElement('div');
+                cardFront.classList.add('card-front');
+                const img = document.createElement('img');
 
-    if (window.speechSynthesis.speaking) {
-        window.speechSynthesis.cancel();
-        console.log("Speech synthesis stopped.");
-        buttonElement.src = 'businessman.png'; // Restaura o ícone
-    } else {
-        let voices = window.speechSynthesis.getVoices();
-        let usVoice = voices.find(voice => voice.lang === 'en-US');
+                img.src = `../../${level}/${unit}/data2/imagens/imagem${index + 1}.png`;
+                img.onerror = function() {
+                    console.error(`Erro ao carregar a imagem: ${img.src}`);
+                };
+                cardFront.appendChild(img);
 
-        if (!usVoice && voices.length === 0) {
-            window.speechSynthesis.onvoiceschanged = () => {
-                voices = window.speechSynthesis.getVoices();
-                usVoice = voices.find(voice => voice.lang === 'en-US');
+                const cardBack = document.createElement('div');
+                cardBack.classList.add('card-back');
+                cardBack.textContent = word;
 
-                if (!usVoice && !alertDisplayed) {
-                    alert("No 'en-US' voice found in your speech synthesizer. Please enable English language in your browser's speech synthesizer. For now, the default voice will be used, which may cause problems.");
-                    alertDisplayed = true;
-                }
+                // Chips de status (Flip / Listen)
+                const chips = document.createElement('div');
+                chips.className = 'status-chips';
 
-                speakText(text, usVoice || voices[0], buttonElement);
-            };
-        } else {
-            if (!usVoice && !alertDisplayed) {
-                alert("No 'en-US' voice found. Using default voice instead.");
-                alertDisplayed = true;
-            }
+                const chipFlip = createCheckChip('Flip status');
+                const chipListen = createCheckChip('Listen status');
 
-            speakText(text, usVoice || voices[0], buttonElement);
+                chips.appendChild(chipFlip);
+                chips.appendChild(chipListen);
+
+                // Estrela de conclusão 2/2
+                const star = createStarBadge();
+
+                // Evento de virar (considera "virou" quando tocar uma vez)
+                card.addEventListener('click', function () {
+                    card.classList.toggle('rotated');
+                    if (!interactedCards[index]) {
+                        interactedCards[index] = true;
+                        chipFlip.classList.add('done');   // marca flip ✓
+                        updateCompletedUI(index);         // pode concluir se já ouviu
+                    }
+                    checkCompletion();
+                });
+
+                // Botão de som
+                const playSoundIcon = document.createElement('img');
+                playSoundIcon.classList.add('play-sound');
+                playSoundIcon.src = 'businessman.png';
+                playSoundIcon.alt = "Play Sound";
+
+                playSoundIcon.onclick = (event) => {
+                    event.stopPropagation();
+                    playMp3OrSpeak(index, word, playSoundIcon, level, unit, () => {
+                        // Callback quando áudio termina — marca listen ✓
+                        if (!soundPlayed[index]) {
+                            soundPlayed[index] = true;
+                            chipListen.classList.add('done');
+                            updateCompletedUI(index);
+                            checkCompletion();
+                        }
+                    });
+                };
+
+                cardInner.appendChild(cardFront);
+                cardInner.appendChild(cardBack);
+                card.appendChild(cardInner);
+                card.appendChild(chips);
+                card.appendChild(star);
+                card.appendChild(playSoundIcon);
+                container.appendChild(card);
+
+                // Guarda referências
+                chipsFlip[index]   = chipFlip;
+                chipsListen[index] = chipListen;
+                starBadges[index]  = star;
+                cardNodes[index]   = card;
+            });
         }
 
-        buttonElement.src = 'pause.png'; // Muda o ícone enquanto o áudio está sendo reproduzido
-    }
-}
+        // Cria um chip de check (SVG quadradinho verde com ✓ branco; cinza quando pendente)
+        function createCheckChip(ariaLabel) {
+            const chip = document.createElement('div');
+            chip.className = 'chip';
+            chip.setAttribute('aria-label', ariaLabel);
+            chip.innerHTML = `
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M20.285 6.709a1 1 0 0 1 .006 1.414l-9.142 9.2a1 1 0 0 1-1.429.006L3.71 11.999a1 1 0 1 1 1.414-1.414l4.095 4.095 8.435-8.485a1 1 0 0 1 1.631.514Z"/>
+              </svg>
+            `;
+            return chip;
+        }
 
-function speakText(text, voice, buttonElement) {
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'en-US';
-    utterance.voice = voice;
+        // Cria o badge de estrela (SVG)
+        function createStarBadge() {
+            const star = document.createElement('div');
+            star.className = 'star-badge';
+            star.setAttribute('aria-label', 'Card completed');
+            star.innerHTML = `
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path fill="#fbbf24" d="M12 .587l3.668 7.43 8.2 1.192-5.934 5.787 1.401 8.164L12 19.771l-7.335 3.889 1.401-8.164L.132 9.209l8.2-1.192L12 .587z"/>
+              </svg>
+            `;
+            return star;
+        }
 
-    // Restaura o ícone após o áudio terminar
-    utterance.onend = () => {
-        buttonElement.src = 'businessman.png';
-        console.log("Speech synthesis completed.");
-    };
+        /**
+         * Tenta tocar o MP3 som{index+1}.mp3; se falhar, usa TTS.
+         * onFinish(): callback chamado quando o áudio (ou a fala) TERMINA.
+         */
+        function playMp3OrSpeak(index, word, buttonElement, level, unit, onFinish) {
+            const audioSrc = `../../${level}/${unit}/data2/sounds/som${index + 1}.mp3`;
+            const audio = new Audio();
+            audio.src = audioSrc;
+            audio.preload = 'auto';
 
-    window.speechSynthesis.speak(utterance);
-}
+            buttonElement.src = 'pause.png';
 
-function checkCompletion() {
-    const allCardsInteracted = interactedCards.every(interacted => interacted); // Todos os cartões virados
-    const allSoundsPlayed = soundPlayed.every(sound => sound); // Todos os áudios reproduzidos
+            let fellBackToTTS = false;
 
-    console.log(`Interações: ${interactedCards}`);
-    console.log(`Áudios reproduzidos: ${soundPlayed}`);
+            const fallbackToTTS = () => {
+                if (fellBackToTTS) return;
+                fellBackToTTS = true;
+                toggleSpeech(word, buttonElement, index, onFinish);
+            };
 
-    if (allCardsInteracted && allSoundsPlayed) {
-        console.log("Todos os cartões foram virados e os áudios reproduzidos.");
-        showModal();
-        ensureUserIsAuthenticated(updateNextPhase);
-    }
-}
+            audio.oncanplaythrough = () => {
+                audio.play().catch(() => fallbackToTTS());
+            };
+
+            audio.onended = () => {
+                buttonElement.src = 'businessman.png';
+                if (typeof onFinish === 'function') onFinish();
+            };
+
+            audio.onerror = () => {
+                fallbackToTTS();
+            };
+        }
+
+        // Fala via SpeechSynthesis com marcação de conclusão no onend.
+        function toggleSpeech(text, buttonElement, index, onFinish) {
+            if (!('speechSynthesis' in window)) {
+                alert("Your browser does not support speech synthesis. Please enable it or use a compatible browser.");
+                return;
+            }
+
+            if (window.speechSynthesis.speaking) {
+                window.speechSynthesis.cancel();
+                buttonElement.src = 'businessman.png';
+            } else {
+                let voices = window.speechSynthesis.getVoices();
+                let usVoice = voices.find(voice => voice.lang === 'en-US');
+
+                const speak = (voiceToUse) => {
+                    speakText(text, voiceToUse || voices[0], buttonElement, index, onFinish);
+                };
+
+                if (!usVoice && voices.length === 0) {
+                    window.speechSynthesis.onvoiceschanged = () => {
+                        voices = window.speechSynthesis.getVoices();
+                        usVoice = voices.find(voice => voice.lang === 'en-US');
+                        if (!usVoice && !alertDisplayed) {
+                            alert("No 'en-US' voice found in your speech synthesizer. Please enable English language in your browser's speech synthesizer. For now, the default voice will be used, which may cause problems.");
+                            alertDisplayed = true;
+                        }
+                        speak(usVoice);
+                    };
+                } else {
+                    if (!usVoice && !alertDisplayed) {
+                        alert("No 'en-US' voice found. Using default voice instead.");
+                        alertDisplayed = true;
+                    }
+                    speak(usVoice);
+                }
+
+                buttonElement.src = 'pause.png';
+            }
+        }
+
+        function speakText(text, voice, buttonElement, index, onFinish) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'en-US';
+            utterance.voice = voice;
+
+            utterance.onend = () => {
+                buttonElement.src = 'businessman.png';
+                if (typeof onFinish === 'function') onFinish();
+            };
+
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // Atualiza UI visual (chips + estrela + pop) ao concluir passos
+        function updateCompletedUI(index) {
+            const flipDone = interactedCards[index] === true;
+            const listenDone = soundPlayed[index] === true;
+
+            if (flipDone)  chipsFlip[index]?.classList.add('done');
+            if (listenDone) chipsListen[index]?.classList.add('done');
+
+            // Se os dois estiverem feitos, mostra estrela e aplica "pop"
+            if (flipDone && listenDone) {
+                starBadges[index]?.classList.add('show');
+                const card = cardNodes[index];
+                if (card) {
+                    card.classList.add('completed');
+                    card.style.animation = 'pop .22s ease';
+                    // remove a animação para poder aplicar novamente se necessário
+                    setTimeout(() => { card.style.animation = 'none'; }, 240);
+                }
+            }
+        }
+
+        function checkCompletion() {
+            const allCardsInteracted = interactedCards.every(interacted => interacted);
+            const allSoundsPlayed = Array.isArray(soundPlayed) && soundPlayed.length > 0
+                ? soundPlayed.every(s => s)
+                : false;
+
+            if (allCardsInteracted && allSoundsPlayed) {
+                showModal();
+                ensureUserIsAuthenticated(updateNextPhase);
+            }
+        }
 
         function showModal() {
             document.getElementById('completion-modal').style.display = 'block';
@@ -383,59 +552,49 @@ function checkCompletion() {
         }
 
         async function updateNextPhase(userId) {
-    const currentPhase = getPhaseFromURL(); // Obtém a fase atual a partir da URL
-    const { level, unit } = getLevelAndUnitFromURL(); // Obtém o nível e a unidade a partir da URL
-    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+            const currentPhase = getPhaseFromURL();
+            const { level, unit } = getLevelAndUnitFromURL();
+            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
 
-    console.log("Atualizando progresso no banco de dados...");
-    console.log(`Level: ${level}, Unit: ${unit}, Current Phase: ${currentPhase}`);
-
-    try {
-        if (currentPhase === "last") {
-            const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-            await dbRef.child(nextUnit).set({ fase1: true });
-            console.log(`Progresso atualizado para a próxima unidade: ${nextUnit}`);
-        } else if (currentPhase === "end") {
-            const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
-            await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
-            console.log(`Progresso atualizado para o próximo nível: ${nextLevel}`);
-        } else {
-            const nextPhase = `fase${parseInt(currentPhase) + 1}`;
-            await dbRef.update({ [`fase${currentPhase}`]: true, [nextPhase]: true });
-            console.log(`Progresso atualizado para a fase: ${nextPhase}`);
+            try {
+                if (currentPhase === "last") {
+                    const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+                    await dbRef.child(nextUnit).set({ fase1: true });
+                } else if (currentPhase === "end") {
+                    const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+                    await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+                } else {
+                    const nextPhase = `fase${parseInt(currentPhase) + 1}`;
+                    await dbRef.update({ [`fase${currentPhase}`]: true, [nextPhase]: true });
+                }
+            } catch (error) {
+                console.error("Erro ao atualizar o progresso da fase:", error);
+            }
         }
-    } catch (error) {
-        console.error("Erro ao atualizar o progresso da fase:", error);
-    }
-}
 
         function getPhaseFromURL() {
-    const params = new URLSearchParams(window.location.search);
-    const phase = params.get('fase'); // Obtém o parâmetro 'fase' da URL
-    if (!phase) {
-        console.error("Fase não encontrada na URL.");
-    }
-    return phase;
-}
+            const params = new URLSearchParams(window.location.search);
+            const phase = params.get('fase');
+            if (!phase) {
+                console.error("Fase não encontrada na URL.");
+            }
+            return phase;
+        }
 
-       function getLevelAndUnitFromURL() {
-    const params = new URLSearchParams(window.location.search);
-    const level = params.get('level'); // Obtém o nível da query string
-    const unit = params.get('unit');  // Obtém a unidade da query string
-    
-    if (!level || !unit) {
-        console.error("Level ou Unit não encontrados na URL");
-        return { level: '', unit: '' }; // Retorna valores padrão para evitar erros
-    }
-    
-    console.log("Level:", level, "Unit:", unit); // Para depuração
-    return { level, unit };
-}
+        function getLevelAndUnitFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            const level = params.get('level');
+            const unit = params.get('unit');
+
+            if (!level || !unit) {
+                console.error("Level ou Unit não encontrados na URL");
+                return { level: '', unit: '' };
+            }
+            return { level, unit };
+        }
 
         async function handleBackButtonClick() {
             const { level, unit } = getLevelAndUnitFromURL();
-
-            console.log("Checking progress for level:", level, "unit:", unit);
 
             if (!level || !unit) {
                 alert("Level or Unit not identified in the URL.");
@@ -464,31 +623,31 @@ function checkCompletion() {
         }
 
         async function checkPhaseProgress(uid, level, unit) {
-    try {
-        const fase = getPhaseFromURL();
+            try {
+                const fase = getPhaseFromURL();
 
-        if (fase === "last") {
-            const nextUnit = `Unit${parseInt(unit.replace("Unit", "")) + 1}`;
-            const dbRef = firebase.database().ref(`usuarios/${uid}/progresso/${level}/${nextUnit}/fase1`);
-            const snapshot = await dbRef.once("value");
-            return snapshot.val() === true;
-        } else if (fase === "end") {
-            const nextLevel = `Level${parseInt(level.replace("Level", "")) + 1}`;
-            const dbRef = firebase.database().ref(`usuarios/${uid}/progresso/${nextLevel}/Unit1/fase1`);
-            const snapshot = await dbRef.once("value");
-            return snapshot.val() === true;
-        } else {
-            const currentPhase = parseInt(fase);
-            const nextPhase = `fase${currentPhase + 1}`;
-            const dbRef = firebase.database().ref(`usuarios/${uid}/progresso/${level}/${unit}/${nextPhase}`);
-            const snapshot = await dbRef.once("value");
-            return snapshot.val() === true;
+                if (fase === "last") {
+                    const nextUnit = `Unit${parseInt(unit.replace("Unit", "")) + 1}`;
+                    const dbRef = firebase.database().ref(`usuarios/${uid}/progresso/${level}/${nextUnit}/fase1`);
+                    const snapshot = await dbRef.once("value");
+                    return snapshot.val() === true;
+                } else if (fase === "end") {
+                    const nextLevel = `Level${parseInt(level.replace("Level", "")) + 1}`;
+                    const dbRef = firebase.database().ref(`usuarios/${uid}/progresso/${nextLevel}/Unit1/fase1`);
+                    const snapshot = await dbRef.once("value");
+                    return snapshot.val() === true;
+                } else {
+                    const currentPhase = parseInt(fase);
+                    const nextPhase = `fase${currentPhase + 1}`;
+                    const dbRef = firebase.database().ref(`usuarios/${uid}/progresso/${level}/${unit}/${nextPhase}`);
+                    const snapshot = await dbRef.once("value");
+                    return snapshot.val() === true;
+                }
+            } catch (error) {
+                console.error("Error checking phase progress:", error);
+                return false;
+            }
         }
-    } catch (error) {
-        console.error("Error checking phase progress:", error);
-        return false;
-    }
-}
 
         generateFlashcards();
     </script>
