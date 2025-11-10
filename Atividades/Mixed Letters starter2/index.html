@@ -268,15 +268,17 @@
         }
     });
 
-    // ================== TTS ==================
+    // ================== TTS (mantido) + Áudio MP3 (NOVO) ==================
     let selectedVoice = null, alertDisplayed = false;
     function initializeVoices() {
         const synth = window.speechSynthesis;
         const voices = synth.getVoices();
         selectedVoice = voices.find(v => v.lang.startsWith("en-")) || voices[0];
-        if (!selectedVoice && !alertDisplayed) { alertDisplayed = true; alert("No English voice found. Using default voice."); }
+        if (!selectedVoice && !alertDisplayed) { alertDisplayed = true; 
+      }
     }
     window.speechSynthesis.onvoiceschanged = initializeVoices;
+
     function speak(text) {
         const synth = window.speechSynthesis;
         synth.cancel();
@@ -284,6 +286,66 @@
         const u = new SpeechSynthesisUtterance(text);
         u.voice = selectedVoice || synth.getVoices()[0];
         synth.speak(u);
+    }
+
+    // Player global para evitar sobreposição
+    let currentAudio = null;
+    function stopCurrentAudio() {
+        if (currentAudio) {
+            try { currentAudio.pause(); } catch {}
+            try { currentAudio.currentTime = 0; } catch {}
+            currentAudio = null;
+        }
+    }
+    async function tryPlayAudio(url) {
+        return new Promise((resolve) => {
+            stopCurrentAudio();
+            const audio = new Audio(url);
+            audio.onended = () => { if (currentAudio === audio) currentAudio = null; };
+            audio.oncanplay = async () => {
+                try {
+                    currentAudio = audio;
+                    await audio.play();
+                    resolve(true);
+                } catch {
+                    resolve(false);
+                }
+            };
+            audio.onerror = () => resolve(false);
+            // força o carregamento
+            audio.load();
+        });
+    }
+    async function playFirstAvailable(urls) {
+        for (const u of urls) {
+            if (await tryPlayAudio(u)) return true;
+        }
+        return false;
+    }
+
+    // ---- MP3 de palavras (data2/sounds/som{N}.mp3) com fallback TTS ----
+    async function playWordMp3OrSpeak(wordIndexZeroBased, wordText) {
+        const { level, unit } = getLevelAndUnitFromURL();
+        const n = wordIndexZeroBased + 1;
+        const base = `../../${level}/${unit}/data2/sounds`;
+        const urls = [`${base}/som${n}.mp3`, `${base}/som.${n}.mp3`];
+        const ok = await playFirstAvailable(urls);
+        if (!ok) speak(wordText);
+    }
+
+    // ---- MP3 das letras (./letras/som{N}.mp3) com fallback TTS ----
+    function letterIndex(ch) {
+        const up = (ch || '').toUpperCase();
+        const code = up.charCodeAt(0);
+        if (code >= 65 && code <= 90) return code - 64; // A=1..Z=26
+        return null;
+    }
+    async function playLetterMp3OrSpeak(ch) {
+        const idx = letterIndex(ch);
+        if (!idx) { speak(ch); return; }
+        const urls = [`./letras/som${idx}.mp3`, `./letras/som.${idx}.mp3`];
+        const ok = await playFirstAvailable(urls);
+        if (!ok) speak(ch);
     }
 
     // ================== Estado e sessão ==================
@@ -310,7 +372,7 @@
     }
 
     // ================== Core da atividade (Drag & Drop) ==================
-    function createActivity(imageUrl, word) {
+    function createActivity(imageUrl, word, wordIndex) {
         const container = document.getElementById('activity-container');
         const div = document.createElement('div');
         div.className = 'activity';
@@ -414,7 +476,7 @@
             tile.tabIndex = 0;
 
             // ===== Desktop Drag & Drop =====
-            tile.addEventListener('dragstart', (e) => {
+            tile.addEventListener('dragstart', async (e) => {
                 // Necessário para o drop funcionar em alguns navegadores
                 try {
                     e.dataTransfer.setData('text/plain', tile.textContent);
@@ -422,7 +484,7 @@
                 } catch (_) {}
                 tile.setAttribute('aria-grabbed', 'true');
                 tile.classList.add('dragging');
-                speak(ch);
+                await playLetterMp3OrSpeak(ch);
             });
             tile.addEventListener('dragend', (e) => {
                 tile.setAttribute('aria-grabbed', 'false');
@@ -430,11 +492,11 @@
                 tile.style.outline = 'none';
             });
 
-            tile.addEventListener('click', () => speak(ch));
+            tile.addEventListener('click', async () => { await playLetterMp3OrSpeak(ch); });
             
             // ===== Touch DnD =====
             if (isTouchDevice) {
-                tile.addEventListener('touchstart', (e) => handleTileTouchStart(e, tile), { passive: false });
+                tile.addEventListener('touchstart', async (e) => { handleTileTouchStart(e, tile); await playLetterMp3OrSpeak(ch); }, { passive: false });
                 tile.addEventListener('touchmove', (e) => handleTileTouchMove(e, tile), { passive: false });
                 tile.addEventListener('touchend', (e) => handleTileTouchEnd(e, tile), { passive: false });
                 tile.addEventListener('touchcancel', (e) => handleTileTouchCancel(e, tile));
@@ -478,7 +540,6 @@
             activeTile = tile;
             tile.setAttribute('aria-grabbed', 'true');
             tile.classList.add('dragging');
-            speak(tile.textContent);
         }
         
         function handleTileTouchMove(e, tile) {
@@ -603,15 +664,15 @@
             });
         }
 
-        function checkAnswer(){
+        async function checkAnswer(){
             const ans = currentAnswer();
             if (ans.length !== word.length || slots.some(s => !s.querySelector('.tile'))) return;
 
             if (ans.toUpperCase() === word.toUpperCase()){
                 if (div.dataset.completed === "false") {
                     div.dataset.completed = "true";
-                    celebrate(div);   // ⬅️ cai purpurina SEMPRE que esta palavra for concluída
-                    speak(word);
+                    celebrate(div);   // Confete
+                    await playWordMp3OrSpeak(wordIndex, word); // ⬅️ MP3 da PALAVRA com fallback TTS
                     completedWords++;
                     updateSessionStatus();
                 }
@@ -655,10 +716,10 @@
         container.appendChild(div);
     }
 
-    // Confete: corrigido para coordenadas da viewport (sem somar scrollY)
+    // Confete
     function celebrate(host){
         const rect = host.getBoundingClientRect();
-        const baseY = Math.max(0, rect.top + 10); // viewport Y
+        const baseY = Math.max(0, rect.top + 10);
         const minX = Math.max(0, rect.left - 50);
         const maxX = Math.min(window.innerWidth, rect.right + 50);
         for (let i=0;i<18;i++){
@@ -707,7 +768,7 @@
             words.forEach((word, index) => {
                 const imageUrl = `../../${level}/${unit}/data2/imagens/imagem${index + 1}.png`;
                 activities.push(word);
-                createActivity(imageUrl, word);
+                createActivity(imageUrl, word, index); // ⬅️ passa o índice da palavra
             });
 
             updateSessionStatus();
