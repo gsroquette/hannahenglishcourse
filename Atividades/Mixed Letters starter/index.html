@@ -286,6 +286,35 @@
         synth.speak(u);
     }
 
+    // ====== ÁUDIO MP3 com fallback para TTS (NOVO) ======
+    let currentAudio = null;
+    function playMp3OrSpeak(wordIndex, text){
+        // Para garantir que não haja sobreposição:
+        try {
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+            }
+        } catch(_) {}
+        window.speechSynthesis.cancel();
+
+        const { level, unit } = getLevelAndUnitFromURL();
+        const mp3Path = `../../${level}/${unit}/data1/sounds/som${wordIndex + 1}.mp3`;
+
+        // Tenta tocar o MP3 correspondente; se falhar, usa TTS
+        const audio = new Audio(mp3Path);
+        currentAudio = audio;
+
+        const fallbackToTTS = () => {
+            // Se o MP3 não carregar ou play falhar (autoplay/policy), usa TTS
+            speak(text);
+        };
+
+        audio.onerror = fallbackToTTS;
+        // Alguns navegadores só disparam erro no play():
+        audio.play().catch(fallbackToTTS);
+    }
+
     // ================== Estado e sessão ==================
     const SESSION_LIMIT = 6; // limite de atividades por sessão para reduzir fadiga
     let activities = [];
@@ -310,7 +339,7 @@
     }
 
     // ================== Core da atividade (Drag & Drop) ==================
-    function createActivity(imageUrl, word) {
+    function createActivity(imageUrl, word, wordIndex) {
         const container = document.getElementById('activity-container');
         const div = document.createElement('div');
         div.className = 'activity';
@@ -610,8 +639,9 @@
             if (ans.toUpperCase() === word.toUpperCase()){
                 if (div.dataset.completed === "false") {
                     div.dataset.completed = "true";
-                    celebrate(div);   // ⬅️ cai purpurina SEMPRE que esta palavra for concluída
-                    speak(word);
+                    celebrate(div);   // ⬅️ confete ao concluir a palavra
+                    // ===== SUBSTITUIÇÃO AQUI: prioriza MP3, fallback TTS =====
+                    playMp3OrSpeak(wordIndex, word);
                     completedWords++;
                     updateSessionStatus();
                 }
@@ -707,7 +737,8 @@
             words.forEach((word, index) => {
                 const imageUrl = `../../${level}/${unit}/data1/imagens/imagem${index + 1}.png`;
                 activities.push(word);
-                createActivity(imageUrl, word);
+                // ⬇️ Passa também o índice para mapear som{N}.mp3
+                createActivity(imageUrl, word, index);
             });
 
             updateSessionStatus();
