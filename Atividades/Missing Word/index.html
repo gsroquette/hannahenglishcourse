@@ -133,26 +133,27 @@
         #completion-modal button:hover {
             background-color: #28a428;
         }
-@media (max-width: 600px) {
-    .activity {
-        flex-direction: column; /* Coloca os elementos em coluna em vez de linha */
-        align-items: center; /* Centraliza os elementos */
-    }
 
-    .activity img {
-        margin: 0 0 15px 0; /* Remove a margem direita e adiciona margem inferior */
-    }
+        @media (max-width: 600px) {
+            .activity {
+                flex-direction: column;
+                align-items: center;
+            }
 
-    .missing-letter-input {
-        width: 30px; /* Diminui a largura dos campos de entrada */
-        font-size: 28px; /* Ajusta o tamanho da fonte */
-        margin-right: 3px; /* Reduz o espaço entre os campos */
-    }
+            .activity img {
+                margin: 0 0 15px 0;
+            }
 
-    .missing-word {
-        font-size: 28px; /* Reduz o tamanho da fonte para letras embaralhadas */
-    }
-}
+            .missing-letter-input {
+                width: 30px;
+                font-size: 28px;
+                margin-right: 3px;
+            }
+
+            .missing-word {
+                font-size: 28px;
+            }
+        }
    </style>
 </head>
 <body>
@@ -196,150 +197,182 @@
     // Inicialização do Firebase
     firebase.initializeApp(firebaseConfig);
 
-// Função para verificar o role e exibir o botão se necessário
+    // Função para verificar o role e exibir o botão se necessário
     firebase.auth().onAuthStateChanged((user) => {
-    if (user) {
-        const userId = user.uid;
-        const userRoleRef = firebase.database().ref(`usuarios/${userId}/role`);
+        if (user) {
+            const userId = user.uid;
+            const userRoleRef = firebase.database().ref(`usuarios/${userId}/role`);
 
-        userRoleRef.once('value').then((snapshot) => {
-            const role = snapshot.val();
-            // Exibe o botão apenas se o role for "professor" ou "proprietário"
-            if (role === 'professor' || role === 'proprietário') {
-                document.getElementById("pdfButton").style.display = "inline-block";
-            }
-        }).catch((error) => {
-            console.error("Erro ao buscar o role do usuário:", error);
-        });
-    } else {
-        console.log("Nenhum usuário autenticado.");
-    }
-});
+            userRoleRef.once('value').then((snapshot) => {
+                const role = snapshot.val();
+                // Exibe o botão apenas se o role for "professor" ou "proprietário"
+                if (role === 'professor' || role === 'proprietário') {
+                    document.getElementById("pdfButton").style.display = "inline-block";
+                }
+            }).catch((error) => {
+                console.error("Erro ao buscar o role do usuário:", error);
+            });
+        } else {
+            console.log("Nenhum usuário autenticado.");
+        }
+    });
 
     async function generatePDF() {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
 
-    // Carrega a logo e gera o PDF
-    const logo = new Image();
-    logo.src = 'Logo.png'; // Ajuste o nome do arquivo conforme necessário
+        // Carrega a logo e gera o PDF
+        const logo = new Image();
+        logo.src = 'Logo.png'; // Ajuste o nome do arquivo conforme necessário
 
-    // Garante que a logo seja carregada em Base64
-    logo.onload = function() {
-        // Adiciona a logo ao PDF
-        doc.addImage(logo, 'PNG', 10, 10, 30, 30);
-        doc.setFontSize(12);
-        doc.text("Name: __________________________________________ Date: ____________", 50, 20);
+        // Garante que a logo seja carregada em Base64
+        logo.onload = function() {
+            // Adiciona a logo ao PDF
+            doc.addImage(logo, 'PNG', 10, 10, 30, 30);
+            doc.setFontSize(12);
+            doc.text("Name: __________________________________________ Date: ____________", 50, 20);
 
-        // Adiciona o título
-        doc.setFontSize(16);
-        doc.text("Hannah Missing Word", 10, 50);
+            // Adiciona o título
+            doc.setFontSize(16);
+            doc.text("Hannah Missing Word", 10, 50);
 
-        // Adiciona as atividades
-        let yOffset = 60; // Posição inicial
-        document.querySelectorAll('.activity').forEach((activity, index) => {
-            if (yOffset > 270) { // Se ultrapassar o limite da página
-                doc.addPage();
-                yOffset = 20;
-            }
-
-            const imgElement = activity.querySelector('img');
-            if (imgElement) {
-                // Converte imagem para Base64 e adiciona ao PDF
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                canvas.width = imgElement.width;
-                canvas.height = imgElement.height;
-                ctx.drawImage(imgElement, 0, 0, imgElement.width, imgElement.height);
-                const imgData = canvas.toDataURL('image/png');
-                doc.addImage(imgData, 'JPEG', 10, yOffset, 30, 30);
-            }
-
-            const wordContainer = activity.querySelector('.word-container');
-            if (wordContainer) {
-                // Adiciona os traços das letras faltantes
-                doc.setFontSize(14);
-                let xPos = 50;
-                wordContainer.querySelectorAll('.missing-letter-input').forEach(() => {
-                    doc.text("_____", xPos, yOffset + 10);
-                    xPos += 15;
-                });
-
-                // Adiciona a palavra completa abaixo dos traços
-                yOffset += 20; // Ajusta o yOffset para mover a palavra completa para baixo das linhas
-                const fullWordElement = wordContainer.querySelector('div:last-child');
-                if (fullWordElement) {
-                    const fullWord = fullWordElement.textContent.trim();
-                    doc.text(fullWord, 50, yOffset);
+            // Adiciona as atividades
+            let yOffset = 60; // Posição inicial
+            document.querySelectorAll('.activity').forEach((activity, index) => {
+                if (yOffset > 270) { // Se ultrapassar o limite da página
+                    doc.addPage();
+                    yOffset = 20;
                 }
-                yOffset += 40; // Ajusta o espaço para a próxima atividade
-            }
-        });
 
-        // Salva o PDF
-        doc.save("Hannah_Missing_Word.pdf");
-    };
+                const imgElement = activity.querySelector('img');
+                if (imgElement) {
+                    // Converte imagem para Base64 e adiciona ao PDF
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = imgElement.width;
+                    canvas.height = imgElement.height;
+                    ctx.drawImage(imgElement, 0, 0, imgElement.width, imgElement.height);
+                    const imgData = canvas.toDataURL('image/png');
+                    doc.addImage(imgData, 'JPEG', 10, yOffset, 30, 30);
+                }
 
-    // Caso a logo não carregue, salva o PDF sem a imagem
-    logo.onerror = function() {
-        doc.setFontSize(12);
-        doc.text("Name: __________________________________________ Date: ____________", 50, 20);
-        doc.setFontSize(16);
-        doc.text("Hannah Missing Word", 10, 50);
-        doc.save("Hannah_Missing_Word.pdf");
-    };
-}
+                const wordContainer = activity.querySelector('.word-container');
+                if (wordContainer) {
+                    // Adiciona os traços das letras faltantes
+                    doc.setFontSize(14);
+                    let xPos = 50;
+                    wordContainer.querySelectorAll('.missing-letter-input').forEach(() => {
+                        doc.text("_____", xPos, yOffset + 10);
+                        xPos += 15;
+                    });
+
+                    // Adiciona a palavra completa abaixo dos traços
+                    yOffset += 20; // Ajusta o yOffset para mover a palavra completa para baixo das linhas
+                    const fullWordElement = wordContainer.querySelector('div:last-child');
+                    if (fullWordElement) {
+                        const fullWord = fullWordElement.textContent.trim();
+                        doc.text(fullWord, 50, yOffset);
+                    }
+                    yOffset += 40; // Ajusta o espaço para a próxima atividade
+                }
+            });
+
+            // Salva o PDF
+            doc.save("Hannah_Missing_Word.pdf");
+        };
+
+        // Caso a logo não carregue, salva o PDF sem a imagem
+        logo.onerror = function() {
+            doc.setFontSize(12);
+            doc.text("Name: __________________________________________ Date: ____________", 50, 20);
+            doc.setFontSize(16);
+            doc.text("Hannah Missing Word", 10, 50);
+            doc.save("Hannah_Missing_Word.pdf");
+        };
+    }
 
     let activities = [];
     let completedWords = 0; // Contador de palavras concluídas
     let alertDisplayed = false;
 
+    /** PRIORIDADE MP3 → fallback TTS (mantém speakText original) */
+    function playMp3OrSpeak(wordIndex, text) {
+        // índice inválido? cai direto no TTS
+        if (typeof wordIndex !== 'number' || wordIndex < 0) {
+            speakText(text);
+            return;
+        }
+
+        const synth = window.speechSynthesis;
+        try { synth.cancel(); } catch {}
+
+        const { level, unit } = getLevelAndUnitFromURL();
+        const src = `../../${level}/${unit}/data1/sounds/som${wordIndex + 1}.mp3`;
+
+        const audio = new Audio();
+        audio.src = src;
+        audio.preload = 'auto';
+
+        let fellBack = false;
+        const useTTS = () => {
+            if (fellBack) return;
+            fellBack = true;
+            speakText(text);
+        };
+
+        audio.oncanplaythrough = () => {
+            audio.play().catch(() => useTTS());
+        };
+        audio.onerror = () => useTTS();
+        // Se quiser acoplar algum evento ao fim do áudio no futuro, usar audio.onended
+    }
+
     function speakText(text) {
-    const synth = window.speechSynthesis;
-    synth.cancel(); // Cancela qualquer síntese de voz anterior
+        const synth = window.speechSynthesis;
+        synth.cancel(); // Cancela qualquer síntese de voz anterior
 
-    // Função para encontrar a voz "en-US"
-    function getEnglishVoice() {
-        const voices = synth.getVoices();
-        return voices.find(voice => voice.lang === "en-US");
-    }
-
-    const englishVoice = getEnglishVoice();
-
-    if (!englishVoice) {
-        if (!alertDisplayed) {
-            if (synth.getVoices().length === 0) {
-                alert("No voices available in your speech synthesizer. Please enable English language in your browser's settings.");
-            } else {
-                alert("No 'en-US' voice found. Using the default voice instead.");
-            }
-            alertDisplayed = true;
+        // Função para encontrar a voz "en-US"
+        function getEnglishVoice() {
+            const voices = synth.getVoices();
+            return voices.find(voice => voice.lang === "en-US");
         }
 
-        if (!synth.onvoiceschanged) {
-            synth.onvoiceschanged = () => {
-                const newEnglishVoice = getEnglishVoice();
-                if (newEnglishVoice) {
-                    speakWithVoice(newEnglishVoice, text);
+        const englishVoice = getEnglishVoice();
+
+        if (!englishVoice) {
+            if (!alertDisplayed) {
+                if (synth.getVoices().length === 0) {
+                    alert("No voices available in your speech synthesizer. Please enable English language in your browser's settings.");
+                } else {
+                    alert("No 'en-US' voice found. Using the default voice instead.");
                 }
-            };
+                alertDisplayed = true;
+            }
+
+            if (!synth.onvoiceschanged) {
+                synth.onvoiceschanged = () => {
+                    const newEnglishVoice = getEnglishVoice();
+                    if (newEnglishVoice) {
+                        speakWithVoice(newEnglishVoice, text);
+                    }
+                };
+            }
+
+            speakWithVoice(null, text); // Usa a voz padrão, se disponível
+        } else {
+            speakWithVoice(englishVoice, text);
         }
-
-        speakWithVoice(null, text); // Usa a voz padrão, se disponível
-    } else {
-        speakWithVoice(englishVoice, text);
     }
-}
 
-function speakWithVoice(voice, text) {
-    const synth = window.speechSynthesis;
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "en-US";
-    if (voice) {
-        utterance.voice = voice;
+    function speakWithVoice(voice, text) {
+        const synth = window.speechSynthesis;
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = "en-US";
+        if (voice) {
+            utterance.voice = voice;
+        }
+        synth.speak(utterance);
     }
-    synth.speak(utterance);
-}
 
     async function loadActivities() {
         try {
@@ -349,12 +382,14 @@ function speakWithVoice(voice, text) {
             const wordsPath = `../../${level}/${unit}/data1/words.txt`;
             const response = await fetch(wordsPath);
             const text = await response.text();
-            const words = text.trim().split('\n');
+            // mantém a ordem e remove linhas vazias/espaços
+            const words = text.split('\n').map(w => w.trim()).filter(Boolean);
 
             words.forEach((word, index) => {
                 const imageName = `imagem${index + 1}.png`;
                 const imageUrl = `../../${level}/${unit}/data1/imagens/${imageName}`;
-                createActivity(imageUrl, word);
+                // passa o índice da palavra para mapear som{index+1}.mp3
+                createActivity(imageUrl, word, index);
             });
         } catch (error) {
             console.error('Erro ao carregar palavras ou imagens:', error);
@@ -383,73 +418,76 @@ function speakWithVoice(voice, text) {
         }
     }
 
- function createActivity(imageUrl, word) {
-    const activityContainer = document.getElementById('activity-container');
-    const activityDiv = document.createElement('div');
-    activityDiv.classList.add('activity');
+    function createActivity(imageUrl, word, wordIndex) {
+        const activityContainer = document.getElementById('activity-container');
+        const activityDiv = document.createElement('div');
+        activityDiv.classList.add('activity');
+        // armazena o índice da palavra (0-based) — útil se precisar recuperar depois
+        activityDiv.dataset.wordIndex = String(wordIndex);
 
-    const imgElement = document.createElement('img');
-    imgElement.src = imageUrl;
-    imgElement.onerror = function () {
-        console.error(`Erro ao carregar a imagem: ${imageUrl}`);
-    };
-    activityDiv.appendChild(imgElement);
+        const imgElement = document.createElement('img');
+        imgElement.src = imageUrl;
+        imgElement.onerror = function () {
+            console.error(`Erro ao carregar a imagem: ${imageUrl}`);
+        };
+        activityDiv.appendChild(imgElement);
 
-    const wordContainer = document.createElement('div');
-    wordContainer.classList.add('word-container');
+        const wordContainer = document.createElement('div');
+        wordContainer.classList.add('word-container');
 
-    const missingWordElement = document.createElement('div');
-    missingWordElement.classList.add('missing-word');
+        const missingWordElement = document.createElement('div');
+        missingWordElement.classList.add('missing-word');
 
-    const letterInputs = [];
+        const letterInputs = [];
 
-    // Cria caixas de entrada para cada letra
-    word.split('').forEach((letter, index) => {
-        const letterInput = document.createElement('input');
-        letterInput.classList.add('missing-letter-input');
-        letterInput.maxLength = 1;
+        // Cria caixas de entrada para cada letra
+        word.split('').forEach((letter, index) => {
+            const letterInput = document.createElement('input');
+            letterInput.classList.add('missing-letter-input');
+            letterInput.maxLength = 1;
 
-        letterInput.addEventListener('input', function () {
-            if (letterInput.value.toUpperCase() === letter.toUpperCase()) {
-                letterInput.classList.add('correct');
-                letterInput.classList.remove('incorrect');
+            letterInput.addEventListener('input', function () {
+                if (letterInput.value.toUpperCase() === letter.toUpperCase()) {
+                    letterInput.classList.add('correct');
+                    letterInput.classList.remove('incorrect');
 
-                if (index < word.length - 1) {
-                    letterInputs[index + 1].focus(); // Move para o próximo input
-                }
-
-                const userWord = letterInputs.map(input => input.value.toUpperCase()).join('');
-                if (userWord === word.toUpperCase()) {
-                    speakText(word);
-                    completedWords++;
-
-                    if (completedWords === activities.length) {
-                        showCompletionModal();
+                    if (index < word.length - 1) {
+                        letterInputs[index + 1].focus(); // Move para o próximo input
                     }
+
+                    const userWord = letterInputs.map(input => input.value.toUpperCase()).join('');
+                    if (userWord === word.toUpperCase()) {
+                        // >>> ALTERAÇÃO: prioriza MP3 som{wordIndex+1}.mp3; fallback TTS
+                        playMp3OrSpeak(wordIndex, word);
+                        completedWords++;
+
+                        if (completedWords === activities.length) {
+                            showCompletionModal();
+                        }
+                    }
+                } else {
+                    letterInput.classList.add('incorrect');
+                    letterInput.classList.remove('correct');
                 }
-            } else {
-                letterInput.classList.add('incorrect');
-                letterInput.classList.remove('correct');
-            }
+            });
+
+            letterInputs.push(letterInput);
+            missingWordElement.appendChild(letterInput);
         });
 
-        letterInputs.push(letterInput);
-        missingWordElement.appendChild(letterInput);
-    });
+        wordContainer.appendChild(missingWordElement);
+        activityDiv.appendChild(wordContainer);
+        activityContainer.appendChild(activityDiv);
+        activities.push(word);
 
-    wordContainer.appendChild(missingWordElement);
-    activityDiv.appendChild(wordContainer);
-    activityContainer.appendChild(activityDiv);
-    activities.push(word);
-
-    // Adiciona o texto abaixo com a substituição da primeira letra por ___
-    const fullWordElement = document.createElement('div');
-    const wordWithPlaceholder = `___${word.slice(1).toUpperCase()}`;
-    fullWordElement.innerText = wordWithPlaceholder;
-    fullWordElement.style.fontWeight = 'bold';
-    fullWordElement.style.marginTop = '10px';
-    wordContainer.appendChild(fullWordElement);
-}
+        // Adiciona o texto abaixo com a substituição da primeira letra por ___
+        const fullWordElement = document.createElement('div');
+        const wordWithPlaceholder = `___${word.slice(1).toUpperCase()}`;
+        fullWordElement.innerText = wordWithPlaceholder;
+        fullWordElement.style.fontWeight = 'bold';
+        fullWordElement.style.marginTop = '10px';
+        wordContainer.appendChild(fullWordElement);
+    }
 
     function showCompletionModal() {
         updateProgressInDatabase();
@@ -496,12 +534,12 @@ function speakWithVoice(voice, text) {
         });
     }
 
-function getPhaseFromURL() {
+    function getPhaseFromURL() {
         const params = new URLSearchParams(window.location.search);
         return params.get('fase');
     }
 
-   function getLevelAndUnitFromURL() {
+    function getLevelAndUnitFromURL() {
         const params = new URLSearchParams(window.location.search);
         return {
             level: params.get('level'),
@@ -510,42 +548,43 @@ function getPhaseFromURL() {
     }
 
     document.addEventListener('DOMContentLoaded', loadActivities);
-document.getElementById("backButton").addEventListener("click", async () => {
-    const { level, unit } = getLevelAndUnitFromURL();
-    const currentPhase = parseInt(getPhaseFromURL());
-    const nextPhase = `fase${currentPhase + 1}`;
 
-    try {
-        // Verifica se o usuário está autenticado
-        const user = firebase.auth().currentUser;
-        if (!user) {
-            console.error("Usuário não autenticado.");
-            history.back(); // Permite a navegação mesmo sem autenticação
-            return;
-        }
+    document.getElementById("backButton").addEventListener("click", async () => {
+        const { level, unit } = getLevelAndUnitFromURL();
+        const currentPhase = parseInt(getPhaseFromURL());
+        const nextPhase = `fase${currentPhase + 1}`;
 
-        const userId = user.uid;
-        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/${nextPhase}`);
+        try {
+            // Verifica se o usuário está autenticado
+            const user = firebase.auth().currentUser;
+            if (!user) {
+                console.error("Usuário não autenticado.");
+                history.back(); // Permite a navegação mesmo sem autenticação
+                return;
+            }
 
-        const snapshot = await dbRef.once("value");
-        if (snapshot.exists() && snapshot.val() === true) {
-            // Próxima fase está desbloqueada
-            history.back();
-        } else {
-            // Exibe a mensagem de confirmação
-            const confirmNavigation = confirm("The current phase has not been completed. Are you sure you want to leave?");
+            const userId = user.uid;
+            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/${nextPhase}`);
+
+            const snapshot = await dbRef.once("value");
+            if (snapshot.exists() && snapshot.val() === true) {
+                // Próxima fase está desbloqueada
+                history.back();
+            } else {
+                // Exibe a mensagem de confirmação
+                const confirmNavigation = confirm("The current phase has not been completed. Are you sure you want to leave?");
+                if (confirmNavigation) {
+                    history.back();
+                }
+            }
+        } catch (error) {
+            console.error("Erro ao verificar o progresso da fase:", error);
+            const confirmNavigation = confirm("Unable to verify the next phase status. Do you still want to navigate back?");
             if (confirmNavigation) {
                 history.back();
             }
         }
-    } catch (error) {
-        console.error("Erro ao verificar o progresso da fase:", error);
-        const confirmNavigation = confirm("Unable to verify the next phase status. Do you still want to navigate back?");
-        if (confirmNavigation) {
-            history.back();
-        }
-    }
-});
+    });
 </script>
 
 </body>
