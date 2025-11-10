@@ -297,12 +297,43 @@
         synth.speak(utterance);
     }
 
+    /** NOVO: Prioriza somN.mp3 com fallback para TTS (readText) */
+    function playMp3OrSpeak(wordIndex, text) {
+        // índice inválido ⇒ cai no TTS
+        if (typeof wordIndex !== 'number' || wordIndex < 0) {
+            readText(text);
+            return;
+        }
+
+        const synth = window.speechSynthesis;
+        try { synth.cancel(); } catch {}
+
+        const { level, unit } = getLevelAndUnitFromURL();
+        const src = `../../${level}/${unit}/data1/sounds/som${wordIndex + 1}.mp3`;
+
+        const audio = new Audio();
+        audio.src = src;
+        audio.preload = 'auto';
+
+        let fellBack = false;
+        const useTTS = () => {
+            if (fellBack) return;
+            fellBack = true;
+            readText(text);
+        };
+
+        audio.oncanplaythrough = () => {
+            audio.play().catch(() => useTTS());
+        };
+        audio.onerror = () => useTTS();
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         initializeVoices();
         loadActivities();
     });
 
-    function createActivity(imageUrl, word) {
+    function createActivity(imageUrl, word, wordIndex) {
         const activityContainer = document.getElementById('activity-container');
         const activityDiv = document.createElement('div');
         activityDiv.classList.add('activity');
@@ -370,26 +401,27 @@
                     input.classList.remove('incorrect');
                 });
 
-                readText(word);
+                // >>> ALTERAÇÃO: prioriza som{wordIndex+1}.mp3; fallback TTS
+                playMp3OrSpeak(wordIndex, word);
 
                 if (activityDiv.dataset.completed === "false") {
                     completedWords++;
                     activityDiv.dataset.completed = "true";
                 }
 
-               if (completedWords === activities.length) {
-    console.log("Todas as atividades foram concluídas!");
-    showCompletionModal();
+                if (completedWords === activities.length) {
+                    console.log("Todas as atividades foram concluídas!");
+                    showCompletionModal();
 
-    // Atualiza o progresso no banco de dados
-    firebase.auth().onAuthStateChanged((user) => {
-        if (user) {
-            updateNextPhase(user.uid);
-        } else {
-            console.error("User not authenticated. Progress cannot be updated.");
-        }
-    });
-}
+                    // Atualiza o progresso no banco de dados
+                    firebase.auth().onAuthStateChanged((user) => {
+                        if (user) {
+                            updateNextPhase(user.uid);
+                        } else {
+                            console.error("User not authenticated. Progress cannot be updated.");
+                        }
+                    });
+                }
             } else {
                 letterInputs.forEach(input => {
                     input.classList.add('incorrect');
@@ -403,28 +435,28 @@
         activityContainer.appendChild(activityDiv);
     }
 
-// Função para atualizar o progresso no banco de dados
-  async function updateNextPhase(userId) {
-    console.log("Updating next phase...");
-    const currentPhase = getPhaseFromURL();
-    const { level, unit } = getLevelAndUnitFromURL();
-    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+    // Função para atualizar o progresso no banco de dados
+    async function updateNextPhase(userId) {
+        console.log("Updating next phase...");
+        const currentPhase = getPhaseFromURL();
+        const { level, unit } = getLevelAndUnitFromURL();
+        const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
 
-    try {
-        if (currentPhase === "last") {
-            const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-            await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
-        } else if (currentPhase === "end") {
-            const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
-            await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
-        } else {
-            const nextPhase = parseInt(currentPhase) + 1;
-            await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true }); // Correção aqui
+        try {
+            if (currentPhase === "last") {
+                const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
+                await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
+            } else if (currentPhase === "end") {
+                const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
+                await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
+            } else {
+                const nextPhase = parseInt(currentPhase) + 1;
+                await dbRef.update({ [`fase${currentPhase}`]: true, [`fase${nextPhase}`]: true });
+            }
+        } catch (error) {
+            console.error("Erro ao atualizar o progresso da fase:", error);
         }
-    } catch (error) {
-        console.error("Erro ao atualizar o progresso da fase:", error);
     }
-}
 
     async function loadActivities() {
         const { level, unit } = getLevelAndUnitFromURL();
@@ -435,11 +467,14 @@
             if (!response.ok) throw new Error(`Erro ao buscar palavras. Status: ${response.status}`);
             const text = await response.text();
 
-            const words = text.trim().split('\n');
+            // mantém ordem e remove linhas vazias
+            const words = text.split('\n').map(w => w.trim()).filter(Boolean);
+
             words.forEach((word, index) => {
                 const imageUrl = `../../${level}/${unit}/data1/imagens/imagem${index + 1}.png`;
                 activities.push(word);
-                createActivity(imageUrl, word);
+                // >>> Passa o índice para mapear som{index+1}.mp3
+                createActivity(imageUrl, word, index);
             });
         } catch (error) {
             console.error('Erro ao carregar palavras ou imagens:', error);
