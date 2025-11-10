@@ -268,7 +268,7 @@
         }
     });
 
-    // ================== TTS ==================
+    // ================== TTS (mantido) + Áudio MP3 (NOVO) ==================
     let selectedVoice = null, alertDisplayed = false;
     function initializeVoices() {
         const synth = window.speechSynthesis;
@@ -277,6 +277,7 @@
         if (!selectedVoice && !alertDisplayed) { alertDisplayed = true; alert("No English voice found. Using default voice."); }
     }
     window.speechSynthesis.onvoiceschanged = initializeVoices;
+
     function speak(text) {
         const synth = window.speechSynthesis;
         synth.cancel();
@@ -286,33 +287,64 @@
         synth.speak(u);
     }
 
-    // ====== ÁUDIO MP3 com fallback para TTS (NOVO) ======
+    // Player global para evitar sobreposição
     let currentAudio = null;
-    function playMp3OrSpeak(wordIndex, text){
-        // Para garantir que não haja sobreposição:
-        try {
-            if (currentAudio) {
-                currentAudio.pause();
-                currentAudio.currentTime = 0;
-            }
-        } catch(_) {}
-        window.speechSynthesis.cancel();
+    function stopCurrentAudio() {
+        if (currentAudio) {
+            try { currentAudio.pause(); } catch {}
+            try { currentAudio.currentTime = 0; } catch {}
+            currentAudio = null;
+        }
+    }
+    async function tryPlayAudio(url) {
+        return new Promise((resolve) => {
+            stopCurrentAudio();
+            const audio = new Audio(url);
+            audio.onended = () => { if (currentAudio === audio) currentAudio = null; };
+            audio.oncanplay = async () => {
+                try {
+                    currentAudio = audio;
+                    await audio.play();
+                    resolve(true);
+                } catch {
+                    resolve(false);
+                }
+            };
+            audio.onerror = () => resolve(false);
+            // força o carregamento
+            audio.load();
+        });
+    }
+    async function playFirstAvailable(urls) {
+        for (const u of urls) {
+            if (await tryPlayAudio(u)) return true;
+        }
+        return false;
+    }
 
+    // ---- MP3 de palavras (data1/sounds/som{N}.mp3) com fallback TTS ----
+    async function playWordMp3OrSpeak(wordIndexZeroBased, wordText) {
         const { level, unit } = getLevelAndUnitFromURL();
-        const mp3Path = `../../${level}/${unit}/data1/sounds/som${wordIndex + 1}.mp3`;
+        const n = wordIndexZeroBased + 1;
+        const base = `../../${level}/${unit}/data1/sounds`;
+        const urls = [`${base}/som${n}.mp3`, `${base}/som.${n}.mp3`];
+        const ok = await playFirstAvailable(urls);
+        if (!ok) speak(wordText);
+    }
 
-        // Tenta tocar o MP3 correspondente; se falhar, usa TTS
-        const audio = new Audio(mp3Path);
-        currentAudio = audio;
-
-        const fallbackToTTS = () => {
-            // Se o MP3 não carregar ou play falhar (autoplay/policy), usa TTS
-            speak(text);
-        };
-
-        audio.onerror = fallbackToTTS;
-        // Alguns navegadores só disparam erro no play():
-        audio.play().catch(fallbackToTTS);
+    // ---- MP3 das letras (./letras/som{N}.mp3) com fallback TTS ----
+    function letterIndex(ch) {
+        const up = (ch || '').toUpperCase();
+        const code = up.charCodeAt(0);
+        if (code >= 65 && code <= 90) return code - 64; // A=1..Z=26
+        return null;
+    }
+    async function playLetterMp3OrSpeak(ch) {
+        const idx = letterIndex(ch);
+        if (!idx) { speak(ch); return; }
+        const urls = [`./letras/som${idx}.mp3`, `./letras/som.${idx}.mp3`];
+        const ok = await playFirstAvailable(urls);
+        if (!ok) speak(ch);
     }
 
     // ================== Estado e sessão ==================
@@ -443,7 +475,7 @@
             tile.tabIndex = 0;
 
             // ===== Desktop Drag & Drop =====
-            tile.addEventListener('dragstart', (e) => {
+            tile.addEventListener('dragstart', async (e) => {
                 // Necessário para o drop funcionar em alguns navegadores
                 try {
                     e.dataTransfer.setData('text/plain', tile.textContent);
@@ -451,7 +483,7 @@
                 } catch (_) {}
                 tile.setAttribute('aria-grabbed', 'true');
                 tile.classList.add('dragging');
-                speak(ch);
+                await playLetterMp3OrSpeak(ch);
             });
             tile.addEventListener('dragend', (e) => {
                 tile.setAttribute('aria-grabbed', 'false');
@@ -459,11 +491,11 @@
                 tile.style.outline = 'none';
             });
 
-            tile.addEventListener('click', () => speak(ch));
+            tile.addEventListener('click', async () => { await playLetterMp3OrSpeak(ch); });
             
             // ===== Touch DnD =====
             if (isTouchDevice) {
-                tile.addEventListener('touchstart', (e) => handleTileTouchStart(e, tile), { passive: false });
+                tile.addEventListener('touchstart', async (e) => { handleTileTouchStart(e, tile); await playLetterMp3OrSpeak(ch); }, { passive: false });
                 tile.addEventListener('touchmove', (e) => handleTileTouchMove(e, tile), { passive: false });
                 tile.addEventListener('touchend', (e) => handleTileTouchEnd(e, tile), { passive: false });
                 tile.addEventListener('touchcancel', (e) => handleTileTouchCancel(e, tile));
@@ -507,7 +539,6 @@
             activeTile = tile;
             tile.setAttribute('aria-grabbed', 'true');
             tile.classList.add('dragging');
-            speak(tile.textContent);
         }
         
         function handleTileTouchMove(e, tile) {
@@ -632,16 +663,15 @@
             });
         }
 
-        function checkAnswer(){
+        async function checkAnswer(){
             const ans = currentAnswer();
             if (ans.length !== word.length || slots.some(s => !s.querySelector('.tile'))) return;
 
             if (ans.toUpperCase() === word.toUpperCase()){
                 if (div.dataset.completed === "false") {
                     div.dataset.completed = "true";
-                    celebrate(div);   // ⬅️ confete ao concluir a palavra
-                    // ===== SUBSTITUIÇÃO AQUI: prioriza MP3, fallback TTS =====
-                    playMp3OrSpeak(wordIndex, word);
+                    celebrate(div);   // Confete
+                    await playWordMp3OrSpeak(wordIndex, word); // ⬅️ MP3 da PALAVRA com fallback TTS
                     completedWords++;
                     updateSessionStatus();
                 }
@@ -685,10 +715,10 @@
         container.appendChild(div);
     }
 
-    // Confete: corrigido para coordenadas da viewport (sem somar scrollY)
+    // Confete
     function celebrate(host){
         const rect = host.getBoundingClientRect();
-        const baseY = Math.max(0, rect.top + 10); // viewport Y
+        const baseY = Math.max(0, rect.top + 10);
         const minX = Math.max(0, rect.left - 50);
         const maxX = Math.min(window.innerWidth, rect.right + 50);
         for (let i=0;i<18;i++){
@@ -737,8 +767,7 @@
             words.forEach((word, index) => {
                 const imageUrl = `../../${level}/${unit}/data1/imagens/imagem${index + 1}.png`;
                 activities.push(word);
-                // ⬇️ Passa também o índice para mapear som{N}.mp3
-                createActivity(imageUrl, word, index);
+                createActivity(imageUrl, word, index); // ⬅️ passa o índice da palavra
             });
 
             updateSessionStatus();
