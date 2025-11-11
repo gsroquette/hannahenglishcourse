@@ -268,23 +268,28 @@
         }
     });
 
-    // ================== TTS (mantido) + Áudio MP3 (NOVO) ==================
-    let selectedVoice = null, alertDisplayed = false;
+    // ================== TTS (silencioso) + Áudio MP3 (iOS fix) ==================
+    let selectedVoice = null;
     function initializeVoices() {
         const synth = window.speechSynthesis;
         const voices = synth.getVoices();
-        selectedVoice = voices.find(v => v.lang.startsWith("en-")) || voices[0];
-        if (!selectedVoice && !alertDisplayed) { alertDisplayed = true; 
-      }
+        // qualquer voz em inglês; se não houver, usa a primeira disponível; se não houver nenhuma, fica null
+        selectedVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith("en-")) || voices[0] || null;
+        if (!selectedVoice) {
+            console.warn("SpeechSynthesis: no voices available.");
+        } else if (!String(selectedVoice.lang).toLowerCase().startsWith("en-")) {
+            console.warn("No 'en-US' voice found. Using first available voice:", selectedVoice.name);
+        }
     }
     window.speechSynthesis.onvoiceschanged = initializeVoices;
 
     function speak(text) {
         const synth = window.speechSynthesis;
-        synth.cancel();
+        try { synth.cancel(); } catch {}
         if (!selectedVoice) initializeVoices();
         const u = new SpeechSynthesisUtterance(text);
-        u.voice = selectedVoice || synth.getVoices()[0];
+        u.lang = "en-US";
+        if (selectedVoice) u.voice = selectedVoice;
         synth.speak(u);
     }
 
@@ -297,25 +302,32 @@
             currentAudio = null;
         }
     }
+
+    // ✅ iPhone/Safari: cria Audio() no gesto, chama load() e depois play() com catch
     async function tryPlayAudio(url) {
+        stopCurrentAudio();
+        const audio = new Audio(url);
+        audio.preload = 'auto';
+        audio.onended = () => { if (currentAudio === audio) currentAudio = null; };
+
         return new Promise((resolve) => {
-            stopCurrentAudio();
-            const audio = new Audio(url);
-            audio.onended = () => { if (currentAudio === audio) currentAudio = null; };
-            audio.oncanplay = async () => {
-                try {
-                    currentAudio = audio;
-                    await audio.play();
-                    resolve(true);
-                } catch {
-                    resolve(false);
-                }
-            };
             audio.onerror = () => resolve(false);
-            // força o carregamento
-            audio.load();
+            try {
+                currentAudio = audio;
+                audio.load(); // libera o pipeline de mídia no iOS
+                const p = audio.play();
+                if (p && typeof p.then === 'function') {
+                    p.then(() => resolve(true)).catch(() => resolve(false));
+                } else {
+                    // Alguns navegadores não retornam Promise—assumimos ok
+                    resolve(true);
+                }
+            } catch {
+                resolve(false);
+            }
         });
     }
+
     async function playFirstAvailable(urls) {
         for (const u of urls) {
             if (await tryPlayAudio(u)) return true;
@@ -406,7 +418,7 @@
             s.setAttribute('role', 'button');
             s.tabIndex = 0;
 
-            // Desktop DnD nativo — garantir compatibilidade
+            // Desktop DnD nativo
             s.addEventListener('dragenter', (e) => e.preventDefault());
             s.addEventListener('dragover',  (e) => e.preventDefault());
             s.addEventListener('drop', (e) => handleDrop(e, s));
@@ -477,7 +489,6 @@
 
             // ===== Desktop Drag & Drop =====
             tile.addEventListener('dragstart', async (e) => {
-                // Necessário para o drop funcionar em alguns navegadores
                 try {
                     e.dataTransfer.setData('text/plain', tile.textContent);
                     e.dataTransfer.effectAllowed = 'move';
@@ -507,7 +518,6 @@
 
         function handleDrop(e, slotEl) {
             e.preventDefault();
-            // Em desktop, o item sendo arrastado é o .dragging com aria-grabbed="true"
             const tile = document.querySelector('.tile[aria-grabbed="true"]');
             if (!tile) return;
             if (slotEl.firstElementChild) {
