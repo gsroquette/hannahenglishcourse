@@ -263,37 +263,32 @@
         }
     });
 
+    /* ====== TTS silencioso (sem alert) com fallback de voz ====== */
     function initializeVoices() {
         const synth = window.speechSynthesis;
         const voices = synth.getVoices();
 
-        console.log("Available voices:", voices);
+        selectedVoice = voices.find(v => v.lang === "en-US") || voices[0] || null;
 
-        selectedVoice = voices.find(voice => voice.lang === "en-US");
-
-        if (!selectedVoice && !alertDisplayed) {
-            alertDisplayed = true;
-            alert("No 'en-US' voice found. Using the first available voice.");
-            selectedVoice = voices[0];
+        if (!selectedVoice) {
+            console.warn("SpeechSynthesis: no voices available.");
+        } else if (selectedVoice.lang !== "en-US") {
+            console.warn("No 'en-US' voice found. Using first available voice:", selectedVoice.name);
         }
-
-        console.log("Selected voice:", selectedVoice ? selectedVoice.name : "Default voice");
     }
 
-    if (!window.speechSynthesis.onvoiceschanged) {
-        window.speechSynthesis.onvoiceschanged = initializeVoices;
-    }
+    // Sempre tente atualizar quando as vozes carregarem
+    window.speechSynthesis.onvoiceschanged = initializeVoices;
 
     function readText(text) {
         const synth = window.speechSynthesis;
-        synth.cancel();
+        try { synth.cancel(); } catch {}
 
-        if (!selectedVoice) {
-            initializeVoices();
-        }
+        if (!selectedVoice) initializeVoices();
 
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.voice = selectedVoice || synth.getVoices()[0];
+        utterance.lang = "en-US";
+        if (selectedVoice) utterance.voice = selectedVoice;
         synth.speak(utterance);
     }
 
@@ -330,7 +325,6 @@
             audio.preload = 'auto';
 
             audio.onerror = fallbackTTS;
-            // Se precisar, use audio.onended para algo após o áudio
 
             // Passo crítico para iPhone/Safari:
             audio.load();
