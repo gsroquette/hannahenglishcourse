@@ -240,7 +240,7 @@
         let firstCard = null;
         let secondCard = null;
         let lockBoard = false;
-        let matchedPairs = 0;
+               let matchedPairs = 0;
         let totalPairs = 0;
         let alertDisplayed = false;
 
@@ -362,6 +362,7 @@
             cardInner.appendChild(cardBack);
             card.appendChild(cardInner);
 
+            // IMPORTANTE: o áudio só é disparado dentro deste gesto de usuário (click)
             card.addEventListener('click', flipCard);
             return card;
         }
@@ -377,6 +378,7 @@
             if (wordEl) {
                 const word = wordEl.textContent;
                 const idx = parseInt(this.dataset.wordIndex || '-1', 10);
+                // Chamado DENTRO do gesto do usuário → compatível com iPhone/Safari
                 playMp3OrSpeak(idx, word);
             }
 
@@ -561,43 +563,53 @@
             loadCardsData(initGame);
         }
 
-        /** PRIORIDADE MP3 → fallback TTS (mantém speakText original) */
+        /** ===============================
+         *  MP3 PRIORITY with iPhone fix → fallback TTS
+         *  - Cria Audio() DENTRO do gesto
+         *  - Chama audio.load() e depois audio.play()
+         *  - Se falhar, cai no SpeechSynthesis
+         * =============================== */
         function playMp3OrSpeak(wordIndex, text, onEnded) {
             // índice inválido? cai direto no TTS
             if (typeof wordIndex !== 'number' || wordIndex < 0) {
-                speakText(text);
-                if (typeof onEnded === 'function') onEnded();
+                speakText(text, onEnded);
                 return;
             }
 
             const { level, unit } = getParamsFromURL();
             const src = `../../${level}/${unit}/data2/sounds/som${wordIndex + 1}.mp3`;
 
-            const audio = new Audio();
-            audio.src = src;
-            audio.preload = 'auto';
+            let usedFallback = false;
+            const finish = () => { if (typeof onEnded === 'function') onEnded(); };
+            const fallbackTTS = () => {
+                if (usedFallback) return;
+                usedFallback = true;
+                speakText(text, finish);
+            };
 
-            let fellBack = false;
-            const useTTS = () => {
-                if (fellBack) return;
-                fellBack = true;
-                speakText(text);
-                if (typeof onEnded === 'function') {
-                    // SpeechSynthesis não dispara um onended global aqui; deixamos simples
-                    setTimeout(onEnded, 0);
+            try {
+                // Criado dentro do handler de clique → gesture OK para iOS
+                const audio = new Audio(src);
+                audio.preload = 'auto';
+
+                audio.onerror = fallbackTTS;
+                audio.onended = finish;
+
+                // Passo crítico para iPhone/Safari
+                audio.load();
+                const p = audio.play();
+                if (p && typeof p.then === 'function') {
+                    p.catch(fallbackTTS);
                 }
-            };
-
-            audio.oncanplaythrough = () => {
-                audio.play().catch(() => useTTS());
-            };
-            audio.onerror = () => useTTS();
-            audio.onended = () => { if (typeof onEnded === 'function') onEnded(); };
+            } catch (e) {
+                fallbackTTS();
+            }
         }
 
-        function speakText(text) {
+        // Mantém funcionalidade original; agora aceita onEnded opcional
+        function speakText(text, onEnded) {
             const synth = window.speechSynthesis;
-            synth.cancel();
+            try { synth.cancel(); } catch (_) {}
 
             const readText = () => {
                 const voices = synth.getVoices();
@@ -614,15 +626,18 @@
 
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'en-US';
-                if (voice) {
-                    utterance.voice = voice;
+                if (voice) utterance.voice = voice;
+                if (typeof onEnded === 'function') {
+                    utterance.onend = () => onEnded();
                 }
-
                 synth.speak(utterance);
             };
 
             if (synth.getVoices().length === 0) {
                 synth.onvoiceschanged = () => {
+                    // remove handler após primeira chamada para evitar múltiplos disparos
+                    const fn = synth.onvoiceschanged;
+                    synth.onvoiceschanged = null;
                     readText();
                 };
             } else {
