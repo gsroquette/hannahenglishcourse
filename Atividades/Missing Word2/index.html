@@ -295,7 +295,12 @@
     let completedWords = 0; // Contador de palavras concluídas
     let alertDisplayed = false;
 
-    /** PRIORIDADE MP3 → fallback TTS (mantém speakText original) */
+    /** =========================================
+     *  MP3 PRIORITY (iPhone/Safari fix) → fallback TTS
+     *  - Criar Audio() dentro do gesto (aqui: input/teclado)
+     *  - Chamar audio.load() e depois audio.play()
+     *  - Se falhar, usar SpeechSynthesis
+     * ========================================= */
     function playMp3OrSpeak(wordIndex, text) {
         // índice inválido? cai direto no TTS
         if (typeof wordIndex !== 'number' || wordIndex < 0) {
@@ -303,28 +308,37 @@
             return;
         }
 
+        // garantir que nenhuma fala anterior está ativa
         const synth = window.speechSynthesis;
         try { synth.cancel(); } catch {}
 
         const { level, unit } = getLevelAndUnitFromURL();
         const src = `../../${level}/${unit}/data2/sounds/som${wordIndex + 1}.mp3`;
 
-        const audio = new Audio();
-        audio.src = src;
-        audio.preload = 'auto';
-
-        let fellBack = false;
-        const useTTS = () => {
-            if (fellBack) return;
-            fellBack = true;
+        let usedFallback = false;
+        const fallbackTTS = () => {
+            if (usedFallback) return;
+            usedFallback = true;
             speakText(text);
         };
 
-        audio.oncanplaythrough = () => {
-            audio.play().catch(() => useTTS());
-        };
-        audio.onerror = () => useTTS();
-        // Se quiser acoplar algum evento ao fim do áudio no futuro, usar audio.onended
+        try {
+            // Criado durante o gesto do usuário (evento input/click) → compatível com iOS
+            const audio = new Audio(src);
+            audio.preload = 'auto';
+
+            audio.onerror = fallbackTTS;
+            // Se quiser acoplar algo ao fim, usar audio.onended
+
+            // Passo crítico para iPhone/Safari:
+            audio.load();
+            const p = audio.play();
+            if (p && typeof p.then === 'function') {
+                p.catch(fallbackTTS);
+            }
+        } catch (_) {
+            fallbackTTS();
+        }
     }
 
     function speakText(text) {
@@ -457,7 +471,7 @@
 
                     const userWord = letterInputs.map(input => input.value.toUpperCase()).join('');
                     if (userWord === word.toUpperCase()) {
-                        // >>> ALTERAÇÃO: prioriza MP3 som{wordIndex+1}.mp3; fallback TTS
+                        // PRIORIDADE MP3 som{wordIndex+1}.mp3; fallback TTS (dentro do gesto input)
                         playMp3OrSpeak(wordIndex, word);
                         completedWords++;
 
