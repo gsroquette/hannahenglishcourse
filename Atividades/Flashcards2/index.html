@@ -412,37 +412,60 @@
         }
 
         /**
-         * Tenta tocar o MP3 som{index+1}.mp3; se falhar, usa TTS.
+         * ATUALIZADO: Toca o MP3 imediatamente no clique (iOS-friendly).
+         * Se falhar, tenta após 'loadeddata'; se ainda falhar, cai no TTS.
          * onFinish(): callback chamado quando o áudio (ou a fala) TERMINA.
          */
         function playMp3OrSpeak(index, word, buttonElement, level, unit, onFinish) {
             const audioSrc = `../../${level}/${unit}/data2/sounds/som${index + 1}.mp3`;
-            const audio = new Audio();
-            audio.src = audioSrc;
+
+            // cria o elemento no gesto do usuário
+            const audio = new Audio(audioSrc);
             audio.preload = 'auto';
+            audio.playsInline = true; // iOS
+            audio.muted = false;
 
             buttonElement.src = 'pause.png';
 
             let fellBackToTTS = false;
+            let finished = false;
 
-            const fallbackToTTS = () => {
-                if (fellBackToTTS) return;
-                fellBackToTTS = true;
-                toggleSpeech(word, buttonElement, index, onFinish);
-            };
-
-            audio.oncanplaythrough = () => {
-                audio.play().catch(() => fallbackToTTS());
-            };
-
-            audio.onended = () => {
+            const cleanup = () => {
+                if (finished) return;
+                finished = true;
                 buttonElement.src = 'businessman.png';
                 if (typeof onFinish === 'function') onFinish();
             };
 
-            audio.onerror = () => {
-                fallbackToTTS();
+            const fallbackToTTS = () => {
+                if (fellBackToTTS) return;
+                fellBackToTTS = true;
+                // cancela qualquer tentativa pendente do <audio>
+                try { audio.pause(); } catch(_) {}
+                audio.src = '';
+                toggleSpeech(word, buttonElement, index, onFinish);
             };
+
+            // tenta tocar IMEDIATAMENTE dentro do clique
+            audio.play()
+                .then(() => {
+                    // ok, apenas aguarda o término
+                })
+                .catch(() => {
+                    // se o play imediato falhar, tenta quando carregar algo
+                    const tryAfterLoad = () => {
+                        audio.play().catch(fallbackToTTS);
+                    };
+                    audio.addEventListener('loadeddata', tryAfterLoad, { once: true });
+
+                    // timeout curto como último fallback
+                    setTimeout(() => {
+                        if (!finished && audio.paused) fallbackToTTS();
+                    }, 800);
+                });
+
+            audio.onended = cleanup;
+            audio.onerror = fallbackToTTS;
         }
 
         // Fala via SpeechSynthesis com marcação de conclusão no onend.
