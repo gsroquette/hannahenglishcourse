@@ -270,10 +270,39 @@
 
     // ================== TTS (silencioso) + Áudio MP3 (iOS fix) ==================
     let selectedVoice = null;
+
+    // === Player global exclusivo para PALAVRAS (iOS-friendly) ===
+    let wordPlayer = new Audio();
+    wordPlayer.preload = 'auto';
+    wordPlayer.setAttribute('playsinline', '');
+    wordPlayer.setAttribute('webkit-playsinline', '');
+
+    // "Desbloqueia" o pipeline de mídia no primeiro gesto (iOS)
+    let audioPrimed = false;
+    function primeAudioPipelineOnce() {
+      if (audioPrimed) return;
+      audioPrimed = true;
+      try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) {
+          const ctx = new AC();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          gain.gain.value = 0;
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.01);
+        }
+      } catch {}
+    }
+    window.addEventListener('pointerdown', primeAudioPipelineOnce, { once: true, passive: true });
+    window.addEventListener('touchstart',  primeAudioPipelineOnce, { once: true, passive: true });
+    window.addEventListener('click',       primeAudioPipelineOnce, { once: true, passive: true });
+
     function initializeVoices() {
         const synth = window.speechSynthesis;
         const voices = synth.getVoices();
-        // qualquer voz em inglês; se não houver, usa a primeira disponível; se não houver nenhuma, fica null
         selectedVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith("en-")) || voices[0] || null;
         if (!selectedVoice) {
             console.warn("SpeechSynthesis: no voices available.");
@@ -285,6 +314,8 @@
 
     function speak(text) {
         const synth = window.speechSynthesis;
+        try { if (!audioPrimed) primeAudioPipelineOnce(); } catch {}
+        try { if (!wordPlayer.paused) { wordPlayer.pause(); wordPlayer.currentTime = 0; } } catch {}
         try { synth.cancel(); } catch {}
         if (!selectedVoice) initializeVoices();
         const u = new SpeechSynthesisUtterance(text);
@@ -293,56 +324,59 @@
         synth.speak(u);
     }
 
-    // Player global para evitar sobreposição
-    let currentAudio = null;
+    // Interrompe QUALQUER áudio corrente (palavra)
     function stopCurrentAudio() {
-        if (currentAudio) {
-            try { currentAudio.pause(); } catch {}
-            try { currentAudio.currentTime = 0; } catch {}
-            currentAudio = null;
-        }
+      try { if (!wordPlayer.paused) { wordPlayer.pause(); wordPlayer.currentTime = 0; } } catch {}
     }
 
-    // ✅ iPhone/Safari: cria Audio() no gesto, chama load() e depois play() com catch
-    async function tryPlayAudio(url) {
-        stopCurrentAudio();
-        const audio = new Audio(url);
-        audio.preload = 'auto';
-        audio.onended = () => { if (currentAudio === audio) currentAudio = null; };
+    // Usa SEMPRE o mesmo <audio> para a PALAVRA (iOS gosta disso)
+    function tryPlayAudio(url) {
+      return new Promise((resolve) => {
+        try { stopCurrentAudio(); } catch {}
+        try { if (!audioPrimed) primeAudioPipelineOnce(); } catch {}
 
-        return new Promise((resolve) => {
-            audio.onerror = () => resolve(false);
-            try {
-                currentAudio = audio;
-                audio.load(); // libera o pipeline de mídia no iOS
-                const p = audio.play();
-                if (p && typeof p.then === 'function') {
-                    p.then(() => resolve(true)).catch(() => resolve(false));
-                } else {
-                    // Alguns navegadores não retornam Promise—assumimos ok
-                    resolve(true);
-                }
-            } catch {
-                resolve(false);
-            }
-        });
+        wordPlayer.src = url;
+        wordPlayer.onended = () => {};
+        wordPlayer.onerror = () => resolve(false);
+
+        try {
+          wordPlayer.load(); // importante no iOS
+          const p = wordPlayer.play();
+          if (p && typeof p.then === 'function') {
+            p.then(() => resolve(true)).catch(() => resolve(false));
+          } else {
+            resolve(true);
+          }
+        } catch {
+          resolve(false);
+        }
+      });
     }
 
     async function playFirstAvailable(urls) {
-        for (const u of urls) {
-            if (await tryPlayAudio(u)) return true;
-        }
-        return false;
+      for (const u of urls) {
+        if (await tryPlayAudio(u)) return true;
+      }
+      return false;
     }
 
+    // Janela para suprimir sons de letras após tocar a palavra
+    let suppressLettersUntil = 0;
+
     // ---- MP3 de palavras (data1/sounds/som{N}.mp3) com fallback TTS ----
-    async function playWordMp3OrSpeak(wordIndexZeroBased, wordText) {
+    function playWordMp3OrSpeak(wordIndexZeroBased, wordText) {
         const { level, unit } = getLevelAndUnitFromURL();
         const n = wordIndexZeroBased + 1;
         const base = `../../${level}/${unit}/data1/sounds`;
         const urls = [`${base}/som${n}.mp3`, `${base}/som.${n}.mp3`];
-        const ok = await playFirstAvailable(urls);
-        if (!ok) speak(wordText);
+
+        // evita conflito com sons de letras
+        suppressLettersUntil = Date.now() + 900;
+
+        // dispara imediatamente (sem await)
+        playFirstAvailable(urls).then((ok) => {
+          if (!ok) speak(wordText);
+        });
     }
 
     // ---- MP3 das letras (./letras/som{N}.mp3) com fallback TTS ----
@@ -353,6 +387,7 @@
         return null;
     }
     async function playLetterMp3OrSpeak(ch) {
+        if (Date.now() < suppressLettersUntil) return; // evita competir com a palavra
         const idx = letterIndex(ch);
         if (!idx) { speak(ch); return; }
         const urls = [`./letras/som${idx}.mp3`, `./letras/som.${idx}.mp3`];
@@ -681,8 +716,9 @@
             if (ans.toUpperCase() === word.toUpperCase()){
                 if (div.dataset.completed === "false") {
                     div.dataset.completed = "true";
+                    // toca a PALAVRA imediatamente — sem await
+                    playWordMp3OrSpeak(wordIndex, word);
                     celebrate(div);   // Confete
-                    await playWordMp3OrSpeak(wordIndex, word); // ⬅️ MP3 da PALAVRA com fallback TTS
                     completedWords++;
                     updateSessionStatus();
                 }
