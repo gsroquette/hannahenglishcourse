@@ -263,41 +263,41 @@
         }
     });
 
+    /* ====== TTS silencioso (sem alert) com fallback de voz ====== */
     function initializeVoices() {
         const synth = window.speechSynthesis;
         const voices = synth.getVoices();
 
-        console.log("Available voices:", voices);
+        selectedVoice = voices.find(v => v.lang === "en-US") || voices[0] || null;
 
-        selectedVoice = voices.find(voice => voice.lang === "en-US");
-
-        if (!selectedVoice && !alertDisplayed) {
-            alertDisplayed = true;
-            alert("No 'en-US' voice found. Using the first available voice.");
-            selectedVoice = voices[0];
+        if (!selectedVoice) {
+            console.warn("SpeechSynthesis: no voices available.");
+        } else if (selectedVoice.lang !== "en-US") {
+            console.warn("No 'en-US' voice found. Using first available voice:", selectedVoice.name);
         }
-
-        console.log("Selected voice:", selectedVoice ? selectedVoice.name : "Default voice");
     }
 
-    if (!window.speechSynthesis.onvoiceschanged) {
-        window.speechSynthesis.onvoiceschanged = initializeVoices;
-    }
+    // Sempre tente atualizar quando as vozes carregarem
+    window.speechSynthesis.onvoiceschanged = initializeVoices;
 
     function readText(text) {
         const synth = window.speechSynthesis;
-        synth.cancel();
+        try { synth.cancel(); } catch {}
 
-        if (!selectedVoice) {
-            initializeVoices();
-        }
+        if (!selectedVoice) initializeVoices();
 
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.voice = selectedVoice || synth.getVoices()[0];
+        utterance.lang = "en-US";
+        if (selectedVoice) utterance.voice = selectedVoice;
         synth.speak(utterance);
     }
 
-    /** NOVO: Prioriza somN.mp3 com fallback para TTS (readText) */
+    /** =========================================
+     *  MP3 PRIORITY (iPhone/Safari fix) → fallback TTS
+     *  - Criar Audio() dentro do gesto (clique no "Check Answer")
+     *  - Chamar audio.load() e depois audio.play()
+     *  - Se falhar, usar SpeechSynthesis
+     * ========================================= */
     function playMp3OrSpeak(wordIndex, text) {
         // índice inválido ⇒ cai no TTS
         if (typeof wordIndex !== 'number' || wordIndex < 0) {
@@ -305,27 +305,36 @@
             return;
         }
 
+        // cancelar qualquer fala ativa antes de tentar o MP3
         const synth = window.speechSynthesis;
         try { synth.cancel(); } catch {}
 
         const { level, unit } = getLevelAndUnitFromURL();
         const src = `../../${level}/${unit}/data2/sounds/som${wordIndex + 1}.mp3`;
 
-        const audio = new Audio();
-        audio.src = src;
-        audio.preload = 'auto';
-
-        let fellBack = false;
-        const useTTS = () => {
-            if (fellBack) return;
-            fellBack = true;
+        let usedFallback = false;
+        const fallbackTTS = () => {
+            if (usedFallback) return;
+            usedFallback = true;
             readText(text);
         };
 
-        audio.oncanplaythrough = () => {
-            audio.play().catch(() => useTTS());
-        };
-        audio.onerror = () => useTTS();
+        try {
+            // Criado durante o gesto do usuário (onclick do botão) → OK no iOS
+            const audio = new Audio(src);
+            audio.preload = 'auto';
+
+            audio.onerror = fallbackTTS;
+
+            // Passo crítico para iPhone/Safari:
+            audio.load();
+            const p = audio.play();
+            if (p && typeof p.then === 'function') {
+                p.catch(fallbackTTS);
+            }
+        } catch (_) {
+            fallbackTTS();
+        }
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -401,7 +410,7 @@
                     input.classList.remove('incorrect');
                 });
 
-                // >>> ALTERAÇÃO: prioriza som{wordIndex+1}.mp3; fallback TTS
+                // PRIORIDADE MP3 som{wordIndex+1}.mp3; fallback TTS (dentro do gesto onclick)
                 playMp3OrSpeak(wordIndex, word);
 
                 if (activityDiv.dataset.completed === "false") {
