@@ -12,22 +12,14 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
   <style>
-    :root{
-      --brand:#4CAF50; --brand-dark:#45a049; --ink:#333; --muted:#6b7280; --ok:#16a34a; --overlay:rgba(0,0,0,.35);
-    }
+    :root{ --brand:#4CAF50; --brand-dark:#45a049; --ink:#333; --muted:#6b7280; --ok:#16a34a; --overlay:rgba(0,0,0,.35); }
     *{box-sizing:border-box}
     html,body{margin:0;padding:0}
-    body{
-      font-family:'Roboto',system-ui,-apple-system,Segoe UI,Arial,sans-serif;
-      background-image:url('../../../imagens/fundo.png');
-      background-repeat:repeat; background-size:auto; color:var(--ink);
-      display:block; min-height:100vh;
-    }
+    body{ font-family:'Roboto',system-ui,-apple-system,Segoe UI,Arial,sans-serif; background-image:url('../../../imagens/fundo.png'); background-repeat:repeat; background-size:auto; color:var(--ink); display:block; min-height:100vh; }
     .container{max-width:900px;width:100%;margin:30px auto;padding:20px;background:#fff;box-shadow:0 8px 16px rgba(0,0,0,.1);border-radius:10px}
     h1{font-size:2.5em;color:var(--brand);margin:0 0 20px;text-align:center}
     .title{font-size:2em;color:#333;margin:10px 0 8px;text-align:center}
 
-    /* Buttons (PDF ao lado do Read) */
     .button-container{display:flex;justify-content:center;align-items:center;gap:10px;margin-bottom:12px}
     button{padding:12px 24px;font-size:16px;background:var(--brand);color:#fff;border:none;border-radius:50px;cursor:pointer}
     button:hover{background:var(--brand-dark)}
@@ -114,9 +106,7 @@
 
   <script>
     // Firebase
-    var firebaseConfig={
-      apiKey:"AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",authDomain:"hannahenglishcourse.firebaseapp.com",projectId:"hannahenglishcourse",storageBucket:"hannahenglishcourse.appspot.com",messagingSenderId:"449818788486",appId:"1:449818788486:web:8a49d3f68591e6fb3f0707",measurementId:"G-07VVJG9LRS",databaseURL:"https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
-    };
+    var firebaseConfig={ apiKey:"AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc", authDomain:"hannahenglishcourse.firebaseapp.com", projectId:"hannahenglishcourse", storageBucket:"hannahenglishcourse.appspot.com", messagingSenderId:"449818788486", appId:"1:449818788486:web:8a49d3f68591e6fb3f0707", measurementId:"G-07VVJG9LRS", databaseURL:"https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app" };
     firebase.initializeApp(firebaseConfig);
 
     // Estado global
@@ -128,7 +118,7 @@
     function checkUserRole(){
       firebase.auth().onAuthStateChanged(async function(user){
         if(user){
-          const uid=user.uid; const roleRef=firebase.database().ref(`usuarios/${uid}/role`); const snapshot=await roleRef.once('value'); const role=snapshot.val();
+          const uid=user.uid; const roleRef=firebase.database().ref('usuarios/'+uid+'/role'); const snapshot=await roleRef.once('value'); const role=snapshot.val();
           if(role==="professor"||role==="proprietário"){ document.getElementById('pdfButton').style.display='block'; }
         }
       });
@@ -137,36 +127,38 @@
     // URL params
     function getParamsFromURL(){ const p=new URLSearchParams(window.location.search); return {level:p.get('level'),unit:p.get('unit'),fase:p.get('fase')}; }
 
+    // Helpers sem regex (evita SyntaxError em alguns ambientes)
+    function stripBOM(s){ if(!s) return s; return (s.charCodeAt(0)===65279) ? s.slice(1) : s; }
+    function splitLines(s){ // suporta \r\n e \n sem regex
+      let arr=s.split('\n');
+      for(let i=0;i<arr.length;i++){ if(arr[i].length && arr[i].charAt(arr[i].length-1)==='\r'){ arr[i]=arr[i].slice(0,-1); } }
+      return arr;
+    }
+
     // Manifest & conteúdo
     async function loadStoryManifest(){
-      const {level,unit}=getParamsFromURL(); const path=`../../${level}/${unit}/DataStory/sounds/storycards-manifest.json`;
-      try{const r=await fetch(path); if(!r.ok) return null; const data=await r.json(); if(data.title) storyTitle=data.title; return data;}catch(e){return null}
+      const p=getParamsFromURL(); const path='../../'+p.level+'/'+p.unit+'/DataStory/sounds/storycards-manifest.json';
+      try{ const r=await fetch(path); if(!r.ok) return null; const data=await r.json(); if(data.title) storyTitle=data.title; return data; }catch(e){ return null }
     }
     async function loadContent(){
-      const {level,unit}=getParamsFromURL(); if(!level||!unit) return [];
-      const base=`../../${level}/${unit}/DataStory/`;
+      const p=getParamsFromURL(); if(!p.level||!p.unit) return [];
+      const base='../../'+p.level+'/'+p.unit+'/DataStory/';
       try{
-        const res=await fetch(`${base}images.txt`); if(!res.ok) throw new Error('Failed to fetch images.txt');
-        let txt=await res.text();
-        // normalizar quebras / remover BOM
-        txt=txt.replace(/^﻿/, '');
-        const rawLines=txt.split(/
-?
-/);
-        const lines=rawLines.filter(l=>l.trim().length>0);
+        const res=await fetch(base+'images.txt'); if(!res.ok) throw new Error('Failed to fetch images.txt');
+        let txt=await res.text(); txt=stripBOM(txt);
+        const lines=splitLines(txt).filter(function(l){ return l.trim().length>0; });
         let cards=[]; let curImg=''; let curTxt='';
-        lines.forEach(line=>{
-          if(line.trim().startsWith('#imagem')){
-            if(curImg&&curTxt) cards.push({image:curImg, text:curTxt.trim()});
+        for(let i=0;i<lines.length;i++){
+          const line=lines[i];
+          if(line.indexOf('#imagem')===0 || line.indexOf('#imagem')===1 && line.charAt(0)==='\ufeff'){ // tolerância
+            if(curImg && curTxt){ cards.push({image:curImg, text:curTxt.trim()}); }
             curImg=line.replace('#','').trim();
             curTxt='';
           } else { curTxt+=line+' '; }
-        });
-        if(curImg&&curTxt) cards.push({image:curImg, text:curTxt.trim()});
-        storyText=cards.map(c=>c.text).join('
-
-');
-        return cards.map(c=>({...c, image:`${base}images/${c.image}.png`}));
+        }
+        if(curImg && curTxt){ cards.push({image:curImg, text:curTxt.trim()}); }
+        storyText=cards.map(function(c){return c.text;}).join('\n\n');
+        return cards.map(function(c){ return { image: base+'images/'+c.image+'.png', text: c.text }; });
       }catch(e){ console.error('loadContent error', e); return [] }
     }
 
@@ -174,19 +166,20 @@
     function buildPaginator(){
       const pag=document.getElementById('paginator'); pag.innerHTML='';
       for(let i=0;i<cardsData.length;i++){
-        const d=document.createElement('span'); d.className='dot'+(i===0?' current':' locked'); d.title=`Card ${i+1}`;
-        d.addEventListener('click',()=>{ if(i<=maxVisitedIndex){ currentCardIndex=i; displayCard(currentCardIndex);} });
+        const d=document.createElement('span'); d.className='dot'+(i===0?' current':' locked'); d.title='Card '+(i+1);
+        d.addEventListener('click',function(){ if(i<=maxVisitedIndex){ currentCardIndex=i; displayCard(currentCardIndex);} });
         pag.appendChild(d);
       }
       refreshPaginator();
     }
     function refreshPaginator(){
-      const dots=document.querySelectorAll('#paginator .dot'); dots.forEach((dot,i)=>{
-        dot.classList.remove('current','done','locked');
+      const dots=document.querySelectorAll('#paginator .dot');
+      for(let i=0;i<dots.length;i++){
+        const dot=dots[i]; dot.classList.remove('current'); dot.classList.remove('done'); dot.classList.remove('locked');
         if(i===currentCardIndex) dot.classList.add('current');
-        if(spokenCards.has(i)) dot.classList.add('done'); // verde quando áudio concluído
+        if(spokenCards.has(i)) dot.classList.add('done');
         if(i>maxVisitedIndex) dot.classList.add('locked');
-      });
+      }
     }
 
     // Card
@@ -196,24 +189,23 @@
         container.innerHTML='<p style="text-align:center;color:#888">No cards found. Check DataStory/images.txt.</p>';
         return;
       }
-
       if(!viewedCards.has(index)) viewedCards.add(index);
       if(index>maxVisitedIndex) maxVisitedIndex=index;
 
       const container=document.getElementById('cardsContainer'); container.innerHTML='';
       const data=cardsData[index];
 
-      const card=document.createElement('div'); card.className='card'; card.onclick=()=>toggleView();
+      const card=document.createElement('div'); card.className='card'; card.onclick=function(){ toggleView(); };
 
       if(showText){
-        const t=document.createElement('div'); t.className='card-text'; t.innerHTML=`<p>${data.text}</p>`; card.appendChild(t);
+        const t=document.createElement('div'); t.className='card-text'; t.innerHTML='<p>'+data.text+'</p>'; card.appendChild(t);
       }else{
         const img=document.createElement('img'); img.src=data.image; img.alt='Image'; img.className='story-image'; card.appendChild(img);
       }
 
       const play=document.createElement('img'); play.src='businessman.png'; play.className='businessman';
       if(!spokenCards.has(index)) play.classList.add('pulse-play');
-      play.onclick=(e)=>{ e.stopPropagation(); play.classList.remove('pulse-play'); toggleSpeech(data.text,play,index); };
+      play.onclick=function(e){ e.stopPropagation(); play.classList.remove('pulse-play'); toggleSpeech(data.text,play,index); };
       card.appendChild(play);
 
       container.appendChild(card);
@@ -224,9 +216,7 @@
       const toggleBtn=document.getElementById('toggleButton'); if(toggleBtn) toggleBtn.innerText=showText?'See the story':'Read the story';
       document.getElementById('storyTitle').textContent=storyTitle||'Hannah Story';
 
-      // microcopy: mostrar apenas se ainda não ouviu este card
-      const hint=document.getElementById('gateHint');
-      if(hint){ hint.textContent='Listen to unlock Next'; hint.style.visibility = spokenCards.has(index) ? 'hidden' : 'visible'; }
+      const hint=document.getElementById('gateHint'); if(hint){ hint.textContent='Listen to unlock Next'; hint.style.visibility = spokenCards.has(index) ? 'hidden' : 'visible'; }
 
       refreshPaginator();
     }
@@ -239,20 +229,16 @@
     function showPreviousCard(){ const idx=Math.max(currentCardIndex-1,0); currentCardIndex=idx; displayCard(currentCardIndex); }
 
     // Back + verificação de fase
-    document.addEventListener('DOMContentLoaded',()=>{ const back=document.querySelector('button#backButton'); if(back) back.addEventListener('click',handleBackButtonClick); });
+    document.addEventListener('DOMContentLoaded',function(){ const back=document.querySelector('button#backButton'); if(back) back.addEventListener('click',handleBackButtonClick); });
     async function handleBackButtonClick(){
-      const {level,unit,fase}=getParamsFromURL(); if(!level||!unit||!fase){ alert('Level, Unit or Fase not identified in the URL.'); return; }
-      firebase.auth().onAuthStateChanged(async (user)=>{
-        if(user){ const uid=user.uid; const ok=await checkPhaseProgress(uid,level,unit,fase); if(ok) window.history.back(); else if(confirm('The next phase is not completed.
-
-To complete this phase, you must view and listen to ALL story cards (open each card and play the audio to the end).
-
-Do you wish to leave anyway?')) window.history.back(); }
+      const u=getParamsFromURL(); if(!u.level||!u.unit||!u.fase){ alert('Level, Unit or Fase not identified in the URL.'); return; }
+      firebase.auth().onAuthStateChanged(async function(user){
+        if(user){ const uid=user.uid; const ok=await checkPhaseProgress(uid,u.level,u.unit,u.fase); if(ok) window.history.back(); else if(confirm('The next phase is not completed.\n\nTo complete this phase, you must view and listen to ALL story cards (open each card and play the audio to the end).\n\nDo you wish to leave anyway?')) window.history.back(); }
         else{ alert('Please log in to save your progress and continue.'); }
       });
     }
     async function checkPhaseProgress(uid,level,unit,currentFase){
-      try{ const n=parseInt(currentFase.replace('fase','')); const next=`fase${n+1}`; const snap=await firebase.database().ref(`usuarios/${uid}/progresso/${level}/${unit}/${next}`).once('value'); return snap.val(); }catch(e){ return false }
+      try{ const n=parseInt(String(currentFase).replace('fase',''),10); const next='fase'+(n+1); const snap=await firebase.database().ref('usuarios/'+uid+'/progresso/'+level+'/'+unit+'/'+next).once('value'); return snap.val(); }catch(e){ return false }
     }
 
     // Áudio (MP3 prioritário + fallback TTS)
@@ -262,11 +248,11 @@ Do you wish to leave anyway?')) window.history.back(); }
       if(mp3Url){ try{ await playMp3(mp3Url,buttonElement,index); return; }catch(e){ console.warn('MP3 failed, fallback to TTS',e); } }
       playTTS(text,buttonElement,index);
     }
-    function getMp3ForCard(index){ if(!storyManifest) return null; const card=storyManifest.cards?.find(c=>c.index===index+1); if(!card) return null; const {level,unit}=getParamsFromURL(); return `../../${level}/${unit}/DataStory/sounds/${card.audio}`; }
-    function playMp3(url,buttonElement,index){ return new Promise((resolve,reject)=>{ currentAudio=new Audio(url); currentAudio.preload='auto'; currentAudio.play().then(()=>{ buttonElement.src='pause.png'; markSpokenOnEnd(buttonElement,index,resolve); }).catch(reject); }); }
+    function getMp3ForCard(index){ if(!storyManifest) return null; var found=null; var arr=storyManifest.cards||[]; for(var i=0;i<arr.length;i++){ if(arr[i].index===index+1){ found=arr[i]; break; } } if(!found) return null; const u=getParamsFromURL(); return '../../'+u.level+'/'+u.unit+'/DataStory/sounds/'+found.audio; }
+    function playMp3(url,buttonElement,index){ return new Promise(function(resolve,reject){ currentAudio=new Audio(url); currentAudio.preload='auto'; currentAudio.play().then(function(){ buttonElement.src='pause.png'; markSpokenOnEnd(buttonElement,index,resolve); }).catch(reject); }); }
     function stopCurrentAudio(){ if(currentAudio){ currentAudio.pause(); currentAudio.currentTime=0; currentAudio=null; } if(window.speechSynthesis.speaking){ window.speechSynthesis.cancel(); } }
-    function playTTS(text,buttonElement,index){ const u=new SpeechSynthesisUtterance(text); u.lang='en-US'; window.speechSynthesis.speak(u); buttonElement.src='pause.png'; u.onend=()=>{ buttonElement.src='businessman.png'; onAudioFinished(index); }; }
-    function markSpokenOnEnd(buttonElement,index,resolve){ currentAudio.onended=()=>{ buttonElement.src='businessman.png'; onAudioFinished(index); resolve(); }; }
+    function playTTS(text,buttonElement,index){ const u=new SpeechSynthesisUtterance(text); u.lang='en-US'; window.speechSynthesis.speak(u); buttonElement.src='pause.png'; u.onend=function(){ buttonElement.src='businessman.png'; onAudioFinished(index); }; }
+    function markSpokenOnEnd(buttonElement,index,resolve){ currentAudio.onended=function(){ buttonElement.src='businessman.png'; onAudioFinished(index); resolve(); }; }
 
     // Ao terminar áudio deste card
     function onAudioFinished(index){
@@ -281,45 +267,27 @@ Do you wish to leave anyway?')) window.history.back(); }
     async function checkCompletion(){
       const total=cardsData.length; if(total===0) return;
       const allViewed=viewedCards.size===total; const allSpoken=spokenCards.size===total;
-      if(allViewed && allSpoken){ if(!phaseCompleted){ phaseCompleted=true; const user=firebase.auth().currentUser; if(user){ const {fase}=getParamsFromURL(); await salvarProgressoAluno(user.uid,fase);} openCompletionModal(); } }
+      if(allViewed && allSpoken){ if(!phaseCompleted){ phaseCompleted=true; const user=firebase.auth().currentUser; if(user){ const f=getParamsFromURL().fase; await salvarProgressoAluno(user.uid,f);} openCompletionModal(); } }
     }
     async function salvarProgressoAluno(uid,fase){
-      try{ const {level,unit}=getParamsFromURL(); const db=firebase.database(); await db.ref(`usuarios/${uid}/progresso/${level}/${unit}/${fase}`).set(true);
+      try{ const u=getParamsFromURL(); const db=firebase.database(); await db.ref('usuarios/'+uid+'/progresso/'+u.level+'/'+u.unit+'/'+fase).set(true);
         if(typeof updateNextPhase==='function'){ await updateNextPhase(uid); }
-        else { const n=parseInt(fase.replace('fase',''),10); if(!isNaN(n)){ const prox=`fase${n+1}`; await db.ref(`usuarios/${uid}/progresso/${level}/${unit}/${prox}`).set(true);} }
+        else { const n=parseInt(String(fase).replace('fase',''),10); if(!isNaN(n)){ const prox='fase'+(n+1); await db.ref('usuarios/'+uid+'/progresso/'+u.level+'/'+u.unit+'/'+prox).set(true);} }
       }catch(err){ console.error('Erro ao salvar progresso:',err); }
     }
-    function openCompletionModal(){
-      const total=cardsData.length; document.getElementById('chkViewed').textContent=`Cards viewed: ${viewedCards.size}/${total} ✓`;
-      document.getElementById('chkAudios').textContent=`Audios finished: ${spokenCards.size}/${total} ✓`;
-      document.getElementById('completeModal').classList.add('show');
-    }
-    (function setupModal(){
-      const modal=document.getElementById('completeModal');
-      document.getElementById('btnBackPhases')?.addEventListener('click',()=>window.history.back());
-      document.getElementById('btnReview')?.addEventListener('click',()=>modal.classList.remove('show'));
-      document.getElementById('btnPDF')?.addEventListener('click',()=>generatePDF());
-      modal.addEventListener('click',(e)=>{ if(e.target===modal) modal.classList.remove('show'); });
-      document.addEventListener('keydown',(e)=>{ if(e.key==='Escape' && modal.classList.contains('show')) modal.classList.remove('show'); });
-    })();
+    function openCompletionModal(){ const total=cardsData.length; document.getElementById('chkViewed').textContent='Cards viewed: '+viewedCards.size+'/'+total+' ✓'; document.getElementById('chkAudios').textContent='Audios finished: '+spokenCards.size+'/'+total+' ✓'; document.getElementById('completeModal').classList.add('show'); }
+    (function setupModal(){ const modal=document.getElementById('completeModal'); var back=document.getElementById('btnBackPhases'); if(back) back.addEventListener('click',function(){ window.history.back(); }); var rev=document.getElementById('btnReview'); if(rev) rev.addEventListener('click',function(){ modal.classList.remove('show'); }); var pdf=document.getElementById('btnPDF'); if(pdf) pdf.addEventListener('click',function(){ generatePDF(); }); modal.addEventListener('click',function(e){ if(e.target===modal) modal.classList.remove('show'); }); document.addEventListener('keydown',function(e){ if(e.key==='Escape' && modal.classList.contains('show')) modal.classList.remove('show'); }); })();
 
     // PDF
-    function generatePDF(){ const {jsPDF}=window.jspdf; const doc=new jsPDF(); try{ doc.addImage('Logo.png','PNG',85,10,40,40);}catch(e){} doc.setFontSize(12); doc.text('Name:_______________________________________________________  Date:_______________',10,60); doc.setFontSize(20); doc.text(storyTitle,105,80,{align:'center'}); doc.setFontSize(12); let y=100; const marginLeft=10,maxLineWidth=180,lineHeight=10; const split=doc.splitTextToSize(storyText,maxLineWidth); split.forEach(line=>{ if(y>280){ doc.addPage(); y=20; } doc.text(line,marginLeft,y); y+=lineHeight; }); doc.save('story.pdf'); }
+    function generatePDF(){ const j=window.jspdf; if(!j) return; const doc=new j.jsPDF(); try{ doc.addImage('Logo.png','PNG',85,10,40,40);}catch(e){} doc.setFontSize(12); doc.text('Name:_______________________________________________________  Date:_______________',10,60); doc.setFontSize(20); doc.text(storyTitle,105,80,{align:'center'}); doc.setFontSize(12); var y=100; var marginLeft=10,maxLineWidth=180,lineHeight=10; var split=doc.splitTextToSize(storyText,maxLineWidth); for(var i=0;i<split.length;i++){ var line=split[i]; if(y>280){ doc.addPage(); y=20; } doc.text(line,marginLeft,y); y+=lineHeight; } doc.save('story.pdf'); }
 
     // Boot
-    document.addEventListener('DOMContentLoaded',async()=>{
+    document.addEventListener('DOMContentLoaded',async function(){
       checkUserRole();
       storyManifest=await loadStoryManifest();
       cardsData=await loadContent();
       document.getElementById('storyTitle').textContent=storyTitle||'Hannah Story';
-      if(cardsData.length>0){
-        buildPaginator();
-        displayCard(0);
-      } else {
-        // fallback de segurança para evitar tela "vazia"
-        const container=document.getElementById('cardsContainer');
-        container.innerHTML='<p style="text-align:center;color:#888">No cards found. Check DataStory/images.txt.</p>';
-      }
+      if(cardsData.length>0){ buildPaginator(); displayCard(0); } else { document.getElementById('cardsContainer').innerHTML='<p style="text-align:center;color:#888">No cards found. Check DataStory/images.txt.</p>'; }
       const t=document.getElementById('toggleButton'); if(t) t.innerText=showText?'See the story':'Read the story';
     });
   </script>
