@@ -27,23 +27,23 @@
         // Inicializa o Firebase
         firebase.initializeApp(firebaseConfig);
 
-        // Variáveis globais para o título e texto da história para o PDF
-        let storyTitle = "Hannah Story"; // Exemplo de título para o PDF
-        let storyText = ""; // Variável que irá conter o texto da história
-        let phaseCompleted = false; // Variável para verificar se a fase foi concluída
-        let alertShown = false; // Variável para garantir que a mensagem seja mostrada apenas uma vez
-        let showText = false; // Alterna entre imagem e texto
-        let viewedCards = new Set(); // Rastreador de cartões visualizados
-        let spokenCards = new Set(); // Rastreador de cartões ouvidos
-        let alertDisplayed = false;
+        // Variáveis globais
+        let storyTitle = "Hannah Story"; // Título para o PDF
+        let storyText = "";              // Texto da história (para PDF)
+        let phaseCompleted = false;
+        let showText = false;            // Alternar entre imagem (false) e texto (true)
+        let viewedCards = new Set();     // Cards visualizados
+        let spokenCards = new Set();     // Cards ouvidos
 
-        // ✅ ADDED – cache do manifest
+        // Áudio local (manifest) + player invisível
         let storyManifest = null;
-
-        // ✅ ADDED – player de áudio
         let currentAudio = null;
 
-        // Função para verificar o role e exibir o botão PDF se o usuário for "professor" ou "proprietário"
+        // Estado de cards
+        let cardsData = [];
+        let currentCardIndex = 0;
+
+        // -------------------- Role e botão de PDF --------------------
         function checkUserRole() {
             firebase.auth().onAuthStateChanged(async function(user) {
                 if (user) {
@@ -61,22 +61,17 @@
                 }
             });
         }
-        // ✅ Quando a página carrega
-        document.addEventListener("DOMContentLoaded", async () => {
-            checkUserRole();
 
-            // ✅ ADDED — carrega manifest primeiro
-            storyManifest = await loadStoryManifest();
+        // -------------------- Params da URL --------------------
+        function getParamsFromURL() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const level = urlParams.get('level');
+            const unit  = urlParams.get('unit');
+            const fase  = urlParams.get('fase');
+            return { level, unit, fase };
+        }
 
-            // ✅ carrega imagens + textos
-            cardsData = await loadContent();
-
-            console.log("Cards data loaded: ", cardsData);
-
-            displayCard(0);
-        });
-
-        // ✅ ADDED — carrega manifest se existir
+        // -------------------- Carrega manifest --------------------
         async function loadStoryManifest() {
             const { level, unit } = getParamsFromURL();
             const manifestPath = `../../${level}/${unit}/DataStory/sounds/storycards-manifest.json`;
@@ -89,6 +84,10 @@
                 }
                 const data = await resp.json();
                 console.log("Loaded manifest:", data);
+                // Se manifest tiver title, usar como título da história
+                if (data.title && typeof data.title === 'string') {
+                    storyTitle = data.title;
+                }
                 return data;
             } catch (e) {
                 console.warn("Error loading manifest:", e);
@@ -96,58 +95,24 @@
             }
         }
 
-        // ✅ identifica Level, Unit, Fase pelo URL
-        function getParamsFromURL() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const level = urlParams.get('level');
-            const unit  = urlParams.get('unit');
-            const fase  = urlParams.get('fase');
-            console.log("URL:", level, unit, fase);
-            return { level, unit, fase };
-        }
-
-        // ✅ salva progresso
-        async function salvarProgressoAluno(uid, fase) {
-            const { level, unit } = getParamsFromURL();
-            const dbRef = firebase.database().ref(`usuarios/${uid}/progresso`);
-
-            try {
-                if (fase === "end") {
-                    const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
-                    await dbRef.child(nextLevel).set({});
-                    await dbRef.child(`${nextLevel}/Unit1/fase1`).set(true);
-                    console.log(`Created new Level ${nextLevel}`);
-                } else if (fase === "last") {
-                    const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-                    await dbRef.child(`${level}/${nextUnit}`).set({});
-                    await dbRef.child(`${level}/${nextUnit}/fase1`).set(true);
-                    console.log(`Created new Unit ${nextUnit} in ${level}`);
-                } else {
-                    const nextFase = `fase${parseInt(fase) + 1}`;
-                    await dbRef.child(`${level}/${unit}/${nextFase}`).set(true);
-                    console.log(`Created ${nextFase} in ${level}/${unit}`);
-                }
-
-                phaseCompleted = true;
-                console.log("Phase marked as completed.");
-            } catch (error) {
-                console.error("Erro ao atualizar progresso:", error);
-            }
-        }
-
-        // ✅ carrega images.txt + imagens
+        // -------------------- Carrega conteúdo (images.txt + imagens) --------------------
         async function loadContent() {
             const { level, unit } = getParamsFromURL();
+
+            if (!level || !unit) {
+                console.error("Level or Unit is missing in the URL parameters.");
+                return [];
+            }
+
             const dataStoryPath = `../../${level}/${unit}/DataStory/`;
 
             try {
                 const response = await fetch(`${dataStoryPath}images.txt`);
-                if (!response.ok) throw new Error(`Failed to fetch images.txt`);
+                if (!response.ok) throw new Error(`Failed to fetch images.txt from ${dataStoryPath}`);
+                
+                const text = await response.text();
+                const lines = text.split('\n');
 
-                const raw = await response.text();
-                console.log("Fetched images.txt:", raw);
-
-                const lines = raw.split('\n');
                 let cards = [];
                 let currentImage = '';
                 let currentText = '';
@@ -157,7 +122,7 @@
                         if (currentImage && currentText) {
                             cards.push({ image: currentImage, text: currentText.trim() });
                         }
-                        currentImage = line.replace('#', '').trim();
+                        currentImage = line.replace('#', '').trim(); // e.g., imagem1
                         currentText = '';
                     } else {
                         currentText += line + ' ';
@@ -168,27 +133,28 @@
                     cards.push({ image: currentImage, text: currentText.trim() });
                 }
 
-                storyText = cards.map(c => c.text).join("\n\n");
+                storyText = cards.map(card => card.text).join('\n\n');
 
-                // monta caminho das imagens
+                // Atualiza caminhos das imagens
                 cards = cards.map(card => ({
                     ...card,
                     image: `${dataStoryPath}images/${card.image}.png`
                 }));
 
-                console.log("Final parsed cards:", cards);
+                console.log("Final Cards Data:", cards);
                 return cards;
-            } catch (err) {
-                console.error("Error loading images:", err);
+            } catch (error) {
+                console.error("Error loading content:", error);
                 return [];
             }
         }
-        // ✅ mostra um card
+
+        // -------------------- Renderização do Card + Sincronização do botão --------------------
         function displayCard(index) {
             const container = document.getElementById('cardsContainer');
             container.innerHTML = '';
-
             const cardData = cardsData[index];
+
             const cardElement = document.createElement('div');
             cardElement.className = 'card active';
             cardElement.onclick = () => toggleView(); // Alternar entre texto e imagem
@@ -202,47 +168,59 @@
                 cardElement.innerHTML = `<img src="${cardData.image}" alt="Image">`;
             }
 
+            // Botão do "speaker"
             const businessmanImage = document.createElement('img');
             businessmanImage.src = 'businessman.png';
             businessmanImage.className = 'businessman';
             businessmanImage.onclick = (event) => {
-                event.stopPropagation();
+                event.stopPropagation(); // Evita alternar texto/imagem ao clicar no ícone
                 toggleSpeech(cardData.text, businessmanImage, index);
             };
 
             cardElement.appendChild(businessmanImage);
             container.appendChild(cardElement);
 
+            // Marcar o cartão como visualizado
             if (!viewedCards.has(index)) {
-                viewedCards.add(index);
                 console.log(`Card ${index + 1} marked as viewed.`);
+                viewedCards.add(index);
             }
-
             checkCompletion();
 
+            // Navegação
             document.getElementById('prevBtn').style.display = (index === 0) ? 'none' : 'block';
             document.getElementById('nextBtn').style.display = (index === cardsData.length - 1) ? 'none' : 'block';
+
+            // ✅ FIX: garantir que o rótulo do botão esteja sempre sincronizado após qualquer render
+            const toggleBtn = document.getElementById("toggleButton");
+            if (toggleBtn) {
+                toggleBtn.innerText = showText ? "See the story" : "Read the story";
+            }
         }
 
+        // Alterna texto/imagem e atualiza rótulo do botão
         function toggleView() {
             showText = !showText;
-            document.getElementById("toggleButton").innerText =
-                showText ? "See the story" : "Read the story";
+            const toggleBtn = document.getElementById("toggleButton");
+            if (toggleBtn) {
+                toggleBtn.innerText = showText ? "See the story" : "Read the story";
+            }
             displayCard(currentCardIndex);
         }
 
+        // Navegação
         function showNextCard() {
             currentCardIndex = (currentCardIndex + 1) % cardsData.length;
-            console.log("Next index:", currentCardIndex);
+            console.log("Showing next card. Current index: ", currentCardIndex);
             displayCard(currentCardIndex);
         }
-
         function showPreviousCard() {
             currentCardIndex = (currentCardIndex - 1 + cardsData.length) % cardsData.length;
-            console.log("Prev index:", currentCardIndex);
+            console.log("Showing previous card. Current index: ", currentCardIndex);
             displayCard(currentCardIndex);
         }
 
+        // -------------------- Botão "Back" com verificação de fase --------------------
         document.addEventListener("DOMContentLoaded", () => {
             const backButton = document.querySelector("button#backButton");
             if (backButton) {
@@ -254,7 +232,7 @@
             const { level, unit, fase } = getParamsFromURL();
 
             if (!level || !unit || !fase) {
-                alert("Level, Unit or Fase not found.");
+                alert("Level, Unit or Fase not identified in the URL.");
                 return;
             }
 
@@ -264,21 +242,19 @@
                     const isPhaseCompleted = await checkPhaseProgress(uid, level, unit, fase);
 
                     if (isPhaseCompleted) {
+                        console.log("Next phase is already unlocked. Going back.");
                         window.history.back();
                     } else {
                         const confirmExit = confirm(
-`The next phase is not completed.
-
-To complete this phase, you must view and listen to ALL story cards (open each card and play the audio to the end).
-
-Do you wish to leave anyway?`
+                            "The next phase is not completed.\n\nTo complete this phase, you must view and listen to ALL story cards (open each card and play the audio to the end).\n\nDo you wish to leave anyway?"
                         );
                         if (confirmExit) {
+                            console.log("User chose to leave without completing the phase. Going back.");
                             window.history.back();
                         }
                     }
                 } else {
-                    alert("Please log in to save your progress.");
+                    alert("Please log in to save your progress and continue.");
                 }
             });
         }
@@ -287,47 +263,38 @@ Do you wish to leave anyway?`
             try {
                 const currentNumber = parseInt(currentFase.replace("fase", ""));
                 const nextFase = `fase${currentNumber + 1}`;
-                const dbRef = firebase
-                    .database()
-                    .ref(`usuarios/${uid}/progresso/${level}/${unit}/${nextFase}`);
-
+                const dbRef = firebase.database().ref(`usuarios/${uid}/progresso/${level}/${unit}/${nextFase}`);
                 const snapshot = await dbRef.once("value");
-                return snapshot.val();
+                return snapshot.val(); // true se estiver liberada, false se não
             } catch (error) {
-                console.error("Error checking progress:", error);
+                console.error("Error checking phase progress:", error);
                 return false;
             }
         }
-        /* =====================================================================
-           ✅ ÁUDIO — PRIORIDADE MP3 / FALLBACK TTS
-        ===================================================================== */
 
-        // ✅ toggleSpeech -> agora apenas delega
+        // -------------------- Áudio: MP3 (prioridade) com fallback TTS --------------------
         function toggleSpeech(text, buttonElement, index) {
             playCardAudio(text, buttonElement, index);
         }
 
-        // ✅ tenta MP3 → fallback TTS
         async function playCardAudio(text, buttonElement, index) {
             stopCurrentAudio();
 
             const mp3Url = getMp3ForCard(index);
-
             if (mp3Url) {
                 try {
                     console.log("Attempting MP3:", mp3Url);
                     await playMp3(mp3Url, buttonElement, index);
                     return;
                 } catch (e) {
-                    console.warn("MP3 failed → fallback TTS:", e);
+                    console.warn("MP3 failed, fallback to TTS:", e);
                 }
             }
 
-            console.log("Fallback → TTS");
+            // Fallback TTS (sem alertas sobre voz en-US)
             playTTS(text, buttonElement, index);
         }
 
-        // ✅ encontra o MP3 do card pelo manifest
         function getMp3ForCard(index) {
             if (!storyManifest) return null;
             const card = storyManifest.cards?.find(c => c.index === index + 1);
@@ -337,14 +304,13 @@ Do you wish to leave anyway?`
             return `../../${level}/${unit}/DataStory/sounds/${card.audio}`;
         }
 
-        // ✅ toca MP3 silenciosamente (sem player)
         function playMp3(url, buttonElement, index) {
             return new Promise((resolve, reject) => {
                 currentAudio = new Audio(url);
                 currentAudio.preload = "auto";
-
                 currentAudio.play().then(() => {
-                    buttonElement.src = 'pause.png'; // opcional visual
+                    // Visual opcional durante reprodução
+                    buttonElement.src = 'pause.png';
                     markSpokenOnEnd(buttonElement, index, resolve);
                 }).catch(reject);
             });
@@ -361,23 +327,19 @@ Do you wish to leave anyway?`
             }
         }
 
-        // ✅ fallback TTS (sem alerts)
         function playTTS(text, buttonElement, index) {
             const utter = new SpeechSynthesisUtterance(text);
-            utter.lang = "en-US";
-
+            utter.lang = 'en-US';
             window.speechSynthesis.speak(utter);
 
             buttonElement.src = 'pause.png';
-
             utter.onend = () => {
                 buttonElement.src = 'businessman.png';
-                spokenCards.add(index);
+                spokenCards.add(index); // Marca como ouvido
                 checkCompletion();
             };
         }
 
-        // ✅ marca listened ao terminar MP3
         function markSpokenOnEnd(buttonElement, index, resolve) {
             currentAudio.onended = () => {
                 buttonElement.src = 'businessman.png';
@@ -387,51 +349,40 @@ Do you wish to leave anyway?`
             };
         }
 
-
-        /* =====================================================================
-            ✅ CHECK COMPLETION
-        ===================================================================== */
-
+        // -------------------- Check Completion --------------------
         async function checkCompletion() {
             console.log("Checking completion...");
-            console.log(`Viewed: ${viewedCards.size}/${cardsData.length}`);
-            console.log(`Heard: ${spokenCards.size}/${cardsData.length}`);
+            console.log(`Viewed cards: ${viewedCards.size}/${cardsData.length}`);
+            console.log(`Spoken cards: ${spokenCards.size}/${cardsData.length}`);
 
-            if (viewedCards.size === cardsData.length &&
-                spokenCards.size === cardsData.length) {
-
+            if (viewedCards.size === cardsData.length && spokenCards.size === cardsData.length) {
                 if (!phaseCompleted) {
                     phaseCompleted = true;
-                    console.log("✅ Phase completed");
-
+                    console.log("All cards viewed and heard. Phase completed.");
+                    
                     const user = firebase.auth().currentUser;
-
                     if (user) {
                         const { fase } = getParamsFromURL();
                         await salvarProgressoAluno(user.uid, fase);
                         alert("Congratulations! You have completed this phase.");
                     } else {
-                        console.log("User not logged. Not saving.");
+                        console.log("User not logged in. Progress not saved.");
                     }
                 }
             }
         }
-        /* =====================================================================
-            ✅ PDF
-        ===================================================================== */
+
+        // -------------------- PDF --------------------
         function generatePDF() {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
 
             // Adiciona a logo
-            doc.addImage('Logo.png', 'PNG', 85, 10, 40, 40);
+            doc.addImage('Logo.png', 'PNG', 85, 10, 40, 40); // Posiciona a logo no PDF
 
             // Campos de nome e data
             doc.setFontSize(12);
-            doc.text(
-"Name:_______________________________________________________  Date:_______________",
-                10, 60
-            );
+            doc.text("Name:_______________________________________________________  Date:_______________", 10, 60);
 
             // Título
             doc.setFontSize(20);
@@ -439,10 +390,10 @@ Do you wish to leave anyway?`
 
             // Texto da história
             doc.setFontSize(12);
-            let y = 100;
-            const marginLeft   = 10;
+            let y = 100; // Posição inicial para o texto
+            const marginLeft = 10;
             const maxLineWidth = 180;
-            const lineHeight   = 10;
+            const lineHeight = 10;
 
             const splitText = doc.splitTextToSize(storyText, maxLineWidth);
             splitText.forEach(line => {
@@ -454,10 +405,25 @@ Do you wish to leave anyway?`
                 y += lineHeight;
             });
 
-            doc.save("story.pdf");
+            doc.save("story.pdf"); // Salva o PDF com o nome 'story.pdf'
         }
 
+        // -------------------- Boot --------------------
+        document.addEventListener("DOMContentLoaded", async () => {
+            // Role e manifest/conteúdo
+            checkUserRole();
+            storyManifest = await loadStoryManifest();
+            cardsData = await loadContent();
 
+            // Exibe o primeiro card
+            displayCard(0);
+
+            // ✅ FIX: sincroniza o rótulo do botão na carga inicial
+            const toggleBtn = document.getElementById("toggleButton");
+            if (toggleBtn) {
+                toggleBtn.innerText = showText ? "See the story" : "Read the story";
+            }
+        });
     </script>
 
     <style>
@@ -482,7 +448,7 @@ Do you wish to leave anyway?`
             margin: 30px auto;
             padding: 20px;
             background-color: #fff;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
             border-radius: 10px;
             overflow: hidden;
         }
@@ -509,12 +475,13 @@ Do you wish to leave anyway?`
             padding: 20px 40px 20px 20px;
             background-color: #f0f8ff;
             border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
             width: 80%;
             max-width: 700px;
             min-height: 100px;
             position: relative;
             text-align: center;
+            /* Garante espaço extra no fundo, para o botão não cobrir o texto */
             padding-bottom: 120px;
         }
 
@@ -575,32 +542,27 @@ Do you wish to leave anyway?`
             margin-bottom: 20px;
         }
 
-        /* Mantém responsividade das imagens */
+        /* Styles remain consistent and functional */
         .card img {
-            max-width: 100%;
+            max-width: 100%; /* Keeps images responsive */
         }
     </style>
 </head>
 <body>
-
     <button id="backButton">Back</button>
 
     <div class="container">
         <h1>Hannah StoryCard</h1>
-
         <div class="button-container">
             <button id="toggleButton" onclick="toggleView()">Read the story</button>
             <button id="pdfButton" onclick="generatePDF()" style="display: none;">Generate PDF</button>
         </div>
-
         <div class="title" id="storyTitle"></div>
         <div id="cardsContainer"></div>
-
         <div class="navigation">
             <button id="prevBtn" onclick="showPreviousCard()">Previous</button>
             <button id="nextBtn" onclick="showNextCard()">Next</button>
         </div>
     </div>
-
 </body>
 </html>
