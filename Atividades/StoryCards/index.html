@@ -547,22 +547,32 @@
     }
 
     async function salvarProgressoAluno(uid, fase){
-      try{
-        const {level,unit} = getParamsFromURL();
-        const db = firebase.database();
-        await db.ref('usuarios/'+uid+'/progresso/'+level+'/'+unit+'/'+fase).set(true);
+  try{
+    const { level, unit } = getParamsFromURL();
+    const db = firebase.database();
+    const baseRef = db.ref(`usuarios/${uid}/progresso/${level}/${unit}`);
 
-        if(typeof updateNextPhase==='function'){
-          await updateNextPhase(uid);
-        }else{
-          const n = parseInt(String(fase).replace('fase',''),10);
-          if(!isNaN(n)){
-            const prox='fase'+(n+1);
-            await db.ref('usuarios/'+uid+'/progresso/'+level+'/'+unit+'/'+prox).set(true);
-          }
-        }
-      }catch(err){ console.error('Erro ao salvar progresso:',err); }
+    // Extrai número da fase: aceita "fase1" ou "1"
+    const s = String(fase || '');
+    const n = s.startsWith('fase') ? parseInt(s.replace('fase',''),10)
+                                   : parseInt(s,10);
+
+    if (isNaN(n)) {
+      // fallback defensivo: grava fase1 e fase2
+      await baseRef.update({ fase1: true, fase2: true });
+      return;
     }
+
+    // Segue o mesmo padrão das outras atividades:
+    const updates = {};
+    updates[`fase${n}`] = true;        // fase atual
+    updates[`fase${n+1}`] = true;      // próxima fase
+
+    await baseRef.update(updates);
+  } catch (err) {
+    console.error('Erro ao salvar progresso:', err);
+  }
+}
 
     function openCompletionModal(){
       const total = cardsData.length;
