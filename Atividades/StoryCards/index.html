@@ -84,7 +84,7 @@
 
     <!-- Paginador mini + microcopy -->
     <div class="paginator" id="paginator" aria-label="Cards"></div>
-    <div class="gate-hint" id="gateHint">Tap <strong>Play</strong> to advance.</div>
+    <div class="gate-hint" id="gateHint">Listen to unlock Next</div>
 
     <div id="cardsContainer"></div>
 
@@ -145,16 +145,29 @@
     async function loadContent(){
       const {level,unit}=getParamsFromURL(); if(!level||!unit) return [];
       const base=`../../${level}/${unit}/DataStory/`;
-      try{const res=await fetch(`${base}images.txt`); if(!res.ok) throw new Error('Failed to fetch images.txt');
-        const txt=await res.text(); const lines=txt.split('
-'); let cards=[]; let curImg=''; let curTxt='';
-        lines.forEach(line=>{ if(line.startsWith('#imagem')){ if(curImg&&curTxt) cards.push({image:curImg,text:curTxt.trim()}); curImg=line.replace('#','').trim(); curTxt=''; } else { curTxt+=line+' '; } });
-        if(curImg&&curTxt) cards.push({image:curImg,text:curTxt.trim()});
+      try{
+        const res=await fetch(`${base}images.txt`); if(!res.ok) throw new Error('Failed to fetch images.txt');
+        let txt=await res.text();
+        // normalizar quebras / remover BOM
+        txt=txt.replace(/^﻿/, '');
+        const rawLines=txt.split(/
+?
+/);
+        const lines=rawLines.filter(l=>l.trim().length>0);
+        let cards=[]; let curImg=''; let curTxt='';
+        lines.forEach(line=>{
+          if(line.trim().startsWith('#imagem')){
+            if(curImg&&curTxt) cards.push({image:curImg, text:curTxt.trim()});
+            curImg=line.replace('#','').trim();
+            curTxt='';
+          } else { curTxt+=line+' '; }
+        });
+        if(curImg&&curTxt) cards.push({image:curImg, text:curTxt.trim()});
         storyText=cards.map(c=>c.text).join('
 
 ');
-        return cards.map(c=>({...c,image:`${base}images/${c.image}.png`}));
-      }catch(e){return []}
+        return cards.map(c=>({...c, image:`${base}images/${c.image}.png`}));
+      }catch(e){ console.error('loadContent error', e); return [] }
     }
 
     // Paginador
@@ -178,6 +191,12 @@
 
     // Card
     function displayCard(index){
+      if(cardsData.length===0){
+        const container=document.getElementById('cardsContainer');
+        container.innerHTML='<p style="text-align:center;color:#888">No cards found. Check DataStory/images.txt.</p>';
+        return;
+      }
+
       if(!viewedCards.has(index)) viewedCards.add(index);
       if(index>maxVisitedIndex) maxVisitedIndex=index;
 
@@ -207,7 +226,7 @@
 
       // microcopy: mostrar apenas se ainda não ouviu este card
       const hint=document.getElementById('gateHint');
-      if(hint){ hint.style.visibility = spokenCards.has(index) ? 'hidden' : 'visible'; }
+      if(hint){ hint.textContent='Listen to unlock Next'; hint.style.visibility = spokenCards.has(index) ? 'hidden' : 'visible'; }
 
       refreshPaginator();
     }
@@ -252,9 +271,7 @@ Do you wish to leave anyway?')) window.history.back(); }
     // Ao terminar áudio deste card
     function onAudioFinished(index){
       spokenCards.add(index);
-      // microcopy some: esconder
       const hint=document.getElementById('gateHint'); if(hint && index===currentCardIndex){ hint.style.visibility='hidden'; }
-      // pulsar Next
       const nextBtn=document.getElementById('nextBtn'); if(nextBtn) nextBtn.classList.add('pulse-next');
       refreshPaginator();
       checkCompletion();
@@ -295,8 +312,14 @@ Do you wish to leave anyway?')) window.history.back(); }
       storyManifest=await loadStoryManifest();
       cardsData=await loadContent();
       document.getElementById('storyTitle').textContent=storyTitle||'Hannah Story';
-      buildPaginator();
-      displayCard(0);
+      if(cardsData.length>0){
+        buildPaginator();
+        displayCard(0);
+      } else {
+        // fallback de segurança para evitar tela "vazia"
+        const container=document.getElementById('cardsContainer');
+        container.innerHTML='<p style="text-align:center;color:#888">No cards found. Check DataStory/images.txt.</p>';
+      }
       const t=document.getElementById('toggleButton'); if(t) t.innerText=showText?'See the story':'Read the story';
     });
   </script>
