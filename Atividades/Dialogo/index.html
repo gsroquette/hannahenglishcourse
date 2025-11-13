@@ -6,8 +6,7 @@
   <title>Hannah Conversation</title>
   <style>
     :root{
-      /* altura “visual” do rodapé; ajuste se mudar o padding dos botões */
-      --nav-h: 72px;
+      --nav-h: 72px; /* altura “visual” do rodapé */
     }
 
     /* ===== Resets e base ===== */
@@ -40,8 +39,7 @@
       display: grid;
       grid-template-rows: auto 1fr;  /* header / conteúdo (rodapé é fixo) */
       gap: 0;
-      /* Reserva espaço para o rodapé fixo: */
-      padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom));
+      padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom)); /* reserva espaço pro rodapé */
     }
 
     /* ===== Header ===== */
@@ -124,8 +122,7 @@
       overflow: auto; /* rolagem própria se necessário */
       -webkit-overflow-scrolling: touch;
       scrollbar-gutter: stable;
-      /* IMPORTANTÍSSIMO: respiro no fim para o rodapé fixo não cobrir o último botão */
-      padding-bottom: calc(var(--nav-h) + 24px);
+      padding-bottom: calc(var(--nav-h) + 24px); /* garante que o último botão não fique atrás do rodapé */
       padding-top: 4px;
     }
 
@@ -432,10 +429,14 @@
     };
     firebase.initializeApp(firebaseConfig);
 
-    // State
+    // ======== Estado ========
     let idleTimer;
     let robotImg = document.getElementById('robot-img');
     let studentImg = document.getElementById('student-img');
+
+    // TTS global
+    const synth = window.speechSynthesis;
+    let currentUtterance = null;
 
     // Parsed dialogue blocks: [{robotText, studentText|null, hasStudent, required}]
     let blocks = [];
@@ -524,6 +525,36 @@
       });
     }
 
+    // ======== Kill switch do TTS ========
+    function stopSpeaking(reason = '') {
+      try {
+        if (synth) {
+          // sequência "agressiva" pra Safari/iOS
+          synth.cancel();
+          synth.pause();
+          synth.resume();
+          synth.cancel();
+        }
+      } catch(e) {}
+      if (currentUtterance) {
+        currentUtterance.onend = null;
+        currentUtterance.onerror = null;
+        currentUtterance = null;
+      }
+      // volta o robo para o estado padrão (caso esteja animado)
+      if (robotImg) robotImg.src = '../../../../../imagens/robo1_static.png';
+      clearTimeout(idleTimer);
+      // console.debug('TTS stopped:', reason);
+    }
+
+    // Interrompe ao sair/ocultar/trocar página
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) stopSpeaking('visibilitychange');
+    }, {passive:true});
+    window.addEventListener('pagehide', () => stopSpeaking('pagehide'), {passive:true});
+    window.addEventListener('beforeunload', () => stopSpeaking('beforeunload'), {passive:true});
+    window.addEventListener('popstate', () => stopSpeaking('popstate'), {passive:true});
+
     // ======== Prompting logic ========
     function clearPromptAnimations() {
       robotBtn.classList.remove('pulse','highlight-once','success-flash');
@@ -553,7 +584,7 @@
       if (forwardBtn) forwardBtn.classList.remove('forward-pulse');
     }
 
-    // AUTH
+    // ======== Auth & boot ========
     firebase.auth().onAuthStateChanged(async function(user) {
       if (user) {
         fetchUserAvatar(user.uid);
@@ -566,6 +597,7 @@
     });
 
     function goBack() {
+      stopSpeaking('goBack'); // <- interrompe TTS antes de sair
       const { level, unit } = getLevelAndUnitFromURL();
       const currentPhase = getPhaseFromURL();
       const userId = firebase.auth().currentUser?.uid;
@@ -599,7 +631,9 @@
     function speakText(text, callback) {
       clearTimeout(idleTimer);
 
-      const synth = window.speechSynthesis;
+      // Antes de falar, cancela qualquer fala ativa
+      stopSpeaking('pre-speak');
+
       let voices = synth.getVoices();
       let selectedVoice = null;
 
@@ -620,17 +654,27 @@
       }
 
       function createUtterance() {
-        const utterance = new SpeechSynthesisUtterance(text.replace(/usuario_nome/g, userName));
+        const utterance = new SpeechSynthesisUtterance(
+          (text || '').replace(/usuario_nome/g, userName)
+        );
         utterance.lang = 'en-US';
         utterance.voice = selectedVoice || null;
 
-        utterance.onstart = () => { robotImg.src = '../../../../../imagens/robo1.gif'; };
+        utterance.onstart = () => {
+          robotImg.src = '../../../../../imagens/robo1.gif';
+          currentUtterance = utterance;
+        };
         utterance.onend = () => {
           robotImg.src = '../../../../../imagens/robo1_static.png';
+          currentUtterance = null;
           if (callback) callback();
           dialoguesRead++;
           checkCompletion();
           startIdleTimer();
+        };
+        utterance.onerror = () => {
+          robotImg.src = '../../../../../imagens/robo1_static.png';
+          currentUtterance = null;
         };
 
         synth.speak(utterance);
@@ -682,6 +726,9 @@
       if (index < 0 || index >= blocks.length) return;
       currentDialogueIndex = index;
 
+      // Ao trocar de diálogo, interrompe qualquer fala
+      stopSpeaking('updateDialogue');
+
       const block = blocks[index];
 
       // Set texts
@@ -707,6 +754,7 @@
 
       // ROBOT
       robotBtn.onclick = () => {
+        stopSpeaking('robotBtn'); // <- interrompe se estiver lendo outra fala
         stopRobotPrompt();
         speakText(block.robotText, () => {
           markHeard(index, 'robot');
@@ -717,6 +765,7 @@
       // STUDENT
       if (block.hasStudent) {
         studentBtn.onclick = () => {
+          stopSpeaking('studentBtn'); // <- interrompe antes de tocar a fala do aluno
           studentBtn.classList.remove('highlight-once');
           speakText(block.studentText, () => {
             markHeard(index, 'student');
@@ -731,6 +780,7 @@
     }
 
     function previousDialogue() {
+      stopSpeaking('previousDialogue');
       if (currentDialogueIndex > 0) {
         stopForwardPrompt();
         currentDialogueIndex--;
@@ -739,6 +789,7 @@
     }
 
     function nextDialogue() {
+      stopSpeaking('nextDialogue');
       if (currentDialogueIndex < blocks.length - 1) {
         stopForwardPrompt();
         currentDialogueIndex++;
@@ -765,11 +816,13 @@
 
     function showModal() {
       stopForwardPrompt();
+      stopSpeaking('showModal'); // interrompe leitura ao abrir modal
       document.getElementById('completion-modal').style.display = 'block';
       document.getElementById('overlay').style.display = 'block';
     }
 
     function closeModal() {
+      stopSpeaking('closeModal'); // segurança
       document.getElementById('completion-modal').style.display = 'none';
       document.getElementById('overlay').style.display = 'none';
     }
