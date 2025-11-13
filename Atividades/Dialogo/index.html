@@ -2,19 +2,36 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <title>Hannah Conversation</title>
   <style>
+    /* ===== Resets e base ===== */
+    html, body {
+      height: 100%;
+      min-height: -webkit-fill-available; /* iOS Safari fallback */
+    }
+    * { box-sizing: border-box; }
+
     body {
       background-image: url('../../../../../imagens/fundo.png');
       background-repeat: repeat;
       font-family: Arial, sans-serif;
+      margin: 0;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      margin: 0;
+      align-items: stretch;
     }
 
+    /* ===== Layout de página: 3 faixas (header / conteúdo / navegação) ===== */
+    #page {
+      min-height: 100dvh;              /* unidades de viewport modernas */
+      min-height: -webkit-fill-available; /* fallback iOS */
+      display: grid;
+      grid-template-rows: auto 1fr auto;  /* header / conteúdo / rodapé */
+      gap: 0;
+    }
+
+    /* ===== Header ===== */
     #header {
       width: 100%;
       display: flex;
@@ -22,91 +39,163 @@
       align-items: center;
       justify-content: center;
       position: relative;
-      padding: 20px;
+      padding: 12px 12px 8px;
+      padding-top: calc(12px + env(safe-area-inset-top)); /* iPhone notch */
     }
 
     .back-button {
       background-color: black;
       color: white;
       border: none;
-      padding: 10px 20px;
+      padding: 8px 14px;
       font-size: 16px;
       cursor: pointer;
       box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
       position: relative;
-      margin-bottom: 30px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      line-height: 1;
+      min-height: 36px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: clamp(16px, 4.5vw, 22px);
+      margin: 4px 8px 8px;
+      line-height: 1.15;
+    }
+
+    /* ===== Stepper (bolinhas de progresso) ===== */
+    #stepper {
+      display:flex;
+      gap:6px;
+      margin: 4px 0 0;
+      max-width: 100%;
+      overflow-x: auto;              /* se houver muitas bolinhas */
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 4px;
+    }
+    .step-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background:#e0e0e0;
+      outline:1px solid #bdbdbd;
+      flex: 0 0 auto;
+    }
+    .step-dot.half { background:#f2b01e; }
+    .step-dot.done { background:#2e7d32; }
+
+    /* ===== Área de diálogos =====
+       Torna-se a "faixa flexível" da grade, com overflow interno caso necessário.
+    */
+    #content-wrap {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;       /* importante para permitir overflow interno */
     }
 
     #dialogue-container {
-      display: flex;
-      align-items: flex-start;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: start;
       justify-content: center;
-      flex-wrap: nowrap;
-      margin: 20px;
+      gap: 12px;
+      padding: 8px 12px;
       max-width: 100%;
-      gap: 20px;
+      width: 100%;
+      /* Se ainda assim, em alguns aparelhos, estourar, permite rolagem interna sem rolar a página inteira */
+      overflow: auto;
+      -webkit-overflow-scrolling: touch;
     }
 
     .character {
-      margin: 20px;
+      margin: 0;
       text-align: center;
-      flex: 1 1 300px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
     }
 
     .character img {
-      width: 100%;
-      max-width: 150px;
+      width: clamp(72px, 22vw, 140px);
       height: auto;
       border-radius: 50%;
+      flex: 0 0 auto;
     }
 
     .character-text {
-      font-size: 20px;
+      font-size: clamp(12px, 3.6vw, 18px);
       font-weight: bold;
       background-color: #ffffff;
-      padding: 15px;
+      padding: 10px 12px;
       border-radius: 10px;
       box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
-      max-width: 90%;
-      min-height: 56px; /* garante presença do balão mesmo vazio */
+      max-width: 100%;
+      min-height: 48px; /* garante presença do balão mesmo vazio */
       position: relative;
       transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease;
-      margin: 0 auto;
+      margin: 0;
+      line-height: 1.25;
+      /* Se o texto for grande, o balão passa a rolar internamente (não a página) */
+      max-height: 28vh;
+      overflow: auto;
+      -webkit-overflow-scrolling: touch;
     }
 
     /* Balão placeholder (em caso de bloco sem fala do aluno) */
     .character-text.placeholder {
       color: transparent;             /* texto vazio/oculto */
       user-select: none;
-      border: 2px dashed #bdbdbd;
-      background-color: rgba(255,255,255,0.8);
+      border: 1px dashed #bdbdbd;
+      background-color: rgba(255,255,255,0.85);
     }
 
-    .audio-button-container { margin-top: 10px; min-height: 44px; } /* reserva altura */
+    .audio-button-container { 
+      margin-top: 4px; 
+      min-height: 40px; 
+      display:flex; 
+      align-items:center; 
+      justify-content:center; 
+      width: 100%;
+    }
 
+    /* ===== Navegação: barra fixa na base da viewport ===== */
     #navigation {
       display: flex;
       justify-content: center;
-      flex-wrap: wrap;
-      margin: 20px;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); /* respeita área segura iPhone */
       width: 100%;
-      gap: 12px;
+      background: rgba(255,255,255,0.8);
+      backdrop-filter: saturate(140%) blur(6px);
+      position: sticky;   /* mantém visível se o conteúdo interno rolar */
+      bottom: 0;
+      left: 0;
+      z-index: 10;
+      border-top: 1px solid rgba(0,0,0,0.08);
     }
 
     .nav-button {
       background-color: green;
       color: white;
       border: none;
-      padding: 10px 20px;
-      font-size: 16px;
+      padding: 10px 14px;
+      font-size: clamp(12px, 3.8vw, 16px);
       cursor: pointer;
       box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
-      margin: 10px 0;
+      margin: 0;
       flex: 1;
-      max-width: 200px;
-      border-radius: 8px;
+      max-width: 220px;
+      border-radius: 10px;
+      min-height: 44px; /* alvos acessíveis */
+      line-height: 1.1;
     }
 
+    /* ===== Modal de conclusão ===== */
     #completion-modal {
       display: none;
       position: fixed;
@@ -119,15 +208,20 @@
       box-shadow: 0px 0px 10px rgba(0,0,0,0.1);
       z-index: 1000;
       text-align: center;
+      max-width: min(92vw, 420px);
+      width: 92vw;
+      border-radius: 12px;
     }
 
     #completion-modal button {
-      margin-top: 20px;
-      padding: 10px 20px;
+      margin-top: 16px;
+      padding: 10px 16px;
       background-color: #333;
       color: white;
       border: none;
       cursor: pointer;
+      border-radius: 8px;
+      min-height: 40px;
     }
 
     #completion-modal button:hover { background-color: #555; }
@@ -143,15 +237,13 @@
       z-index: 999;
     }
 
-    h1 { text-align: center; font-size: 2em; margin: 20px; }
-
-    /* ======== VISUAL PROGRESS ======== */
+    /* ===== Visual progress badges nas bolhas ===== */
     .progress-badge {
       position: absolute;
-      top: -8px;
-      right: -8px;
-      font-size: 12px;
-      padding: 4px 6px;
+      top: -6px;
+      right: -6px;
+      font-size: 11px;
+      padding: 3px 6px;
       border-radius: 999px;
       background: #e0e0e0; /* base */
       color: #000;
@@ -160,21 +252,23 @@
     .badge-half { background: #ffe08a; }
     .badge-full { background: #a5d6a7; }
 
-    .bubble-0 { border: 2px dashed #bdbdbd; }
+    .bubble-0 { border: 1px dashed #bdbdbd; }
     .bubble-1 { border: 2px solid #f2b01e; }
-    .bubble-2 { border: 2px solid #2e7d32; box-shadow: 0 0 0 2px rgba(46,125,50,.15); }
+    .bubble-2 { border: 2px solid #2e7d32; box-shadow: 0 0 0 2px rgba(46,125,50,.12); }
 
-    #stepper { display:flex; gap:8px; margin:8px 0; }
-    .step-dot { width:10px; height:10px; border-radius:50%; background:#e0e0e0; outline:1px solid #bdbdbd; }
-    .step-dot.half { background:#f2b01e; }
-    .step-dot.done { background:#2e7d32; }
-
-    /* ======== Animações: botões de áudio ======== */
-    .audio-button { border-radius: 999px; border: none; padding: 10px 14px; }
+    /* ===== Botões de áudio e animações ===== */
+    .audio-button { 
+      border-radius: 999px; 
+      border: none; 
+      padding: 10px 14px; 
+      font-size: 18px;
+      min-width: 44px;
+      min-height: 44px;
+    }
 
     @keyframes pulse {
       0%   { transform: scale(1);    box-shadow: 0 0 0 0 rgba(33,150,243,0.45); }
-      70%  { transform: scale(1.08); box-shadow: 0 0 0 12px rgba(33,150,243,0); }
+      70%  { transform: scale(1.06); box-shadow: 0 0 0 12px rgba(33,150,243,0); }
       100% { transform: scale(1);    box-shadow: 0 0 0 0 rgba(33,150,243,0); }
     }
     .pulse { animation: pulse 1.2s ease-in-out infinite; outline: 2px solid rgba(33,150,243,.25); }
@@ -193,7 +287,6 @@
     }
     .success-flash { animation: successFlash 700ms ease-in-out 1; }
 
-    /* ======== Animação: Forward quando bloco concluído ======== */
     @keyframes forwardPulse {
       0%   { transform: scale(1);    box-shadow: 0 0 0 0 rgba(76,175,80,.45); }
       70%  { transform: scale(1.06); box-shadow: 0 0 0 14px rgba(76,175,80,0); }
@@ -209,43 +302,64 @@
       .pulse, .highlight-once, .success-flash, .forward-pulse { animation: none; outline: none; box-shadow: none; }
     }
 
+    /* ===== Ajustes adicionais para telas pequenas ===== */
     @media (max-width: 600px) {
-      .back-button { font-size: 14px; padding: 8px 16px; }
-      .nav-button { font-size: 14px; padding: 8px 16px; }
-      .character { flex: 1 1 100%; margin: 10px 0; }
-      .character-text { font-size: 16px; }
-      #dialogue-container { flex-wrap: wrap; }
+      .back-button { font-size: 14px; padding: 8px 12px; min-height: 36px; }
+      .nav-button { font-size: clamp(12px, 3.8vw, 15px); padding: 10px 12px; }
+      #dialogue-container { 
+        grid-template-columns: repeat(2, minmax(0, 1fr)); 
+        gap: 10px; 
+        padding: 8px 10px; 
+      }
+      .character-text { 
+        font-size: clamp(12px, 3.6vw, 16px);
+        padding: 8px 10px; 
+        max-height: 28vh;
+      }
+      .audio-button-container { min-height: 40px; }
+    }
+
+    /* Ultra-compacto para aparelhos muito pequenos (largura <= 360px) */
+    @media (max-width: 360px) {
+      .character img { width: clamp(64px, 24vw, 110px); }
+      .character-text { max-height: 26vh; }
+      .nav-button { min-height: 42px; }
+      .step-dot { width: 7px; height: 7px; }
     }
   </style>
 </head>
 <body>
-  <div id="header">
-    <button class="back-button" onclick="goBack()">Back</button>
-    <h1>Hannah Conversation</h1>
-    <div id="stepper" aria-label="Dialogues progress"></div>
-  </div>
+  <div id="page">
+    <div id="header">
+      <button class="back-button" onclick="goBack()">Back</button>
+      <h1>Hannah Conversation</h1>
+      <div id="stepper" aria-label="Dialogues progress"></div>
+    </div>
 
-  <div id="dialogue-container">
-    <div class="character" id="robot">
-      <img id="robot-img" src="../../../../../imagens/robo1_static.png" alt="Robot Lex" />
-      <div class="character-text" id="robot-text"></div>
-      <div class="audio-button-container">
-        <button class="audio-button" id="robot-audio-button">🔊</button>
+    <div id="content-wrap">
+      <div id="dialogue-container">
+        <div class="character" id="robot">
+          <img id="robot-img" src="../../../../../imagens/robo1_static.png" alt="Robot Lex" />
+          <div class="character-text" id="robot-text"></div>
+          <div class="audio-button-container">
+            <button class="audio-button" id="robot-audio-button">🔊</button>
+          </div>
+        </div>
+
+        <div class="character" id="student">
+          <img id="student-img" src="../../../../../imagens/avatar_aluno1.png" alt="Student Avatar" />
+          <div class="character-text" id="student-text"></div>
+          <div class="audio-button-container">
+            <button class="audio-button" id="student-audio-button">🔊</button>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="character" id="student">
-      <img id="student-img" src="../../../../../imagens/avatar_aluno1.png" alt="Student Avatar" />
-      <div class="character-text" id="student-text"></div>
-      <div class="audio-button-container">
-        <button class="audio-button" id="student-audio-button">🔊</button>
-      </div>
+    <div id="navigation">
+      <button class="nav-button" onclick="previousDialogue()">&lt;&lt; Back</button>
+      <button class="nav-button" onclick="nextDialogue()">Forward &gt;&gt;</button>
     </div>
-  </div>
-
-  <div id="navigation">
-    <button class="nav-button" onclick="previousDialogue()">&lt;&lt; Back</button>
-    <button class="nav-button" onclick="nextDialogue()">Forward &gt;&gt;</button>
   </div>
 
   <div id="overlay"></div>
