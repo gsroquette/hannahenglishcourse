@@ -96,7 +96,7 @@
         .drop-zone{
             display:flex; gap:var(--slot-gap); flex-wrap:nowrap; align-items:center;
             min-height: var(--slot-h);
-            justify-content:center;
+            justify-content:flex-start; /* <<< importante: garante que o 1º slot fique realmente à esquerda */
             padding: 2px 4px;
         }
 
@@ -369,7 +369,7 @@
         }
     }
 
-    // ===== Criar atividade (com híbrido)
+    // ===== Criar atividade (com híbrido + 1 letra por campo)
     function createActivity(imageUrl, word, wordIndex) {
         const activityContainer = document.getElementById('activity-container');
         const activityDiv = document.createElement('div');
@@ -398,26 +398,65 @@
         track.appendChild(thumb); overflowUi.appendChild(leftBtn); overflowUi.appendChild(track); overflowUi.appendChild(rightBtn);
         dropWrap.appendChild(overflowUi);
 
-        // Inputs
+        // Inputs (uma letra por campo)
         const letterInputs = [];
-        word.split('').forEach((letter, index) => {
+        const letters = word.split('');
+        letters.forEach((expected, index) => {
             const input = document.createElement('input');
-            input.classList.add('missing-letter-input'); // mantém a classe original (PDF e estilos)
+            input.classList.add('missing-letter-input');
+            input.setAttribute('inputmode', 'latin');     // hint para teclado
+            input.setAttribute('autocomplete', 'off');
+            input.setAttribute('autocorrect', 'off');
+            input.setAttribute('autocapitalize', 'characters');
+            input.setAttribute('spellcheck', 'false');
             input.maxLength = 1;
 
-            input.addEventListener('input', function () {
-                if (input.value.toUpperCase() === letter.toUpperCase()) {
-                    input.classList.add('correct'); input.classList.remove('incorrect');
-                    if (index < word.length - 1) letterInputs[index + 1].focus();
+            // Digitação: força 1 char, uppercase, avança foco, marca certo/errado
+            input.addEventListener('input', () => {
+                let v = (input.value || '').toUpperCase();
+                if (v.length > 1) v = v.charAt(0); // trunca
+                // aceita somente A-Z; se não for, limpa e não avança
+                if (!/^[A-Z]$/.test(v)) {
+                    input.value = '';
+                    input.classList.remove('correct','incorrect');
+                    return;
+                }
+                input.value = v;
 
-                    const userWord = letterInputs.map(x => (x.value || '').toUpperCase()).join('');
+                // marcação
+                if (v === expected.toUpperCase()) {
+                    input.classList.add('correct');
+                    input.classList.remove('incorrect');
+                } else {
+                    input.classList.add('incorrect');
+                    input.classList.remove('correct');
+                }
+
+                // avança foco se houver próximo
+                if (index < letters.length - 1) {
+                    letterInputs[index + 1].focus();
+                }
+
+                // verifica se todos estão preenchidos
+                const done = letterInputs.every(i => (i.value || '').length === 1);
+                if (done) {
+                    const userWord = letterInputs.map(i => (i.value || '').toUpperCase()).join('');
                     if (userWord === word.toUpperCase()) {
                         playMp3OrSpeak(wordIndex, word);
                         completedWords++;
                         if (completedWords === activities.length) showCompletionModal();
                     }
-                } else {
-                    input.classList.add('incorrect'); input.classList.remove('correct');
+                }
+            });
+
+            // Backspace: se vazio, volta para o anterior
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Backspace' && !input.value && index > 0) {
+                    e.preventDefault();
+                    const prev = letterInputs[index - 1];
+                    prev.focus();
+                    prev.value = '';
+                    prev.classList.remove('correct','incorrect');
                 }
             });
 
@@ -439,18 +478,19 @@
 
         // ====== Layout adaptativo + overflow amigável ======
         dropZone.dataset.letters = String(word.length);
-        const ro = new ResizeObserver(()=> fitSlotsToOneLine(dropViewport, dropZone, dropWrap, track, thumb));
+        const ro = new ResizeObserver(()=> fitSlotsToOneLine(dropViewport, dropZone, dropWrap, track, thumb, {resetScroll:true}));
         ro.observe(activityDiv);
-        imgElement.addEventListener('load', ()=> fitSlotsToOneLine(dropViewport, dropZone, dropWrap, track, thumb));
+        imgElement.addEventListener('load', ()=> fitSlotsToOneLine(dropViewport, dropZone, dropWrap, track, thumb, {resetScroll:true}));
         dropViewport.addEventListener('scroll', ()=> syncThumb(dropViewport, dropZone, track, thumb));
         leftBtn.addEventListener('click', ()=> nudgeScroll(dropViewport, -stepSize(dropZone)));
         rightBtn.addEventListener('click',()=> nudgeScroll(dropViewport,  stepSize(dropZone)));
         enableThumbDrag(track, thumb, dropViewport, dropZone);
 
-        requestAnimationFrame(()=> fitSlotsToOneLine(dropViewport, dropZone, dropWrap, track, thumb));
+        // Inicial: garante que a primeira casinha esteja visível
+        requestAnimationFrame(()=> fitSlotsToOneLine(dropViewport, dropZone, dropWrap, track, thumb, {resetScroll:true}));
     }
 
-    // ===== Overflow helpers (mesmos do outro arquivo, adaptados para inputs)
+    // ===== Overflow helpers
     function elArrow(txt){ const b=document.createElement('div'); b.className='drop-arrow'; b.setAttribute('role','button'); b.setAttribute('tabindex','0'); b.textContent=txt; b.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' ') b.click(); }); return b; }
     function stepSize(dropZone){
         const cs=getComputedStyle(dropZone);
@@ -459,7 +499,9 @@
         return Math.round(w+g);
     }
     function nudgeScroll(viewport, delta){
-        viewport.scrollTo({ left: clamp(viewport.scrollLeft + delta, 0, viewport.scrollWidth - viewport.clientWidth), behavior:'smooth' });
+        const max = viewport.scrollWidth - viewport.clientWidth;
+        const next = clamp(viewport.scrollLeft + delta, 0, max);
+        viewport.scrollTo({ left: next, behavior:'smooth' });
     }
     function enableThumbDrag(track, thumb, viewport, dropZone){
         let dragging=false, startX=0, startLeft=0;
@@ -482,8 +524,13 @@
     function syncThumb(viewport, dropZone, track, thumb){
         const contentW = dropZone.scrollWidth, vpW = viewport.clientWidth;
         const overflow = contentW > vpW + 1;
+        if(!overflow){
+            thumb.style.left='4px';
+            viewport.dataset.gradientLeft = '0';
+            viewport.dataset.gradientRight = '0';
+            return;
+        }
         const limits = Math.max(8, track.clientWidth - (parseFloat(getComputedStyle(thumb).width)||120) - 8);
-        if(!overflow){ thumb.style.left='4px'; dropWrap?.setAttribute?.('data-overflow','0'); return; }
         const ratio = viewport.scrollLeft / (contentW - vpW);
         thumb.style.left = (4 + limits * ratio) + 'px';
 
@@ -492,7 +539,7 @@
         viewport.dataset.gradientLeft  = nearLeft ? '0' : '1';
         viewport.dataset.gradientRight = nearRight ? '0' : '1';
     }
-    function fitSlotsToOneLine(viewport, dropZone, dropWrap, track, thumb){
+    function fitSlotsToOneLine(viewport, dropZone, dropWrap, track, thumb, opts={}){
         const root = getComputedStyle(document.documentElement);
         const DZstyles = getComputedStyle(dropZone);
 
@@ -538,16 +585,19 @@
         const overflow = contentW > vpW + 1;
         dropWrap.dataset.overflow = overflow ? '1' : '0';
 
+        if (opts.resetScroll) {
+            // garante que o primeiro slot fique visível
+            viewport.scrollLeft = 0;
+        }
+
         if(overflow){
             const trackInner = track.clientWidth - 8;
             const thumbW = clamp(Math.round((vpW/contentW)*trackInner), parseInt(root.getPropertyValue('--thumb-min'))||40, trackInner);
             thumb.style.width = thumbW + 'px';
         }
-        // Sincroniza indicadores
-        const nearLeft = viewport.scrollLeft <= 2;
-        const nearRight = (contentW - vpW - viewport.scrollLeft) <= 2;
-        viewport.dataset.gradientLeft  = nearLeft ? '0' : '1';
-        viewport.dataset.gradientRight = nearRight ? '0' : '1';
+
+        // Sincroniza trilho e gradientes
+        syncThumb(viewport, dropZone, track, thumb);
     }
 
     // ===== Utilidades gerais
@@ -556,7 +606,7 @@
     function reflowAllDropZones(){ document.querySelectorAll('.activity .drop-viewport').forEach(vp => {
         const wrap = vp.parentElement, dz = vp.querySelector('.drop-zone');
         const track = wrap.querySelector('.drop-track'), thumb = wrap.querySelector('.drop-thumb');
-        fitSlotsToOneLine(vp, dz, wrap, track, thumb);
+        fitSlotsToOneLine(vp, dz, wrap, track, thumb, {resetScroll:false});
     }); }
 
     // ===== Modal + Progresso (mantidos)
