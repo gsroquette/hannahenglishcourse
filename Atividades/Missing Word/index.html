@@ -12,7 +12,7 @@
             /* Dimensões padrão (máximas) dos “slots”/inputs */
             --slot-w:56px; --slot-h:64px; --slot-gap:8px; --tile-font:1.6rem;
 
-            /* Limites para adaptação */
+            /* Limites para adaptação (mantidos e seguros para toque) */
             --slot-w-max:56px; --slot-h-max:64px;
             --slot-w-min:48px; --slot-h-min:56px; --slot-gap-min:6px;
 
@@ -45,7 +45,7 @@
             -webkit-tap-highlight-color: transparent;
         }
 
-        /* Título responsivo */
+        /* Título responsivo (mantido) */
         h1 {
             text-align: center;
             color: var(--brand);
@@ -109,7 +109,7 @@
             font-size: var(--tile-font);
             font-weight: 700;
             text-align: center;
-            border: 3px dashed #999;
+            border: 3px dashed #999;     /* 3px*2 = +6px na largura externa */
             border-radius: 12px;
             background: #fff;
             outline: none;
@@ -169,7 +169,7 @@
         }
         #completion-modal button:hover{ background-color: #28a428; }
 
-        /* Toolbar: botões responsivos */
+        /* Toolbar: botões responsivos (mantidos) */
         .toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; justify-content:center; margin-bottom:8px; }
         .btn {
             padding: 12px 20px;
@@ -555,10 +555,10 @@
 
     /**
      * Ajusta os slots para tentar CABER EM UMA LINHA antes de ativar o scroll.
-     * Regras:
-     *  - Reduz quadradinhos e gap até o mínimo para caber.
-     *  - Só ativa scroll se AINDA não couber E letras >= 6.
-     *  - Para letras <= 5 => nunca mostra scroll (nem UI).
+     * Decisão 100% por MEDIÇÃO, com tolerância de micro-overflow.
+     * - Reduz quadradinhos e gap até o mínimo para caber.
+     * - Se ainda não couber, ativa scroll.
+     * - Para curtas (≈<=5 letras), aplica tolerância maior para evitar scroll desnecessário.
      */
     function fitSlotsToOneLine(viewport, dropZone, dropWrap, track, thumb, opts={}){
         const root = getComputedStyle(document.documentElement);
@@ -581,7 +581,16 @@
 
         let gap = gapDefault;
 
-        const outer = (w)=> w + 6; // 3px*2 borda
+        // largura externa: conteúdo + 3px*2 da borda
+        const outer = (w)=> w + 6;
+
+        // largura necessária com w/gap
+        function neededWidth(w, gap){
+            const totalGaps = Math.max(0, letters-1) * gap;
+            return (letters * outer(w)) + totalGaps;
+        }
+
+        // tenta calcular w para caber (com gap atual)
         function computeSlotWidthToFit(avail, letters, gap){
             if (letters <= 0) return MAX_W;
             const totalGaps = Math.max(0, letters-1) * gap;
@@ -589,15 +598,13 @@
             const raw = Math.floor(numerator / letters);
             return isFinite(raw) ? raw : MAX_W;
         }
-        function neededWidth(w, gap){
-            const totalGaps = Math.max(0, letters-1) * gap;
-            return (letters * outer(w)) + totalGaps;
-        }
 
+        // 1) tenta caber com gap default
         let slotW = computeSlotWidthToFit(available, letters, gap);
         slotW = clamp(slotW, MIN_W, MAX_W);
-
         let needed = neededWidth(slotW, gap);
+
+        // 2) se não coube, reduz gap até o mínimo
         if (needed > available && gap > gapMin){
             gap = gapMin;
             slotW = computeSlotWidthToFit(available, letters, gap);
@@ -605,27 +612,32 @@
             needed = neededWidth(slotW, gap);
         }
 
+        // 3) se ainda não coube, força slotW no mínimo (scroll pode ser necessário)
         if (needed > available){
             slotW = MIN_W;
             needed = neededWidth(slotW, gap);
         }
 
+        // Ajuste de altura e fonte proporcional
         const ratio = MAX_H / MAX_W;
         let slotH = Math.round(slotW * ratio); slotH = clamp(slotH, MIN_H, MAX_H);
         const baseRem=1.6, scale=slotW/MAX_W; let fontRem = clamp(baseRem*scale, 1.0, 1.6);
 
+        // Aplica tamanhos/gap
         dropZone.style.setProperty('--slot-w', slotW+'px');
         dropZone.style.setProperty('--slot-h', slotH+'px');
         dropZone.style.setProperty('--tile-font', fontRem+'rem');
         dropZone.style.gap = gap+'px';
 
-        // *** Regra de exibição do scroll ***
-        let overflow = needed > available + 0.5;
-        const allowScroll = letters >= 6;   // até 5 letras: nunca mostra scroll
+        // ===== Decisão de overflow com tolerância dinâmica =====
+        // Tolerância base: 2% da área visível + 8px
+        let tolerance = Math.max(8, Math.round(available * 0.02));
+        // Para palavras curtas/medianas (<=5), aumenta um pouco a tolerância para evitar scroll à toa
+        if (letters <= 5) tolerance += 12;
 
-        if (!allowScroll) {
-            overflow = false;
-        }
+        // overflow real só se "passar" da tolerância
+        const realOverflow = needed - available;
+        const overflow = realOverflow > tolerance;
 
         dropWrap.dataset.overflow = overflow ? '1' : '0';
         viewport.style.overflowX = overflow ? 'auto' : 'hidden';
@@ -640,6 +652,7 @@
             thumb.style.width = thumbW + 'px';
         }
 
+        // Gradientes e posição do polegar
         syncThumb(viewport, dropZone, track, thumb);
     }
 
@@ -694,11 +707,11 @@
         return { level: params.get('level'), unit: params.get('unit') };
     }
 
-    // ===== Back (mantido)
+    // ===== Back (mantido + fix de variável)
     document.getElementById("backButton").addEventListener("click", async () => {
         const { level, unit } = getLevelAndUnitFromURL();
-        theCurrentPhase = parseInt(getPhaseFromURL());
-        const nextPhase = `fase${theCurrentPhase + 1}`;
+        const currentPhase = parseInt(getPhaseFromURL());
+        const nextPhase = `fase${currentPhase + 1}`;
         try {
             const user = firebase.auth().currentUser;
             if (!user) { history.back(); return; }
