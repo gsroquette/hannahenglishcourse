@@ -17,6 +17,18 @@
             --tile: #fff;
             --tile-border: #333;
             --err: #e53935;
+
+            /* Dimensões padrão (máximas) dos slots/tiles */
+            --slot-w: 56px;
+            --slot-h: 64px;
+            --tile-font: 1.6rem;
+            --slot-gap: 8px;
+
+            /* Limites para o ajuste adaptativo */
+            --slot-w-min: 48px;  /* >=44px para área de toque confortável no iPhone */
+            --slot-h-min: 56px;
+            --slot-w-max: 56px;
+            --slot-h-max: 64px;
         }
         * { box-sizing: border-box }
         body {
@@ -78,15 +90,27 @@
             justify-self: center;
         }
         .word-area { display: grid; gap: 12px }
+
+        /* ======= NOVO: drop-zone em uma LINHA, com fallback de scroll-x ======= */
         .drop-zone {
             display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            min-height: 64px;
+            gap: var(--slot-gap);
+            flex-wrap: nowrap;                 /* não quebrar linha */
+            min-height: var(--slot-h);
+            align-items: center;
+            overflow-x: hidden;                /* padrão: sem scroll */
+            -webkit-overflow-scrolling: touch; /* suavidade no iOS quando ativar scroll */
         }
+        /* Quando não couber nem no mínimo, ativamos scroll-x de forma elegante */
+        .drop-zone.scrollable {
+            overflow-x: auto;
+            touch-action: pan-x; /* permite arrastar a faixa horizontalmente sem conflitar com DnD */
+            scroll-snap-type: x proximity;
+        }
+
         .slot {
-            width: 56px;
-            height: 64px;
+            width: var(--slot-w);
+            height: var(--slot-h);
             border: 3px dashed #999;
             border-radius: 12px;
             background: #fff;
@@ -94,6 +118,8 @@
             place-items: center;
             position: relative;
             outline: none;
+            flex: 0 0 var(--slot-w); /* fixo para calculo de uma linha */
+            scroll-snap-align: center;
         }
         .slot:focus, .slot:focus-visible { outline: none }
         .slot.correct { border-style: solid; border-color: var(--ok) }
@@ -105,12 +131,13 @@
             position: absolute;
             color: #bbb;
             font-weight: 700;
-            font-size: 1.35rem;
+            font-size: calc(var(--tile-font) * 0.85);
             pointer-events: none;
         }
+
         .tray {
             display: flex;
-            gap: 8px;
+            gap: var(--slot-gap);
             flex-wrap: wrap;
             background: rgba(255,255,255,.8);
             border: 2px solid #eee;
@@ -118,20 +145,21 @@
             padding: 8px;
         }
         .tile {
-            width: 56px;
-            height: 64px;
+            width: var(--slot-w);
+            height: var(--slot-h);
             border: 3px solid var(--tile-border);
             border-radius: 12px;
             background: var(--tile);
             display: grid;
             place-items: center;
-            font-size: 1.6rem;
+            font-size: var(--tile-font);
             font-weight: 700;
             cursor: grab;
             user-select: none;
             touch-action: none;
             transition: transform 0.2s ease;
             outline: none;
+            flex: 0 0 var(--slot-w);
         }
         .tile:active { cursor: grabbing }
         .tile:focus, .tile:focus-visible { outline: none }
@@ -191,10 +219,11 @@
             to { transform: translateY(120vh) rotate(540deg); opacity: 0 }
         }
 
+        /* Layout menor: mantém grid, mas a linha única dos slots é garantida via JS/CSS vars */
         @media (max-width: 700px) {
             .activity { grid-template-columns: 1fr; justify-items: center }
             .activity img { width: 140px; height: 140px }
-            .slot, .tile { width: 52px; height: 60px }
+            /* Não fixamos mais tamanhos aqui; o JS ajusta via vars. */
         }
     </style>
 </head>
@@ -407,6 +436,10 @@
         if (isTouchDevice) document.body.classList.add('touch');
         initializeVoices();
         loadActivities();
+
+        // Recalcular em resize/orientationchange (debounced)
+        window.addEventListener('resize', debounce(reflowAllDropZones, 120));
+        window.addEventListener('orientationchange', debounce(reflowAllDropZones, 120));
     });
 
     function getPhaseFromURL() {
@@ -438,6 +471,8 @@
         // DROP ZONE
         const dropZone = document.createElement('div');
         dropZone.className = 'drop-zone';
+        // Sinaliza o número de letras para o ajuste
+        dropZone.dataset.letters = String(word.length);
         area.appendChild(dropZone);
 
         // Bandeja (definida cedo para os handlers poderem usar)
@@ -757,9 +792,97 @@
                 if (i === 0 && revealHintBtn.disabled) s.dataset.ghost = word[0].toUpperCase();
             });
             updatePerSlotFeedback();
+            // Recalcular após reset (caso mude algo no layout)
+            requestAnimationFrame(() => fitSlotsToOneLine(dropZone));
         }
 
+        // ======= NOVO: Ajuste adaptativo para manter uma linha =======
+        // Observa mudanças de tamanho no card
+        const ro = new ResizeObserver(() => fitSlotsToOneLine(dropZone));
+        ro.observe(div);
+
+        // Recalcula também quando a imagem carregar (afeta layout)
+        img.addEventListener('load', () => fitSlotsToOneLine(dropZone));
+
+        // Aplica o ajuste inicial
+        requestAnimationFrame(() => fitSlotsToOneLine(dropZone));
+
         container.appendChild(div);
+    }
+
+    // ======= NOVO: Funções para ajuste adaptativo de uma linha =======
+    function fitSlotsToOneLine(dropZoneEl){
+        if (!dropZoneEl || !dropZoneEl.isConnected) return;
+
+        // Parâmetros e limites
+        const letters = parseInt(dropZoneEl.dataset.letters || '0', 10) || 0;
+        if (letters <= 0) return;
+
+        const gap = parseFloat(getComputedStyle(dropZoneEl).getPropertyValue('--slot-gap')) || 8;
+
+        // Largura disponível
+        // Usamos clientWidth da área pai (word-area) para ter o espaço líquido.
+        // Se o parent não for encontrado, usamos o próprio dropZone.
+        const host = dropZoneEl.parentElement || dropZoneEl;
+        const available = Math.floor(host.clientWidth);
+
+        // Limites definidos em :root
+        const styles = getComputedStyle(document.documentElement);
+        const MIN_W = parseInt(styles.getPropertyValue('--slot-w-min')) || 48;
+        const MAX_W = parseInt(styles.getPropertyValue('--slot-w-max')) || 56;
+        const MIN_H = parseInt(styles.getPropertyValue('--slot-h-min')) || 56;
+        const MAX_H = parseInt(styles.getPropertyValue('--slot-h-max')) || 64;
+
+        // Quanto espaço os gaps consomem
+        const totalGaps = Math.max(0, letters - 1) * gap;
+
+        // Cálculo do slot "ideal" para caber em 1 linha
+        let idealW = Math.floor((available - totalGaps) / letters);
+
+        // Se for NaN ou absurdo, aborta
+        if (!Number.isFinite(idealW) || idealW <= 0) idealW = MAX_W;
+
+        // Clampa entre min e max
+        let slotW = Math.max(MIN_W, Math.min(MAX_W, idealW));
+
+        // Se no mínimo ainda não couber, ativamos scroll horizontal
+        const minTotal = MIN_W * letters + totalGaps;
+
+        if (minTotal > available) {
+            // Ativa scroll-x com área de toque suave
+            dropZoneEl.classList.add('scrollable');
+            slotW = MIN_W; // fixa no mínimo para manter toque confortável
+        } else {
+            dropZoneEl.classList.remove('scrollable');
+        }
+
+        // Altura acompanha a proporção original 64/56 ≈ 1.1428, clamp nos limites
+        const ratio = MAX_H / MAX_W; // 64 / 56
+        let slotH = Math.round(slotW * ratio);
+        slotH = Math.max(MIN_H, Math.min(MAX_H, slotH));
+
+        // Fonte proporcional, clamped para legibilidade
+        // Base: 1.6rem em 56px => fator = slotW/56
+        const baseFontRem = 1.6;
+        const scale = slotW / MAX_W;
+        let tileFontRem = baseFontRem * scale;
+        // clamps suaves
+        if (tileFontRem < 1.2) tileFontRem = 1.2;
+        if (tileFontRem > 1.6) tileFontRem = 1.6;
+
+        // Aplica via CSS custom properties (escopo: drop-zone)
+        dropZoneEl.style.setProperty('--slot-w', slotW + 'px');
+        dropZoneEl.style.setProperty('--slot-h', slotH + 'px');
+        dropZoneEl.style.setProperty('--tile-font', tileFontRem + 'rem');
+    }
+
+    function reflowAllDropZones(){
+        document.querySelectorAll('.drop-zone').forEach(dz => fitSlotsToOneLine(dz));
+    }
+
+    function debounce(fn, ms){
+        let t; 
+        return (...args) => { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), ms); };
     }
 
     // Confete
@@ -841,7 +964,7 @@
         const arr = word.toUpperCase().split('');
         for (let i = arr.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
-            [arr[i], arr[j]] = [arr[j], arr[i]];
+            [arr[i], arr[j]] = [arr[j]];
         }
         return arr.join('');
     }
