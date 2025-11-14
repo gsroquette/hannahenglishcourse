@@ -5,164 +5,201 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hannah Missing Word</title>
     <style>
+        :root{
+            /* Cores base */
+            --brand:#ff4500; --ok:#32CD32; --err:#e53935;
+
+            /* Dimensões padrão (máximas) dos “slots”/inputs */
+            --slot-w:56px; --slot-h:64px; --slot-gap:8px; --tile-font:1.6rem;
+
+            /* Limites para adaptação (mantidos e seguros para toque) */
+            --slot-w-max:56px; --slot-h-max:64px;
+            --slot-w-min:48px; --slot-h-min:56px; --slot-gap-min:6px;
+
+            /* UI do overflow amigável */
+            --track-height:30px;
+            --thumb-min:40px;
+            --track-radius:14px;
+            --track-bg:#e9eef5;
+            --thumb-bg:#c4d2e6;
+            --arrow-bg:#ffffff;
+            --arrow-bd:#c8d2e0;
+            --fade:linear-gradient(90deg, rgba(255,255,255,0.0), rgba(0,0,0,0.08) 90%);
+        }
+        @media (max-width:480px){
+            :root{ --slot-w-min:42px; --slot-h-min:50px; --slot-gap:6px; --slot-gap-min:4px; }
+        }
+        @media (max-width:360px){
+            :root{ --slot-w-min:40px; --slot-h-min:48px; --slot-gap:6px; --slot-gap-min:4px; }
+        }
+
+        *{ box-sizing:border-box }
         body {
             font-family: 'Times New Roman', Times, serif;
             margin: 0;
-            padding: 20px;
+            padding: 16px;
             background-image: url('../../../imagens/fundo.png');
             background-repeat: repeat;
             background-size: contain;
             background-position: center;
+            -webkit-tap-highlight-color: transparent;
         }
+
+        /* Título responsivo (mantido) */
         h1 {
             text-align: center;
-            color: #ff4500;
-            font-size: 3rem;
-            margin-bottom: 20px;
+            color: var(--brand);
+            font-size: clamp(1.6rem, 5vw, 3rem);
+            margin: 12px 0 16px;
         }
-        .activity-container {
-            margin-top: 20px;
-        }
+
+        .activity-container { margin-top: 8px; }
         .activity {
             display: flex;
             align-items: center;
             position: relative;
-            padding: 20px;
+            padding: 16px;
             background-color: #ffdab9;
             border-radius: 15px;
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
-            margin-bottom: 30px;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+            margin-bottom: 22px;
             overflow: hidden;
         }
         .activity img {
             max-width: 150px;
             max-height: 150px;
             border-radius: 12px;
-            margin-right: 20px;
+            margin-right: 16px;
+            object-fit: contain;
+            background:#fff;
+            border:2px solid #eee;
         }
-        .missing-word {
-            font-size: 36px;
-            font-weight: bold;
-            color: #ff4500;
+        .word-container { display: grid; gap: 12px; align-items: center; justify-items: center; width: 100%; }
+
+        /* ===== Linha de inputs adaptável ===== */
+        .drop-wrap{ display:grid; gap:8px; width:100%; }
+        .drop-viewport{
+            position:relative;
+            overflow-x:auto;
+            -webkit-overflow-scrolling:touch;
+            padding: 2px 4px;            /* considerado no cálculo */
+            touch-action: pan-x;
         }
-        .missing-letter-input {
-            width: 40px;
-            font-size: 36px;
+        .drop-viewport[data-gradient-left="1"]::before,
+        .drop-viewport[data-gradient-right="1"]::after{
+            content:""; position:absolute; top:0; bottom:0; width:14px; pointer-events:none;
+        }
+        .drop-viewport[data-gradient-left="1"]::before{
+            left:0; transform:scaleX(-1); background:var(--fade); border-radius:12px 0 0 12px;
+        }
+        .drop-viewport[data-gradient-right="1"]::after{
+            right:0; background:var(--fade); border-radius:0 12px 12px 0;
+        }
+
+        .drop-zone{
+            display:flex; gap:var(--slot-gap); flex-wrap:nowrap; align-items:center;
+            min-height: var(--slot-h);
+            justify-content:flex-start;
+        }
+
+        /* Inputs como “slots” */
+        .missing-letter-input{
+            width: var(--slot-w);
+            height: var(--slot-h);
+            font-size: var(--tile-font);
+            font-weight: 700;
             text-align: center;
-            border: 2px solid black;
-            margin-right: 10px;
+            border: 3px dashed #999;     /* 3px*2 = +6px na largura externa */
+            border-radius: 12px;
+            background: #fff;
+            outline: none;
+            flex: 0 0 var(--slot-w);
         }
-        .correct {
-            border-color: blue;
+        .missing-letter-input.correct{ border-style: solid; border-color: #2e7d32; }
+        .missing-letter-input.incorrect{ border-style: solid; border-color: var(--err); }
+
+        /* ===== Trilho custom visível quando há overflow ===== */
+        .overflow-ui{ display:none; align-items:center; gap:10px; }
+        .drop-wrap[data-overflow="1"] .overflow-ui{ display:flex; }
+        .drop-track{
+            position:relative; flex:1 1 auto; height:var(--track-height);
+            background:var(--track-bg); border-radius:var(--track-radius); overflow:hidden;
         }
-        .incorrect {
-            border-color: red;
+        .drop-thumb{
+            position:absolute; top:4px; bottom:4px; left:4px; width:120px;
+            background:var(--thumb-bg); border-radius:999px; cursor:pointer;
         }
-        .word-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+        .drop-arrow{
+            width:44px; height:var(--track-height);
+            display:grid; place-items:center; user-select:none; cursor:pointer;
+            background:var(--arrow-bg); border:1px solid var(--arrow-bd); border-radius:12px;
+            font-weight:700;
         }
+        .drop-arrow:active{ transform:scale(.98) }
+
+        /* Letra “celebração” (mantido) */
         .letter-animation {
             font-size: 80px;
-            color: #32CD32;
-            position: absolute;
-            top: 50%;
-            left: 50%;
+            color: var(--ok);
+            position: absolute; top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             animation: grow-shrink 1s ease-in-out;
             display: none;
             font-family: 'Times New Roman', Times, serif;
         }
         @keyframes grow-shrink {
-            0% {
-                transform: translate(-50%, -50%) scale(0);
-            }
-            50% {
-                transform: translate(-50%, -50%) scale(1.5);
-            }
-            100% {
-                transform: translate(-50%, -50%) scale(1);
-            }
+            0% { transform: translate(-50%, -50%) scale(0); }
+            50% { transform: translate(-50%, -50%) scale(1.5); }
+            100% { transform: translate(-50%, -50%) scale(1); }
         }
 
-        /* Estilos do modal de conclusão */
-        #overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            display: none;
-            z-index: 1000;
+        /* Modal de conclusão (mantido) */
+        #overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); display: none; z-index: 1000; }
+        #completion-modal{
+            position: fixed; top:50%; left:50%; transform: translate(-50%, -50%);
+            background: white; padding: 30px; border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,.3); text-align: center; display: none; z-index: 1001;
         }
-        #completion-modal {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-            text-align: center;
-            display: none;
-            z-index: 1001;
+        #completion-modal h2 { margin: 0; font-size: 2rem; color: var(--ok); }
+        #completion-modal p { font-size: 1.2rem; margin: 10px 0; }
+        #completion-modal button{
+            margin-top: 20px; padding: 10px 20px; font-size: 1rem; cursor: pointer;
+            border: none; border-radius: 5px; background-color: var(--ok); color: white;
+            transition: background-color .3s ease;
         }
-        #completion-modal h2 {
-            margin-top: 0;
-            font-size: 2rem;
-            color: #32CD32;
-        }
-        #completion-modal p {
-            font-size: 1.2rem;
-            margin: 10px 0;
-        }
-        #completion-modal button {
-            margin-top: 20px;
-            padding: 10px 20px;
-            font-size: 1rem;
-            cursor: pointer;
+        #completion-modal button:hover{ background-color: #28a428; }
+
+        /* Toolbar: botões responsivos (mantidos) */
+        .toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; justify-content:center; margin-bottom:8px; }
+        .btn {
+            padding: 12px 20px;
+            border-radius: 12px;
             border: none;
-            border-radius: 5px;
-            background-color: #32CD32;
-            color: white;
-            transition: background-color 0.3s ease;
+            color: #fff;
+            background:#000;
+            font-size: 1.05rem;
+            cursor:pointer;
         }
-        #completion-modal button:hover {
-            background-color: #28a428;
+        .btn--pdf { background:#32CD32; }
+
+        @media (max-width:480px){
+            .btn{ padding:10px 16px; font-size: 0.95rem; border-radius: 10px; }
+        }
+        @media (max-width:360px){
+            .btn{ padding:8px 14px; font-size: 0.9rem; border-radius: 10px; }
         }
 
         @media (max-width: 600px) {
-            .activity {
-                flex-direction: column;
-                align-items: center;
-            }
-
-            .activity img {
-                margin: 0 0 15px 0;
-            }
-
-            .missing-letter-input {
-                width: 30px;
-                font-size: 28px;
-                margin-right: 3px;
-            }
-
-            .missing-word {
-                font-size: 28px;
-            }
+            .activity { flex-direction: column; align-items: center; }
+            .activity img { margin: 0 0 12px 0; }
         }
    </style>
 </head>
 <body>
-<button id="backButton" style="padding: 15px 25px; background-color: black; color: white; border: none; border-radius: 10px; font-size: 1.5rem; cursor: pointer; transition: background-color 0.3s ease;">
-    Back
-</button>
-<button id="pdfButton" onclick="generatePDF()" style="display: none; padding: 15px 25px; background-color: #32CD32; color: white; border: none; border-radius: 10px; font-size: 1.5rem; cursor: pointer; transition: background-color 0.3s ease; margin-top: 10px;">
-    Generate PDF
-</button>
+<div class="toolbar" aria-label="Toolbar">
+    <button id="backButton" class="btn">Back</button>
+    <button id="pdfButton" onclick="generatePDF()" class="btn btn--pdf" style="display:none">Generate PDF</button>
+</div>
 
 <h1>Hannah Missing Word</h1>
 
@@ -183,7 +220,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
 
 <script>
-    // Configuração do Firebase
+    // ===== Firebase (mantido)
     const firebaseConfig = {
         apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
         authDomain: "hannahenglishcourse.firebaseapp.com",
@@ -193,60 +230,43 @@
         messagingSenderId: "449818788486",
         appId: "1:449818788486:web:8a49d3f68591e6fb3f0707"
     };
-
-    // Inicialização do Firebase
     firebase.initializeApp(firebaseConfig);
 
-    // Função para verificar o role e exibir o botão se necessário
     firebase.auth().onAuthStateChanged((user) => {
         if (user) {
             const userId = user.uid;
             const userRoleRef = firebase.database().ref(`usuarios/${userId}/role`);
-
             userRoleRef.once('value').then((snapshot) => {
                 const role = snapshot.val();
-                // Exibe o botão apenas se o role for "professor" ou "proprietário"
                 if (role === 'professor' || role === 'proprietário') {
                     document.getElementById("pdfButton").style.display = "inline-block";
                 }
-            }).catch((error) => {
-                console.error("Erro ao buscar o role do usuário:", error);
-            });
+            }).catch((error) => console.error("Erro ao buscar o role do usuário:", error));
         } else {
             console.log("Nenhum usuário autenticado.");
         }
     });
 
+    // ===== PDF (mantido)
     async function generatePDF() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
-
-        // Carrega a logo e gera o PDF
         const logo = new Image();
-        logo.src = 'Logo.png'; // Ajuste o nome do arquivo conforme necessário
+        logo.src = 'Logo.png';
 
-        // Garante que a logo seja carregada em Base64
         logo.onload = function() {
-            // Adiciona a logo ao PDF
             doc.addImage(logo, 'PNG', 10, 10, 30, 30);
             doc.setFontSize(12);
             doc.text("Name: __________________________________________ Date: ____________", 50, 20);
-
-            // Adiciona o título
             doc.setFontSize(16);
             doc.text("Hannah Missing Word", 10, 50);
 
-            // Adiciona as atividades
-            let yOffset = 60; // Posição inicial
-            document.querySelectorAll('.activity').forEach((activity, index) => {
-                if (yOffset > 270) { // Se ultrapassar o limite da página
-                    doc.addPage();
-                    yOffset = 20;
-                }
+            let yOffset = 60;
+            document.querySelectorAll('.activity').forEach((activity) => {
+                if (yOffset > 270) { doc.addPage(); yOffset = 20; }
 
                 const imgElement = activity.querySelector('img');
                 if (imgElement) {
-                    // Converte imagem para Base64 e adiciona ao PDF
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
                     canvas.width = imgElement.width;
@@ -256,32 +276,22 @@
                     doc.addImage(imgData, 'JPEG', 10, yOffset, 30, 30);
                 }
 
-                const wordContainer = activity.querySelector('.word-container');
-                if (wordContainer) {
-                    // Adiciona os traços das letras faltantes
+                const dz = activity.querySelector('.drop-zone');
+                if (dz) {
                     doc.setFontSize(14);
                     let xPos = 50;
-                    wordContainer.querySelectorAll('.missing-letter-input').forEach(() => {
-                        doc.text("_____", xPos, yOffset + 10);
-                        xPos += 15;
-                    });
+                    const count = dz.querySelectorAll('.missing-letter-input').length;
+                    for (let i=0;i<count;i++){ doc.text("_____", xPos, yOffset + 10); xPos += 15; }
 
-                    // Adiciona a palavra completa abaixo dos traços
-                    yOffset += 20; // Ajusta o yOffset para mover a palavra completa para baixo das linhas
-                    const fullWordElement = wordContainer.querySelector('div:last-child');
-                    if (fullWordElement) {
-                        const fullWord = fullWordElement.textContent.trim();
-                        doc.text(fullWord, 50, yOffset);
-                    }
-                    yOffset += 40; // Ajusta o espaço para a próxima atividade
+                    yOffset += 20;
+                    const fullWordEl = activity.querySelector('.full-word');
+                    if (fullWordEl) doc.text(fullWordEl.textContent.trim(), 50, yOffset);
+                    yOffset += 40;
                 }
             });
-
-            // Salva o PDF
             doc.save("Hannah_Missing_Word.pdf");
         };
 
-        // Caso a logo não carregue, salva o PDF sem a imagem
         logo.onerror = function() {
             doc.setFontSize(12);
             doc.text("Name: __________________________________________ Date: ____________", 50, 20);
@@ -291,118 +301,66 @@
         };
     }
 
-    let activities = [];
-    let completedWords = 0; // Contador de palavras concluídas
+    // ===== Áudio: MP3 prioritário com fallback TTS (mantido)
     let alertDisplayed = false;
-
-    /** =========================================
-     *  MP3 PRIORITY (iPhone/Safari fix) → fallback TTS
-     *  - Criar Audio() dentro do gesto (aqui: input/teclado)
-     *  - Chamar audio.load() e depois audio.play()
-     *  - Se falhar, usar SpeechSynthesis
-     * ========================================= */
     function playMp3OrSpeak(wordIndex, text) {
-        // índice inválido? cai direto no TTS
-        if (typeof wordIndex !== 'number' || wordIndex < 0) {
-            speakText(text);
-            return;
-        }
-
-        // garantir que nenhuma fala anterior está ativa
-        const synth = window.speechSynthesis;
-        try { synth.cancel(); } catch {}
-
+        if (typeof wordIndex !== 'number' || wordIndex < 0) { speakText(text); return; }
+        const synth = window.speechSynthesis; try { synth.cancel(); } catch {}
         const { level, unit } = getLevelAndUnitFromURL();
         const src = `../../${level}/${unit}/data3/sounds/som${wordIndex + 1}.mp3`;
 
         let usedFallback = false;
-        const fallbackTTS = () => {
-            if (usedFallback) return;
-            usedFallback = true;
-            speakText(text);
-        };
+        const fallbackTTS = () => { if (usedFallback) return; usedFallback = true; speakText(text); };
 
         try {
-            // Criado durante o gesto do usuário (evento input/click) → compatível com iOS
             const audio = new Audio(src);
             audio.preload = 'auto';
-
             audio.onerror = fallbackTTS;
-            // Se quiser acoplar algo ao fim, usar audio.onended
-
-            // Passo crítico para iPhone/Safari:
             audio.load();
             const p = audio.play();
-            if (p && typeof p.then === 'function') {
-                p.catch(fallbackTTS);
-            }
-        } catch (_) {
-            fallbackTTS();
-        }
+            if (p && typeof p.then === 'function') { p.catch(fallbackTTS); }
+        } catch (_) { fallbackTTS(); }
     }
-
     function speakText(text) {
         const synth = window.speechSynthesis;
-        synth.cancel(); // Cancela qualquer síntese de voz anterior
-
-        // Função para encontrar a voz "en-US"
-        function getEnglishVoice() {
-            const voices = synth.getVoices();
-            return voices.find(voice => voice.lang === "en-US");
-        }
-
-        const englishVoice = getEnglishVoice();
-
-        if (!englishVoice) {
+        synth.cancel();
+        function getEnglishVoice(){ return synth.getVoices().find(v=>v.lang==="en-US"); }
+        const voice = getEnglishVoice();
+        if (!voice) {
             if (!alertDisplayed) {
-                if (synth.getVoices().length === 0) {
-                    alert("No voices available in your speech synthesizer. Please enable English language in your browser's settings.");
-                } else {
-                    alert("No 'en-US' voice found. Using the default voice instead.");
-                }
+                if (synth.getVoices().length === 0) { alert("No voices available in your speech synthesizer. Please enable English language in your browser's settings."); }
+                else { alert("No 'en-US' voice found. Using the default voice instead."); }
                 alertDisplayed = true;
             }
-
-            if (!synth.onvoiceschanged) {
-                synth.onvoiceschanged = () => {
-                    const newEnglishVoice = getEnglishVoice();
-                    if (newEnglishVoice) {
-                        speakWithVoice(newEnglishVoice, text);
-                    }
-                };
-            }
-
-            speakWithVoice(null, text); // Usa a voz padrão, se disponível
-        } else {
-            speakWithVoice(englishVoice, text);
-        }
+            if (!synth.onvoiceschanged) synth.onvoiceschanged = () => { const v=getEnglishVoice(); if (v) speakWithVoice(v,text); };
+            speakWithVoice(null, text);
+        } else speakWithVoice(voice, text);
+    }
+    function speakWithVoice(voice, text){
+        const u = new SpeechSynthesisUtterance(text); u.lang="en-US"; if (voice) u.voice=voice; window.speechSynthesis.speak(u);
     }
 
-    function speakWithVoice(voice, text) {
-        const synth = window.speechSynthesis;
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = "en-US";
-        if (voice) {
-            utterance.voice = voice;
-        }
-        synth.speak(utterance);
-    }
+    // ===== Estado
+    let activities = [];
+    let completedWords = 0;
 
+    document.addEventListener('DOMContentLoaded', () => {
+        loadActivities();
+        window.addEventListener('resize', debounce(reflowAllDropZones,120));
+        window.addEventListener('orientationchange', debounce(reflowAllDropZones,120));
+    });
+
+    // ===== Carregar
     async function loadActivities() {
         try {
             const { level, unit } = getLevelAndUnitFromURL();
-
-            // Caminho dinâmico baseado no level e unit
             const wordsPath = `../../${level}/${unit}/data3/words.txt`;
             const response = await fetch(wordsPath);
             const text = await response.text();
-            // mantém a ordem e remove linhas vazias/espaços
             const words = text.split('\n').map(w => w.trim()).filter(Boolean);
 
             words.forEach((word, index) => {
-                const imageName = `imagem${index + 1}.png`;
-                const imageUrl = `../../${level}/${unit}/data3/imagens/${imageName}`;
-                // passa o índice da palavra para mapear som{index+1}.mp3
+                const imageUrl = `../../${level}/${unit}/data3/imagens/imagem${index + 1}.png`;
                 createActivity(imageUrl, word, index);
             });
         } catch (error) {
@@ -410,12 +368,11 @@
         }
     }
 
+    // ===== Próxima fase (mantido)
     async function updateNextPhase(userId) {
-        console.log("Atualizando a próxima fase...");
         const currentPhase = getPhaseFromURL();
         const { level, unit } = getLevelAndUnitFromURL();
         const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-
         try {
             if (currentPhase === "last") {
                 const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
@@ -432,171 +389,340 @@
         }
     }
 
+    // ===== Criar atividade (com híbrido + 1 letra por campo)
     function createActivity(imageUrl, word, wordIndex) {
         const activityContainer = document.getElementById('activity-container');
         const activityDiv = document.createElement('div');
         activityDiv.classList.add('activity');
-        // armazena o índice da palavra (0-based) — útil se precisar recuperar depois
         activityDiv.dataset.wordIndex = String(wordIndex);
 
         const imgElement = document.createElement('img');
         imgElement.src = imageUrl;
-        imgElement.onerror = function () {
-            console.error(`Erro ao carregar a imagem: ${imageUrl}`);
-        };
+        imgElement.onerror = () => console.error(`Erro ao carregar a imagem: ${imageUrl}`);
         activityDiv.appendChild(imgElement);
 
         const wordContainer = document.createElement('div');
         wordContainer.classList.add('word-container');
 
-        const missingWordElement = document.createElement('div');
-        missingWordElement.classList.add('missing-word');
+        // ---------- HÍBRIDO: wrap + viewport + zone ----------
+        const dropWrap = document.createElement('div'); dropWrap.className='drop-wrap';
+        const dropViewport = document.createElement('div'); dropViewport.className='drop-viewport';
+        const dropZone = document.createElement('div'); dropZone.className='drop-zone';
+        dropViewport.appendChild(dropZone); dropWrap.appendChild(dropViewport); wordContainer.appendChild(dropWrap);
 
+        // UI de overflow: setas + trilho
+        const overflowUi = document.createElement('div'); overflowUi.className='overflow-ui';
+        const leftBtn = elArrow('◄'); const rightBtn = elArrow('►');
+        const track = document.createElement('div'); track.className='drop-track';
+        const thumb = document.createElement('div'); thumb.className='drop-thumb';
+        track.appendChild(thumb); overflowUi.appendChild(leftBtn); overflowUi.appendChild(track); overflowUi.appendChild(rightBtn);
+        dropWrap.appendChild(overflowUi);
+
+        // Inputs (uma letra por campo)
         const letterInputs = [];
+        const letters = word.split('');
+        letters.forEach((expected, index) => {
+            const input = document.createElement('input');
+            input.classList.add('missing-letter-input');
+            input.setAttribute('inputmode', 'latin');
+            input.setAttribute('autocomplete', 'off');
+            input.setAttribute('autocorrect', 'off');
+            input.setAttribute('autocapitalize', 'characters');
+            input.setAttribute('spellcheck', 'false');
+            input.maxLength = 1;
 
-        // Cria caixas de entrada para cada letra
-        word.split('').forEach((letter, index) => {
-            const letterInput = document.createElement('input');
-            letterInput.classList.add('missing-letter-input');
-            letterInput.maxLength = 1;
+            input.addEventListener('input', () => {
+                let v = (input.value || '').toUpperCase();
+                if (v.length > 1) v = v.charAt(0);
+                if (!/^[A-Z]$/.test(v)) {
+                    input.value = '';
+                    input.classList.remove('correct','incorrect');
+                    return;
+                }
+                input.value = v;
 
-            letterInput.addEventListener('input', function () {
-                if (letterInput.value.toUpperCase() === letter.toUpperCase()) {
-                    letterInput.classList.add('correct');
-                    letterInput.classList.remove('incorrect');
+                if (v === expected.toUpperCase()) {
+                    input.classList.add('correct');
+                    input.classList.remove('incorrect');
+                } else {
+                    input.classList.add('incorrect');
+                    input.classList.remove('correct');
+                }
 
-                    if (index < word.length - 1) {
-                        letterInputs[index + 1].focus(); // Move para o próximo input
-                    }
+                if (index < letters.length - 1) {
+                    letterInputs[index + 1].focus();
+                }
 
-                    const userWord = letterInputs.map(input => input.value.toUpperCase()).join('');
+                const done = letterInputs.every(i => (i.value || '').length === 1);
+                if (done) {
+                    const userWord = letterInputs.map(i => (i.value || '').toUpperCase()).join('');
                     if (userWord === word.toUpperCase()) {
-                        // PRIORIDADE MP3 som{wordIndex+1}.mp3; fallback TTS (dentro do gesto input)
                         playMp3OrSpeak(wordIndex, word);
                         completedWords++;
-
-                        if (completedWords === activities.length) {
-                            showCompletionModal();
-                        }
+                        if (completedWords === activities.length) showCompletionModal();
                     }
-                } else {
-                    letterInput.classList.add('incorrect');
-                    letterInput.classList.remove('correct');
                 }
             });
 
-            letterInputs.push(letterInput);
-            missingWordElement.appendChild(letterInput);
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Backspace' && !input.value && index > 0) {
+                    e.preventDefault();
+                    const prev = letterInputs[index - 1];
+                    prev.focus();
+                    prev.value = '';
+                    prev.classList.remove('correct','incorrect');
+                }
+            });
+
+            letterInputs.push(input);
+            dropZone.appendChild(input);
         });
 
-        wordContainer.appendChild(missingWordElement);
+        // Texto com placeholder (mantido)
+        const fullWordElement = document.createElement('div');
+        fullWordElement.className = 'full-word';
+        fullWordElement.textContent = `___${word.slice(1).toUpperCase()}`;
+        fullWordElement.style.fontWeight = 'bold';
+        fullWordElement.style.marginTop = '10px';
+        wordContainer.appendChild(fullWordElement);
+
         activityDiv.appendChild(wordContainer);
         activityContainer.appendChild(activityDiv);
         activities.push(word);
 
-        // Adiciona o texto abaixo com a substituição da primeira letra por ___
-        const fullWordElement = document.createElement('div');
-        const wordWithPlaceholder = `___${word.slice(1).toUpperCase()}`;
-        fullWordElement.innerText = wordWithPlaceholder;
-        fullWordElement.style.fontWeight = 'bold';
-        fullWordElement.style.marginTop = '10px';
-        wordContainer.appendChild(fullWordElement);
+        // ====== Layout adaptativo + overflow amigável ======
+        dropZone.dataset.letters = String(word.length);
+        const ro = new ResizeObserver(()=> fitSlotsToOneLine(dropViewport, dropZone, dropWrap, track, thumb, {resetScroll:true}));
+        ro.observe(activityDiv);
+        imgElement.addEventListener('load', ()=> fitSlotsToOneLine(dropViewport, dropZone, dropWrap, track, thumb, {resetScroll:true}));
+        dropViewport.addEventListener('scroll', ()=> syncThumb(dropViewport, dropZone, track, thumb));
+        leftBtn.addEventListener('click', ()=> nudgeScroll(dropViewport, -stepSize(dropZone)));
+        rightBtn.addEventListener('click',()=> nudgeScroll(dropViewport,  stepSize(dropZone)));
+        enableThumbDrag(track, thumb, dropViewport, dropZone);
+
+        requestAnimationFrame(()=> fitSlotsToOneLine(dropViewport, dropZone, dropWrap, track, thumb, {resetScroll:true}));
     }
 
+    // ===== Overflow helpers
+    function elArrow(txt){ const b=document.createElement('div'); b.className='drop-arrow'; b.setAttribute('role','button'); b.setAttribute('tabindex','0'); b.textContent=txt; b.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' ') b.click(); }); return b; }
+    function stepSize(dropZone){
+        const cs=getComputedStyle(dropZone);
+        const w=parseFloat(cs.getPropertyValue('--slot-w'))||56;
+        const g=parseFloat(cs.getPropertyValue('gap'))||8;
+        return Math.round(w + g + 6); // inclui 3px*2 de borda
+    }
+    function nudgeScroll(viewport, delta){
+        const max = viewport.scrollWidth - viewport.clientWidth;
+        const next = clamp(viewport.scrollLeft + delta, 0, max);
+        viewport.scrollTo({ left: next, behavior:'smooth' });
+    }
+    function enableThumbDrag(track, thumb, viewport, dropZone){
+        let dragging=false, startX=0, startLeft=0;
+        function onDown(e){ dragging=true; startX=(e.touches?e.touches[0].clientX:e.clientX); startLeft=parseFloat(getComputedStyle(thumb).left)||0; e.preventDefault(); }
+        function onMove(e){
+            if(!dragging) return;
+            const x=(e.touches?e.touches[0].clientX:e.clientX), dx=x-startX;
+            const limits = track.clientWidth - thumb.clientWidth - 8;
+            const left = clamp(startLeft + dx, 4, 4 + limits);
+            thumb.style.left = left+'px';
+            const ratio = (left-4) / limits;
+            const target = (viewport.scrollWidth - viewport.clientWidth) * ratio;
+            viewport.scrollLeft = target;
+        }
+        function onUp(){ dragging=false; }
+        thumb.addEventListener('mousedown',onDown); thumb.addEventListener('touchstart',onDown,{passive:false});
+        window.addEventListener('mousemove',onMove); window.addEventListener('touchmove',onMove,{passive:false});
+        window.addEventListener('mouseup',onUp); window.addEventListener('touchend',onUp);
+    }
+    function syncThumb(viewport, dropZone, track, thumb){
+        const contentW = dropZone.scrollWidth, vpW = viewport.clientWidth;
+        const overflow = contentW > vpW + 1;
+        if(!overflow){
+            thumb.style.left='4px';
+            viewport.dataset.gradientLeft = '0';
+            viewport.dataset.gradientRight = '0';
+            return;
+        }
+        const limits = Math.max(8, track.clientWidth - (parseFloat(getComputedStyle(thumb).width)||120) - 8);
+        const ratio = viewport.scrollLeft / (contentW - vpW);
+        thumb.style.left = (4 + limits * ratio) + 'px';
+
+        const nearLeft = viewport.scrollLeft <= 2;
+        const nearRight = (contentW - vpW - viewport.scrollLeft) <= 2;
+        viewport.dataset.gradientLeft  = nearLeft ? '0' : '1';
+        viewport.dataset.gradientRight = nearRight ? '0' : '1';
+    }
+
+    /**
+     * Ajusta os slots para tentar CABER EM UMA LINHA antes de ativar o scroll.
+     * Decisão 100% por MEDIÇÃO, com tolerância de micro-overflow.
+     * - Reduz quadradinhos e gap até o mínimo para caber.
+     * - Se ainda não couber, ativa scroll.
+     * - Para curtas (≈<=5 letras), aplica tolerância maior para evitar scroll desnecessário.
+     */
+    function fitSlotsToOneLine(viewport, dropZone, dropWrap, track, thumb, opts={}){
+        const root = getComputedStyle(document.documentElement);
+        const DZstyles = getComputedStyle(dropZone);
+        const VPstyles = getComputedStyle(viewport);
+
+        const MIN_W = parseInt(root.getPropertyValue('--slot-w-min'))||42;
+        const MAX_W = parseInt(root.getPropertyValue('--slot-w-max'))||56;
+        const MIN_H = parseInt(root.getPropertyValue('--slot-h-min'))||50;
+        const MAX_H = parseInt(root.getPropertyValue('--slot-h-max'))||64;
+
+        const gapDefault = parseFloat(DZstyles.getPropertyValue('gap'))||8;
+        const gapMin = parseFloat(root.getPropertyValue('--slot-gap-min'))||4;
+
+        const letters = (dropZone.dataset.letters|0)||0;
+
+        const vpPaddingLeft  = parseFloat(VPstyles.getPropertyValue('padding-left'))  || 0;
+        const vpPaddingRight = parseFloat(VPstyles.getPropertyValue('padding-right')) || 0;
+        const available = Math.floor(viewport.clientWidth - vpPaddingLeft - vpPaddingRight);
+
+        let gap = gapDefault;
+
+        // largura externa: conteúdo + 3px*2 da borda
+        const outer = (w)=> w + 6;
+
+        // largura necessária com w/gap
+        function neededWidth(w, gap){
+            const totalGaps = Math.max(0, letters-1) * gap;
+            return (letters * outer(w)) + totalGaps;
+        }
+
+        // tenta calcular w para caber (com gap atual)
+        function computeSlotWidthToFit(avail, letters, gap){
+            if (letters <= 0) return MAX_W;
+            const totalGaps = Math.max(0, letters-1) * gap;
+            const numerator = avail - totalGaps - (6 * letters);
+            const raw = Math.floor(numerator / letters);
+            return isFinite(raw) ? raw : MAX_W;
+        }
+
+        // 1) tenta caber com gap default
+        let slotW = computeSlotWidthToFit(available, letters, gap);
+        slotW = clamp(slotW, MIN_W, MAX_W);
+        let needed = neededWidth(slotW, gap);
+
+        // 2) se não coube, reduz gap até o mínimo
+        if (needed > available && gap > gapMin){
+            gap = gapMin;
+            slotW = computeSlotWidthToFit(available, letters, gap);
+            slotW = clamp(slotW, MIN_W, MAX_W);
+            needed = neededWidth(slotW, gap);
+        }
+
+        // 3) se ainda não coube, força slotW no mínimo (scroll pode ser necessário)
+        if (needed > available){
+            slotW = MIN_W;
+            needed = neededWidth(slotW, gap);
+        }
+
+        // Ajuste de altura e fonte proporcional
+        const ratio = MAX_H / MAX_W;
+        let slotH = Math.round(slotW * ratio); slotH = clamp(slotH, MIN_H, MAX_H);
+        const baseRem=1.6, scale=slotW/MAX_W; let fontRem = clamp(baseRem*scale, 1.0, 1.6);
+
+        // Aplica tamanhos/gap
+        dropZone.style.setProperty('--slot-w', slotW+'px');
+        dropZone.style.setProperty('--slot-h', slotH+'px');
+        dropZone.style.setProperty('--tile-font', fontRem+'rem');
+        dropZone.style.gap = gap+'px';
+
+        // ===== Decisão de overflow com tolerância dinâmica =====
+        // Tolerância base: 2% da área visível + 8px
+        let tolerance = Math.max(8, Math.round(available * 0.02));
+        // Para palavras curtas/medianas (<=5), aumenta um pouco a tolerância para evitar scroll à toa
+        if (letters <= 5) tolerance += 12;
+
+        // overflow real só se "passar" da tolerância
+        const realOverflow = needed - available;
+        const overflow = realOverflow > tolerance;
+
+        dropWrap.dataset.overflow = overflow ? '1' : '0';
+        viewport.style.overflowX = overflow ? 'auto' : 'hidden';
+
+        if (opts.resetScroll) viewport.scrollLeft = 0;
+
+        if(overflow){
+            const contentW = needed;
+            const vpW = available;
+            const trackInner = track.clientWidth - 8;
+            const thumbW = clamp(Math.round((vpW/contentW)*trackInner), parseInt(root.getPropertyValue('--thumb-min'))||40, trackInner);
+            thumb.style.width = thumbW + 'px';
+        }
+
+        // Gradientes e posição do polegar
+        syncThumb(viewport, dropZone, track, thumb);
+    }
+
+    // ===== Utilidades gerais
+    function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+    function debounce(fn, ms){ let t; return (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn.apply(this,args), ms); }; }
+    function reflowAllDropZones(){ document.querySelectorAll('.activity .drop-viewport').forEach(vp => {
+        const wrap = vp.parentElement, dz = vp.querySelector('.drop-zone');
+        const track = wrap.querySelector('.drop-track'), thumb = wrap.querySelector('.drop-thumb');
+        fitSlotsToOneLine(vp, dz, wrap, track, thumb, {resetScroll:false});
+    }); }
+
+    // ===== Modal + Progresso (mantidos)
     function showCompletionModal() {
         updateProgressInDatabase();
         document.getElementById('overlay').style.display = 'block';
         document.getElementById('completion-modal').style.display = 'block';
     }
-
     function closeModal() {
         document.getElementById('overlay').style.display = 'none';
         document.getElementById('completion-modal').style.display = 'none';
     }
-
     function updateProgressInDatabase() {
         const currentPhase = getPhaseFromURL();
         const { level, unit } = getLevelAndUnitFromURL();
-        
-        // Verifica se o usuário está autenticado
         firebase.auth().onAuthStateChanged(function(user) {
             if (user) {
                 const userId = user.uid;
                 const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
-
-                // Verifica se a fase atual é uma palavra (last ou end)
                 if (currentPhase === "last") {
                     const nextUnit = `Unit${parseInt(unit.replace('Unit', '')) + 1}`;
-                    // Criar a nova unidade na mesma Level
                     dbRef.parent.child(nextUnit).set({ fase1: true });
                 } else if (currentPhase === "end") {
                     const nextLevel = `Level${parseInt(level.replace('Level', '')) + 1}`;
-                    // Criar um novo level e adicionar Unit1
                     firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
                 } else {
-                    // Verifica se a fase atual é um número
                     const phaseNumber = parseInt(currentPhase);
                     if (!isNaN(phaseNumber)) {
                         dbRef.update({ [`fase${currentPhase}`]: true });
-                        const nextPhase = phaseNumber + 1; // Incrementa a fase
+                        const nextPhase = phaseNumber + 1;
                         dbRef.update({ [`fase${nextPhase}`]: true });
                     }
                 }
-            } else {
-                console.error("Usuário não autenticado");
-            }
+            } else { console.error("Usuário não autenticado"); }
         });
     }
 
-    function getPhaseFromURL() {
-        const params = new URLSearchParams(window.location.search);
-        return params.get('fase');
-    }
-
+    // ===== URL helpers (mantidos)
+    function getPhaseFromURL() { return new URLSearchParams(window.location.search).get('fase'); }
     function getLevelAndUnitFromURL() {
         const params = new URLSearchParams(window.location.search);
-        return {
-            level: params.get('level'),
-            unit: params.get('unit'),
-        };
+        return { level: params.get('level'), unit: params.get('unit') };
     }
 
-    document.addEventListener('DOMContentLoaded', loadActivities);
-
+    // ===== Back (mantido + fix de variável)
     document.getElementById("backButton").addEventListener("click", async () => {
         const { level, unit } = getLevelAndUnitFromURL();
         const currentPhase = parseInt(getPhaseFromURL());
         const nextPhase = `fase${currentPhase + 1}`;
-
         try {
-            // Verifica se o usuário está autenticado
             const user = firebase.auth().currentUser;
-            if (!user) {
-                console.error("Usuário não autenticado.");
-                history.back(); // Permite a navegação mesmo sem autenticação
-                return;
-            }
-
+            if (!user) { history.back(); return; }
             const userId = user.uid;
             const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/${nextPhase}`);
-
             const snapshot = await dbRef.once("value");
-            if (snapshot.exists() && snapshot.val() === true) {
-                // Próxima fase está desbloqueada
-                history.back();
-            } else {
-                // Exibe a mensagem de confirmação
-                const confirmNavigation = confirm("The current phase has not been completed. Are you sure you want to leave?");
-                if (confirmNavigation) {
-                    history.back();
-                }
-            }
+            if (snapshot.exists() && snapshot.val() === true) history.back();
+            else if (confirm("The current phase has not been completed. Are you sure you want to leave?")) history.back();
         } catch (error) {
             console.error("Erro ao verificar o progresso da fase:", error);
-            const confirmNavigation = confirm("Unable to verify the next phase status. Do you still want to navigate back?");
-            if (confirmNavigation) {
-                history.back();
-            }
+            if (confirm("Unable to verify the next phase status. Do you still want to navigate back?")) history.back();
         }
     });
 </script>
