@@ -91,17 +91,17 @@
         }
         .word-area { display: grid; gap: 12px }
 
-        /* ======= Drop-zone em uma LINHA, com scroll-x quando necessário ======= */
+        /* Drop-zone em 1 linha; se não couber, scroll-x (sem cortar) */
         .drop-zone {
             display: flex;
             gap: var(--slot-gap);
-            flex-wrap: nowrap;                 /* não quebrar linha */
+            flex-wrap: nowrap;
             min-height: var(--slot-h);
             align-items: center;
-            overflow-x: auto;                  /* << auto por padrão evita corte à direita */
-            -webkit-overflow-scrolling: touch; /* suavidade no iOS */
-            padding-bottom: 2px;               /* evita “corte” visual do conteúdo no limite */
-            touch-action: pan-x;               /* permite deslizar quando houver scroll-x */
+            overflow-x: auto;                  /* garante visibilidade total */
+            -webkit-overflow-scrolling: touch; /* iOS suave */
+            padding-bottom: 2px;               /* evita “corte” visual no limite */
+            touch-action: pan-x;
             scroll-snap-type: x proximity;
         }
 
@@ -115,7 +115,7 @@
             place-items: center;
             position: relative;
             outline: none;
-            flex: 0 0 var(--slot-w); /* fixo para cálculo linear */
+            flex: 0 0 var(--slot-w);
             scroll-snap-align: center;
         }
         .slot:focus, .slot:focus-visible { outline: none }
@@ -392,7 +392,7 @@
     function playWordMp3OrSpeak(wordIndexZeroBased, wordText) {
         const { level, unit } = getLevelAndUnitFromURL();
         const n = wordIndexZeroBased + 1;
-        aconst base = `../../${level}/${unit}/data1/sounds`;
+        const base = `../../${level}/${unit}/data1/sounds`; // <== corrigido (sem 'a' antes de const)
         const urls = [`${base}/som${n}.mp3`, `${base}/som.${n}.mp3`];
 
         // evita conflito com sons de letras
@@ -790,26 +790,22 @@
             requestAnimationFrame(() => fitSlotsToOneLine(dropZone));
         }
 
-        // ======= Ajuste adaptativo para manter uma linha (com scroll se precisar) =======
+        // ======= Ajuste adaptativo simples (encolhe até caber; se não couber, scroll-x) =======
         const ro = new ResizeObserver(() => fitSlotsToOneLine(dropZone));
         ro.observe(div);
-
         img.addEventListener('load', () => fitSlotsToOneLine(dropZone));
-
         requestAnimationFrame(() => fitSlotsToOneLine(dropZone));
 
         container.appendChild(div);
     }
 
-    // ======= Funções para ajuste adaptativo de uma linha =======
+    // ======= Funções para ajuste adaptativo =======
     function fitSlotsToOneLine(dropZoneEl){
         if (!dropZoneEl || !dropZoneEl.isConnected) return;
 
         const letters = parseInt(dropZoneEl.dataset.letters || '0', 10) || 0;
         if (letters <= 0) return;
 
-        // Largura real do elemento (evita cortar à direita)
-        const available = Math.floor(dropZoneEl.getBoundingClientRect().width) || Math.floor(dropZoneEl.clientWidth);
         const stylesRoot = getComputedStyle(document.documentElement);
         const gap = parseFloat(getComputedStyle(dropZoneEl).getPropertyValue('--slot-gap')) || 8;
 
@@ -817,6 +813,10 @@
         const MAX_W = parseInt(stylesRoot.getPropertyValue('--slot-w-max')) || 56;
         const MIN_H = parseInt(stylesRoot.getPropertyValue('--slot-h-min')) || 56;
         const MAX_H = parseInt(stylesRoot.getPropertyValue('--slot-h-max')) || 64;
+
+        // Largura disponível (usar o próprio contêiner pai da faixa de slots)
+        const host = dropZoneEl.parentElement || dropZoneEl;
+        const available = Math.floor(host.clientWidth);
 
         const totalGaps = Math.max(0, letters - 1) * gap;
 
@@ -830,26 +830,23 @@
         // calcula largura total necessária com slotW escolhido
         const needed = slotW * letters + totalGaps;
 
-        // se ainda não couber, ativa scroll e fixa no mínimo para toque confortável
-        if (needed > available) {
-            slotW = MIN_W;
-        }
-
-        // altura proporcional 64/56
+        // Altura proporcional 64/56
         const ratio = MAX_H / MAX_W; // 64/56
         let slotH = Math.round(slotW * ratio);
         slotH = Math.max(MIN_H, Math.min(MAX_H, slotH));
 
-        // tamanho de fonte proporcional
+        // Fonte proporcional
         const baseFontRem = 1.6;
         const scale = slotW / MAX_W;
-        let tileFontRem = baseFontRem * scale;
-        if (tileFontRem < 1.2) tileFontRem = 1.2;
-        if (tileFontRem > 1.6) tileFontRem = 1.6;
+        let tileFontRem = Math.max(1.2, Math.min(1.6, baseFontRem * scale));
 
+        // Aplica
         dropZoneEl.style.setProperty('--slot-w', slotW + 'px');
         dropZoneEl.style.setProperty('--slot-h', slotH + 'px');
         dropZoneEl.style.setProperty('--tile-font', tileFontRem + 'rem');
+
+        // Se ainda não couber, o overflow-x:auto da CSS garante visibilidade (sem corte)
+        // Não forçamos nada aqui — deixamos o scroll-x entrar em ação quando necessário.
     }
 
     function reflowAllDropZones(){
@@ -935,12 +932,12 @@
         }
     }
 
-    // Embaralhador estável
+    // Embaralhador estável (corrigido)
     function shuffleWord(word) {
         const arr = word.toUpperCase().split('');
         for (let i = arr.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
-            [arr[i], arr[j]] = [arr[j]];
+            [arr[i], arr[j]] = [arr[j], arr[i]]; // <== corrigido
         }
         return arr.join('');
     }
