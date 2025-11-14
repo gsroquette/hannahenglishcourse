@@ -37,36 +37,39 @@
         body {
             font-family: 'Times New Roman', Times, serif;
             margin: 0;
-            padding: 20px;
+            padding: 16px;
             background-image: url('../../../imagens/fundo.png');
             background-repeat: repeat;
             background-size: contain;
             background-position: center;
             -webkit-tap-highlight-color: transparent;
         }
+
+        /* Título responsivo */
         h1 {
             text-align: center;
             color: var(--brand);
-            font-size: 3rem;
-            margin-bottom: 20px;
+            font-size: clamp(1.6rem, 5vw, 3rem);
+            margin: 12px 0 16px;
         }
-        .activity-container { margin-top: 20px; }
+
+        .activity-container { margin-top: 8px; }
         .activity {
             display: flex;
             align-items: center;
             position: relative;
-            padding: 20px;
+            padding: 16px;
             background-color: #ffdab9;
             border-radius: 15px;
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
-            margin-bottom: 30px;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+            margin-bottom: 22px;
             overflow: hidden;
         }
         .activity img {
             max-width: 150px;
             max-height: 150px;
             border-radius: 12px;
-            margin-right: 20px;
+            margin-right: 16px;
             object-fit: contain;
             background:#fff;
             border:2px solid #eee;
@@ -79,7 +82,7 @@
             position:relative;
             overflow-x:auto;
             -webkit-overflow-scrolling:touch;
-            padding: 2px 4px;            /* <<< considerar no cálculo */
+            padding: 2px 4px;            /* considerado no cálculo */
             touch-action: pan-x;
         }
         .drop-viewport[data-gradient-left="1"]::before,
@@ -106,7 +109,7 @@
             font-size: var(--tile-font);
             font-weight: 700;
             text-align: center;
-            border: 3px dashed #999;     /* <<< 3px em cada lado = +6px de largura real */
+            border: 3px dashed #999;
             border-radius: 12px;
             background: #fff;
             outline: none;
@@ -166,19 +169,37 @@
         }
         #completion-modal button:hover{ background-color: #28a428; }
 
+        /* Toolbar: botões responsivos */
+        .toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; justify-content:center; margin-bottom:8px; }
+        .btn {
+            padding: 12px 20px;
+            border-radius: 12px;
+            border: none;
+            color: #fff;
+            background:#000;
+            font-size: 1.05rem;
+            cursor:pointer;
+        }
+        .btn--pdf { background:#32CD32; }
+
+        @media (max-width:480px){
+            .btn{ padding:10px 16px; font-size: 0.95rem; border-radius: 10px; }
+        }
+        @media (max-width:360px){
+            .btn{ padding:8px 14px; font-size: 0.9rem; border-radius: 10px; }
+        }
+
         @media (max-width: 600px) {
             .activity { flex-direction: column; align-items: center; }
-            .activity img { margin: 0 0 15px 0; }
+            .activity img { margin: 0 0 12px 0; }
         }
    </style>
 </head>
 <body>
-<button id="backButton" style="padding: 15px 25px; background-color: black; color: white; border: none; border-radius: 10px; font-size: 1.5rem; cursor: pointer; transition: background-color 0.3s ease;">
-    Back
-</button>
-<button id="pdfButton" onclick="generatePDF()" style="display: none; padding: 15px 25px; background-color: #32CD32; color: white; border: none; border-radius: 10px; font-size: 1.5rem; cursor: pointer; transition: background-color 0.3s ease; margin-top: 10px;">
-    Generate PDF
-</button>
+<div class="toolbar" aria-label="Toolbar">
+    <button id="backButton" class="btn">Back</button>
+    <button id="pdfButton" onclick="generatePDF()" class="btn btn--pdf" style="display:none">Generate PDF</button>
+</div>
 
 <h1>Hannah Missing Word</h1>
 
@@ -488,8 +509,7 @@
         const cs=getComputedStyle(dropZone);
         const w=parseFloat(cs.getPropertyValue('--slot-w'))||56;
         const g=parseFloat(cs.getPropertyValue('gap'))||8;
-        // inclui também a largura real de bordas (3px de cada lado = +6)
-        return Math.round(w + g + 6);
+        return Math.round(w + g + 6); // inclui 3px*2 de borda
     }
     function nudgeScroll(viewport, delta){
         const max = viewport.scrollWidth - viewport.clientWidth;
@@ -535,7 +555,10 @@
 
     /**
      * Ajusta os slots para tentar CABER EM UMA LINHA antes de ativar o scroll.
-     * Considera: largura do slot + bordas (6px), gaps e padding do viewport.
+     * Regras:
+     *  - Reduz quadradinhos e gap até o mínimo para caber.
+     *  - Só ativa scroll se AINDA não couber E letras >= 6.
+     *  - Para letras <= 5 => nunca mostra scroll (nem UI).
      */
     function fitSlotsToOneLine(viewport, dropZone, dropWrap, track, thumb, opts={}){
         const root = getComputedStyle(document.documentElement);
@@ -547,44 +570,32 @@
         const MIN_H = parseInt(root.getPropertyValue('--slot-h-min'))||50;
         const MAX_H = parseInt(root.getPropertyValue('--slot-h-max'))||64;
 
-        // gap atual e mínimo
         const gapDefault = parseFloat(DZstyles.getPropertyValue('gap'))||8;
         const gapMin = parseFloat(root.getPropertyValue('--slot-gap-min'))||4;
 
         const letters = (dropZone.dataset.letters|0)||0;
 
-        // largura disponível efetiva: largura do viewport MENOS paddings horizontais
         const vpPaddingLeft  = parseFloat(VPstyles.getPropertyValue('padding-left'))  || 0;
         const vpPaddingRight = parseFloat(VPstyles.getPropertyValue('padding-right')) || 0;
         const available = Math.floor(viewport.clientWidth - vpPaddingLeft - vpPaddingRight);
 
-        // Começa tentando com gap padrão
         let gap = gapDefault;
 
-        // Calcula a largura EXTERNA de cada slot (conteúdo + 3px*2 de borda)
-        const outer = (w)=> w + 6;
-
-        // Primeiro, tenta ajustar a largura do slot pra caber sem overflow
+        const outer = (w)=> w + 6; // 3px*2 borda
         function computeSlotWidthToFit(avail, letters, gap){
             if (letters <= 0) return MAX_W;
-            // total = letters * (slotOuter) + gaps*(letters-1)
-            // slotOuter = slotW + 6
-            // => slotW = floor( (avail - gaps*(letters-1) - 6*letters) / letters )
             const totalGaps = Math.max(0, letters-1) * gap;
             const numerator = avail - totalGaps - (6 * letters);
             const raw = Math.floor(numerator / letters);
             return isFinite(raw) ? raw : MAX_W;
         }
-
-        let slotW = computeSlotWidthToFit(available, letters, gap);
-        // Se ficou fora dos limites, ajusta
-        slotW = clamp(slotW, MIN_W, MAX_W);
-
-        // Verifica se coube; se não coube, tenta reduzir gap até o mínimo e refaz a conta
         function neededWidth(w, gap){
             const totalGaps = Math.max(0, letters-1) * gap;
             return (letters * outer(w)) + totalGaps;
         }
+
+        let slotW = computeSlotWidthToFit(available, letters, gap);
+        slotW = clamp(slotW, MIN_W, MAX_W);
 
         let needed = neededWidth(slotW, gap);
         if (needed > available && gap > gapMin){
@@ -594,31 +605,34 @@
             needed = neededWidth(slotW, gap);
         }
 
-        // Se ainda não coube, fixamos slotW no mínimo e aceitamos overflow (scroll)
         if (needed > available){
             slotW = MIN_W;
-            needed = neededWidth(slotW, gap); // (ainda pode passar; ativaremos overflow)
+            needed = neededWidth(slotW, gap);
         }
 
-        // Mantém proporção visual e fonte confortável
         const ratio = MAX_H / MAX_W;
         let slotH = Math.round(slotW * ratio); slotH = clamp(slotH, MIN_H, MAX_H);
         const baseRem=1.6, scale=slotW/MAX_W; let fontRem = clamp(baseRem*scale, 1.0, 1.6);
 
-        // Aplica tamanhos e gap calculados
         dropZone.style.setProperty('--slot-w', slotW+'px');
         dropZone.style.setProperty('--slot-h', slotH+'px');
         dropZone.style.setProperty('--tile-font', fontRem+'rem');
         dropZone.style.gap = gap+'px';
 
-        // Decide overflow com base no cálculo exato
-        const overflow = needed > available + 0.5; // tolerância pequena
+        // *** Regra de exibição do scroll ***
+        let overflow = needed > available + 0.5;
+        const allowScroll = letters >= 6;   // até 5 letras: nunca mostra scroll
+
+        if (!allowScroll) {
+            overflow = false;
+        }
+
         dropWrap.dataset.overflow = overflow ? '1' : '0';
+        viewport.style.overflowX = overflow ? 'auto' : 'hidden';
 
         if (opts.resetScroll) viewport.scrollLeft = 0;
 
-        // Configura trilho se houver overflow
-        if (overflow){
+        if(overflow){
             const contentW = needed;
             const vpW = available;
             const trackInner = track.clientWidth - 8;
@@ -626,7 +640,6 @@
             thumb.style.width = thumbW + 'px';
         }
 
-        // Sincroniza trilho e gradientes
         syncThumb(viewport, dropZone, track, thumb);
     }
 
@@ -684,8 +697,8 @@
     // ===== Back (mantido)
     document.getElementById("backButton").addEventListener("click", async () => {
         const { level, unit } = getLevelAndUnitFromURL();
-        const currentPhase = parseInt(getPhaseFromURL());
-        const nextPhase = `fase${currentPhase + 1}`;
+        theCurrentPhase = parseInt(getPhaseFromURL());
+        const nextPhase = `fase${theCurrentPhase + 1}`;
         try {
             const user = firebase.auth().currentUser;
             if (!user) { history.back(); return; }
