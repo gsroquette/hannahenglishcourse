@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Hannah Mixed Letters</title>
 
-    <!-- Fonte legível e com boa distinção de formas -->
     <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
 
     <style>
@@ -24,12 +23,32 @@
             --tile-font: 1.6rem;
             --slot-gap: 8px;
 
-            /* Limites para o ajuste adaptativo */
-            --slot-w-min: 48px;  /* >=44px para área de toque confortável no iPhone */
+            /* Limites padrão (desktop / médios) */
+            --slot-w-min: 48px;
             --slot-h-min: 56px;
             --slot-w-max: 56px;
             --slot-h-max: 64px;
+            --slot-gap-min: 6px;   /* novo */
         }
+
+        /* Perfis para telas menores */
+        @media (max-width: 480px){
+          :root{
+            --slot-w-min: 42px;
+            --slot-h-min: 50px;
+            --slot-gap: 6px;
+            --slot-gap-min: 4px;
+          }
+        }
+        @media (max-width: 360px){
+          :root{
+            --slot-w-min: 40px;   /* mínimo seguro de toque */
+            --slot-h-min: 48px;
+            --slot-gap: 6px;
+            --slot-gap-min: 4px;
+          }
+        }
+
         * { box-sizing: border-box }
         body {
             font-family: 'Atkinson Hyperlegible', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
@@ -91,16 +110,16 @@
         }
         .word-area { display: grid; gap: 12px }
 
-        /* Drop-zone em 1 linha; se não couber, scroll-x (sem cortar) */
+        /* Drop-zone em 1 linha; se não couber, ainda assim SEM cortar (pode rolar) */
         .drop-zone {
             display: flex;
             gap: var(--slot-gap);
             flex-wrap: nowrap;
             min-height: var(--slot-h);
             align-items: center;
-            overflow-x: auto;                  /* garante visibilidade total */
-            -webkit-overflow-scrolling: touch; /* iOS suave */
-            padding-bottom: 2px;               /* evita “corte” visual no limite */
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 2px;
             touch-action: pan-x;
             scroll-snap-type: x proximity;
         }
@@ -167,8 +186,6 @@
             transform: scale(1.1);
             z-index: 100;
         }
-
-        /* A posição fixa do tile arrastado só é aplicada em dispositivos touch */
         body.touch .tile.dragging { position: fixed; pointer-events: none; }
 
         .controls { display: flex; gap: 8px; flex-wrap: wrap }
@@ -181,41 +198,21 @@
             font-size: .95rem;
         }
         .pill:focus-visible { outline: 3px solid var(--focus) }
-        .status {
-            font-size: .95rem;
-            color: #444;
-        }
+        .status { font-size: .95rem; color: #444; }
         .good { color: var(--ok); font-weight: 700 }
 
-        /* Modal */
-        #overlay {
-            position: fixed; inset: 0; background: rgba(0,0,0,.6);
-            display: none; z-index: 1000;
-        }
+        #overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; z-index: 1000; }
         #completion-modal {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
-            background: #fff; padding: 28px; border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(0,0,0,.25);
+            background: #fff; padding: 28px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.25);
             text-align: center; display: none; z-index: 1001; width: min(92vw,520px);
         }
         #completion-modal h2 { margin: 0; font-size: 1.8rem; color: var(--ok) }
         #completion-modal p { font-size: 1rem; margin: 8px 0 0 }
-        #completion-modal button {
-            margin-top: 16px; padding: 10px 16px; font-size: 1rem; cursor: pointer;
-            border: none; border-radius: 10px; background: var(--ok); color: #fff;
-        }
+        #completion-modal button { margin-top: 16px; padding: 10px 16px; font-size: 1rem; cursor: pointer; border: none; border-radius: 10px; background: var(--ok); color: #fff; }
 
-        /* Confete */
-        .confetti {
-            position: fixed;
-            pointer-events: none;
-            z-index: 1200;
-            width: 8px; height: 12px; background: #ffd54f;
-            animation: fall 900ms ease-out forwards;
-        }
-        @keyframes fall {
-            to { transform: translateY(120vh) rotate(540deg); opacity: 0 }
-        }
+        .confetti { position: fixed; pointer-events: none; z-index: 1200; width: 8px; height: 12px; background: #ffd54f; animation: fall 900ms ease-out forwards; }
+        @keyframes fall { to { transform: translateY(120vh) rotate(540deg); opacity: 0 } }
 
         @media (max-width: 700px) {
             .activity { grid-template-columns: 1fr; justify-items: center }
@@ -234,7 +231,6 @@
 
     <div id="activity-container" class="activity-container"></div>
 
-    <!-- Modal de conclusão -->
     <div id="overlay" role="presentation"></div>
     <div id="completion-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <h2 id="modal-title">Phase Completed!</h2>
@@ -242,14 +238,13 @@
         <button onclick="closeModal()">Close</button>
     </div>
 
-    <!-- Scripts -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
 
     <script>
-    // ================== Firebase (mantido) ==================
+    /* ================== Firebase (mantido) ================== */
     const firebaseConfig = {
         apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
         authDomain: "hannahenglishcourse.firebaseapp.com",
@@ -293,16 +288,13 @@
         }
     });
 
-    // ================== TTS (silencioso) + Áudio MP3 (iOS fix) ==================
+    /* ================== TTS + MP3 (iOS safe) ================== */
     let selectedVoice = null;
-
-    // === Player global exclusivo para PALAVRAS (iOS-friendly) ===
     let wordPlayer = new Audio();
     wordPlayer.preload = 'auto';
     wordPlayer.setAttribute('playsinline', '');
     wordPlayer.setAttribute('webkit-playsinline', '');
 
-    // "Desbloqueia" o pipeline de mídia no primeiro gesto (iOS)
     let audioPrimed = false;
     function primeAudioPipelineOnce() {
       if (audioPrimed) return;
@@ -329,11 +321,6 @@
         const synth = window.speechSynthesis;
         const voices = synth.getVoices();
         selectedVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith("en-")) || voices[0] || null;
-        if (!selectedVoice) {
-            console.warn("SpeechSynthesis: no voices available.");
-        } else if (!String(selectedVoice.lang).toLowerCase().startsWith("en-")) {
-            console.warn("No 'en-US' voice found. Using first available voice:", selectedVoice.name);
-        }
     }
     window.speechSynthesis.onvoiceschanged = initializeVoices;
 
@@ -349,70 +336,50 @@
         synth.speak(u);
     }
 
-    // Interrompe QUALQUER áudio corrente (palavra)
     function stopCurrentAudio() {
       try { if (!wordPlayer.paused) { wordPlayer.pause(); wordPlayer.currentTime = 0; } } catch {}
     }
 
-    // Usa SEMPRE o mesmo <audio> para a PALAVRA (iOS gosta disso)
     function tryPlayAudio(url) {
       return new Promise((resolve) => {
         try { stopCurrentAudio(); } catch {}
         try { if (!audioPrimed) primeAudioPipelineOnce(); } catch {}
-
         wordPlayer.src = url;
-        wordPlayer.onended = () => {};
         wordPlayer.onerror = () => resolve(false);
-
         try {
-          wordPlayer.load(); // importante no iOS
+          wordPlayer.load();
           const p = wordPlayer.play();
           if (p && typeof p.then === 'function') {
             p.then(() => resolve(true)).catch(() => resolve(false));
-          } else {
-            resolve(true);
-          }
-        } catch {
-          resolve(false);
-        }
+          } else { resolve(true); }
+        } catch { resolve(false); }
       });
     }
 
     async function playFirstAvailable(urls) {
-      for (const u of urls) {
-        if (await tryPlayAudio(u)) return true;
-      }
+      for (const u of urls) if (await tryPlayAudio(u)) return true;
       return false;
     }
 
-    // Janela para suprimir sons de letras após tocar a palavra
     let suppressLettersUntil = 0;
 
-    // ---- MP3 de palavras (data1/sounds/som{N}.mp3) com fallback TTS ----
     function playWordMp3OrSpeak(wordIndexZeroBased, wordText) {
         const { level, unit } = getLevelAndUnitFromURL();
         const n = wordIndexZeroBased + 1;
-        const base = `../../${level}/${unit}/data1/sounds`; // <== corrigido (sem 'a' antes de const)
+        const base = `../../${level}/${unit}/data1/sounds`;
         const urls = [`${base}/som${n}.mp3`, `${base}/som.${n}.mp3`];
-
-        // evita conflito com sons de letras
         suppressLettersUntil = Date.now() + 900;
-
-        // dispara imediatamente (sem await)
-        playFirstAvailable(urls).then((ok) => {
-          if (!ok) speak(wordText);
-        });
+        playFirstAvailable(urls).then((ok) => { if (!ok) speak(wordText); });
     }
 
-    // ---- MP3 das letras (./letras/som{N}.mp3) com fallback TTS ----
     function letterIndex(ch) {
         const up = (ch || '').toUpperCase();
         const code = up.charCodeAt(0);
-        if (code >= 65 && code <= 90) return code - 64; // A=1..Z=26
+        if (code >= 65 && code <= 90) return code - 64;
         return null;
     }
     async function playLetterMp3OrSpeak(ch) {
-        if (Date.now() < suppressLettersUntil) return; // evita competir com a palavra
+        if (Date.now() < suppressLettersUntil) return;
         const idx = letterIndex(ch);
         if (!idx) { speak(ch); return; }
         const urls = [`./letras/som${idx}.mp3`, `./letras/som.${idx}.mp3`];
@@ -420,34 +387,28 @@
         if (!ok) speak(ch);
     }
 
-    // ================== Estado e sessão ==================
-    const SESSION_LIMIT = 6; // limite de atividades por sessão para reduzir fadiga
+    /* ================== Estado/Sessão ================== */
+    const SESSION_LIMIT = 6;
     let activities = [];
     let completedWords = 0;
     const sessionStatus = document.getElementById('sessionStatus');
-    
     const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
     document.addEventListener('DOMContentLoaded', () => {
         if (isTouchDevice) document.body.classList.add('touch');
         initializeVoices();
         loadActivities();
-
-        // Recalcular em resize/orientationchange (debounced)
         window.addEventListener('resize', debounce(reflowAllDropZones, 120));
         window.addEventListener('orientationchange', debounce(reflowAllDropZones, 120));
     });
 
-    function getPhaseFromURL() {
-        const params = new URLSearchParams(window.location.search);
-        return params.get('fase');
-    }
+    function getPhaseFromURL() { return new URLSearchParams(window.location.search).get('fase'); }
     function getLevelAndUnitFromURL() {
-        const params = new URLSearchParams(window.location.search);
-        return { level: params.get('level'), unit: params.get('unit') };
+        const p = new URLSearchParams(window.location.search);
+        return { level: p.get('level'), unit: p.get('unit') };
     }
 
-    // ================== Core da atividade (Drag & Drop) ==================
+    /* ================== Core DnD ================== */
     function createActivity(imageUrl, word, wordIndex) {
         const container = document.getElementById('activity-container');
         const div = document.createElement('div');
@@ -464,17 +425,14 @@
         area.className = 'word-area';
         div.appendChild(area);
 
-        // DROP ZONE
         const dropZone = document.createElement('div');
         dropZone.className = 'drop-zone';
         dropZone.dataset.letters = String(word.length);
         area.appendChild(dropZone);
 
-        // Bandeja (definida cedo para os handlers poderem usar)
         const tray = document.createElement('div');
         tray.className = 'tray';
 
-        // Cria slots
         const slots = [];
         for (let i = 0; i < word.length; i++) {
             const s = document.createElement('div');
@@ -483,19 +441,16 @@
             s.setAttribute('role', 'button');
             s.tabIndex = 0;
 
-            // Desktop DnD nativo
             s.addEventListener('dragenter', (e) => e.preventDefault());
             s.addEventListener('dragover',  (e) => e.preventDefault());
             s.addEventListener('drop', (e) => handleDrop(e, s));
-            
-            // Touch helpers
+
             if (isTouchDevice) {
                 s.addEventListener('touchstart', (e) => handleTouchStart(e, s), { passive: false });
                 s.addEventListener('touchmove', (e) => handleTouchMove(e, s), { passive: false });
                 s.addEventListener('touchend', (e) => handleTouchEnd(e, s), { passive: false });
                 s.addEventListener('touchcancel', (e) => handleTouchCancel(e, s));
             }
-            
             s.addEventListener('click', () => {
                 const child = s.querySelector('.tile');
                 if (child) {
@@ -514,7 +469,6 @@
             dropZone.appendChild(s);
         }
 
-        // Hint e reset
         const revealHintBtn = document.createElement('button');
         revealHintBtn.className = 'pill';
         revealHintBtn.textContent = 'Hint (1st letter)';
@@ -536,10 +490,8 @@
         controls.appendChild(resetBtn);
         area.appendChild(controls);
 
-        // Agora, de fato, adiciona a bandeja à UI (depois dos controles)
         area.appendChild(tray);
 
-        // Letras embaralhadas
         const shuffled = shuffleWord(word);
         const finalShuffle = (shuffled.toUpperCase() === word.toUpperCase()) ? forcedShuffle(word) : shuffled;
 
@@ -552,7 +504,6 @@
             tile.setAttribute('aria-grabbed', 'false');
             tile.tabIndex = 0;
 
-            // ===== Desktop Drag & Drop =====
             tile.addEventListener('dragstart', async (e) => {
                 try {
                     e.dataTransfer.setData('text/plain', tile.textContent);
@@ -562,15 +513,14 @@
                 tile.classList.add('dragging');
                 await playLetterMp3OrSpeak(ch);
             });
-            tile.addEventListener('dragend', (e) => {
+            tile.addEventListener('dragend', () => {
                 tile.setAttribute('aria-grabbed', 'false');
                 tile.classList.remove('dragging');
                 tile.style.outline = 'none';
             });
 
             tile.addEventListener('click', async () => { await playLetterMp3OrSpeak(ch); });
-            
-            // ===== Touch DnD =====
+
             if (isTouchDevice) {
                 tile.addEventListener('touchstart', async (e) => { handleTileTouchStart(e, tile); await playLetterMp3OrSpeak(ch); }, { passive: false });
                 tile.addEventListener('touchmove', (e) => handleTileTouchMove(e, tile), { passive: false });
@@ -600,12 +550,12 @@
             updatePerSlotFeedback();
             checkAnswer();
         }
-        
-        // ===== Touch DnD =====
+
+        /* ===== Touch DnD ===== */
         let activeTile = null;
         let touchOffsetX = 0;
         let touchOffsetY = 0;
-        
+
         function handleTileTouchStart(e, tile) {
             e.preventDefault();
             const touch = e.touches[0];
@@ -616,8 +566,7 @@
             tile.setAttribute('aria-grabbed', 'true');
             tile.classList.add('dragging');
         }
-        
-        function handleTileTouchMove(e, tile) {
+        function handleTileTouchMove(e) {
             if (!activeTile) return;
             e.preventDefault();
             const touch = e.touches[0];
@@ -625,7 +574,6 @@
             const currentY = touch.clientY - touchOffsetY;
             activeTile.style.left = currentX + 'px';
             activeTile.style.top = currentY + 'px';
-
             const slotsEls = dropZone.querySelectorAll('.slot');
             slotsEls.forEach(slot => {
                 const rect = slot.getBoundingClientRect();
@@ -636,14 +584,13 @@
                 }
             });
         }
-        
         function handleTileTouchEnd(e, tile) {
             if (!activeTile) return;
             e.preventDefault();
             const touch = e.changedTouches[0];
             const slotsEls = dropZone.querySelectorAll('.slot');
             let dropped = false;
-            
+
             slotsEls.forEach((slot) => {
                 const rect = slot.getBoundingClientRect();
                 if (touch.clientX >= rect.left && touch.clientX <= rect.right && touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
@@ -659,7 +606,7 @@
                     }
                     slot.innerHTML = '';
                     if (slot.dataset.ghost) delete slot.dataset.ghost;
-                    
+
                     tile.setAttribute('draggable', 'false');
                     tile.setAttribute('aria-grabbed', 'false');
                     tile.classList.remove('dragging');
@@ -667,14 +614,14 @@
                     tile.style.top = '';
                     tile.style.outline = 'none';
                     slot.appendChild(tile);
-                    
+
                     dropped = true;
                     updatePerSlotFeedback();
                     checkAnswer();
                 }
                 slot.style.backgroundColor = '';
             });
-            
+
             if (!dropped) {
                 tray.appendChild(tile);
                 tile.classList.remove('dragging');
@@ -686,7 +633,6 @@
             }
             activeTile = null;
         }
-        
         function handleTileTouchCancel(e, tile) {
             if (activeTile) {
                 tile.classList.remove('dragging');
@@ -697,15 +643,14 @@
                 activeTile = null;
             }
         }
-        
-        function handleTouchStart(e, slot) { e.preventDefault(); }
-        function handleTouchMove(e, slot)  { e.preventDefault(); }
-        function handleTouchEnd(e, slot) {
+        function handleTouchStart(e){ e.preventDefault(); }
+        function handleTouchMove(e){ e.preventDefault(); }
+        function handleTouchEnd(e, slot){
             if (!activeTile) {
                 const child = slot.querySelector('.tile');
                 if (child) {
-                    child.setAttribute('draggable', 'true');
-                    child.setAttribute('aria-grabbed', 'false');
+                    child.setAttribute('draggable','true');
+                    child.setAttribute('aria-grabbed','false');
                     child.style.outline = 'none';
                     tray.appendChild(child);
                     slot.innerHTML = '';
@@ -717,13 +662,12 @@
                 }
             }
         }
-        function handleTouchCancel(e, slot) {}
+        function handleTouchCancel(){}
 
         function currentAnswer(){
             return slots.map(s => (s.querySelector('.tile')?.textContent || '')).join('');
         }
 
-        // Feedback imediato por letra
         function updatePerSlotFeedback(){
             slots.forEach((s, idx) => {
                 const t = s.querySelector('.tile');
@@ -746,9 +690,8 @@
             if (ans.toUpperCase() === word.toUpperCase()){
                 if (div.dataset.completed === "false") {
                     div.dataset.completed = "true";
-                    // toca a PALAVRA imediatamente — sem await
                     playWordMp3OrSpeak(wordIndex, word);
-                    celebrate(div);   // Confete
+                    celebrate(div);
                     completedWords++;
                     updateSessionStatus();
                 }
@@ -790,7 +733,7 @@
             requestAnimationFrame(() => fitSlotsToOneLine(dropZone));
         }
 
-        // ======= Ajuste adaptativo simples (encolhe até caber; se não couber, scroll-x) =======
+        /* Ajuste adaptativo */
         const ro = new ResizeObserver(() => fitSlotsToOneLine(dropZone));
         ro.observe(div);
         img.addEventListener('load', () => fitSlotsToOneLine(dropZone));
@@ -799,66 +742,73 @@
         container.appendChild(div);
     }
 
-    // ======= Funções para ajuste adaptativo =======
+    /* ======= Ajuste adaptativo p/ caber em 1 linha ======= */
     function fitSlotsToOneLine(dropZoneEl){
         if (!dropZoneEl || !dropZoneEl.isConnected) return;
 
         const letters = parseInt(dropZoneEl.dataset.letters || '0', 10) || 0;
         if (letters <= 0) return;
 
-        const stylesRoot = getComputedStyle(document.documentElement);
-        const gap = parseFloat(getComputedStyle(dropZoneEl).getPropertyValue('--slot-gap')) || 8;
+        const rootStyles = getComputedStyle(document.documentElement);
+        const DZstyles   = getComputedStyle(dropZoneEl);
 
-        const MIN_W = parseInt(stylesRoot.getPropertyValue('--slot-w-min')) || 48;
-        const MAX_W = parseInt(stylesRoot.getPropertyValue('--slot-w-max')) || 56;
-        const MIN_H = parseInt(stylesRoot.getPropertyValue('--slot-h-min')) || 56;
-        const MAX_H = parseInt(stylesRoot.getPropertyValue('--slot-h-max')) || 64;
+        const MIN_W = parseInt(rootStyles.getPropertyValue('--slot-w-min')) || 42;
+        const MAX_W = parseInt(rootStyles.getPropertyValue('--slot-w-max')) || 56;
+        const MIN_H = parseInt(rootStyles.getPropertyValue('--slot-h-min')) || 50;
+        const MAX_H = parseInt(rootStyles.getPropertyValue('--slot-h-max')) || 64;
 
-        // Largura disponível (usar o próprio contêiner pai da faixa de slots)
+        const gapDefault = parseFloat(DZstyles.getPropertyValue('gap')) || 8;
+        const gapMin     = parseFloat(rootStyles.getPropertyValue('--slot-gap-min')) || 4;
+
         const host = dropZoneEl.parentElement || dropZoneEl;
         const available = Math.floor(host.clientWidth);
 
-        const totalGaps = Math.max(0, letters - 1) * gap;
-
-        // tenta caber em 1 linha entre MIN..MAX
+        // 1) Tenta com gap padrão
+        let gap = gapDefault;
+        let totalGaps = Math.max(0, letters - 1) * gap;
         let idealW = Math.floor((available - totalGaps) / letters);
         if (!Number.isFinite(idealW) || idealW <= 0) idealW = MAX_W;
 
-        // clampa
-        let slotW = Math.max(MIN_W, Math.min(MAX_W, idealW));
+        let slotW = clamp(idealW, MIN_W, MAX_W);
+        let needed = slotW * letters + totalGaps;
 
-        // calcula largura total necessária com slotW escolhido
-        const needed = slotW * letters + totalGaps;
+        // 2) Se não couber, diminui o gap até o mínimo
+        if (needed > available && gap > gapMin){
+            gap = gapMin;
+            totalGaps = Math.max(0, letters - 1) * gap;
+            idealW = Math.floor((available - totalGaps) / letters);
+            slotW = clamp(idealW, MIN_W, MAX_W);
+            needed = slotW * letters + totalGaps;
+            dropZoneEl.style.gap = gap + 'px';
+        } else {
+            dropZoneEl.style.gap = ''; // volta para o CSS
+        }
+
+        // 3) Com o menor gap, usa o menor slot se ainda não couber (scroll-x assume o resto)
+        if (needed > available) slotW = MIN_W;
 
         // Altura proporcional 64/56
-        const ratio = MAX_H / MAX_W; // 64/56
+        const ratio = MAX_H / MAX_W;
         let slotH = Math.round(slotW * ratio);
-        slotH = Math.max(MIN_H, Math.min(MAX_H, slotH));
+        slotH = clamp(slotH, MIN_H, MAX_H);
 
-        // Fonte proporcional
+        // Fonte proporcional (pode ir até 1.0rem)
         const baseFontRem = 1.6;
         const scale = slotW / MAX_W;
-        let tileFontRem = Math.max(1.2, Math.min(1.6, baseFontRem * scale));
+        let tileFontRem = clamp(baseFontRem * scale, 1.0, 1.6);
 
-        // Aplica
         dropZoneEl.style.setProperty('--slot-w', slotW + 'px');
         dropZoneEl.style.setProperty('--slot-h', slotH + 'px');
         dropZoneEl.style.setProperty('--tile-font', tileFontRem + 'rem');
-
-        // Se ainda não couber, o overflow-x:auto da CSS garante visibilidade (sem corte)
-        // Não forçamos nada aqui — deixamos o scroll-x entrar em ação quando necessário.
     }
 
     function reflowAllDropZones(){
         document.querySelectorAll('.drop-zone').forEach(dz => fitSlotsToOneLine(dz));
     }
+    function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+    function debounce(fn, ms){ let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), ms); }; }
 
-    function debounce(fn, ms){
-        let t; 
-        return (...args) => { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), ms); };
-    }
-
-    // Confete
+    /* Confete */
     function celebrate(host){
         const rect = host.getBoundingClientRect();
         const baseY = Math.max(0, rect.top + 10);
@@ -876,7 +826,7 @@
         }
     }
 
-    // ================== Progresso (mantido) ==================
+    /* =========== Progresso (mantido) =========== */
     async function updateNextPhase(userId) {
         const currentPhase = getPhaseFromURL();
         const { level, unit } = getLevelAndUnitFromURL();
@@ -895,7 +845,7 @@
         } catch (error) { console.error("Erro ao atualizar o progresso da fase:", error); }
     }
 
-    // ================== Carregamento / sessão ==================
+    /* =========== Carregamento / sessão =========== */
     async function loadActivities() {
         const { level, unit } = getLevelAndUnitFromURL();
         try {
@@ -910,7 +860,7 @@
             words.forEach((word, index) => {
                 const imageUrl = `../../${level}/${unit}/data1/imagens/imagem${index + 1}.png`;
                 activities.push(word);
-                createActivity(imageUrl, word, index); // ⬅️ passa o índice da palavra
+                createActivity(imageUrl, word, index);
             });
 
             updateSessionStatus();
@@ -922,22 +872,17 @@
     function updateSessionStatus(){
         const total = activities.length;
         const done = completedWords;
-        if (total === 0) {
-            sessionStatus.textContent = '';
-            return;
-        }
+        if (total === 0) { sessionStatus.textContent = ''; return; }
         sessionStatus.textContent = `Activities: ${done}/${total}`;
-        if (done === total) {
-            sessionStatus.innerHTML = `<span class="good">All done! Great job!</span>`;
-        }
+        if (done === total) sessionStatus.innerHTML = `<span class="good">All done! Great job!</span>`;
     }
 
-    // Embaralhador estável (corrigido)
+    /* Embaralhador estável */
     function shuffleWord(word) {
         const arr = word.toUpperCase().split('');
         for (let i = arr.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
-            [arr[i], arr[j]] = [arr[j], arr[i]]; // <== corrigido
+            [arr[i], arr[j]] = [arr[j], arr[i]];
         }
         return arr.join('');
     }
@@ -957,7 +902,7 @@
         document.getElementById('completion-modal').style.display = 'none';
     }
 
-    // ================== PDF (mantido) ==================
+    /* PDF (mantido) */
     async function generatePDF() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
