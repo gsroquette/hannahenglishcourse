@@ -72,6 +72,7 @@
       display: flex;
       flex-direction: column;
       align-items: center;
+      /* sem overflow interno: rola só a página inteira */
       -webkit-overflow-scrolling: touch;
       padding-bottom: 24px;
       background-color: #ffffff;
@@ -99,52 +100,14 @@
     .map-inner {
       position: relative;
       width: 100%;
-      max-width: 540px;          /* imita celular em telas grandes */
+      max-width: 540px;          /* MAIS estreito para imitar celular em telas grandes */
       margin: 8px auto 0;
       background-image: url('../../imagens/map.png');
       background-repeat: no-repeat;
       background-position: top center;
       background-size: 100% 100%;
       aspect-ratio: 1080 / 2880;  /* mantém proporção do mapa */
-    }
-
-    /* BLOCO DO TÍTULO/VERSE NO PERGAMINHO */
-    .unit-info-box {
-      position: absolute;
-      top: 7%;             /* região "AQUI" do pergaminho */
-      right: 7%;
-      width: 48%;
-      z-index: 2;
-      text-align: left;
-      font-family: "Comic Sans MS", "Trebuchet MS", cursive;
-      color: #145c2c;
-      line-height: 1.25;
-      pointer-events: none; /* para não atrapalhar cliques no mapa */
-    }
-    .unit-level-line {
-      font-size: 0.9rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      color: #8a5a2b; /* marrom, combina com pergaminho */
-      margin-bottom: 4px;
-      letter-spacing: 0.04em;
-    }
-    .unit-title {
-      font-size: 1.1rem;
-      font-weight: 700;
-      color: #188244;  /* verde vivo estilo "AQUI" */
-      margin-bottom: 3px;
-    }
-    .unit-verse-ref {
-      font-size: 0.95rem;
-      font-weight: 600;
-      color: #145c2c;
-      margin-bottom: 2px;
-    }
-    .unit-verse-text {
-      font-size: 0.85rem;
-      font-style: italic;
-      color: #2f4f3c;
+      /* sem height baseado em viewport: evita esticar em desktop e criar scroll duplo */
     }
 
     /* Container invisível que segura os botões/click targets */
@@ -168,7 +131,7 @@
     .hannah-video {
       position: absolute;
       transform: translate(-50%, -50%);
-      width: 34%;              /* tamanho calibrado para os círculos azuis */
+      width: 34%;              /* reduzido um pouco em relação aos 40% */
       aspect-ratio: 1 / 1;
       border-radius: 50%;
       background-color: rgba(255,255,255,0.0);
@@ -182,13 +145,13 @@
                   border-color 0.2s ease, background-color 0.2s ease;
     }
 
-    /* Imagens dentro do botão */
+    /* Imagens grandes dentro do botão */
     .activity-button img,
     .teacher-resources img,
     .robot-lex img,
     .hannah-video img {
       position: absolute;
-      inset: 6%;              /* margem pra não passar muito da linha azul */
+      inset: 6%;              /* mais margem pra não exagerar */
       width: 88%;
       height: 88%;
       object-fit: contain;
@@ -259,14 +222,6 @@
     </header>
 
     <div class="map-inner">
-      <!-- BLOCO DO LEVEL / TÍTULO / VERSÍCULO -->
-      <div class="unit-info-box">
-        <div class="unit-level-line" id="unit-level-line"></div>
-        <div class="unit-title" id="unit-title"></div>
-        <div class="unit-verse-ref" id="unit-verse-ref"></div>
-        <div class="unit-verse-text" id="unit-verse-text"></div>
-      </div>
-
       <main>
         <div class="activity-buttons" id="activity-buttons">
           <!-- Teacher Resources (controlado por role) -->
@@ -327,62 +282,6 @@
     anchorEl.classList.remove("disabled-btn");
     anchorEl.removeAttribute("aria-disabled");
     anchorEl.removeAttribute("title");
-  }
-
-  /* ==========
-     Header dinâmico: Level / Unit / Título / Versículo
-  ========== */
-  async function loadUnitHeader() {
-    const levelLineEl = document.getElementById("unit-level-line");
-    const titleEl     = document.getElementById("unit-title");
-    const verseRefEl  = document.getElementById("unit-verse-ref");
-    const verseTextEl = document.getElementById("unit-verse-text");
-    if (!levelLineEl || !titleEl || !verseRefEl || !verseTextEl) return;
-
-    // Level display – Starter para Level0
-    const levelRaw = __levelDB || __level;
-    let levelDisplay = String(levelRaw);
-    const mLev = String(levelRaw).match(/(\d+)/);
-    if (mLev) {
-      if (mLev[1] === "0") {
-        levelDisplay = "Starter";
-      } else {
-        levelDisplay = "Level " + mLev[1];
-      }
-    }
-
-    // Unit display
-    const unitRaw = __unitDB || __unit;
-    let unitDisplay = String(unitRaw);
-    const mUnit = String(unitRaw).match(/(\d+)/);
-    if (mUnit) {
-      unitDisplay = "Unit " + mUnit[1];
-    }
-
-    levelLineEl.textContent = `${levelDisplay} – ${unitDisplay}`;
-
-    // Caminho do arquivo de título/verso
-    const titlePath = `/${__level}/${__unit}/DataTitle/title.txt`;
-
-    try {
-      const resp = await fetch(titlePath);
-      if (!resp.ok) throw new Error("HTTP " + resp.status);
-      const text = await resp.text();
-      const lines = text
-        .split(/\r?\n/)
-        .map(l => l.trim())
-        .filter(l => l.length > 0);
-
-      if (lines[0]) titleEl.textContent = lines[0];
-      if (lines[1]) verseRefEl.textContent = lines[1];
-      if (lines.length > 2) {
-        const verseLines = lines.slice(2);
-        verseTextEl.innerHTML = verseLines.join("<br>");
-      }
-    } catch (e) {
-      console.warn("Falha ao carregar título/versículo:", e?.message);
-      // fallback: mantém só o Level/Unit, sem quebrar layout
-    }
   }
 
   /* ==========
@@ -456,9 +355,6 @@
     });
     robotButton.dataset.kind = "robotLex";
     container.appendChild(robotButton);
-
-    // Carrega título / versículo para o header do pergaminho
-    loadUnitHeader().catch(e => console.warn("Erro loadUnitHeader:", e?.message));
   });
 
   /* ==========
