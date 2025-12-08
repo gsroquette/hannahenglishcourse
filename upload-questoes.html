@@ -84,7 +84,7 @@
     border-radius:999px;
     border:1px solid #1f2937;
     font-size:12px;
-    color:var(--muted);
+    color:#var(--muted);
   }
   .msg{margin-top:6px;font-size:13px}
   .msg.ok{color:#22c55e}
@@ -461,7 +461,7 @@ firebase.initializeApp(firebaseConfig);
     blockOrder.style.display  = (t === 'order') ? 'block' : 'none';
     blockMatch.style.display  = (t === 'match') ? 'block' : 'none';
 
-    // Options aparecem para todos exceto match e order+fill? (order/fill possíveis sem options)
+    // Options aparecem para todos exceto match
     if (t === 'match'){
       blockOptions.style.display = 'none';
     } else {
@@ -624,7 +624,10 @@ firebase.initializeApp(firebaseConfig);
     if (shuffle === false) baseQuestion.shuffleOptions = false;
 
     if (t === 'fillblank'){
-      const lines = norm(fbAnswers.value).split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+      const linesRaw = norm(fbAnswers.value);
+      const lines = linesRaw
+        ? linesRaw.split(/\r?\n/).map(s=>s.trim()).filter(Boolean)
+        : [];
       if (!lines.length){
         toast('Para Fill in the Blanks, preencha ao menos uma resposta em "Respostas esperadas".');
         return null;
@@ -639,7 +642,10 @@ firebase.initializeApp(firebaseConfig);
         baseQuestion.answer = obj;
       }
     } else if (t === 'order'){
-      const words = norm(ordWords.value).split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+      const wordsRaw = norm(ordWords.value);
+      const words = wordsRaw
+        ? wordsRaw.split(/\r?\n/).map(s=>s.trim()).filter(Boolean)
+        : [];
       if (!words.length){
         toast('Para Order, preencha as palavras/fragmentos (uma por linha).');
         return null;
@@ -700,13 +706,15 @@ firebase.initializeApp(firebaseConfig);
     const payload = buildQuestionObject();
     if (!payload) return;
     jsonView.textContent = JSON.stringify(payload, null, 2);
-    pillInfo.textContent = `JSON gerado para ${payload.meta.level} / ${payload.meta.unit} / fase ${payload.meta.fase} / ${payload.meta.questionId}`;
+    pillInfo.textContent =
+      `JSON gerado para ${payload.meta.level} / ${payload.meta.unit} / fase ${payload.meta.fase} / ${payload.meta.questionId}`;
     toast('JSON gerado com sucesso. Você pode enviar ao Firebase ou usar Preview.', true);
   });
 
   /* ========= BOTÃO: PREVIEW =========
      - Gera payload
-     - Salva em localStorage (qaPreviewPayload)
+     - Salva em localStorage com a chave esperada pelo qa-preview.html
+       (hannahQA_preview)
      - Abre qa-preview.html em nova aba
   ==================================== */
   btnPreview.addEventListener('click', ()=>{
@@ -714,14 +722,15 @@ firebase.initializeApp(firebaseConfig);
     if (!payload) return;
 
     try{
-      localStorage.setItem('qaPreviewPayload', JSON.stringify(payload));
+      // >>> chave alinhada com qa-preview.html <<<
+      localStorage.setItem('hannahQA_preview', JSON.stringify(payload));
     }catch(e){
       console.error('Erro ao salvar no localStorage:', e);
       toast('Não foi possível salvar no localStorage para o Preview.', false);
       return;
     }
 
-    toast('Payload salvo em localStorage. Abrindo qa-preview.html...', true);
+    toast('Preview salvo (hannahQA_preview). Abrindo qa-preview.html...', true);
 
     // Ajuste o caminho abaixo se o qa-preview.html estiver em outra pasta
     window.open('qa-preview.html', '_blank');
