@@ -503,6 +503,44 @@
     if (btnSearch) btnSearch.disabled = !!flag;
   }
 
+  // ==== Regra híbrida de validação de type ====
+  const VALID_TYPES = [
+    "mcq",
+    "yesno",
+    "truefalse",
+    "image_mcq",
+    "audio_mcq",
+    "fillblank",
+    "order",
+    "match"
+  ];
+
+  function resolveAndValidateType(question, typeQuick, label){
+    if (question && question.type){
+      if (!VALID_TYPES.includes(question.type)){
+        throw new Error(
+          `Questão ${label}: type inválido "${question.type}". ` +
+          `Tipos válidos: ${VALID_TYPES.join(", ")}`
+        );
+      }
+      return question.type;
+    }
+
+    if (typeQuick){
+      if (!VALID_TYPES.includes(typeQuick)){
+        throw new Error(
+          `TypeQuick inválido "${typeQuick}".`
+        );
+      }
+      question.type = typeQuick;
+      return typeQuick;
+    }
+
+    throw new Error(
+      `Questão ${label}: sem type e sem TypeQuick selecionado.`
+    );
+  }
+
   // ==== Templates rápidos para JSON ====
   const txtJson = document.getElementById('json');
 
@@ -755,66 +793,72 @@
     // título do preview
     const title = (bulkMode && parsed.title) ? String(parsed.title) : "Preview";
 
-    // normaliza e injeta metadados em UMA ou VÁRIAS questões
-    if (!bulkMode){
-      let obj = parsed;
-      if (!obj || typeof obj !== "object" || Array.isArray(obj)) obj = {};
+    try{
+      // normaliza e injeta metadados em UMA ou VÁRIAS questões
+      if (!bulkMode){
+        let obj = parsed;
+        if (!obj || typeof obj !== "object" || Array.isArray(obj)) obj = {};
 
-      if (!qId) qId = `Q_${Date.now()}`;
+        if (!qId) qId = `Q_${Date.now()}`;
 
-      obj.id    = obj.id || qId;
-      obj.level = obj.level || levelKey;
-      obj.unit  = obj.unit  || unitKey;
-      obj.fase  = obj.fase  || faseKey;
+        obj.id    = obj.id || qId;
+        obj.level = obj.level || levelKey;
+        obj.unit  = obj.unit  || unitKey;
+        obj.fase  = obj.fase  || faseKey;
 
-      if (orderNum != null) obj.order = orderNum;
-      if (typeQuick && !obj.type) obj.type = typeQuick;
+        if (orderNum != null) obj.order = orderNum;
 
-      obj.skillType  = skillSel;
-      obj.difficulty = diffSel;
+        resolveAndValidateType(obj, typeQuick, "#1");
 
-      meta.questionId = obj.id;
+        obj.skillType  = skillSel;
+        obj.difficulty = diffSel;
 
-      return { title, meta, questions: [obj] };
-    }
+        meta.questionId = obj.id;
 
-    // bulk: preview do bloco inteiro
-    const list = parsed.questions || [];
-    if (!Array.isArray(list) || list.length === 0){
-      showToast("O bloco está vazio: questions[] sem itens.");
+        return { title, meta, questions: [obj] };
+      }
+
+      // bulk: preview do bloco inteiro
+      const list = parsed.questions || [];
+      if (!Array.isArray(list) || list.length === 0){
+        showToast("O bloco está vazio: questions[] sem itens.");
+        return null;
+      }
+
+      const baseMs = Date.now();
+      const out = [];
+
+      for (let i = 0; i < list.length; i++){
+        let q = list[i];
+        if (!q || typeof q !== "object" || Array.isArray(q)) q = {};
+
+        // se não vier id, gera um estável para o preview
+        const autoId = makeIdForBulk(baseMs, i);
+        q.id    = q.id || autoId;
+
+        q.level = q.level || levelKey;
+        q.unit  = q.unit  || unitKey;
+        q.fase  = q.fase  || faseKey;
+
+        resolveAndValidateType(q, typeQuick, `#${i+1}`);
+
+        // aplica pedagógicos (sempre)
+        q.skillType  = skillSel;
+        q.difficulty = diffSel;
+
+        // aplica ordem sequencial a partir do orderNum (se houver)
+        if (orderNum != null) q.order = orderNum + i;
+
+        out.push(q);
+      }
+
+      meta.questionId = out[0].id;
+
+      return { title, meta, questions: out };
+    } catch(err){
+      showToast(err.message);
       return null;
     }
-
-    const baseMs = Date.now();
-    const out = [];
-
-    for (let i = 0; i < list.length; i++){
-      let q = list[i];
-      if (!q || typeof q !== "object" || Array.isArray(q)) q = {};
-
-      // se não vier id, gera um estável para o preview
-      const autoId = makeIdForBulk(baseMs, i);
-      q.id    = q.id || autoId;
-
-      q.level = q.level || levelKey;
-      q.unit  = q.unit  || unitKey;
-      q.fase  = q.fase  || faseKey;
-
-      if (typeQuick && !q.type) q.type = typeQuick;
-
-      // aplica pedagógicos (sempre)
-      q.skillType  = skillSel;
-      q.difficulty = diffSel;
-
-      // aplica ordem sequencial a partir do orderNum (se houver)
-      if (orderNum != null) q.order = orderNum + i;
-
-      out.push(q);
-    }
-
-    meta.questionId = out[0].id;
-
-    return { title, meta, questions: out };
   }
 
   // ==== Botão Preview: salva em localStorage e abre qa-preview.html ====
@@ -921,9 +965,7 @@
           obj.order = null;
         }
 
-        if (typeQuick && !obj.type) {
-          obj.type = typeQuick;
-        }
+        resolveAndValidateType(obj, typeQuick, "#1");
 
         obj.skillType  = skillSel;
         obj.difficulty = diffSel;
@@ -972,6 +1014,19 @@
           return;
         }
 
+        // valida tudo antes (sem salvar parcialmente)
+        try{
+          for (let i = 0; i < list.length; i++){
+            let q = list[i];
+            if (!q || typeof q !== "object" || Array.isArray(q)) q = {};
+            resolveAndValidateType(q, typeQuick, `#${i+1}`);
+          }
+        } catch(err){
+          showToast(err.message);
+          setStatus("<b>Status:</b> validação falhou.<span class='pill-err'>Erro</span>");
+          return;
+        }
+
         // determina posição de inserção
         const insertAt = (orderStart != null)
           ? Math.max(0, Math.min(orderStart - 1, existingIds.length))
@@ -998,8 +1053,7 @@
           q.unit  = q.unit  || unitKey;
           q.fase  = q.fase  || faseKey;
 
-          // aplica typeQuick só se não existir type
-          if (typeQuick && !q.type) q.type = typeQuick;
+          resolveAndValidateType(q, typeQuick, `#${i+1}`);
 
           // pedagógicos dominam
           q.skillType  = skillSel;
@@ -1051,7 +1105,7 @@
 
     } catch (err) {
       console.error("Erro ao salvar no Firebase:", err);
-      showToast("Erro ao salvar no Firebase. Veja o console.");
+      showToast(err.message || "Erro ao salvar no Firebase. Veja o console.");
       setStatus("<b>Status:</b> erro ao salvar no Firebase.<span class='pill-err'>Erro</span>");
     } finally {
       showLoading(false);
