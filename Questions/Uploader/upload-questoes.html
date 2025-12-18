@@ -318,13 +318,13 @@
     <div class="field">
       <label for="questionId">Question ID (opcional)</label>
       <input id="questionId" type="text" placeholder="Ex.: L0_U1_F7_Q01" />
-      <div class="hint">Se vazio, será gerado automaticamente (Q_timestamp).</div>
+      <div class="hint">Se vazio, será gerado automaticamente (Q_timestamp). (No modo lote, IDs são gerados automaticamente.)</div>
     </div>
 
     <div class="field">
       <label for="order">Ordem na atividade</label>
       <input id="order" type="number" min="1" step="1" placeholder="Ex.: 1" />
-      <div class="hint">1 = primeira questão; se vazio, será adicionada ao final.</div>
+      <div class="hint">1 = primeira questão; se vazio, será adicionada ao final. No modo lote, isso define a posição inicial do bloco.</div>
     </div>
 
     <div class="field">
@@ -373,10 +373,9 @@
       <textarea id="json" spellcheck="false"></textarea>
       <div class="hint">
         Cole/edite aqui um objeto JSON com os campos da questão.<br>
-        Exemplo básico para MCQ:
-        <code>
-{"type":"mcq","prompt":"What is this?","image":"images/apple.png","options":[{"label":"Apple","value":"apple"},{"label":"Banana","value":"banana"}],"answer":"apple","skillType":"vocabulary","difficulty":"easy"}
-        </code><br>
+        Você pode colar:<br>
+        (A) um objeto de questão único: <code>{"type":"mcq", ...}</code><br>
+        (B) um bloco com várias questões: <code>{"title":"...", "questions":[{...},{...}]}</code><br><br>
         Observação: ao salvar/preview, o sistema garante que <code>skillType</code> e <code>difficulty</code> serão aplicados a partir dos dropdowns.
       </div>
     </div>
@@ -404,7 +403,7 @@
   <div class="section-box">
     <div class="section-title">Pesquisar / editar questões existentes</div>
     <div class="section-sub">
-      Informe Level, Unit e Fase para ver todas as questões daquela atividade.  
+      Informe Level, Unit e Fase para ver todas as questões daquela atividade.
       Você pode carregar qualquer questão para o formulário acima ou apagá-la.
     </div>
 
@@ -575,38 +574,38 @@
   document.getElementById('btnTemplateImageMcq').onclick = () => {
     applyDropdownDefaultsToUI("vocabulary", "easy");
     txtJson.value = JSON.stringify({
-  "answer": "mary",
-  "difficulty": "easy",
-  "fase": "10",
-  "id": "Q_1765664627181",
-  "image": "/Level0/Unit1/data1/imagens/imagem1.png",
-  "level": "Level0",
-  "options": [
-    {
-      "audio": "/Level0/Unit1/data1/sounds/som1.mp3",
+      "answer": "mary",
+      "difficulty": "easy",
+      "fase": "10",
+      "id": "Q_1765664627181",
       "image": "/Level0/Unit1/data1/imagens/imagem1.png",
-      "label": "Mary",
-      "value": "mary"
-    },
-    {
-      "audio": "/Level0/Unit1/data1/sounds/som2.mp3",
-      "image": "/Level0/Unit1/data1/imagens/imagem2.png",
-      "label": "Elizabeth",
-      "value": "elizabeth"
-    },
-    {
-      "audio": "/Level0/Unit1/data1/sounds/som3.mp3",
-      "image": "/Level0/Unit1/data1/imagens/imagem3.png",
-      "label": "Jesus",
-      "value": "jesus"
-    }
-  ],
-  "prompt": "Look. Choose.",
-  "promptAudio": "/Level0/Unit1/QA2/prompt1.mp3",
-  "skillType": "vocabulary",
-  "type": "image_mcq",
-  "unit": "Unit1"
-}, null, 2);
+      "level": "Level0",
+      "options": [
+        {
+          "audio": "/Level0/Unit1/data1/sounds/som1.mp3",
+          "image": "/Level0/Unit1/data1/imagens/imagem1.png",
+          "label": "Mary",
+          "value": "mary"
+        },
+        {
+          "audio": "/Level0/Unit1/data1/sounds/som2.mp3",
+          "image": "/Level0/Unit1/data1/imagens/imagem2.png",
+          "label": "Elizabeth",
+          "value": "elizabeth"
+        },
+        {
+          "audio": "/Level0/Unit1/data1/sounds/som3.mp3",
+          "image": "/Level0/Unit1/data1/imagens/imagem3.png",
+          "label": "Jesus",
+          "value": "jesus"
+        }
+      ],
+      "prompt": "Look. Choose.",
+      "promptAudio": "/Level0/Unit1/QA2/prompt1.mp3",
+      "skillType": "vocabulary",
+      "type": "image_mcq",
+      "unit": "Unit1"
+    }, null, 2);
   };
 
   // 5) Listen & Choose
@@ -647,9 +646,7 @@
       type: "order",
       prompt: "Put the words in order.",
       image: "images/order_sentence.png",
-      // O preview usa "options" para montar os botões de palavras
       options: ["Mary", "visits", "Elizabeth"],
-      // (opcional) manter também "chunks" se quiser para organização futura
       chunks: ["Mary", "visits", "Elizabeth"],
       answer: ["Mary", "visits", "Elizabeth"]
     }, null, 2);
@@ -661,7 +658,6 @@
     txtJson.value = JSON.stringify({
       type: "match",
       prompt: "Match the character with the description.",
-      // left.value e right.value precisam ser IGUAIS em cada par
       pairs: [
         {
           left:  { label: "Mary",      value: "mary" },
@@ -675,6 +671,30 @@
     }, null, 2);
   };
 
+  // ===== helpers: bulk detection and id generation =====
+  function isBulkBlock(parsed){
+    return parsed && typeof parsed === "object" && Array.isArray(parsed.questions);
+  }
+
+  function makeIdForBulk(baseMs, index){
+    // garante ordem e unicidade (mesmo ms) com sufixo
+    const pad = String(index + 1).padStart(3, "0");
+    return `Q_${baseMs}_${pad}`;
+  }
+
+  function parseJsonTextarea(){
+    const jsonStr = txtJson.value.trim();
+    if (!jsonStr) return { ok:false, error:"JSON vazio" };
+    let parsed;
+    try{
+      parsed = JSON.parse(jsonStr);
+    }catch(err){
+      console.error("JSON inválido:", err);
+      return { ok:false, error:"JSON inválido" };
+    }
+    return { ok:true, parsed };
+  }
+
   // ==== Função para montar payload de preview (meta + question) ====
   function buildPreviewPayload(){
     const levelRaw = document.getElementById('level').value.trim();
@@ -683,16 +703,14 @@
     let   qId      = document.getElementById('questionId').value.trim();
     const orderRaw = document.getElementById('order').value.trim();
     const typeQuick= document.getElementById('typeQuick').value;
-    const jsonStr  = txtJson.value.trim();
 
     const skillSel = document.getElementById('skillType').value;
     const diffSel  = document.getElementById('difficulty').value;
 
-    if (!levelRaw || !unitRaw || !faseRaw || !jsonStr) {
-      showToast("Preencha Level, Unit, Fase e o JSON da questão antes de fazer o preview.");
+    if (!levelRaw || !unitRaw || !faseRaw || !txtJson.value.trim()) {
+      showToast("Preencha Level, Unit, Fase e o JSON antes de fazer o preview.");
       return null;
     }
-
     if (!skillSel || !diffSel){
       showToast("Selecione Skill Type e Difficulty antes de fazer o preview.");
       return null;
@@ -702,30 +720,41 @@
     const unitKey  = normalizeDir("Unit",  unitRaw,  "1");
     const faseKey  = String(parseInt(faseRaw, 10) || 1);
 
-    if (!qId) {
-      qId = `Q_${Date.now()}`;
-    }
-
     let orderNum = null;
     if (orderRaw) {
       const n = parseInt(orderRaw, 10);
       if (!isNaN(n) && n > 0) orderNum = n;
     }
 
-    let obj;
-    try {
-      obj = JSON.parse(jsonStr);
-    } catch (err) {
-      console.error("JSON inválido para preview:", err);
-      showToast("Erro: JSON inválido. Verifique a sintaxe antes do preview.");
+    const parsedRes = parseJsonTextarea();
+    if (!parsedRes.ok){
+      showToast("Erro: " + parsedRes.error + ". Verifique a sintaxe antes do preview.");
       return null;
     }
 
-    // aplica metadados básicos (mesma lógica do submit)
+    let obj = parsedRes.parsed;
+
+    // Se for bloco com várias questões, faz preview da PRIMEIRA questão
+    if (isBulkBlock(obj)){
+      if (!obj.questions.length){
+        showToast("O bloco está vazio: questions[] sem itens.");
+        return null;
+      }
+      showToast("Preview do bloco: exibindo a 1ª questão (modo lote).");
+      obj = obj.questions[0];
+    }
+
+    if (!qId) {
+      qId = `Q_${Date.now()}`;
+    }
+
+    // aplica metadados básicos
+    obj = (obj && typeof obj === "object") ? obj : {};
     obj.id    = obj.id || qId;
     obj.level = obj.level || levelKey;
     obj.unit  = obj.unit  || unitKey;
     obj.fase  = obj.fase  || faseKey;
+
     if (orderNum != null) {
       obj.order = orderNum;
     }
@@ -733,7 +762,7 @@
       obj.type = typeQuick;
     }
 
-    // ===== GARANTE OS DOIS CAMPOS PEDAGÓGICOS =====
+    // garante pedagógicos
     obj.skillType  = skillSel;
     obj.difficulty = diffSel;
 
@@ -757,7 +786,6 @@
     if (!payload) return;
 
     try {
-      // chave usada pelo qa-preview.html (mensagem: hannahQA_preview)
       localStorage.setItem('hannahQA_preview', JSON.stringify(payload));
     } catch (err) {
       console.error("Erro ao salvar preview no localStorage:", err);
@@ -765,11 +793,10 @@
       return;
     }
 
-    // abre nova aba com a tela de preview
     window.open('qa-preview.html', '_blank');
   });
 
-  // ==== Salvando questão + activity (Firebase) ====
+  // ======= SAVE (SINGLE OU BULK) =======
   document.getElementById('q-form').addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -782,19 +809,17 @@
     const levelRaw = document.getElementById('level').value.trim();
     const unitRaw  = document.getElementById('unit').value.trim();
     const faseRaw  = document.getElementById('fase').value.trim();
-    let   qId      = document.getElementById('questionId').value.trim();
+    let   qId      = document.getElementById('questionId').value.trim(); // single only
     const orderRaw = document.getElementById('order').value.trim();
     const typeQuick= document.getElementById('typeQuick').value;
-    const jsonStr  = txtJson.value.trim();
 
     const skillSel = document.getElementById('skillType').value;
     const diffSel  = document.getElementById('difficulty').value;
 
-    if (!levelRaw || !unitRaw || !faseRaw || !jsonStr) {
+    if (!levelRaw || !unitRaw || !faseRaw || !txtJson.value.trim()) {
       showToast("Preencha Level, Unit, Fase e o JSON da questão.");
       return;
     }
-
     if (!skillSel || !diffSel){
       showToast("Selecione Skill Type e Difficulty antes de salvar.");
       return;
@@ -805,82 +830,182 @@
     const faseKey  = String(parseInt(faseRaw, 10) || 1);
     const activityKey = `${levelKey}_${unitKey}_Fase${faseKey}`;
 
-    if (!qId) {
-      qId = `Q_${Date.now()}`;
-    }
-
-    let orderNum = null;
+    let orderStart = null;
     if (orderRaw) {
       const n = parseInt(orderRaw, 10);
-      if (!isNaN(n) && n > 0) orderNum = n;
+      if (!isNaN(n) && n > 0) orderStart = n;
     }
 
-    let obj;
-    try {
-      obj = JSON.parse(jsonStr);
-    } catch (err) {
-      console.error("JSON inválido:", err);
-      showToast("Erro: JSON inválido. Verifique a sintaxe.");
+    const parsedRes = parseJsonTextarea();
+    if (!parsedRes.ok){
+      showToast("Erro: " + parsedRes.error + ". Verifique a sintaxe.");
       setStatus("<b>Status:</b> erro ao fazer parse do JSON (veja console).<span class='pill-err'>JSON inválido</span>");
       return;
     }
 
-    // Força alguns metadados importantes
-    obj.id    = qId;
-    obj.level = obj.level || levelKey;
-    obj.unit  = obj.unit  || unitKey;
-    obj.fase  = obj.fase  || faseKey;
-    if (orderNum != null) {
-      obj.order = orderNum;
-    } else if (obj.order == null) {
-      obj.order = null;
-    }
-
-    if (typeQuick && !obj.type) {
-      obj.type = typeQuick;
-    }
-
-    // ===== GARANTE OS DOIS CAMPOS PEDAGÓGÓGICOS =====
-    obj.skillType  = skillSel;
-    obj.difficulty = diffSel;
+    const parsed = parsedRes.parsed;
+    const bulkMode = isBulkBlock(parsed);
 
     showLoading(true);
-    setStatus("<b>Status:</b> salvando questão em <code>questions/"+qId+"</code>…");
 
     try {
-      // 1) salva em questions/{qId}
-      await firebase.database().ref("questions/"+qId).set(obj);
-
-      // 2) atualiza activities/{activityKey}/questionIds
+      setStatus("<b>Status:</b> carregando activity <code>activities/"+activityKey+"</code>…");
       const actRef = firebase.database().ref("activities/"+activityKey);
       const snap = await actRef.once("value");
       const act  = snap.val() || {};
-      let ids    = Array.isArray(act.questionIds) ? act.questionIds.slice() : [];
+      const existingIds = Array.isArray(act.questionIds) ? act.questionIds.slice() : [];
 
-      if (!ids.includes(qId)) {
+      if (!bulkMode){
+        // ===== SINGLE SAVE (como antes) =====
+        if (!qId) qId = `Q_${Date.now()}`;
+
+        let obj = parsed;
+        if (!obj || typeof obj !== "object" || Array.isArray(obj)) obj = {};
+
+        // metadados
+        obj.id    = qId;
+        obj.level = obj.level || levelKey;
+        obj.unit  = obj.unit  || unitKey;
+        obj.fase  = obj.fase  || faseKey;
+
+        // ordem (se fornecida, vai inserir na lista)
+        let orderNum = null;
+        if (orderStart != null) orderNum = orderStart;
+
         if (orderNum != null) {
-          // insere na posição (order-1), limitado ao tamanho
-          const idx = Math.max(0, Math.min(orderNum - 1, ids.length));
-          ids.splice(idx, 0, qId);
-        } else {
-          ids.push(qId);
+          obj.order = orderNum;
+        } else if (obj.order == null) {
+          obj.order = null;
         }
+
+        if (typeQuick && !obj.type) {
+          obj.type = typeQuick;
+        }
+
+        obj.skillType  = skillSel;
+        obj.difficulty = diffSel;
+
+        setStatus("<b>Status:</b> salvando questão única em <code>questions/"+qId+"</code>…");
+
+        // monta a lista final de IDs
+        let finalIds = existingIds.slice();
+        if (!finalIds.includes(qId)) {
+          if (orderNum != null) {
+            const idx = Math.max(0, Math.min(orderNum - 1, finalIds.length));
+            finalIds.splice(idx, 0, qId);
+          } else {
+            finalIds.push(qId);
+          }
+        }
+
+        // update atômico (multi-location)
+        const updates = {};
+        updates["questions/" + qId] = obj;
+
+        const newAct = {
+          level: act.level || levelKey,
+          unit:  act.unit  || unitKey,
+          fase:  act.fase  || faseKey,
+          questionIds: finalIds
+        };
+        updates["activities/" + activityKey] = newAct;
+
+        await firebase.database().ref().update(updates);
+
+        showToast("Questão salva com sucesso!");
+        setStatus(
+          "<b>Status:</b> salvo com sucesso.<br>" +
+          "questions/<code>" + qId + "</code><br>" +
+          "activities/<code>" + activityKey + "</code> " +
+          "<span class='pill-ok'>OK</span>"
+        );
+
+      } else {
+        // ===== BULK SAVE =====
+        const list = parsed.questions || [];
+        if (!Array.isArray(list) || list.length === 0){
+          showToast("Bloco em lote inválido: questions[] está vazio.");
+          setStatus("<b>Status:</b> bloco inválido.<span class='pill-err'>Erro</span>");
+          return;
+        }
+
+        // determina posição de inserção
+        const insertAt = (orderStart != null)
+          ? Math.max(0, Math.min(orderStart - 1, existingIds.length))
+          : existingIds.length;
+
+        const baseMs = Date.now();
+        const newIds = [];
+        const updates = {};
+
+        // prepara novos objetos
+        for (let i = 0; i < list.length; i++){
+          const rawQ = list[i];
+
+          // garante object
+          let q = rawQ;
+          if (!q || typeof q !== "object" || Array.isArray(q)) q = {};
+
+          const newId = makeIdForBulk(baseMs, i);
+          newIds.push(newId);
+
+          // injeta metadados
+          q.id    = q.id || newId;
+          q.level = q.level || levelKey;
+          q.unit  = q.unit  || unitKey;
+          q.fase  = q.fase  || faseKey;
+
+          // aplica typeQuick só se não existir type
+          if (typeQuick && !q.type) q.type = typeQuick;
+
+          // pedagógicos dominam
+          q.skillType  = skillSel;
+          q.difficulty = diffSel;
+
+          // order vai ser definido conforme posição FINAL na activity (após inserir)
+          // (definimos depois, quando montarmos finalIds)
+
+          updates["questions/" + newId] = q;
+        }
+
+        // monta a lista final de IDs com inserção do bloco
+        const finalIds = existingIds.slice();
+        finalIds.splice(insertAt, 0, ...newIds);
+
+        // agora que temos a ordem final, ajusta q.order dos novos
+        for (let i = 0; i < newIds.length; i++){
+          const id = newIds[i];
+          const pos = finalIds.indexOf(id);
+          if (pos >= 0){
+            updates["questions/" + id + "/order"] = pos + 1;
+          }
+        }
+
+        // activity
+        const newAct = {
+          level: act.level || levelKey,
+          unit:  act.unit  || unitKey,
+          fase:  act.fase  || faseKey,
+          questionIds: finalIds
+        };
+        updates["activities/" + activityKey] = newAct;
+
+        setStatus(
+          "<b>Status:</b> salvando lote de " + list.length +
+          " questão(ões) em <code>activities/"+activityKey+"</code>…"
+        );
+
+        await firebase.database().ref().update(updates);
+
+        showToast("Lote salvo com sucesso!");
+        setStatus(
+          "<b>Status:</b> lote salvo com sucesso.<br>" +
+          "Adicionadas: <b>" + newIds.length + "</b> questão(ões).<br>" +
+          "activities/<code>" + activityKey + "</code> " +
+          "<span class='pill-ok'>OK</span>"
+        );
       }
 
-      act.level      = act.level      || levelKey;
-      act.unit       = act.unit       || unitKey;
-      act.fase       = act.fase       || faseKey;
-      act.questionIds= ids;
-
-      await actRef.set(act);
-
-      showToast("Questão salva com sucesso!");
-      setStatus(
-        "<b>Status:</b> salvo com sucesso.<br>" +
-        "questions/<code>" + qId + "</code><br>" +
-        "activities/<code>" + activityKey + "</code> " +
-        "<span class='pill-ok'>OK</span>"
-      );
     } catch (err) {
       console.error("Erro ao salvar no Firebase:", err);
       showToast("Erro ao salvar no Firebase. Veja o console.");
@@ -1054,7 +1179,6 @@
       selType.value = "";
     }
 
-    // ajusta dropdowns (skillType/difficulty) com base na questão
     applyDropdownDefaultsToUI(q.skillType || "", q.difficulty || "");
 
     txtJson.value = JSON.stringify(q, null, 2);
@@ -1071,10 +1195,8 @@
 
     showLoading(true);
     try{
-      // remove question
       await firebase.database().ref("questions/"+questionId).remove();
 
-      // atualiza activity
       const actRef = firebase.database().ref("activities/"+activityKey);
       const snap = await actRef.once("value");
       const act  = snap.val() || {};
@@ -1086,7 +1208,6 @@
       showToast("Questão apagada.");
       setStatus("<b>Status:</b> questão apagada de <code>questions/"+questionId+"</code> e atualizada em <code>activities/"+activityKey+"</code>.");
 
-      // recarrega a lista com a última busca
       if (lastSearch){
         await performSearch(lastSearch.levelKey, lastSearch.unitKey, lastSearch.faseKey);
       }
@@ -1099,7 +1220,6 @@
     }
   }
 
-  // expõe funções no escopo global (caso precise no console)
   window.editQuestionFromList = editQuestionFromList;
   window.deleteQuestionFromList = deleteQuestionFromList;
 </script>
