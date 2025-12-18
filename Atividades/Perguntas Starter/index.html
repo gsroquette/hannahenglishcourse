@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -642,10 +642,28 @@ firebase.auth().onAuthStateChanged(function(user){
   function stripQuotesForTTS(str){
     return String(str ?? '').replace(/[“”"]/g,'').replace(/\s{2,}/g,' ').trim();
   }
+
+  // IMPORTANTE:
+  // - Para audio_mcq: o ícone 🔊 SEMPRE lê o PROMPT (promptAudio ou TTS do prompt),
+  //   ignorando q.tts (que pode estar configurado para a resposta).
   function buildSpokenPrompt(q){
+    if (!q) return '';
+
+    // audio_mcq -> sempre falar o prompt
+    if (q.type === 'audio_mcq'){
+      const raw = typeof q.prompt === 'string' ? q.prompt : '';
+      return stripQuotesForTTS(ttsSanitize(raw));
+    }
+
+    // Demais tipos podem usar q.tts, se houver
     if (q.tts && String(q.tts).trim()) return stripQuotesForTTS(q.tts);
+
     let text = String(q.prompt || '');
-    if (q.type !== 'fillblank'){ return stripQuotesForTTS(ttsSanitize(text)); }
+    if (q.type !== 'fillblank'){ 
+      return stripQuotesForTTS(ttsSanitize(text)); 
+    }
+
+    // fillblank: substitui blanks pelas respostas para o TTS
     const optMap = new Map();
     (Array.isArray(q.options) ? q.options : []).forEach(op=>{
       const o = (typeof op === 'string') ? {label:op, value:op} : {...op};
@@ -756,7 +774,8 @@ firebase.auth().onAuthStateChanged(function(user){
     const q = questions[idx];
     if(!q){ finish(); return; }
 
-    const pct = Math.round(((idx)/questions.length)*100);
+    // Progresso baseado na questão atual (1-based)
+    const pct = Math.round(((idx + 1)/questions.length)*100);
     bar.style.width = pct + '%';
     statusPill.textContent = `Question ${idx+1}/${questions.length}`;
 
@@ -772,7 +791,7 @@ firebase.auth().onAuthStateChanged(function(user){
     // Ícone de áudio do PROMPT: sempre lê o prompt (via promptAudio ou TTS)
     btnPlayPrompt.onclick = () => { if (!isReading) playPrompt(q); };
 
-    // Se for audio_mcq, mostrar botão LISTEN que lê a RESPOSTA
+    // Se for audio_mcq, mostrar botão LISTEN que lê a RESPOSTA correta
     if (q.type === 'audio_mcq'){
       btnListenAnswer.classList.remove('is-hidden');
       btnListenAnswer.disabled = false;
