@@ -116,23 +116,6 @@
 
   .footer{margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
   .pill{background:#eef2ff;color:#3949ab;padding:8px 12px;border-radius:999px;font-size:12px;border:1px solid #d7defc}
-
-  /* ====== NAV BUTTONS (Prev/Next) ====== */
-  .nav-actions{display:flex;gap:8px;align-items:center}
-  .nav-btn{
-    border:none;
-    background:#e6f0ff;
-    color:#0f3ea8;
-    font-weight:800;
-    padding:12px 14px;
-    border-radius:14px;
-    cursor:pointer;
-    box-shadow:0 6px 14px rgba(0,0,0,.06);
-    transition:opacity .2s ease,transform .06s ease;
-  }
-  .nav-btn:active{transform:translateY(1px)}
-  .nav-btn[disabled]{opacity:.35;pointer-events:none}
-
   .next-btn{border:none;background:linear-gradient(90deg,#3b82f6,#22c55e);color:#fff;font-weight:800;padding:12px 16px;border-radius:14px;cursor:pointer;box-shadow:0 10px 18px rgba(34,197,94,.25);opacity:.3;pointer-events:none;transition:opacity .2s ease,transform .06s ease}
   .next-btn.ready{opacity:1;pointer-events:auto}
   .next-btn:active{transform:translateY(1px)}
@@ -252,12 +235,7 @@
 
         <div class="footer">
           <span class="pill" id="statusPill">Question —/—</span>
-
-          <!-- ===== NAV ACTIONS (Prev + Next) ===== -->
-          <div class="nav-actions">
-            <button class="nav-btn" id="btnPrev" disabled>Prev</button>
-            <button class="next-btn" id="btnNext" disabled>Next</button>
-          </div>
+          <button class="next-btn" id="btnNext" disabled>Next</button>
         </div>
       </div>
     </div>
@@ -294,7 +272,6 @@
   let currentAudio = null;
   let BASE = '';          // basePath opcional vindo do upload
   let metaInfo = {};      // level, unit, fase etc.
-  let previewTitle = 'Preview';
 
   const subtitle   = document.getElementById('subtitle');
   const bar        = document.getElementById('bar');
@@ -303,7 +280,6 @@
   const optionsEl  = document.getElementById('options');
   const btnPlayPrompt = document.getElementById('btnPlayPrompt');
   const btnRepeat  = document.getElementById('btnRepeat');
-  const btnPrev    = document.getElementById('btnPrev');
   const btnNext    = document.getElementById('btnNext');
   const statusPill = document.getElementById('statusPill');
   const confettiEl = document.getElementById('confetti');
@@ -442,40 +418,21 @@
   }
   function showLoader(v){ if (loadingEl) loadingEl.style.display = v ? 'flex' : 'none'; }
 
-  function clampIndex(n){
-    if(!questions.length) return 0;
-    return Math.max(0, Math.min(n, questions.length - 1));
-  }
-
-  function updateNavButtons(){
-    btnPrev.disabled = (idx <= 0);
-    // btnNext fica controlado pelo answered; mas se for última questão, também deve bloquear
-    if (idx >= questions.length - 1){
-      // na última, o botão Next ainda pode ficar "ready" para finalizar; mantemos como está
-      // (não forçamos disabled aqui, pois finish() depende do clique)
-    }
-  }
-
   /* =========================
      Render da questão atual
   ========================= */
   function renderQuestion(){
     answered = false;
     btnNext.disabled = true; btnNext.classList.remove('ready');
-
     btnPlayPrompt.disabled = false; btnRepeat.disabled = false;
     btnPlayPrompt.classList.remove('is-hidden'); btnRepeat.classList.remove('is-hidden');
 
     const q = questions[idx];
     if(!q){ finish(); return; }
 
-    // progresso: posição atual (idx+1)/total
-    const pct = Math.round(((idx + 1) / questions.length) * 100);
+    const pct = Math.round(((idx)/questions.length)*100);
     bar.style.width = pct + '%';
-
     statusPill.textContent = `Question ${idx+1}/${questions.length}`;
-
-    updateNavButtons();
 
     const rawPrompt = q.prompt || '—';
     promptEl.innerHTML = renderPromptWithBlanks(rawPrompt);
@@ -510,18 +467,8 @@
       opts.forEach(opt => optionsEl.appendChild(makeOption(q, opt)));
     }
 
-    // Prev: volta uma questão (não exige answered)
-    btnPrev.onclick = () => {
-      (ensureAudio()? sfxTick() : null);
-      stopAllAudio();
-      idx = clampIndex(idx - 1);
-      renderQuestion();
-    };
-
-    // Next: por padrão só fica liberado quando answered (exceto final, que também requer answered)
     btnNext.onclick = () => {
       (ensureAudio()? sfxTick() : null);
-      stopAllAudio();
       idx++;
       if (idx >= questions.length) { finish(); return; }
       renderQuestion();
@@ -879,7 +826,6 @@
     mediaBox.innerHTML = '<div style="font-size:44px">🏅</div>';
     optionsEl.innerHTML = '';
     btnNext.disabled = true; btnNext.classList.remove('ready');
-    btnPrev.disabled = (questions.length <= 1); // se quiser voltar, permite
     statusPill.textContent = `Preview • ${questions.length}/${questions.length}`;
     confetti(30);
     speakFriendly(['Great! You finished the preview!','Looks good!']);
@@ -930,20 +876,16 @@
       let title = 'Preview';
       let qList = [];
 
-      // 1) modo lote: { title, meta, questions: [...] }
-      if (data && typeof data === 'object' && Array.isArray(data.questions)){
+      if (Array.isArray(data.questions)){
         qList = data.questions;
         if(data.title) title = data.title;
         metaInfo = data.meta || {};
-      }
-      // 2) modo single: { meta, question }
-      else if (data && typeof data === 'object' && data.question){
+      } else if (data && typeof data === 'object' && data.question){
         qList = [data.question];
         if(data.title) title = data.title;
         metaInfo = data.meta || {};
-      }
-      // 3) fallback: objeto de questão direto
-      else if (data && typeof data === 'object'){
+      } else if (data && typeof data === 'object'){
+        // Pode ser um objeto de questão direto (mais simples)
         qList = [data];
         title = data.title || 'Preview';
         metaInfo = data.meta || {};
@@ -960,9 +902,7 @@
       BASE = metaInfo.basePath || '';
 
       // Subtitle + pill (level/unit/fase)
-      previewTitle = title;
       subtitle.textContent = title;
-
       const pillParts = [];
       if(metaInfo.level) pillParts.push(metaInfo.level);
       if(metaInfo.unit)  pillParts.push(metaInfo.unit);
@@ -971,12 +911,6 @@
 
       questions = qList;
       idx = 0;
-
-      // prepara nav
-      btnPrev.disabled = true;
-      btnNext.disabled = true;
-      btnNext.classList.remove('ready');
-
       renderQuestion();
     }finally{
       showLoader(false);

@@ -695,7 +695,12 @@
     return { ok:true, parsed };
   }
 
-  // ==== Função para montar payload de preview (meta + question) ====
+  /* =========================================================
+     PREVIEW (CORRIGIDO):
+     Sempre salva no localStorage como:
+       { title, meta, questions:[...]}   (bloco)
+     Assim o qa-preview.html navega por todas as questões.
+  ========================================================= */
   function buildPreviewPayload(){
     const levelRaw = document.getElementById('level').value.trim();
     const unitRaw  = document.getElementById('unit').value.trim();
@@ -732,51 +737,84 @@
       return null;
     }
 
-    let obj = parsedRes.parsed;
+    const parsed = parsedRes.parsed;
+    const bulkMode = isBulkBlock(parsed);
 
-    // Se for bloco com várias questões, faz preview da PRIMEIRA questão
-    if (isBulkBlock(obj)){
-      if (!obj.questions.length){
-        showToast("O bloco está vazio: questions[] sem itens.");
-        return null;
-      }
-      showToast("Preview do bloco: exibindo a 1ª questão (modo lote).");
-      obj = obj.questions[0];
-    }
-
-    if (!qId) {
-      qId = `Q_${Date.now()}`;
-    }
-
-    // aplica metadados básicos
-    obj = (obj && typeof obj === "object") ? obj : {};
-    obj.id    = obj.id || qId;
-    obj.level = obj.level || levelKey;
-    obj.unit  = obj.unit  || unitKey;
-    obj.fase  = obj.fase  || faseKey;
-
-    if (orderNum != null) {
-      obj.order = orderNum;
-    }
-    if (typeQuick && !obj.type) {
-      obj.type = typeQuick;
-    }
-
-    // garante pedagógicos
-    obj.skillType  = skillSel;
-    obj.difficulty = diffSel;
-
+    // meta sempre presente
     const meta = {
       level: levelKey,
       unit:  unitKey,
       fase:  faseKey,
-      questionId: obj.id,
-      order: obj.order || orderNum || 1,
-      skillType: obj.skillType || null,
-      difficulty: obj.difficulty || "easy"
+      order: orderNum || 1,
+      skillType: skillSel,
+      difficulty: diffSel
+      // basePath (opcional) pode ser adicionado aqui se você quiser
+      // basePath: ""
     };
 
-    return { meta, question: obj };
+    // título do preview
+    const title = (bulkMode && parsed.title) ? String(parsed.title) : "Preview";
+
+    // normaliza e injeta metadados em UMA ou VÁRIAS questões
+    if (!bulkMode){
+      let obj = parsed;
+      if (!obj || typeof obj !== "object" || Array.isArray(obj)) obj = {};
+
+      if (!qId) qId = `Q_${Date.now()}`;
+
+      obj.id    = obj.id || qId;
+      obj.level = obj.level || levelKey;
+      obj.unit  = obj.unit  || unitKey;
+      obj.fase  = obj.fase  || faseKey;
+
+      if (orderNum != null) obj.order = orderNum;
+      if (typeQuick && !obj.type) obj.type = typeQuick;
+
+      obj.skillType  = skillSel;
+      obj.difficulty = diffSel;
+
+      meta.questionId = obj.id;
+
+      return { title, meta, questions: [obj] };
+    }
+
+    // bulk: preview do bloco inteiro
+    const list = parsed.questions || [];
+    if (!Array.isArray(list) || list.length === 0){
+      showToast("O bloco está vazio: questions[] sem itens.");
+      return null;
+    }
+
+    const baseMs = Date.now();
+    const out = [];
+
+    for (let i = 0; i < list.length; i++){
+      let q = list[i];
+      if (!q || typeof q !== "object" || Array.isArray(q)) q = {};
+
+      // se não vier id, gera um estável para o preview
+      const autoId = makeIdForBulk(baseMs, i);
+      q.id    = q.id || autoId;
+
+      q.level = q.level || levelKey;
+      q.unit  = q.unit  || unitKey;
+      q.fase  = q.fase  || faseKey;
+
+      if (typeQuick && !q.type) q.type = typeQuick;
+
+      // aplica pedagógicos (sempre)
+      q.skillType  = skillSel;
+      q.difficulty = diffSel;
+
+      // aplica ordem sequencial a partir do orderNum (se houver)
+      if (orderNum != null) q.order = orderNum + i;
+
+      out.push(q);
+    }
+
+    meta.questionId = out[0].id;
+
+    return { title, meta, questions: out };
   }
 
   // ==== Botão Preview: salva em localStorage e abre qa-preview.html ====
@@ -793,7 +831,12 @@
       return;
     }
 
-    window.open('qa-preview.html', '_blank');
+    // abre; se popup for bloqueado, cai no redirect
+    const w = window.open('qa-preview.html', '_blank');
+    if (!w) {
+      showToast("Popup bloqueado. Abrindo o preview nesta aba…");
+      window.location.href = 'qa-preview.html';
+    }
   });
 
   // ======= SAVE (SINGLE OU BULK) =======
