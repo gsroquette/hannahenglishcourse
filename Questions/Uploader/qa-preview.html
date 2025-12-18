@@ -149,9 +149,6 @@
     transform:translateY(1px);
   }
 
-  .icon-btn{border:none;background:#e6f0ff;color:#0f3ea8;padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:700}
-  .icon-btn:active{transform:translateY(1px)}
-
   .options{display:grid;gap:10px;margin-top:6px;grid-template-columns:repeat(2,minmax(0,1fr))}
   .option{
     display:flex;align-items:center;gap:12px;background:#fff;border:2px solid #e9eef7;border-radius:18px;
@@ -324,7 +321,6 @@
                 <span class="listen-icon">🎧</span>
                 <span class="listen-label">LISTEN</span>
               </button>
-              <button class="icon-btn" id="btnRepeat" title="Repeat aloud (optional)">🎤 Repeat</button>
             </div>
           </div>
           <div class="q-media" id="mediaBox" aria-label="Question image"></div>
@@ -385,7 +381,6 @@
   const optionsEl  = document.getElementById('options');
   const btnPlayPrompt   = document.getElementById('btnPlayPrompt');
   const btnListenAnswer = document.getElementById('btnListenAnswer');
-  const btnRepeat  = document.getElementById('btnRepeat');
   const btnPrev    = document.getElementById('btnPrev');
   const btnNext    = document.getElementById('btnNext');
   const statusPill = document.getElementById('statusPill');
@@ -447,6 +442,7 @@
   function stripQuotesForTTS(str){
     return String(str ?? '').replace(/[“”"]/g,'').replace(/\s{2,}/g,' ').trim();
   }
+
   function buildSpokenPrompt(q){
     if (q.tts && String(q.tts).trim()) return stripQuotesForTTS(q.tts);
     let text = String(q.prompt || '');
@@ -488,6 +484,14 @@
       return speakValue(val);
     });
     return stripQuotesForTTS(text);
+  }
+
+  // Prompt TTS específico: para audio_mcq NUNCA fala a resposta, só o prompt
+  function buildPromptTTS(q){
+    if (q.type === 'audio_mcq'){
+      return stripQuotesForTTS(ttsSanitize(q.prompt || ''));
+    }
+    return buildSpokenPrompt(q);
   }
 
   function stopAllAudio(){
@@ -572,9 +576,7 @@
     btnNext.disabled = true; btnNext.classList.remove('ready');
 
     btnPlayPrompt.disabled = false;
-    btnRepeat.disabled     = false;
     btnPlayPrompt.classList.remove('is-hidden');
-    btnRepeat.classList.remove('is-hidden');
 
     // reset LISTEN da resposta (audio_mcq)
     btnListenAnswer.classList.add('is-hidden');
@@ -601,15 +603,8 @@
       promptEl.appendChild(span);
     }
 
-    // Botão de áudio do PROMPT (sempre lê a questão)
+    // Botão de áudio do PROMPT: lê SEMPRE o prompt (promptAudio ou TTS do prompt)
     btnPlayPrompt.onclick = () => { if (!isReading) playPrompt(q); };
-
-    // Botão Repeat: sempre lê o prompt reconstruído via TTS
-    btnRepeat.onclick = () => {
-      if (isReading) return;
-      stopAllAudio();
-      speak(buildSpokenPrompt(q));
-    };
 
     // Se for audio_mcq, mostrar LISTEN para RESPOSTA
     if (q.type === 'audio_mcq'){
@@ -940,15 +935,26 @@
 
   function playPrompt(q){
     stopAllAudio();
-    const spoken = buildSpokenPrompt(q);
+    const spoken = buildPromptTTS(q);
+
     if (q.promptAudio){
-      const a = new Audio(absPath(q.promptAudio));
-      currentAudio = a;
-      a.onended = () => { currentAudio = null; };
-      a.onerror  = () => { currentAudio = null; speak(spoken); };
-      a.play().catch(() => { currentAudio = null; speak(spoken); });
+      try{
+        const a = new Audio(absPath(q.promptAudio));
+        currentAudio = a;
+        a.onended = () => { currentAudio = null; };
+        a.onerror  = () => {
+          currentAudio = null;
+          if (spoken) speak(spoken);
+        };
+        a.play().catch(() => {
+          currentAudio = null;
+          if (spoken) speak(spoken);
+        });
+      }catch(e){
+        if (spoken) speak(spoken);
+      }
     } else {
-      speak(spoken);
+      if (spoken) speak(spoken);
     }
   }
 
@@ -1016,9 +1022,7 @@
     confetti(30);
     speakFriendly(['Great! You finished the preview!','Looks good!']);
     btnPlayPrompt.disabled = true;
-    btnRepeat.disabled     = true;
     btnPlayPrompt.classList.add('is-hidden');
-    btnRepeat.classList.add('is-hidden');
     btnListenAnswer.classList.add('is-hidden');
     btnListenAnswer.disabled = true;
     (ensureAudio()? sfxWin() : null);
