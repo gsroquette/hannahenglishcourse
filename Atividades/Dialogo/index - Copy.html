@@ -2,19 +2,47 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <title>Hannah Conversation</title>
   <style>
+    :root{
+      --nav-h: 72px; /* altura “visual” do rodapé */
+    }
+
+    /* ===== Resets e base ===== */
+    html, body {
+      height: 100%;
+      min-height: -webkit-fill-available; /* iOS Safari fallback */
+      scrollbar-gutter: stable both-edges; /* evita flicker de scrollbar */
+    }
+    * { box-sizing: border-box; }
+
     body {
       background-image: url('../../../../../imagens/fundo.png');
       background-repeat: repeat;
       font-family: Arial, sans-serif;
+      margin: 0;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      margin: 0;
+      align-items: stretch;
     }
 
+    /* Em telas grandes, força a presença da barra de rolagem para não “piscar” */
+    @media (min-width: 901px){
+      body{ overflow-y: scroll; }
+    }
+
+    /* ===== Layout de página ===== */
+    #page {
+      min-height: 100dvh;
+      min-height: -webkit-fill-available;
+      display: grid;
+      grid-template-rows: auto 1fr;  /* header / conteúdo (rodapé é fixo) */
+      gap: 0;
+      padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom)); /* reserva espaço pro rodapé */
+    }
+
+    /* ===== Header ===== */
     #header {
       width: 100%;
       display: flex;
@@ -22,91 +50,175 @@
       align-items: center;
       justify-content: center;
       position: relative;
-      padding: 20px;
+      padding: 12px 12px 8px;
+      padding-top: calc(12px + env(safe-area-inset-top)); /* iPhone notch */
     }
 
     .back-button {
       background-color: black;
       color: white;
       border: none;
-      padding: 10px 20px;
+      padding: 8px 14px;
       font-size: 16px;
       cursor: pointer;
       box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
       position: relative;
-      margin-bottom: 30px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      line-height: 1;
+      min-height: 36px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: clamp(16px, 4.5vw, 22px);
+      margin: 4px 8px 8px;
+      line-height: 1.15;
+    }
+
+    /* ===== Stepper ===== */
+    #stepper {
+      display:flex;
+      gap:6px;
+      margin: 4px 0 0;
+      max-width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 4px;
+    }
+    .step-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background:#e0e0e0;
+      outline:1px solid #bdbdbd;
+      flex: 0 0 auto;
+    }
+    .step-dot.half { background:#f2b01e; }
+    .step-dot.done { background:#2e7d32; }
+
+    /* ===== Área de diálogos ===== */
+    #content-wrap {
+      display: flex;
+      flex-direction: column;
+      min-height: 0; /* permite overflow interno */
+      align-items: center;
+    }
+
+    .dialogue-max {
+      width: 100%;
+      max-width: 880px; /* aproxima no desktop/tablet */
+      padding: 8px 12px;
     }
 
     #dialogue-container {
-      display: flex;
-      align-items: flex-start;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr)); /* desktop: lado a lado */
+      align-items: start;
       justify-content: center;
-      flex-wrap: nowrap;
-      margin: 20px;
+      gap: 18px;
       max-width: 100%;
-      gap: 20px;
+      width: 100%;
+      overflow: auto; /* rolagem própria se necessário */
+      -webkit-overflow-scrolling: touch;
+      scrollbar-gutter: stable;
+      padding-bottom: calc(var(--nav-h) + 24px); /* garante que o último botão não fique atrás do rodapé */
+      padding-top: 4px;
     }
 
     .character {
-      margin: 20px;
+      margin: 0;
       text-align: center;
-      flex: 1 1 300px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
     }
 
     .character img {
-      width: 100%;
-      max-width: 150px;
+      width: clamp(96px, 18vw, 160px);
       height: auto;
       border-radius: 50%;
+      flex: 0 0 auto;
     }
 
     .character-text {
-      font-size: 20px;
+      font-size: clamp(14px, 1.8vw, 18px);
       font-weight: bold;
       background-color: #ffffff;
-      padding: 15px;
-      border-radius: 10px;
+      /* Espaço reservado para o badge no topo/direita */
+      padding: 34px 40px 12px 14px;
+      border-radius: 12px;
       box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
-      max-width: 90%;
-      min-height: 56px; /* garante presença do balão mesmo vazio */
+      max-width: 100%;
+      min-height: 52px;
       position: relative;
       transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease;
-      margin: 0 auto;
+      margin: 0;
+      line-height: 1.28;
+      word-break: break-word;
+
+      /* Limita fala longa a uma “janela” interna com scroll (desktop) */
+      max-height: 55vh;
+      overflow: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-gutter: stable;
     }
 
-    /* Balão placeholder (em caso de bloco sem fala do aluno) */
+    /* Balão placeholder (sem fala do aluno) */
     .character-text.placeholder {
-      color: transparent;             /* texto vazio/oculto */
+      color: transparent;
       user-select: none;
-      border: 2px dashed #bdbdbd;
-      background-color: rgba(255,255,255,0.8);
+      border: 1px dashed #bdbdbd;
+      background-color: rgba(255,255,255,0.85);
     }
 
-    .audio-button-container { margin-top: 10px; min-height: 44px; } /* reserva altura */
+    .audio-button-container { 
+      margin-top: 4px; 
+      min-height: 40px; 
+      display:flex; 
+      align-items:center; 
+      justify-content:center; 
+      width: 100%;
+    }
 
+    /* ===== Rodapé FIXO ===== */
     #navigation {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 20;
       display: flex;
       justify-content: center;
-      flex-wrap: wrap;
-      margin: 20px;
+      align-items: center;
+      gap: 10px;
       width: 100%;
-      gap: 12px;
+      background: rgba(255,255,255,0.9);
+      backdrop-filter: saturate(140%) blur(6px);
+      border-top: 1px solid rgba(0,0,0,0.08);
+      padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+      min-height: var(--nav-h); /* altura usada no padding-bottom do page */
     }
 
     .nav-button {
       background-color: green;
       color: white;
       border: none;
-      padding: 10px 20px;
-      font-size: 16px;
+      padding: 10px 14px;
+      font-size: clamp(12px, 3.2vw, 16px);
       cursor: pointer;
       box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
-      margin: 10px 0;
+      margin: 0;
       flex: 1;
-      max-width: 200px;
-      border-radius: 8px;
+      max-width: 220px;
+      border-radius: 10px;
+      min-height: 44px;
+      line-height: 1.1;
     }
 
+    /* ===== Modal ===== */
     #completion-modal {
       display: none;
       position: fixed;
@@ -119,15 +231,20 @@
       box-shadow: 0px 0px 10px rgba(0,0,0,0.1);
       z-index: 1000;
       text-align: center;
+      max-width: min(92vw, 420px);
+      width: 92vw;
+      border-radius: 12px;
     }
 
     #completion-modal button {
-      margin-top: 20px;
-      padding: 10px 20px;
+      margin-top: 16px;
+      padding: 10px 16px;
       background-color: #333;
       color: white;
       border: none;
       cursor: pointer;
+      border-radius: 8px;
+      min-height: 40px;
     }
 
     #completion-modal button:hover { background-color: #555; }
@@ -143,38 +260,41 @@
       z-index: 999;
     }
 
-    h1 { text-align: center; font-size: 2em; margin: 20px; }
-
-    /* ======== VISUAL PROGRESS ======== */
+    /* ===== Badge de progresso no balão ===== */
     .progress-badge {
       position: absolute;
-      top: -8px;
-      right: -8px;
+      top: 8px;
+      right: 10px;
       font-size: 12px;
-      padding: 4px 6px;
+      padding: 3px 6px;
       border-radius: 999px;
-      background: #e0e0e0; /* base */
+      background: #e0e0e0;
       color: #000;
       box-shadow: 0 1px 3px rgba(0,0,0,.2);
+      line-height: 1;
+      pointer-events: none;
+      z-index: 1;
     }
     .badge-half { background: #ffe08a; }
     .badge-full { background: #a5d6a7; }
 
-    .bubble-0 { border: 2px dashed #bdbdbd; }
+    .bubble-0 { border: 1px dashed #bdbdbd; }
     .bubble-1 { border: 2px solid #f2b01e; }
-    .bubble-2 { border: 2px solid #2e7d32; box-shadow: 0 0 0 2px rgba(46,125,50,.15); }
+    .bubble-2 { border: 2px solid #2e7d32; box-shadow: 0 0 0 2px rgba(46,125,50,.12); }
 
-    #stepper { display:flex; gap:8px; margin:8px 0; }
-    .step-dot { width:10px; height:10px; border-radius:50%; background:#e0e0e0; outline:1px solid #bdbdbd; }
-    .step-dot.half { background:#f2b01e; }
-    .step-dot.done { background:#2e7d32; }
-
-    /* ======== Animações: botões de áudio ======== */
-    .audio-button { border-radius: 999px; border: none; padding: 10px 14px; }
+    /* ===== Botões de áudio e animações ===== */
+    .audio-button { 
+      border-radius: 999px; 
+      border: none; 
+      padding: 10px 14px; 
+      font-size: 18px;
+      min-width: 44px;
+      min-height: 44px;
+    }
 
     @keyframes pulse {
       0%   { transform: scale(1);    box-shadow: 0 0 0 0 rgba(33,150,243,0.45); }
-      70%  { transform: scale(1.08); box-shadow: 0 0 0 12px rgba(33,150,243,0); }
+      70%  { transform: scale(1.06); box-shadow: 0 0 0 12px rgba(33,150,243,0); }
       100% { transform: scale(1);    box-shadow: 0 0 0 0 rgba(33,150,243,0); }
     }
     .pulse { animation: pulse 1.2s ease-in-out infinite; outline: 2px solid rgba(33,150,243,.25); }
@@ -193,7 +313,6 @@
     }
     .success-flash { animation: successFlash 700ms ease-in-out 1; }
 
-    /* ======== Animação: Forward quando bloco concluído ======== */
     @keyframes forwardPulse {
       0%   { transform: scale(1);    box-shadow: 0 0 0 0 rgba(76,175,80,.45); }
       70%  { transform: scale(1.06); box-shadow: 0 0 0 14px rgba(76,175,80,0); }
@@ -204,45 +323,82 @@
       outline: 2px solid rgba(76,175,80,.25);
     }
 
-    /* acessibilidade: respeita menos movimento */
+    /* acessibilidade: menos movimento */
     @media (prefers-reduced-motion: reduce) {
       .pulse, .highlight-once, .success-flash, .forward-pulse { animation: none; outline: none; box-shadow: none; }
     }
 
+    /* ===== Tablets médios ===== */
+    @media (max-width: 900px) {
+      .dialogue-max { max-width: 760px; }
+      .character img { width: clamp(90px, 22vw, 140px); }
+      .character-text { 
+        font-size: clamp(13px, 2.2vw, 17px);
+        max-height: 50vh; /* tablet */
+      }
+    }
+
+    /* ===== Celular: empilhado ===== */
     @media (max-width: 600px) {
-      .back-button { font-size: 14px; padding: 8px 16px; }
-      .nav-button { font-size: 14px; padding: 8px 16px; }
-      .character { flex: 1 1 100%; margin: 10px 0; }
-      .character-text { font-size: 16px; }
-      #dialogue-container { flex-wrap: wrap; }
+      #dialogue-container { 
+        grid-template-columns: 1fr;  /* empilhado */
+        gap: 14px; 
+      }
+      .dialogue-max { padding: 8px 10px; }
+      .character img { width: clamp(84px, 28vw, 120px); }
+      .character-text { 
+        font-size: clamp(14px, 3.8vw, 16px);
+        padding: 34px 40px 12px 12px;
+        max-height: 48vh; /* mobile */
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .audio-button-container { min-height: 40px; }
+      .nav-button { font-size: clamp(12px, 3.6vw, 15px); }
+      .step-dot { width: 8px; height: 8px; }
+    }
+
+    /* Ultra-compacto (<=360px) */
+    @media (max-width: 360px) {
+      .character img { width: clamp(72px, 30vw, 110px); }
+      .character-text { max-height: 50vh; }
+      .nav-button { min-height: 42px; }
+      .step-dot { width: 7px; height: 7px; }
     }
   </style>
 </head>
 <body>
-  <div id="header">
-    <button class="back-button" onclick="goBack()">Back</button>
-    <h1>Hannah Conversation</h1>
-    <div id="stepper" aria-label="Dialogues progress"></div>
-  </div>
-
-  <div id="dialogue-container">
-    <div class="character" id="robot">
-      <img id="robot-img" src="../../../../../imagens/robo1_static.png" alt="Robot Lex" />
-      <div class="character-text" id="robot-text"></div>
-      <div class="audio-button-container">
-        <button class="audio-button" id="robot-audio-button">🔊</button>
-      </div>
+  <div id="page">
+    <div id="header">
+      <button class="back-button" onclick="goBack()">Back</button>
+      <h1>Hannah Conversation</h1>
+      <div id="stepper" aria-label="Dialogues progress"></div>
     </div>
 
-    <div class="character" id="student">
-      <img id="student-img" src="../../../../../imagens/avatar_aluno1.png" alt="Student Avatar" />
-      <div class="character-text" id="student-text"></div>
-      <div class="audio-button-container">
-        <button class="audio-button" id="student-audio-button">🔊</button>
+    <div id="content-wrap">
+      <div class="dialogue-max">
+        <div id="dialogue-container">
+          <div class="character" id="robot">
+            <img id="robot-img" src="../../../../../imagens/robo1_static.png" alt="Robot Lex" />
+            <div class="character-text" id="robot-text"></div>
+            <div class="audio-button-container">
+              <button class="audio-button" id="robot-audio-button">🔊</button>
+            </div>
+          </div>
+
+          <div class="character" id="student">
+            <img id="student-img" src="../../../../../imagens/avatar_aluno1.png" alt="Student Avatar" />
+            <div class="character-text" id="student-text"></div>
+            <div class="audio-button-container">
+              <button class="audio-button" id="student-audio-button">🔊</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
+  <!-- Rodapé fixo -->
   <div id="navigation">
     <button class="nav-button" onclick="previousDialogue()">&lt;&lt; Back</button>
     <button class="nav-button" onclick="nextDialogue()">Forward &gt;&gt;</button>
@@ -273,10 +429,14 @@
     };
     firebase.initializeApp(firebaseConfig);
 
-    // State
+    // ======== Estado ========
     let idleTimer;
     let robotImg = document.getElementById('robot-img');
     let studentImg = document.getElementById('student-img');
+
+    // TTS global
+    const synth = window.speechSynthesis;
+    let currentUtterance = null;
 
     // Parsed dialogue blocks: [{robotText, studentText|null, hasStudent, required}]
     let blocks = [];
@@ -365,7 +525,37 @@
       });
     }
 
-    // ======== Prompting logic for audio buttons and forward ========
+    // ======== Kill switch do TTS ========
+    function stopSpeaking(reason = '') {
+      try {
+        if (synth) {
+          // sequência "agressiva" pra Safari/iOS
+          synth.cancel();
+          synth.pause();
+          synth.resume();
+          synth.cancel();
+        }
+      } catch(e) {}
+      if (currentUtterance) {
+        currentUtterance.onend = null;
+        currentUtterance.onerror = null;
+        currentUtterance = null;
+      }
+      // volta o robo para o estado padrão (caso esteja animado)
+      if (robotImg) robotImg.src = '../../../../../imagens/robo1_static.png';
+      clearTimeout(idleTimer);
+      // console.debug('TTS stopped:', reason);
+    }
+
+    // Interrompe ao sair/ocultar/trocar página
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) stopSpeaking('visibilitychange');
+    }, {passive:true});
+    window.addEventListener('pagehide', () => stopSpeaking('pagehide'), {passive:true});
+    window.addEventListener('beforeunload', () => stopSpeaking('beforeunload'), {passive:true});
+    window.addEventListener('popstate', () => stopSpeaking('popstate'), {passive:true});
+
+    // ======== Prompting logic ========
     function clearPromptAnimations() {
       robotBtn.classList.remove('pulse','highlight-once','success-flash');
       studentBtn.classList.remove('pulse','highlight-once','success-flash');
@@ -393,14 +583,13 @@
     function stopForwardPrompt() {
       if (forwardBtn) forwardBtn.classList.remove('forward-pulse');
     }
-    // ================================================================
 
-    // AUTH: wait for userName BEFORE initializing dialogue
+    // ======== Auth & boot ========
     firebase.auth().onAuthStateChanged(async function(user) {
       if (user) {
         fetchUserAvatar(user.uid);
-        await fetchUserName(user.uid);   // ensures userName is set
-        initializeDialogue();            // then load & show dialogue
+        await fetchUserName(user.uid);
+        initializeDialogue();
       } else {
         alert("You are not authenticated. Please log in.");
         window.location.href = '/login.html';
@@ -408,6 +597,7 @@
     });
 
     function goBack() {
+      stopSpeaking('goBack'); // <- interrompe TTS antes de sair
       const { level, unit } = getLevelAndUnitFromURL();
       const currentPhase = getPhaseFromURL();
       const userId = firebase.auth().currentUser?.uid;
@@ -441,7 +631,9 @@
     function speakText(text, callback) {
       clearTimeout(idleTimer);
 
-      const synth = window.speechSynthesis;
+      // Antes de falar, cancela qualquer fala ativa
+      stopSpeaking('pre-speak');
+
       let voices = synth.getVoices();
       let selectedVoice = null;
 
@@ -462,17 +654,27 @@
       }
 
       function createUtterance() {
-        const utterance = new SpeechSynthesisUtterance(text.replace(/usuario_nome/g, userName));
+        const utterance = new SpeechSynthesisUtterance(
+          (text || '').replace(/usuario_nome/g, userName)
+        );
         utterance.lang = 'en-US';
         utterance.voice = selectedVoice || null;
 
-        utterance.onstart = () => { robotImg.src = '../../../../../imagens/robo1.gif'; };
+        utterance.onstart = () => {
+          robotImg.src = '../../../../../imagens/robo1.gif';
+          currentUtterance = utterance;
+        };
         utterance.onend = () => {
           robotImg.src = '../../../../../imagens/robo1_static.png';
+          currentUtterance = null;
           if (callback) callback();
           dialoguesRead++;
           checkCompletion();
           startIdleTimer();
+        };
+        utterance.onerror = () => {
+          robotImg.src = '../../../../../imagens/robo1_static.png';
+          currentUtterance = null;
         };
 
         synth.speak(utterance);
@@ -491,7 +693,6 @@
           return res.text();
         })
         .then(text => {
-          // Split by empty line(s), trim lines
           const rawBlocks = text.trim().split(/\n\s*\n/);
           blocks = rawBlocks.map(b => {
             const lines = b.split('\n').map(l => l.trim()).filter(Boolean);
@@ -525,6 +726,9 @@
       if (index < 0 || index >= blocks.length) return;
       currentDialogueIndex = index;
 
+      // Ao trocar de diálogo, interrompe qualquer fala
+      stopSpeaking('updateDialogue');
+
       const block = blocks[index];
 
       // Set texts
@@ -533,23 +737,24 @@
       robotTextEl.textContent = block.robotText || '';
       studentTextEl.textContent = block.studentText || '';
 
-      // Student area: sempre visível; se não houver fala, vira placeholder e oculta botão mantendo espaço
+      // Student area
       const studentBtnWrap = document.getElementById('student-audio-button').parentElement;
       if (block.hasStudent) {
         studentTextEl.classList.remove('placeholder');
         studentBtnWrap.style.visibility = 'visible';
       } else {
         studentTextEl.classList.add('placeholder');
-        studentBtnWrap.style.visibility = 'hidden'; // mantém layout
+        studentBtnWrap.style.visibility = 'hidden';
       }
 
       // Reset prompts
       clearPromptAnimations();
-      stopForwardPrompt();   // não pisca antes da hora
-      startRobotPrompt();    // convida a começar pelo robô
+      stopForwardPrompt();
+      startRobotPrompt();
 
-      // ROBOT button
+      // ROBOT
       robotBtn.onclick = () => {
+        stopSpeaking('robotBtn'); // <- interrompe se estiver lendo outra fala
         stopRobotPrompt();
         speakText(block.robotText, () => {
           markHeard(index, 'robot');
@@ -557,9 +762,10 @@
         });
       };
 
-      // STUDENT button (só se existir)
+      // STUDENT
       if (block.hasStudent) {
         studentBtn.onclick = () => {
+          stopSpeaking('studentBtn'); // <- interrompe antes de tocar a fala do aluno
           studentBtn.classList.remove('highlight-once');
           speakText(block.studentText, () => {
             markHeard(index, 'student');
@@ -574,16 +780,18 @@
     }
 
     function previousDialogue() {
+      stopSpeaking('previousDialogue');
       if (currentDialogueIndex > 0) {
-        stopForwardPrompt(); // garante que não pisque ao voltar
+        stopForwardPrompt();
         currentDialogueIndex--;
         updateDialogue(currentDialogueIndex);
       }
     }
 
     function nextDialogue() {
+      stopSpeaking('nextDialogue');
       if (currentDialogueIndex < blocks.length - 1) {
-        stopForwardPrompt(); // garante que não pisque no início do próximo
+        stopForwardPrompt();
         currentDialogueIndex++;
         updateDialogue(currentDialogueIndex);
       }
@@ -607,12 +815,14 @@
     }
 
     function showModal() {
-      stopForwardPrompt(); // não precisa piscar com modal aberto
+      stopForwardPrompt();
+      stopSpeaking('showModal'); // interrompe leitura ao abrir modal
       document.getElementById('completion-modal').style.display = 'block';
       document.getElementById('overlay').style.display = 'block';
     }
 
     function closeModal() {
+      stopSpeaking('closeModal'); // segurança
       document.getElementById('completion-modal').style.display = 'none';
       document.getElementById('overlay').style.display = 'none';
     }
