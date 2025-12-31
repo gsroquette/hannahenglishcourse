@@ -36,14 +36,14 @@ function getActivitiesByTrecho(trecho, level, unit) {
                 { id: 21, name: "Perguntas Starter6", path: `/Atividades/perguntas%20starter/index.html?level=${level}&unit=${unit}&fase=21`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
                 { id: 22, name: "Speak", path: `/Atividades/Speak/index.html?level=${level}&unit=${unit}&fase=22`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
                 { id: 23, name: "Speak2", path: `/Atividades/Speak2/index.html?level=${level}&unit=${unit}&fase=23`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
-                { id: 24, name: "Perguntas Starter6", path: `/Atividades/perguntas%20starter/index.html?level=${level}&unit=${unit}&fase=24`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
+                { id: 24, name: "Perguntas Starter7", path: `/Atividades/perguntas%20starter/index.html?level=${level}&unit=${unit}&fase=24`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
             ];
         case "trecho5":
             return [
                 { id: 25, name: "GrammarStarterDialogo", path: `/Atividades/GrammarStarterDialogo/index.html?level=${level}&unit=${unit}&fase=25`, img: "../../imagens/botoes/grammar_button.png", unlocked: false },
-                { id: 26, name: "Perguntas Starter6", path: `/Atividades/perguntas%20starter/index.html?level=${level}&unit=${unit}&fase=26`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
+                { id: 26, name: "Perguntas Starter8", path: `/Atividades/perguntas%20starter/index.html?level=${level}&unit=${unit}&fase=26`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
                 { id: 27, name: "Diálogo", path: `/Atividades/Dialogo/index.html?level=${level}&unit=${unit}&fase=27`, img: "../../imagens/botoes/dialogo_button.png", unlocked: false },
-                { id: 28, name: "Perguntas Starter6", path: `/Atividades/perguntas%20starter/index.html?level=${level}&unit=${unit}&fase=28`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
+                { id: 28, name: "Perguntas Starter9", path: `/Atividades/perguntas%20starter/index.html?level=${level}&unit=${unit}&fase=28`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
 
             ];
         case "trecho6":
