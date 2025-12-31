@@ -387,7 +387,8 @@
           </div>
 
           <div class="character" id="student">
-            <img id="student-img" src="../../../../../imagens/avatar_aluno1.png" alt="Student Avatar" />
+            <!-- ✅ Hannah no lugar do avatar do aluno -->
+            <img id="student-img" src="../../../../../imagens/hannah_static.png" alt="Hannah" />
             <div class="character-text" id="student-text"></div>
             <div class="audio-button-container">
               <button class="audio-button" id="student-audio-button">🔊</button>
@@ -433,6 +434,25 @@
     let idleTimer;
     let robotImg = document.getElementById('robot-img');
     let studentImg = document.getElementById('student-img');
+
+    // ✅ Skins (Robo + Hannah) com a mesma dinâmica
+    const ROBOT_SKIN = {
+      talk:   '../../../../../imagens/robo1.gif',
+      static: '../../../../../imagens/robo1_static.png',
+      idle:   '../../../../../imagens/robo2.gif'
+    };
+
+    const HANNAH_SKIN = {
+      talk:   '../../../../../imagens/hannah_talk.gif',
+      static: '../../../../../imagens/hannah_static.png',
+      idle:   '../../../../../imagens/hannah_idle.gif'
+    };
+
+    function setCharacterState(who, state) {
+      const skin = (who === 'student') ? HANNAH_SKIN : ROBOT_SKIN;
+      const el   = (who === 'student') ? studentImg : robotImg;
+      if (el) el.src = skin[state] || skin.static;
+    }
 
     // TTS global
     const synth = window.speechSynthesis;
@@ -541,8 +561,10 @@
         currentUtterance.onerror = null;
         currentUtterance = null;
       }
-      // volta o robo para o estado padrão (caso esteja animado)
-      if (robotImg) robotImg.src = '../../../../../imagens/robo1_static.png';
+      // ✅ volta robo e Hannah para o estado padrão (caso estejam animados)
+      setCharacterState('robot', 'static');
+      setCharacterState('student', 'static');
+
       clearTimeout(idleTimer);
       // console.debug('TTS stopped:', reason);
     }
@@ -587,7 +609,7 @@
     // ======== Auth & boot ========
     firebase.auth().onAuthStateChanged(async function(user) {
       if (user) {
-        fetchUserAvatar(user.uid);
+        // ✅ removido: fetchUserAvatar(user.uid);
         await fetchUserName(user.uid);
         initializeDialogue();
       } else {
@@ -628,7 +650,8 @@
         });
     }
 
-    function speakText(text, callback) {
+    // ✅ Agora a fala anima o personagem correto: 'robot' ou 'student'(Hannah)
+    function speakText(who, text, callback) {
       clearTimeout(idleTimer);
 
       // Antes de falar, cancela qualquer fala ativa
@@ -661,11 +684,11 @@
         utterance.voice = selectedVoice || null;
 
         utterance.onstart = () => {
-          robotImg.src = '../../../../../imagens/robo1.gif';
+          setCharacterState(who, 'talk');
           currentUtterance = utterance;
         };
         utterance.onend = () => {
-          robotImg.src = '../../../../../imagens/robo1_static.png';
+          setCharacterState(who, 'static');
           currentUtterance = null;
           if (callback) callback();
           dialoguesRead++;
@@ -673,7 +696,7 @@
           startIdleTimer();
         };
         utterance.onerror = () => {
-          robotImg.src = '../../../../../imagens/robo1_static.png';
+          setCharacterState(who, 'static');
           currentUtterance = null;
         };
 
@@ -756,18 +779,18 @@
       robotBtn.onclick = () => {
         stopSpeaking('robotBtn'); // <- interrompe se estiver lendo outra fala
         stopRobotPrompt();
-        speakText(block.robotText, () => {
+        speakText('robot', block.robotText, () => {
           markHeard(index, 'robot');
           if (block.hasStudent) cueStudentOnce();
         });
       };
 
-      // STUDENT
+      // STUDENT (Hannah)
       if (block.hasStudent) {
         studentBtn.onclick = () => {
           stopSpeaking('studentBtn'); // <- interrompe antes de tocar a fala do aluno
           studentBtn.classList.remove('highlight-once');
-          speakText(block.studentText, () => {
+          speakText('student', block.studentText, () => {
             markHeard(index, 'student');
           });
         };
@@ -797,12 +820,15 @@
       }
     }
 
+    // ✅ Idle com a mesma dinâmica para Robo e Hannah
     function startIdleTimer() {
       clearTimeout(idleTimer);
       idleTimer = setTimeout(function () {
-        robotImg.src = '../../../../../imagens/robo2.gif';
+        setCharacterState('robot', 'idle');
+        setCharacterState('student', 'idle');
         setTimeout(function () {
-          robotImg.src = '../../../../../imagens/robo1_static.png';
+          setCharacterState('robot', 'static');
+          setCharacterState('student', 'static');
         }, 10000);
       }, 15000);
     }
@@ -827,20 +853,7 @@
       document.getElementById('overlay').style.display = 'none';
     }
 
-    function fetchUserAvatar(userId) {
-      const avatarRef = firebase.database().ref(`usuarios/${userId}`);
-      avatarRef.once('value')
-        .then(snapshot => {
-          const userData = snapshot.val();
-          if (userData && userData.avatar) {
-            const avatarUrl = `../../../../imagens/${userData.avatar}`;
-            const img = new Image();
-            img.src = avatarUrl;
-            img.onload = () => { studentImg.src = avatarUrl; };
-          }
-        })
-        .catch(() => {});
-    }
+    // ✅ Removido: fetchUserAvatar(userId) (não usado, Hannah é fixa)
 
     async function fetchUserName(userId) {
       try {

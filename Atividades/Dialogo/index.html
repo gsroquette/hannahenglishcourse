@@ -174,12 +174,12 @@
       background-color: rgba(255,255,255,0.85);
     }
 
-    .audio-button-container { 
-      margin-top: 4px; 
-      min-height: 40px; 
-      display:flex; 
-      align-items:center; 
-      justify-content:center; 
+    .audio-button-container {
+      margin-top: 4px;
+      min-height: 40px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
       width: 100%;
     }
 
@@ -283,10 +283,10 @@
     .bubble-2 { border: 2px solid #2e7d32; box-shadow: 0 0 0 2px rgba(46,125,50,.12); }
 
     /* ===== Botões de áudio e animações ===== */
-    .audio-button { 
-      border-radius: 999px; 
-      border: none; 
-      padding: 10px 14px; 
+    .audio-button {
+      border-radius: 999px;
+      border: none;
+      padding: 10px 14px;
       font-size: 18px;
       min-width: 44px;
       min-height: 44px;
@@ -332,7 +332,7 @@
     @media (max-width: 900px) {
       .dialogue-max { max-width: 760px; }
       .character img { width: clamp(90px, 22vw, 140px); }
-      .character-text { 
+      .character-text {
         font-size: clamp(13px, 2.2vw, 17px);
         max-height: 50vh; /* tablet */
       }
@@ -340,13 +340,13 @@
 
     /* ===== Celular: empilhado ===== */
     @media (max-width: 600px) {
-      #dialogue-container { 
+      #dialogue-container {
         grid-template-columns: 1fr;  /* empilhado */
-        gap: 14px; 
+        gap: 14px;
       }
       .dialogue-max { padding: 8px 10px; }
       .character img { width: clamp(84px, 28vw, 120px); }
-      .character-text { 
+      .character-text {
         font-size: clamp(14px, 3.8vw, 16px);
         padding: 34px 40px 12px 12px;
         max-height: 48vh; /* mobile */
@@ -458,6 +458,12 @@
     const synth = window.speechSynthesis;
     let currentUtterance = null;
 
+    // ✅ MP3 global (novo)
+    let currentAudio = null;
+
+    // ✅ Manifesto de diálogo (novo)
+    let dialogueManifest = null;
+
     // Parsed dialogue blocks: [{robotText, studentText|null, hasStudent, required}]
     let blocks = [];
     let totalDialogues = 0;      // sum of required utterances (1 or 2 per block)
@@ -545,8 +551,20 @@
       });
     }
 
-    // ======== Kill switch do TTS ========
+    // ======== Kill switch do áudio (TTS + MP3) ========
     function stopSpeaking(reason = '') {
+      // 1) Para MP3 (novo)
+      try{
+        if (currentAudio) {
+          currentAudio.pause();
+          currentAudio.currentTime = 0;
+          currentAudio.onended = null;
+          currentAudio.onerror = null;
+          currentAudio = null;
+        }
+      }catch(e){}
+
+      // 2) Para TTS
       try {
         if (synth) {
           // sequência "agressiva" pra Safari/iOS
@@ -556,17 +574,19 @@
           synth.cancel();
         }
       } catch(e) {}
+
       if (currentUtterance) {
         currentUtterance.onend = null;
         currentUtterance.onerror = null;
         currentUtterance = null;
       }
+
       // ✅ volta robo e Hannah para o estado padrão (caso estejam animados)
       setCharacterState('robot', 'static');
       setCharacterState('student', 'static');
 
       clearTimeout(idleTimer);
-      // console.debug('TTS stopped:', reason);
+      // console.debug('Audio stopped:', reason);
     }
 
     // Interrompe ao sair/ocultar/trocar página
@@ -611,6 +631,10 @@
       if (user) {
         // ✅ removido: fetchUserAvatar(user.uid);
         await fetchUserName(user.uid);
+
+        // ✅ carrega manifest antes, mas não bloqueia (fallback TTS continua)
+        await loadDialogueManifestSafely();
+
         initializeDialogue();
       } else {
         alert("You are not authenticated. Please log in.");
@@ -619,7 +643,7 @@
     });
 
     function goBack() {
-      stopSpeaking('goBack'); // <- interrompe TTS antes de sair
+      stopSpeaking('goBack'); // <- interrompe áudio antes de sair
       const { level, unit } = getLevelAndUnitFromURL();
       const currentPhase = getPhaseFromURL();
       const userId = firebase.auth().currentUser?.uid;
@@ -650,11 +674,126 @@
         });
     }
 
+    // =========================
+    // ✅ Manifest (MP3) - NOVO
+    // =========================
+    async function loadDialogueManifestSafely(){
+      try{
+        const { level, unit } = getLevelAndUnitFromURL();
+        const manifestPath = `../../${level}/${unit}/DataDialogo/sounds/dialogo-manifest.json`;
+        const r = await fetch(manifestPath, { cache: 'no-store' });
+        if(!r.ok) { dialogueManifest = null; return; }
+        const data = await r.json();
+        dialogueManifest = data || null;
+      }catch(e){
+        dialogueManifest = null;
+      }
+    }
+
+    function getMp3ForBlock(blockIndex0, who){
+      // blockIndex0: 0-based (igual ao blocks[])
+      // manifest usa index 1-based: index === blockIndex0 + 1
+      if(!dialogueManifest) return null;
+      const arr = dialogueManifest.blocks || dialogueManifest.cards || []; // tolerante
+      if(!Array.isArray(arr) || arr.length===0) return null;
+
+      const targetIndex = blockIndex0 + 1;
+      let found = null;
+      for(let i=0;i<arr.length;i++){
+        if(arr[i] && arr[i].index === targetIndex){
+          found = arr[i];
+          break;
+        }
+      }
+      if(!found) return null;
+
+      let audioFile = null;
+      if(who === 'robot' && found.robot && found.robot.audio) audioFile = found.robot.audio;
+      if(who === 'student' && found.student && found.student.audio) audioFile = found.student.audio;
+
+      if(!audioFile || typeof audioFile !== 'string') return null;
+
+      try{
+        const { level, unit } = getLevelAndUnitFromURL();
+        return `../../${level}/${unit}/DataDialogo/sounds/${audioFile}`;
+      }catch(e){
+        return null;
+      }
+    }
+
+    // ✅ Play MP3 com fallback para TTS, mantendo toda a lógica original
+    async function playLineAudio(who, text, blockIndex, onFinished){
+      clearTimeout(idleTimer);
+
+      // Antes de tocar, cancela qualquer áudio ativo
+      stopSpeaking('pre-playLineAudio');
+
+      // Tenta MP3 primeiro
+      const mp3Url = getMp3ForBlock(blockIndex, who);
+      if(mp3Url){
+        try{
+          await playMp3(mp3Url, who, onFinished);
+          return;
+        }catch(e){
+          // fallback TTS
+        }
+      }
+
+      // Fallback TTS (original)
+      speakText(who, text, onFinished);
+    }
+
+    function playMp3(url, who, onFinished){
+      return new Promise((resolve, reject)=>{
+        try{
+          const a = new Audio(url);
+          currentAudio = a;
+          a.preload = 'auto';
+
+          a.onended = () => {
+            // volta para static e segue fluxo
+            setCharacterState(who, 'static');
+            currentAudio = null;
+
+            if (typeof onFinished === 'function') onFinished();
+
+            // mantém contadores e conclusão como no TTS
+            dialoguesRead++;
+            checkCompletion();
+            startIdleTimer();
+
+            resolve();
+          };
+
+          a.onerror = () => {
+            // garante estado e rejeita para fallback TTS
+            setCharacterState(who, 'static');
+            currentAudio = null;
+            reject(new Error('MP3 error'));
+          };
+
+          // anima personagem ao tocar
+          setCharacterState(who, 'talk');
+
+          const p = a.play();
+          if(p && typeof p.then === 'function'){
+            p.then(()=>{}).catch((err)=>{
+              setCharacterState(who, 'static');
+              currentAudio = null;
+              reject(err);
+            });
+          }
+        }catch(e){
+          reject(e);
+        }
+      });
+    }
+
     // ✅ Agora a fala anima o personagem correto: 'robot' ou 'student'(Hannah)
     function speakText(who, text, callback) {
       clearTimeout(idleTimer);
 
-      // Antes de falar, cancela qualquer fala ativa
+      // Antes de falar, cancela qualquer fala/áudio ativa
       stopSpeaking('pre-speak');
 
       let voices = synth.getVoices();
@@ -749,7 +888,7 @@
       if (index < 0 || index >= blocks.length) return;
       currentDialogueIndex = index;
 
-      // Ao trocar de diálogo, interrompe qualquer fala
+      // Ao trocar de diálogo, interrompe qualquer fala/áudio
       stopSpeaking('updateDialogue');
 
       const block = blocks[index];
@@ -776,10 +915,12 @@
       startRobotPrompt();
 
       // ROBOT
-      robotBtn.onclick = () => {
-        stopSpeaking('robotBtn'); // <- interrompe se estiver lendo outra fala
+      robotBtn.onclick = async () => {
+        stopSpeaking('robotBtn');
         stopRobotPrompt();
-        speakText('robot', block.robotText, () => {
+
+        // ✅ MP3 first (manifest), fallback TTS
+        await playLineAudio('robot', block.robotText, index, () => {
           markHeard(index, 'robot');
           if (block.hasStudent) cueStudentOnce();
         });
@@ -787,10 +928,12 @@
 
       // STUDENT (Hannah)
       if (block.hasStudent) {
-        studentBtn.onclick = () => {
-          stopSpeaking('studentBtn'); // <- interrompe antes de tocar a fala do aluno
+        studentBtn.onclick = async () => {
+          stopSpeaking('studentBtn');
           studentBtn.classList.remove('highlight-once');
-          speakText('student', block.studentText, () => {
+
+          // ✅ MP3 first (manifest), fallback TTS
+          await playLineAudio('student', block.studentText, index, () => {
             markHeard(index, 'student');
           });
         };
