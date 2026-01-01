@@ -693,23 +693,41 @@ firebase.auth().onAuthStateChanged(function(user){
   /* =========================
      REVIEW: scoring (same as yours)
   ========================= */
-  const SCORE_THRESHOLD = 25;
+const SCORE_THRESHOLD = 25;
 
-  function scoreFromStats(stats){
-    const total = Math.max(1, Number(stats.totalAttempts || 0));
-    const correct = Math.max(0, Number(stats.correctAttempts || 0));
-    const accuracy = correct / total; // 0–1
+// NEW: quantos acertos seguidos “limpam” a penalidade do primeiro erro
+const STREAK_MASTERY = 3;
 
-    let score = (1 - accuracy) * 100;
+function scoreFromStats(stats){
+  const total = Math.max(1, Number(stats.totalAttempts || 0));
+  const correct = Math.max(0, Number(stats.correctAttempts || 0));
+  const accuracy = correct / total; // 0–1
 
+  const streak = Math.max(0, Number(stats.correctStreak || 0));
+
+  let score = (1 - accuracy) * 100;
+
+  // REGRA PRINCIPAL:
+  // Se o aluno já acertou N vezes seguidas, não faz sentido manter o peso do firstAttemptResult.
+  if (streak < STREAK_MASTERY){
     if (stats.firstAttemptResult === "wrong") score += 20;
-    if (stats.lastIsCorrect === false) score += 15;
-
-    score += Math.min(total, 5) * 3;
-
-    if (!Number.isFinite(score)) score = 0;
-    return Math.max(0, Math.round(score));
   }
+
+  // Se o último foi errado, continua entrando como sinal de dificuldade recente
+  if (stats.lastIsCorrect === false) score += 15;
+
+  // “peso por tentativas” continua, mas quando há domínio recente, reduzimos o impacto
+  // (isso evita que totalAttempts alto mantenha score alto mesmo com streak alto)
+  if (streak >= STREAK_MASTERY){
+    score += Math.min(total, 5) * 1;   // era *3, agora *1 quando já dominou
+    score -= 25;                       // bônus de domínio: empurra score pra baixo
+  } else {
+    score += Math.min(total, 5) * 3;
+  }
+
+  if (!Number.isFinite(score)) score = 0;
+  return Math.max(0, Math.round(score));
+}
 
   /* =========================
      REVIEW: compute a round plan
@@ -806,49 +824,63 @@ firebase.auth().onAuthStateChanged(function(user){
   /* =========================
      Log de respostas do aluno
   ========================= */
-  function logAnswer(question, isCorrect){
-    if (!question || !question.id) return;
-    ensureUserIsAuthenticated(function(uid){
-      if (!uid) return;
-      const ref = firebase.database().ref(`userAnswers/${uid}/${question.id}`);
-      ref.transaction(prev => {
-        const now = Date.now();
-        const meta = {
-          level:      question.level || levelDir,
-          unit:       question.unit  || unitDir,
-          fase:       question.fase  || (fase || null),
-          grammarTag: question.grammarTag || null,
-          skillType:  question.skillType  || null,
-          difficulty: question.difficulty || null
-        };
+function logAnswer(question, isCorrect){
+  if (!question || !question.id) return;
 
-        if (!prev){
-          return {
-            ...meta,
-            totalAttempts: 1,
-            correctAttempts: isCorrect ? 1 : 0,
-            firstAttemptResult: isCorrect ? 'correct' : 'wrong',
-            lastIsCorrect: isCorrect,
-            lastTimestamp: now
-          };
-        }
+  ensureUserIsAuthenticated(function(uid){
+    if (!uid) return;
 
-        const totalAttempts   = (prev.totalAttempts   || 0) + 1;
-        const correctAttempts = (prev.correctAttempts || 0) + (isCorrect ? 1 : 0);
-        const firstAttemptResult = prev.firstAttemptResult || (isCorrect ? 'correct' : 'wrong');
+    const ref = firebase.database().ref(`userAnswers/${uid}/${question.id}`);
 
+    ref.transaction(prev => {
+      const now = Date.now();
+
+      const meta = {
+        level:      question.level || levelDir,
+        unit:       question.unit  || unitDir,
+        fase:       question.fase  || (fase || null),
+        grammarTag: question.grammarTag || null,
+        skillType:  question.skillType  || null,
+        difficulty: question.difficulty || null
+      };
+
+      // ===== NEW: streak de acertos (domínio recente) =====
+      // - Se acertou: incrementa
+      // - Se errou: zera
+      const prevStreak = Number(prev && prev.correctStreak ? prev.correctStreak : 0);
+      const nextStreak = isCorrect ? (prevStreak + 1) : 0;
+
+      if (!prev){
         return {
-          ...prev,
           ...meta,
-          totalAttempts,
-          correctAttempts,
-          firstAttemptResult,
+          totalAttempts: 1,
+          correctAttempts: isCorrect ? 1 : 0,
+          firstAttemptResult: isCorrect ? 'correct' : 'wrong',
           lastIsCorrect: isCorrect,
+          lastAttemptResult: isCorrect ? 'correct' : 'wrong', // NEW (útil p/ regras futuras)
+          correctStreak: nextStreak,                          // NEW
           lastTimestamp: now
         };
-      });
+      }
+
+      const totalAttempts   = (prev.totalAttempts   || 0) + 1;
+      const correctAttempts = (prev.correctAttempts || 0) + (isCorrect ? 1 : 0);
+      const firstAttemptResult = prev.firstAttemptResult || (isCorrect ? 'correct' : 'wrong');
+
+      return {
+        ...prev,
+        ...meta,
+        totalAttempts,
+        correctAttempts,
+        firstAttemptResult,
+        lastIsCorrect: isCorrect,
+        lastAttemptResult: isCorrect ? 'correct' : 'wrong', // NEW
+        correctStreak: nextStreak,                          // NEW
+        lastTimestamp: now
+      };
     });
-  }
+  });
+}
 
   /* =========================
      Prompt/blank utils + TTS builder
@@ -1625,7 +1657,7 @@ firebase.auth().onAuthStateChanged(function(user){
     const msg =
       `Good job! You still have a few points to improve.\n` +
       `Let's keep going.\n\n` +
-      `Remaining difficult questions in this Unit: ${remainingCount}`;
+      `Remaining difficult questions: ${remainingCount}`;
 
     promptEl.textContent = msg;
 
