@@ -48,9 +48,10 @@ function getActivitiesByTrecho(trecho, level, unit) {
             ];
         case "trecho6":      
             return [
-                { id: 29, name: "TestStarter", path: `/Atividades/TestStarter/review.html?level=${level}&unit=${unit}&fase=29`, img: "../../imagens/test.png", unlocked: false },
-                { id: 30, name: "TestwordB2CFacil", path: `/Atividades/TestwordB2CFacil/index.html?level=${level}&unit=${unit}&fase=30`, img: "../../imagens/test.png", unlocked: false },
-                { id: 31, name: "Testword2B2CFacil", path: `/Atividades/Testword2B2CFacil/index.html?level=${level}&unit=${unit}&fase=last`, img: "../../imagens/test.png", unlocked: false },
+                { id: 29, name: "Perguntas Starter9", path: `/Atividades/perguntas%20starter/review.html?level=${level}&unit=${unit}&fase=29`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
+                { id: 30, name: "TestStarter", path: `/Atividades/TestStarter/index.html?level=${level}&unit=${unit}&fase=30`, img: "../../imagens/test.png", unlocked: false },
+                { id: 31, name: "TestwordB2CFacil", path: `/Atividades/TestwordB2CFacil/index.html?level=${level}&unit=${unit}&fase=31`, img: "../../imagens/test.png", unlocked: false },
+                { id: 32, name: "Testword2B2CFacil", path: `/Atividades/Testword2B2CFacil/index.html?level=${level}&unit=${unit}&fase=last`, img: "../../imagens/test.png", unlocked: false },
             ];
         default:
             return []; // ou um fallback
