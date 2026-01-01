@@ -691,51 +691,50 @@ firebase.auth().onAuthStateChanged(function(user){
   }
 
   /* =========================
-     REVIEW: scoring (FIXED)
+     REVIEW: scoring (same as yours)
   ========================= */
-  const SCORE_THRESHOLD = 25;
+const SCORE_THRESHOLD = 25;
 
-  // Mastery rules (when mastered => should NOT stay in review)
-  // ✅ Queremos: 2 acertos seguidos já tirar da revisão
-  const MASTERY_STREAK = 2;          // 2 acertos consecutivos
-  const MASTERY_MIN_CORRECT = 2;     // (opcional) mínimo de acertos no total
-  const MASTERY_ACCURACY = 0.70;     // (opcional) evita prender por erro antigo (70% já basta)
+// NEW: quantos acertos seguidos “limpam” a penalidade do primeiro erro
+const STREAK_MASTERY = 3;
 
-  function scoreFromStats(stats){
-    const total = Math.max(1, Number(stats.totalAttempts || 0));
-    const correct = Math.max(0, Number(stats.correctAttempts || 0));
-    const accuracy = correct / total; // 0–1
-    const streak = Math.max(0, Number(stats.correctStreak || 0));
+function scoreFromStats(stats){
+  const total = Math.max(1, Number(stats.totalAttempts || 0));
+  const correct = Math.max(0, Number(stats.correctAttempts || 0));
+  const accuracy = correct / total; // 0–1
 
-    // ✅ MASTERED: 2 acertos seguidos já dominou => sai da revisão
-    // Mantém também o "plano B" (min correct + accuracy), mas bem mais permissivo
-    const mastered =
-      (stats.lastIsCorrect === true) &&
-      (
-        streak >= MASTERY_STREAK ||
-        (correct >= MASTERY_MIN_CORRECT && accuracy >= MASTERY_ACCURACY)
-      );
+  const streak = Math.max(0, Number(stats.correctStreak || 0));
 
-    if (mastered) return 0;
+  let score = (1 - accuracy) * 100;
 
-    // Base score: quanto menor a acurácia, maior o score
-    let score = (1 - accuracy) * 100;
-
-    // Penalidade do primeiro erro, mas agora TEMPORÁRIA (some quando dominar)
+  // REGRA PRINCIPAL:
+  // Se o aluno já acertou N vezes seguidas, não faz sentido manter o peso do firstAttemptResult.
+  if (streak < STREAK_MASTERY){
     if (stats.firstAttemptResult === "wrong") score += 20;
-
-    // Se o último foi errado, sinal de dificuldade recente
-    if (stats.lastIsCorrect === false) score += 15;
-
-    // Peso por tentativas
-    score += Math.min(total, 5) * 3;
-
-    if (!Number.isFinite(score)) score = 0;
-    return Math.max(0, Math.round(score));
   }
+
+  // Se o último foi errado, continua entrando como sinal de dificuldade recente
+  if (stats.lastIsCorrect === false) score += 15;
+
+  // “peso por tentativas” continua, mas quando há domínio recente, reduzimos o impacto
+  // (isso evita que totalAttempts alto mantenha score alto mesmo com streak alto)
+  if (streak >= STREAK_MASTERY){
+    score += Math.min(total, 5) * 1;   // era *3, agora *1 quando já dominou
+    score -= 25;                       // bônus de domínio: empurra score pra baixo
+  } else {
+    score += Math.min(total, 5) * 3;
+  }
+
+  if (!Number.isFinite(score)) score = 0;
+  return Math.max(0, Math.round(score));
+}
 
   /* =========================
      REVIEW: compute a round plan
+     - Only attempted questions
+     - Needs review if score >= threshold
+     - Select top 15 hardest by score desc
+     - Present easier->harder (score asc)
   ========================= */
   async function recomputeReviewPlan({ levelKey, unitKey }){
     const allIds = await getAllQuestionIdsForUnit(levelKey, unitKey);
@@ -823,74 +822,65 @@ firebase.auth().onAuthStateChanged(function(user){
   }
 
   /* =========================
-     Log de respostas do aluno (FIXED STREAK)
+     Log de respostas do aluno
   ========================= */
-  function logAnswer(question, isCorrect){
-    if (!question || !question.id) return;
+function logAnswer(question, isCorrect){
+  if (!question || !question.id) return;
 
-    ensureUserIsAuthenticated(function(uid){
-      if (!uid) return;
+  ensureUserIsAuthenticated(function(uid){
+    if (!uid) return;
 
-      const ref = firebase.database().ref(`userAnswers/${uid}/${question.id}`);
+    const ref = firebase.database().ref(`userAnswers/${uid}/${question.id}`);
 
-      ref.transaction(prev => {
-        const now = Date.now();
+    ref.transaction(prev => {
+      const now = Date.now();
 
-        const meta = {
-          level:      question.level || levelDir,
-          unit:       question.unit  || unitDir,
-          fase:       question.fase  || (fase || null),
-          grammarTag: question.grammarTag || null,
-          skillType:  question.skillType  || null,
-          difficulty: question.difficulty || null
-        };
+      const meta = {
+        level:      question.level || levelDir,
+        unit:       question.unit  || unitDir,
+        fase:       question.fase  || (fase || null),
+        grammarTag: question.grammarTag || null,
+        skillType:  question.skillType  || null,
+        difficulty: question.difficulty || null
+      };
 
-        const prevStreak = Number(prev && prev.correctStreak ? prev.correctStreak : 0);
-        const prevLastAttempt = (prev && prev.lastAttemptResult) ? String(prev.lastAttemptResult) : null;
+      // ===== NEW: streak de acertos (domínio recente) =====
+      // - Se acertou: incrementa
+      // - Se errou: zera
+      const prevStreak = Number(prev && prev.correctStreak ? prev.correctStreak : 0);
+      const nextStreak = isCorrect ? (prevStreak + 1) : 0;
 
-        // ✅ Streak REAL:
-        // - Só incrementa se o attempt atual for correto E o attempt anterior também foi correto
-        // - Se for correto mas o anterior não foi correto => começa em 1
-        // - Se errar => zera
-        const nextStreak = isCorrect
-          ? (prevLastAttempt === 'correct' ? (prevStreak + 1) : 1)
-          : 0;
-
-        if (!prev){
-          return {
-            ...meta,
-            totalAttempts: 1,
-            correctAttempts: isCorrect ? 1 : 0,
-            firstAttemptResult: isCorrect ? 'correct' : 'wrong',
-            lastIsCorrect: isCorrect,
-            lastAttemptResult: isCorrect ? 'correct' : 'wrong',
-            correctStreak: nextStreak,
-            lastTimestamp: now,
-            lastCorrectTimestamp: isCorrect ? now : null,
-            lastWrongTimestamp: isCorrect ? null : now
-          };
-        }
-
-        const totalAttempts   = (prev.totalAttempts   || 0) + 1;
-        const correctAttempts = (prev.correctAttempts || 0) + (isCorrect ? 1 : 0);
-        const firstAttemptResult = prev.firstAttemptResult || (isCorrect ? 'correct' : 'wrong');
-
+      if (!prev){
         return {
-          ...prev,
           ...meta,
-          totalAttempts,
-          correctAttempts,
-          firstAttemptResult,
+          totalAttempts: 1,
+          correctAttempts: isCorrect ? 1 : 0,
+          firstAttemptResult: isCorrect ? 'correct' : 'wrong',
           lastIsCorrect: isCorrect,
-          lastAttemptResult: isCorrect ? 'correct' : 'wrong',
-          correctStreak: nextStreak,
-          lastTimestamp: now,
-          lastCorrectTimestamp: isCorrect ? now : (prev.lastCorrectTimestamp || null),
-          lastWrongTimestamp: isCorrect ? (prev.lastWrongTimestamp || null) : now
+          lastAttemptResult: isCorrect ? 'correct' : 'wrong', // NEW (útil p/ regras futuras)
+          correctStreak: nextStreak,                          // NEW
+          lastTimestamp: now
         };
-      });
+      }
+
+      const totalAttempts   = (prev.totalAttempts   || 0) + 1;
+      const correctAttempts = (prev.correctAttempts || 0) + (isCorrect ? 1 : 0);
+      const firstAttemptResult = prev.firstAttemptResult || (isCorrect ? 'correct' : 'wrong');
+
+      return {
+        ...prev,
+        ...meta,
+        totalAttempts,
+        correctAttempts,
+        firstAttemptResult,
+        lastIsCorrect: isCorrect,
+        lastAttemptResult: isCorrect ? 'correct' : 'wrong', // NEW
+        correctStreak: nextStreak,                          // NEW
+        lastTimestamp: now
+      };
     });
-  }
+  });
+}
 
   /* =========================
      Prompt/blank utils + TTS builder
@@ -1665,9 +1655,9 @@ firebase.auth().onAuthStateChanged(function(user){
     statusPill.textContent = "Review round completed";
 
     const msg =
-      `Good job!\n` +
-      `You are getting better.\n\n` +
-      `Questions that still need review: ${remainingCount}`;
+  `Good job!\n` +
+  `You are getting better.\n\n` +
+  `Questions that still need review: ${remainingCount}`;
 
     promptEl.textContent = msg;
 
