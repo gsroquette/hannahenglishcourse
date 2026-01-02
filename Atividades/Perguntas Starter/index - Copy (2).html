@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Hannah Questions — Review</title>
+<title>Hannah Questions — Fill in the Blanks</title>
 <style>
   :root{
     --bg:#f7f9fc; --card:#ffffff; --text:#1f2937; --muted:#6b7280;
@@ -179,21 +179,9 @@
 
   .footer{margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
   .pill{background:#eef2ff;color:#3949ab;padding:8px 12px;border-radius:999px;font-size:12px;border:1px solid #d7defc}
-  .next-btn{
-    border:none;background:linear-gradient(90deg,#3b82f6,#22c55e);
-    color:#fff;font-weight:800;padding:12px 16px;border-radius:14px;
-    cursor:pointer;box-shadow:0 10px 18px rgba(34,197,94,.25);
-    opacity:.3;pointer-events:none;transition:opacity .2s ease,transform .06s ease
-  }
+  .next-btn{border:none;background:linear-gradient(90deg,#3b82f6,#22c55e);color:#fff;font-weight:800;padding:12px 16px;border-radius:14px;cursor:pointer;box-shadow:0 10px 18px rgba(34,197,94,.25);opacity:.3;pointer-events:none;transition:opacity .2s ease,transform .06s ease}
   .next-btn.ready{opacity:1;pointer-events:auto}
   .next-btn:active{transform:translateY(1px)}
-
-  .secondary-btn{
-    border:none;background:#eef2ff;color:#0f3ea8;font-weight:800;
-    padding:12px 16px;border-radius:14px;cursor:pointer;
-    box-shadow:0 10px 18px rgba(15,62,168,.12);
-  }
-  .secondary-btn:active{transform:translateY(1px)}
 
   .confetti{position:absolute;inset:0;pointer-events:none;overflow:hidden}
   .piece{position:absolute;width:10px;height:10px;background:hsl(var(--h) 80% 60%);top:-12px;border-radius:2px;animation:drop linear forwards}
@@ -286,7 +274,7 @@
     <div class="header">
       <div class="avatar" id="avatar" aria-hidden="true">🤖</div>
       <div class="title-wrap">
-        <div class="title">Hannah Questions — Review</div>
+        <div class="title">Hannah Questions</div>
         <div class="subtitle" id="subtitle">Loading content…</div>
         <div class="progress"><div id="bar"></div></div>
       </div>
@@ -330,14 +318,9 @@
 
         <div class="options" id="options"></div>
 
-        <div class="footer" id="footerBar">
+        <div class="footer">
           <span class="pill" id="statusPill">Question —/—</span>
-
-          <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; align-items:center;">
-            <button class="secondary-btn is-hidden" id="btnAlt1" type="button">Review Oldest</button>
-            <button class="secondary-btn is-hidden" id="btnAlt2" type="button">Mixed Quiz</button>
-            <button class="next-btn" id="btnNext" disabled>Next</button>
-          </div>
+          <button class="next-btn" id="btnNext" disabled>Next</button>
         </div>
       </div>
     </div>
@@ -379,23 +362,6 @@ firebase.auth().onAuthStateChanged(function(user){
 
 <script>
 (function(){
-  /* ============================================================
-     REVIEW MODE (UPDATED to "FINAL LIST")
-     - Entry/pool comes from activity history (userAnswers) and activities list
-     - Review is binary:
-        correct in review => remove from review queue
-        wrong in review   => stays in review queue
-     - No multiple attempts in review (MCQ/order/match):
-        first decision counts, then Next is enabled
-     - Historical attempts are used ONLY for:
-        (1) who enters review
-        (2) priority ordering
-     - Review queue is stored in Firebase under:
-        reviewState/{uid}/{LevelX}/{UnitY}/pending/{questionId}: true
-     - Up to 15 per round: hardest 15 (priority), presented easier->harder
-     - Round counter: sessionStorage, after 3 rounds => Take a break (no unlock)
-  ============================================================ */
-
   /* =========================
      Helpers essenciais
   ========================= */
@@ -403,7 +369,7 @@ firebase.auth().onAuthStateChanged(function(user){
     const url = new URL(location.href);
     const level = url.searchParams.get('level');
     const unit  = url.searchParams.get('unit');
-    const fase  = url.searchParams.get('fase'); // used for progress unlock/back check
+    const fase  = url.searchParams.get('fase');
     return { level, unit, fase };
   }
   function normalizeDir(prefix, value, fallbackNum){
@@ -414,54 +380,9 @@ firebase.auth().onAuthStateChanged(function(user){
     return prefix + (onlyNum || fallbackNum);
   }
 
-  function escapeHtml(str){
-    return String(str ?? '')
-      .replace(/&/g,'&amp;')
-      .replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;')
-      .replace(/"/g,'&quot;')
-      .replace(/'/g,'&#039;');
-  }
-
-  function normalize(v){
-    return String(v ?? '')
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g,' ')
-      .replace(/[“”"]/g,'"');
-  }
-
-  function shuffle(arr){
-    const a = Array.isArray(arr) ? arr : [];
-    for (let i = a.length - 1; i > 0; i--){
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
-  }
-
-  function absPath(p){
-    const s = String(p ?? '').trim();
-    if (!s) return s;
-    if (/^https?:\/\//i.test(s)) return s;
-    if (s.startsWith('/')) return s;
-    return s;
-  }
-
-  function showLoader(show){
-    const el = document.getElementById('loading');
-    if (!el) return;
-    el.style.display = show ? 'flex' : 'none';
-  }
-
   /* WebAudio SFX */
   let audioCtx = null;
-  function ensureAudio(){
-    if(!audioCtx){
-      try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){}
-    }
-    return !!audioCtx;
-  }
+  function ensureAudio(){ if(!audioCtx){ try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return !!audioCtx; }
   function tone(freq, durMs, type){
     if(!ensureAudio()) return;
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
@@ -496,86 +417,28 @@ firebase.auth().onAuthStateChanged(function(user){
       else { console.error("[Auth] User not authenticated"); }
     });
   }
-
+  function markPhaseCompleted(){ ensureUserIsAuthenticated(updateNextPhase); }
   async function updateNextPhase(userId){
     const { level, unit, fase } = getParams();
     if(!level || !unit || !fase){ console.warn("[Progress] Missing URL params."); return; }
-
-    const levelKey = normalizeDir('Level', level || '0', '0');
-    const unitKey  = normalizeDir('Unit',  unit  || '1', '1');
-
-    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${levelKey}/${unitKey}`);
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
     try{
       if(fase === "last"){
-        const nextUnit = `Unit${parseInt((unitKey||'').replace(/\D/g,''),10) + 1}`;
-        await firebase.database().ref(`usuarios/${userId}/progresso/${levelKey}/${nextUnit}`).set({ fase1: true });
+        const nextUnit = `Unit${parseInt((unit||'').replace(/\D/g,''),10) + 1}`;
+        await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
       } else if(fase === "end"){
-        const nextLevel = `Level${parseInt((levelKey||'').replace(/\D/g,''),10) + 1}`;
+        const nextLevel = `Level${parseInt((level||'').replace(/\D/g,''),10) + 1}`;
+
         await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
       } else {
-        const cur = parseInt(fase,10);
-        const nextPhase = cur + 1;
-        await dbRef.update({ [`fase${cur}`]: true, [`fase${nextPhase}`]: true });
+        const nextPhase = parseInt(fase,10) + 1;
+        await dbRef.update({ [`fase${fase}`]: true, [`fase${nextPhase}`]: true });
       }
       console.log("[Progress] Update successful.");
     } catch(err){
       console.error("[Progress] Error updating next phase:", err);
     }
   }
-
-  function markPhaseCompleted(){
-    ensureUserIsAuthenticated(function(uid){
-      if (uid) updateNextPhase(uid);
-    });
-  }
-
-  /* Back button rule:
-     - If activityCompleted => always back
-     - Else, check if next phase is unlocked; if not, confirm in English
-  */
-  window.activityCompleted = false;
-  window.goBack = async function goBack(){
-    try{
-      if (window.activityCompleted){
-        history.back();
-        return;
-      }
-
-      await new Promise((resolve)=>ensureUserIsAuthenticated(()=>resolve()));
-      if (!currentUserId){
-        const ok = confirm("You are not logged in. Do you want to go back anyway?");
-        if (ok) history.back();
-        return;
-      }
-
-      const { level, unit, fase } = getParams();
-      const levelKey = normalizeDir('Level', level || '0', '0');
-      const unitKey  = normalizeDir('Unit',  unit  || '1', '1');
-
-      const cur = parseInt(fase, 10);
-      if (!Number.isFinite(cur)){
-        const ok = confirm("Next phase status cannot be checked here. Do you want to go back anyway?");
-        if (ok) history.back();
-        return;
-      }
-
-      const nextPhase = cur + 1;
-      const ref = firebase.database().ref(`usuarios/${currentUserId}/progresso/${levelKey}/${unitKey}/fase${nextPhase}`);
-      const snap = await ref.once('value');
-      const unlocked = snap.val() === true;
-
-      if (unlocked){
-        history.back();
-      } else {
-        const ok = confirm("Next phase is not unlocked yet. Do you want to go back anyway?");
-        if (ok) history.back();
-      }
-    }catch(err){
-      console.warn("[Back] Fallback due to error:", err);
-      const ok = confirm("Could not verify next phase. Do you want to go back anyway?");
-      if (ok) history.back();
-    }
-  };
 
   /* =========================
      Avatar + paths
@@ -607,9 +470,6 @@ firebase.auth().onAuthStateChanged(function(user){
   let idx = 0;
   let answered = false;
 
-  const MAX_PER_ROUND = 15;
-  const MAX_ROUNDS = 3;
-
   const subtitle   = document.getElementById('subtitle');
   const bar        = document.getElementById('bar');
   const promptEl   = document.getElementById('prompt');
@@ -618,11 +478,10 @@ firebase.auth().onAuthStateChanged(function(user){
   const btnPlayPrompt = document.getElementById('btnPlayPrompt');
   const btnListenAnswer = document.getElementById('btnListenAnswer');
   const btnNext    = document.getElementById('btnNext');
-  const btnAlt1    = document.getElementById('btnAlt1');
-  const btnAlt2    = document.getElementById('btnAlt2');
   const statusPill = document.getElementById('statusPill');
   const confettiEl = document.getElementById('confetti');
   const liveEl     = document.getElementById('live');
+  const loadingEl  = document.getElementById('loading');
 
   const sCorrect = new Audio(`${BASE}/sounds/correct.mp3`);
   const sWrong   = new Audio(`${BASE}/sounds/wrong.mp3`);
@@ -631,26 +490,7 @@ firebase.auth().onAuthStateChanged(function(user){
   [sCorrect,sWrong,sTap,sNext].forEach(a=>{a.preload='auto'});
 
   /* =========================
-     Confetti
-  ========================= */
-  function confetti(n){
-    const count = Math.max(0, Math.min(80, Number(n || 18)));
-    confettiEl.innerHTML = '';
-    const w = confettiEl.clientWidth || 600;
-    for(let i=0;i<count;i++){
-      const p = document.createElement('div');
-      p.className = 'piece';
-      p.style.left = Math.round(Math.random()*w) + 'px';
-      p.style.setProperty('--h', String(Math.round(Math.random()*360)));
-      p.style.animationDuration = (900 + Math.random()*900) + 'ms';
-      p.style.opacity = String(0.85 + Math.random()*0.15);
-      confettiEl.appendChild(p);
-      setTimeout(()=>{ try{ p.remove(); }catch(e){} }, 2200);
-    }
-  }
-
-  /* =========================
-     Firebase: título (de questions.txt)
+     Firebase: título + questões
   ========================= */
   async function loadTitleFromFile(){
     try{
@@ -667,219 +507,59 @@ firebase.auth().onAuthStateChanged(function(user){
     return null;
   }
 
-  /* =========================
-     REVIEW: activities -> questionIds for unit (all phases)
-  ========================= */
-  async function getAllQuestionIdsForUnit(levelKey, unitKey){
-    const prefix = `${levelKey}_${unitKey}_Fase`;
-    const snap = await firebase.database()
-      .ref("activities")
-      .orderByKey()
-      .startAt(prefix)
-      .endAt(prefix + "\uf8ff")
-      .once("value");
+  async function loadActivityQuestionsFromFirebase(levelKey, unitKey, faseParam){
+    const faseKey = faseParam || '1';
+    const activityKey = `${levelKey}_${unitKey}_Fase${faseKey}`;
 
-    const obj = snap.val() || {};
-    const set = new Set();
+    const activitySnap = await firebase.database()
+      .ref(`activities/${activityKey}`)
+      .once('value');
+    const activity = activitySnap.val();
 
-    Object.keys(obj).forEach(k => {
-      const a = obj[k];
-      if (!a || !Array.isArray(a.questionIds)) return;
-      a.questionIds.forEach(id => { if (id) set.add(id); });
-    });
-
-    return Array.from(set);
-  }
-
-  /* =========================
-     REVIEW STATE (Firebase)
-     reviewState/{uid}/{levelKey}/{unitKey}/pending/{qid}: true
-  ========================= */
-  function reviewRootRef(uid, levelKey, unitKey){
-    return firebase.database().ref(`reviewState/${uid}/${levelKey}/${unitKey}`);
-  }
-  async function getPendingMap(uid, levelKey, unitKey){
-    const snap = await reviewRootRef(uid, levelKey, unitKey).child('pending').once('value');
-    return snap.val() || {};
-  }
-  async function setPendingFromList(uid, levelKey, unitKey, ids){
-    const root = reviewRootRef(uid, levelKey, unitKey);
-    const pending = {};
-    (ids || []).forEach(id => { if (id) pending[id] = true; });
-    await root.update({
-      createdAt: firebase.database.ServerValue.TIMESTAMP,
-      updatedAt: firebase.database.ServerValue.TIMESTAMP,
-      pending
-    });
-  }
-  async function removeFromPending(uid, levelKey, unitKey, qid){
-    const root = reviewRootRef(uid, levelKey, unitKey);
-    const pRef = root.child('pending').child(String(qid));
-    await pRef.remove();
-    await root.update({ updatedAt: firebase.database.ServerValue.TIMESTAMP });
-  }
-
-  /* =========================
-     ENTRY CRITERIA + PRIORITY (HISTORY ONLY)
-     Criteria (conservative):
-       - at least 1 wrong (wrongAttempts >= 1)
-       - AND (totalAttempts < 3 OR wrongAttempts >= correctAttempts)
-  ========================= */
-  function statsToCounts(stats){
-    const total = Math.max(0, Number(stats && stats.totalAttempts || 0));
-    const correct = Math.max(0, Number(stats && stats.correctAttempts || 0));
-    const wrong = Math.max(0, total - correct);
-    const accuracy = total > 0 ? (correct / total) : 0;
-    const lastIsCorrect = (stats && typeof stats.lastIsCorrect === 'boolean') ? stats.lastIsCorrect : null;
-    const firstAttemptResult = (stats && stats.firstAttemptResult) ? String(stats.firstAttemptResult) : null;
-    return { total, correct, wrong, accuracy, lastIsCorrect, firstAttemptResult };
-  }
-
-  function eligibleForReview(stats){
-    const c = statsToCounts(stats);
-    if (c.total <= 0) return false; // not attempted
-    if (c.wrong < 1) return false;  // never wrong => not in review
-    if (c.total < 3) return true;   // conservative rule for early attempts
-    return (c.wrong >= c.correct);  // conservative tie/greater wrong
-  }
-
-  // Priority: higher means harder (history only)
-  function priorityScoreFromHistory(stats){
-    const c = statsToCounts(stats);
-    // Weighted: wrong count matters most, then low accuracy, then recent wrong
-    let score = 0;
-    score += c.wrong * 30;                 // wrong weight
-    score += Math.round((1 - c.accuracy) * 100); // accuracy penalty
-    if (c.lastIsCorrect === false) score += 15;  // recent difficulty
-    if (c.firstAttemptResult === "wrong") score += 10; // early struggle
-    score += Math.min(c.total, 10) * 2;   // small weight for more exposure
-    return score;
-  }
-
-  /* =========================
-     BUILD / LOAD REVIEW QUEUE
-     - If pending exists -> use it
-     - Else create pending using eligibility from userAnswers for unit questionIds
-  ========================= */
-  async function ensureReviewQueue({ uid, levelKey, unitKey }){
-    const existing = await getPendingMap(uid, levelKey, unitKey);
-    const existingIds = Object.keys(existing || {});
-    if (existingIds.length) return { pendingIds: existingIds, created: false };
-
-    const allIds = await getAllQuestionIdsForUnit(levelKey, unitKey);
-    if (!allIds.length){
-      await setPendingFromList(uid, levelKey, unitKey, []);
-      return { pendingIds: [], created: true };
+    if (!activity || !Array.isArray(activity.questionIds) || activity.questionIds.length === 0){
+      throw new Error(`No questionIds configured for activity ${activityKey}`);
     }
 
-    const userAnsSnap = await firebase.database().ref(`userAnswers/${uid}`).once('value');
-    const userAnsAll = userAnsSnap.val() || {};
-
-    const attempted = allIds.filter(id => !!userAnsAll[id]);
-    if (!attempted.length){
-      await setPendingFromList(uid, levelKey, unitKey, []);
-      return { pendingIds: [], created: true };
-    }
-
-    const eligible = attempted.filter(id => eligibleForReview(userAnsAll[id]));
-    await setPendingFromList(uid, levelKey, unitKey, eligible);
-
-    return { pendingIds: eligible, created: true };
-  }
-
-  /* =========================
-     SELECT ROUND (up to 15)
-     - choose hardest 15 by history priority (from userAnswers snapshot)
-     - present easier->harder
-  ========================= */
-  async function buildRoundFromPending({ uid, levelKey, unitKey }){
-    const pendingMap = await getPendingMap(uid, levelKey, unitKey);
-    const pendingIds = Object.keys(pendingMap || {});
-    if (!pendingIds.length){
-      return { status: "complete", remainingCount: 0, selected: [] };
-    }
-
-    const uaSnap = await firebase.database().ref(`userAnswers/${uid}`).once('value');
-    const uaAll = uaSnap.val() || {};
-
-    const scored = pendingIds.map(id => {
-      const stats = uaAll[id] || {};
-      const pr = priorityScoreFromHistory(stats);
-      return { id, pr, stats };
-    });
-
-    const topHardest = scored
-      .sort((a,b)=> b.pr - a.pr)
-      .slice(0, MAX_PER_ROUND);
-
-    const orderedForStudent = [...topHardest].sort((a,b)=> a.pr - b.pr);
-
-    const qSnaps = await Promise.all(
-      orderedForStudent.map(x => firebase.database().ref(`questions/${x.id}`).once("value"))
+    const questionIds = activity.questionIds;
+    const snaps = await Promise.all(
+      questionIds.map(id =>
+        firebase.database().ref(`questions/${id}`).once('value')
+      )
     );
 
-    const selectedQuestions = [];
-    qSnaps.forEach((snap, i) => {
+    const list = [];
+    snaps.forEach((snap, index) => {
       const val = snap.val();
       if (!val) return;
-
-      const id = orderedForStudent[i].id;
       const q = { ...val };
 
-      q.id = q.id || id;
+      q.id = q.id || questionIds[index];
       q.level = q.level || levelKey;
       q.unit  = q.unit  || unitKey;
-      q.fase  = q.fase || null;
+      q.fase  = q.fase  || faseKey;
 
-      if (!q.type) q.type = "mcq";
+      if (!q.type) q.type = 'mcq';
       if (!Array.isArray(q.options)) q.options = [];
 
-      q._priority = orderedForStudent[i].pr;
-      selectedQuestions.push(q);
+      list.push(q);
     });
 
-    return {
-      status: "needs_review",
-      remainingCount: pendingIds.length,
-      selected: selectedQuestions
-    };
+    if (!list.length){
+      throw new Error(`Questions not found in database for activity ${activityKey}`);
+    }
+    return list;
   }
 
   /* =========================
-     REVIEW: round counter (3 rounds break)
-  ========================= */
-  function roundKey(levelKey, unitKey, uid){
-    return `reviewRounds_${uid}_${levelKey}_${unitKey}`;
-  }
-  function getReviewRoundCounter(levelKey, unitKey, uid){
-    try{
-      const v = Number(sessionStorage.getItem(roundKey(levelKey, unitKey, uid)) || "0");
-      return Number.isFinite(v) ? v : 0;
-    }catch{ return 0; }
-  }
-  function incrementReviewRoundCounter(levelKey, unitKey, uid){
-    const cur = getReviewRoundCounter(levelKey, unitKey, uid);
-    try{ sessionStorage.setItem(roundKey(levelKey, unitKey, uid), String(cur + 1)); }catch{}
-  }
-  function resetReviewRoundCounter(levelKey, unitKey, uid){
-    try{ sessionStorage.removeItem(roundKey(levelKey, unitKey, uid)); }catch{}
-  }
-
-  /* =========================
-     Log de respostas do aluno (kept for analytics/history)
-     - This continues updating userAnswers normally.
+     Log de respostas do aluno
   ========================= */
   function logAnswer(question, isCorrect){
     if (!question || !question.id) return;
-
     ensureUserIsAuthenticated(function(uid){
       if (!uid) return;
-
       const ref = firebase.database().ref(`userAnswers/${uid}/${question.id}`);
-
       ref.transaction(prev => {
         const now = Date.now();
-
         const meta = {
           level:      question.level || levelDir,
           unit:       question.unit  || unitDir,
@@ -889,13 +569,6 @@ firebase.auth().onAuthStateChanged(function(user){
           difficulty: question.difficulty || null
         };
 
-        const prevStreak = Number(prev && prev.correctStreak ? prev.correctStreak : 0);
-        const prevLastAttempt = (prev && prev.lastAttemptResult) ? String(prev.lastAttemptResult) : null;
-
-        const nextStreak = isCorrect
-          ? (prevLastAttempt === 'correct' ? (prevStreak + 1) : 1)
-          : 0;
-
         if (!prev){
           return {
             ...meta,
@@ -903,11 +576,7 @@ firebase.auth().onAuthStateChanged(function(user){
             correctAttempts: isCorrect ? 1 : 0,
             firstAttemptResult: isCorrect ? 'correct' : 'wrong',
             lastIsCorrect: isCorrect,
-            lastAttemptResult: isCorrect ? 'correct' : 'wrong',
-            correctStreak: nextStreak,
-            lastTimestamp: now,
-            lastCorrectTimestamp: isCorrect ? now : null,
-            lastWrongTimestamp: isCorrect ? null : now
+            lastTimestamp: now
           };
         }
 
@@ -922,14 +591,36 @@ firebase.auth().onAuthStateChanged(function(user){
           correctAttempts,
           firstAttemptResult,
           lastIsCorrect: isCorrect,
-          lastAttemptResult: isCorrect ? 'correct' : 'wrong',
-          correctStreak: nextStreak,
-          lastTimestamp: now,
-          lastCorrectTimestamp: isCorrect ? now : (prev.lastCorrectTimestamp || null),
-          lastWrongTimestamp: isCorrect ? (prev.lastWrongTimestamp || null) : now
+          lastTimestamp: now
         };
       });
     });
+  }
+
+  /* =========================
+     Init (carrega título + questões)
+  ========================= */
+  async function initActivity(){
+    showLoader(true);
+    try{
+      const title = await loadTitleFromFile();
+      subtitle.textContent = title || 'Practice answering quickly and carefully!';
+
+      const loadedQuestions = await loadActivityQuestionsFromFirebase(levelDir, unitDir, fase);
+      questions = loadedQuestions;
+      idx = 0;
+      renderQuestion();
+    }catch(err){
+      console.error('[Q&A] Init failed:', err);
+      toast('Error loading questions. Please check database configuration.');
+      subtitle.textContent = 'Failed to load content';
+      promptEl.textContent =
+        `Could not load questions from database.\nLevel: ${levelDir}\nUnit: ${unitDir}\nPhase: ${fase || '-'}`;
+      mediaBox.innerHTML = '';
+      optionsEl.innerHTML = '';
+    }finally{
+      showLoader(false);
+    }
   }
 
   /* =========================
@@ -952,21 +643,27 @@ firebase.auth().onAuthStateChanged(function(user){
     return String(str ?? '').replace(/[“”"]/g,'').replace(/\s{2,}/g,' ').trim();
   }
 
+  // IMPORTANTE:
+  // - Para audio_mcq: o ícone 🔊 SEMPRE lê o PROMPT (promptAudio ou TTS do prompt),
+  //   ignorando q.tts (que pode estar configurado para a resposta).
   function buildSpokenPrompt(q){
     if (!q) return '';
 
+    // audio_mcq -> sempre falar o prompt
     if (q.type === 'audio_mcq'){
       const raw = typeof q.prompt === 'string' ? q.prompt : '';
       return stripQuotesForTTS(ttsSanitize(raw));
     }
 
+    // Demais tipos podem usar q.tts, se houver
     if (q.tts && String(q.tts).trim()) return stripQuotesForTTS(q.tts);
 
     let text = String(q.prompt || '');
-    if (q.type !== 'fillblank'){
-      return stripQuotesForTTS(ttsSanitize(text));
+    if (q.type !== 'fillblank'){ 
+      return stripQuotesForTTS(ttsSanitize(text)); 
     }
 
+    // fillblank: substitui blanks pelas respostas para o TTS
     const optMap = new Map();
     (Array.isArray(q.options) ? q.options : []).forEach(op=>{
       const o = (typeof op === 'string') ? {label:op, value:op} : {...op};
@@ -977,7 +674,6 @@ firebase.auth().onAuthStateChanged(function(user){
       const o = optMap.get(key);
       return stripQuotesForTTS((o && (o.tts || o.label || o.value)) || String(val||''));
     };
-
     text = text.replace(/\{b(\d+)\}/gi, (_m, nStr)=>{
       const n = parseInt(nStr,10);
       let ans = null;
@@ -986,7 +682,6 @@ firebase.auth().onAuthStateChanged(function(user){
       else ans = q.answer;
       return speakValue(ans);
     });
-
     const seqAnswers = (()=>{
       if (Array.isArray(q.answer)) return q.answer.slice();
       if (q.answer && typeof q.answer==='object'){
@@ -999,14 +694,12 @@ firebase.auth().onAuthStateChanged(function(user){
       }
       return [q.answer];
     })();
-
     let seqIdx = 0;
     text = text.replace(/\{blank\}|_{3,}/g, ()=>{
       const val = seqAnswers[Math.min(seqIdx, seqAnswers.length-1)];
       seqIdx++;
       return speakValue(val);
     });
-
     return stripQuotesForTTS(text);
   }
 
@@ -1029,11 +722,7 @@ firebase.auth().onAuthStateChanged(function(user){
       speechSynthesis.cancel(); speechSynthesis.speak(u);
     }catch(e){}
   }
-  function speakFriendly(pool){
-    const list = Array.isArray(pool) && pool.length ? pool : ['Great job!'];
-    const pick = list[(Math.random()*list.length)|0];
-    speak(pick);
-  }
+  function speakFriendly(pool){ const pick = pool[(Math.random()*pool.length)|0]; speak(pick); }
 
   /* =========================
      Audio da RESPOSTA (apenas audio_mcq)
@@ -1041,7 +730,9 @@ firebase.auth().onAuthStateChanged(function(user){
   function playAnswerAudio(q){
     stopAllAudio();
 
-    if (!q || !Array.isArray(q.options)) return;
+    if (!q || !Array.isArray(q.options)) {
+      return;
+    }
 
     const correctOpt = q.options.find(opt => normalize(opt.value) === normalize(q.answer));
     if (!correctOpt){
@@ -1068,316 +759,25 @@ firebase.auth().onAuthStateChanged(function(user){
   }
 
   /* =========================
-     Fallback buttons (optional tools)
-  ========================= */
-  function showFallbackButtons(){
-    btnAlt1.classList.remove('is-hidden');
-    btnAlt2.classList.remove('is-hidden');
-  }
-  function hideFallbackButtons(){
-    btnAlt1.classList.add('is-hidden');
-    btnAlt2.classList.add('is-hidden');
-    btnAlt1.onclick = null;
-    btnAlt2.onclick = null;
-  }
-
-  function wireFallbackButtons(){
-    btnAlt1.onclick = async ()=>{
-      showLoader(true);
-      try{
-        await new Promise((resolve) => ensureUserIsAuthenticated(()=>resolve()));
-        if (!currentUserId) return;
-
-        const allIds = await getAllQuestionIdsForUnit(levelDir, unitDir);
-        const uaSnap = await firebase.database().ref(`userAnswers/${currentUserId}`).once('value');
-        const uaAll = uaSnap.val() || {};
-
-        const attempted = [];
-        allIds.forEach(id=>{
-          const ua = uaAll[id];
-          if (!ua) return;
-          attempted.push({ id, lastTimestamp: Number(ua.lastTimestamp || 0) });
-        });
-
-        if (!attempted.length){
-          toast("No attempted questions found.");
-          return;
-        }
-
-        attempted.sort((a,b)=>(a.lastTimestamp||0)-(b.lastTimestamp||0));
-        const pick = attempted.slice(0, MAX_PER_ROUND).map(x=>x.id);
-
-        const snaps = await Promise.all(pick.map(id=>firebase.database().ref(`questions/${id}`).once('value')));
-        const list = [];
-        snaps.forEach((s,i)=>{
-          const v = s.val();
-          if(!v) return;
-          const q = {...v};
-          q.id = q.id || pick[i];
-          q.level = q.level || levelDir;
-          q.unit  = q.unit  || unitDir;
-          if (!q.type) q.type = "mcq";
-          if (!Array.isArray(q.options)) q.options = [];
-          list.push(q);
-        });
-
-        if (!list.length){
-          toast("Could not load questions.");
-          return;
-        }
-
-        resetReviewRoundCounter(levelDir, unitDir, currentUserId);
-        questions = list;
-        idx = 0;
-        window.activityCompleted = false;
-
-        hideFallbackButtons();
-        btnPlayPrompt.disabled = false;
-        renderQuestion();
-      }catch(err){
-        console.error("[Fallback] Review Oldest failed:", err);
-        toast("Could not load oldest review.");
-      }finally{
-        showLoader(false);
-      }
-    };
-
-    btnAlt2.onclick = async ()=>{
-      showLoader(true);
-      try{
-        const allIds = await getAllQuestionIdsForUnit(levelDir, unitDir);
-        if (!allIds.length){
-          toast("No questions found for this unit.");
-          return;
-        }
-        const pick = shuffle([...allIds]).slice(0, MAX_PER_ROUND);
-
-        const snaps = await Promise.all(pick.map(id=>firebase.database().ref(`questions/${id}`).once('value')));
-        const list = [];
-        snaps.forEach((s,i)=>{
-          const v = s.val();
-          if(!v) return;
-          const q = {...v};
-          q.id = q.id || pick[i];
-          q.level = q.level || levelDir;
-          q.unit  = q.unit  || unitDir;
-          if (!q.type) q.type = "mcq";
-          if (!Array.isArray(q.options)) q.options = [];
-          list.push(q);
-        });
-
-        if (!list.length){
-          toast("Could not load questions.");
-          return;
-        }
-
-        ensureUserIsAuthenticated(function(uid){
-          if (uid) resetReviewRoundCounter(levelDir, unitDir, uid);
-        });
-
-        questions = list;
-        idx = 0;
-        window.activityCompleted = false;
-
-        hideFallbackButtons();
-        btnPlayPrompt.disabled = false;
-        renderQuestion();
-      }catch(err){
-        console.error("[Fallback] Mixed Quiz failed:", err);
-        toast("Could not load mixed quiz.");
-      }finally{
-        showLoader(false);
-      }
-    };
-  }
-
-  /* =========================
-     REVIEW: UI states
-  ========================= */
-  function renderReviewCompleteState(){
-    stopAllAudio();
-    isReading = false;
-    answered = true;
-
-    bar.style.width = "100%";
-    optionsEl.innerHTML = "";
-    btnPlayPrompt.disabled = true;
-    btnListenAnswer.classList.add("is-hidden");
-    btnListenAnswer.disabled = true;
-    btnNext.disabled = true;
-    btnNext.classList.remove("ready");
-
-    statusPill.textContent = "Review completed";
-
-    promptEl.textContent =
-      "🎉 Great job!\n" +
-      "You completed the review.\n" +
-      "You are ready for the evaluation.";
-
-    mediaBox.innerHTML = '<div style="font-size:44px">🏅</div>';
-    confetti(30);
-    speakFriendly(["Great job!", "Awesome!", "You did it!"]);
-
-    showFallbackButtons();
-    wireFallbackButtons();
-
-    window.activityCompleted = true;
-  }
-
-  function renderTakeABreakState(){
-    stopAllAudio();
-    isReading = false;
-    answered = true;
-
-    bar.style.width = "100%";
-    optionsEl.innerHTML = "";
-    btnPlayPrompt.disabled = true;
-    btnListenAnswer.classList.add("is-hidden");
-    btnListenAnswer.disabled = true;
-    btnNext.disabled = true;
-    btnNext.classList.remove("ready");
-
-    statusPill.textContent = "Take a break";
-
-    promptEl.textContent =
-      "You worked hard!\n" +
-      "Take a break and try again later.";
-
-    mediaBox.innerHTML = `
-      <div style="display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;height:100%">
-        <div style="font-size:44px">🧠</div>
-        <button id="btnRetryLater"
-          style="border:none;background:#eef2ff;color:#0f3ea8;font-weight:900;padding:12px 16px;border-radius:14px;cursor:pointer;box-shadow:0 6px 14px rgba(0,0,0,.06);">
-          Try Again
-        </button>
-      </div>
-    `;
-
-    const b = document.getElementById("btnRetryLater");
-    if (b){
-      b.onclick = () => {
-        resetReviewRoundCounter(levelDir, unitDir, currentUserId);
-        location.reload();
-      };
-    }
-
-    hideFallbackButtons();
-    window.activityCompleted = false;
-  }
-
-  function renderContinueReviewState(remainingCount){
-    stopAllAudio();
-    isReading = false;
-    answered = true;
-
-    bar.style.width = "100%";
-    optionsEl.innerHTML = "";
-    btnPlayPrompt.disabled = true;
-    btnListenAnswer.classList.add("is-hidden");
-    btnListenAnswer.disabled = true;
-    btnNext.disabled = true;
-    btnNext.classList.remove("ready");
-
-    statusPill.textContent = "Review round completed";
-
-    const msg =
-      `Good job!\n` +
-      `You are getting better.\n\n` +
-      `Questions that still need review: ${remainingCount}`;
-
-    promptEl.textContent = msg;
-
-    mediaBox.innerHTML = `
-      <div style="display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;height:100%">
-        <div style="font-size:44px">💪</div>
-        <button id="btnContinueReview"
-          style="border:none;background:linear-gradient(90deg,#3b82f6,#22c55e);color:#fff;font-weight:900;padding:12px 16px;border-radius:14px;cursor:pointer;box-shadow:0 10px 18px rgba(34,197,94,.25);">
-          Continue Review
-        </button>
-      </div>
-    `;
-
-    hideFallbackButtons();
-
-    const b = document.getElementById("btnContinueReview");
-    if (b){
-      b.onclick = async () => {
-        showLoader(true);
-        try{
-          const plan = await buildRoundFromPending({ uid: currentUserId, levelKey: levelDir, unitKey: unitDir });
-
-          if (plan.status === "complete" || !plan.selected.length){
-            resetReviewRoundCounter(levelDir, unitDir, currentUserId);
-            renderReviewCompleteState();
-            markPhaseCompleted();
-            return;
-          }
-
-          questions = plan.selected;
-          idx = 0;
-          answered = false;
-          btnPlayPrompt.disabled = false;
-          renderQuestion();
-        }catch(err){
-          console.error("[Review] Continue failed:", err);
-          toast("Could not continue review.");
-        }finally{
-          showLoader(false);
-        }
-      };
-    }
-
-    window.activityCompleted = false;
-  }
-
-  function renderNoContentState(title, subtitleText){
-    stopAllAudio();
-    isReading = false;
-    answered = true;
-
-    bar.style.width = "0%";
-    optionsEl.innerHTML = "";
-    btnPlayPrompt.disabled = true;
-    btnListenAnswer.classList.add("is-hidden");
-    btnListenAnswer.disabled = true;
-    btnNext.disabled = true;
-    btnNext.classList.remove("ready");
-
-    statusPill.textContent = "Review";
-
-    promptEl.textContent = String(title || "No content.");
-    mediaBox.innerHTML = `<div style="padding:10px;text-align:center;color:#334155">
-      ${escapeHtml(String(subtitleText || ""))}
-    </div>`;
-
-    hideFallbackButtons();
-    window.activityCompleted = false;
-  }
-
-  /* =========================
      Render current question
   ========================= */
   function renderQuestion(){
     answered = false;
     btnNext.disabled = true; btnNext.classList.remove('ready');
-    btnNext.textContent = "Next";
     btnPlayPrompt.disabled = false;
 
+    // reset botão de ouvir RESPOSTA (audio_mcq)
     btnListenAnswer.classList.add('is-hidden');
     btnListenAnswer.disabled = true;
     btnListenAnswer.onclick = null;
 
-    hideFallbackButtons();
-
     const q = questions[idx];
-    if(!q){ finishRound(); return; }
+    if(!q){ finish(); return; }
 
+    // Progresso baseado na questão atual (1-based)
     const pct = Math.round(((idx + 1)/questions.length)*100);
     bar.style.width = pct + '%';
-
-    const roundsDone = getReviewRoundCounter(levelDir, unitDir, currentUserId);
-    const roundDisplay = Math.min(roundsDone + 1, MAX_ROUNDS);
-    statusPill.textContent = `Round ${roundDisplay} • Question ${idx+1}/${questions.length}`;
+    statusPill.textContent = `Question ${idx+1}/${questions.length}`;
 
     const rawPrompt = q.prompt || '—';
     promptEl.innerHTML = renderPromptWithBlanks(rawPrompt);
@@ -1388,8 +788,10 @@ firebase.auth().onAuthStateChanged(function(user){
       promptEl.appendChild(span);
     }
 
+    // Ícone de áudio do PROMPT: sempre lê o prompt (via promptAudio ou TTS)
     btnPlayPrompt.onclick = () => { if (!isReading) playPrompt(q); };
 
+    // Se for audio_mcq, mostrar botão LISTEN que lê a RESPOSTA correta
     if (q.type === 'audio_mcq'){
       btnListenAnswer.classList.remove('is-hidden');
       btnListenAnswer.disabled = false;
@@ -1423,7 +825,7 @@ firebase.auth().onAuthStateChanged(function(user){
     btnNext.onclick = () => {
       (ensureAudio()? sfxTick() : sNext.play().catch(()=>{}));
       idx++;
-      if (idx >= questions.length) { finishRound(); return; }
+      if (idx >= questions.length) { finish(); return; }
       renderQuestion();
     };
   }
@@ -1476,33 +878,7 @@ firebase.auth().onAuthStateChanged(function(user){
   }
 
   /* =========================
-     REVIEW RULE: no retries
-     - After first decision:
-         correct -> remove from pending, enable Next
-         wrong   -> keep in pending, enable Next
-  ========================= */
-  async function applyReviewResult(q, isCorrect){
-    try{
-      if (!currentUserId || !q || !q.id) return;
-      if (isCorrect){
-        await removeFromPending(currentUserId, levelDir, unitDir, q.id);
-      }
-    }catch(err){
-      console.warn("[Review] Could not update pending:", err);
-    }
-  }
-
-  function lockAndEnableNext(){
-    answered = true;
-    btnNext.disabled = false;
-    btnNext.classList.add('ready');
-    Array.from(optionsEl.querySelectorAll('.option')).forEach(el => {
-      try{ el.disabled = true; }catch(e){}
-    });
-  }
-
-  /* =========================
-     ORDER type (no retries)
+     Order type
   ========================= */
   function renderOrderQuestion(q){
     optionsEl.classList.add('is-order');
@@ -1510,7 +886,6 @@ firebase.auth().onAuthStateChanged(function(user){
     const words = (q.options || []).map(w => String(w));
     const answerSeq = Array.isArray(q.answer) ? q.answer.map(String) : [];
     let built = [];
-    let decided = false; // lock after first full attempt
 
     const wrap = document.createElement('div'); wrap.className = 'build-wrap';
     const tray = document.createElement('div'); tray.className = 'build-tray'; tray.id = 'buildTray';
@@ -1528,9 +903,8 @@ firebase.auth().onAuthStateChanged(function(user){
     words.forEach(w=>{
       const b = document.createElement('button');
       b.type='button'; b.className='option word-only';
-      b.innerHTML = `<div class="label">${escapeHtml(w)}</div>`;
+      b.innerHTML = `<div class="label">${w}</div>`;
       b.onclick = ()=>{
-        if (decided) return;
         (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
         if (built.length >= answerSeq.length) return;
         built.push(w);
@@ -1540,16 +914,8 @@ firebase.auth().onAuthStateChanged(function(user){
       grid.appendChild(b);
     });
 
-    undoBtn.onclick = ()=>{
-      if (decided) return;
-      built.pop(); drawTray();
-      btnNext.disabled = true; btnNext.classList.remove('ready');
-    };
-    clearBtn.onclick = ()=>{
-      if (decided) return;
-      built = []; drawTray();
-      btnNext.disabled = true; btnNext.classList.remove('ready');
-    };
+    undoBtn.onclick = ()=>{ built.pop(); drawTray(); btnNext.disabled = true; btnNext.classList.remove('ready'); };
+    clearBtn.onclick = ()=>{ built = []; drawTray(); btnNext.disabled = true; btnNext.classList.remove('ready'); };
 
     function drawTray(){
       tray.innerHTML = '';
@@ -1560,18 +926,10 @@ firebase.auth().onAuthStateChanged(function(user){
         tray.appendChild(chip);
       });
     }
-
-    async function checkBuilt(){
+    function checkBuilt(){
       const sameLen = built.length === answerSeq.length;
-      if (!sameLen || decided) return;
-
-      decided = true;
-
+      if (!sameLen) return;
       const ok = built.every((w,i)=> normalize(w) === normalize(answerSeq[i]));
-
-      // Log attempt (kept)
-      logAnswer(q, ok);
-
       if (ok){
         try{
           mediaBox.innerHTML = '';
@@ -1583,33 +941,27 @@ firebase.auth().onAuthStateChanged(function(user){
         (ensureAudio()? sfxCorrect() : sCorrect.play().catch(()=>{}));
         speakFriendly(['Great!','Awesome!']);
         liveEl.textContent = 'Correct order';
-
-        await applyReviewResult(q, true);
+        btnNext.disabled = false; btnNext.classList.add('ready');
+        answered = true;
+        Array.from(optionsEl.querySelectorAll('.option')).forEach(el=> el.disabled = true);
+        undoBtn.disabled = true; clearBtn.disabled = true;
+        logAnswer(q, true);
       } else {
         (ensureAudio()? sfxWrong() : sWrong.play().catch(()=>{}));
-        speakFriendly(['Try again next time!']);
-        liveEl.textContent = 'Incorrect order';
-        await applyReviewResult(q, false);
+        speakFriendly(['Try again!']);
+        liveEl.textContent = 'Incorrect order, try again';
+        logAnswer(q, false);
       }
-
-      // lock UI & enable next (no retries)
-      Array.from(optionsEl.querySelectorAll('.option')).forEach(el => { try{ el.disabled = true; }catch(e){} });
-      undoBtn.disabled = true; clearBtn.disabled = true;
-
-      btnNext.disabled = false; btnNext.classList.add('ready');
-      answered = true;
     }
   }
 
   /* =========================
-     MATCH type (no retries)
-     - first wrong attempt ends (keeps in pending)
-     - only if completes all pairs correctly without a wrong attempt -> correct
+     Match type
   ========================= */
   function renderMatchQuestion(q){
     const sourcePairs = Array.isArray(q.pairs) ? q.pairs : [];
 
-    const normItem = (_side, it) => {
+    const normItem = (side, it) => {
       if (typeof it === 'string') return { label: it, value: it };
       const o = {...it};
       if (!o.value) o.value = o.label || o.image || String(Math.random());
@@ -1631,14 +983,6 @@ firebase.auth().onAuthStateChanged(function(user){
     let selectedLeftBtn = null;
     let selectedLeftVal = null;
     let matched = new Set();
-    let decided = false;
-    let anyWrong = false;
-
-    const lockAll = ()=>{
-      Array.from(optionsEl.querySelectorAll('.option')).forEach(el => { try{ el.disabled = true; }catch(e){} });
-      answered = true;
-      btnNext.disabled = false; btnNext.classList.add('ready');
-    };
 
     const makeLeftBtn = (item) => {
       const b = document.createElement('button');
@@ -1650,7 +994,6 @@ firebase.auth().onAuthStateChanged(function(user){
       b.appendChild(label);
 
       b.onclick = () => {
-        if (decided) return;
         if (b.classList.contains('matched')) return;
         (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
         Array.from(colL.children).forEach(el => el.classList.remove('selected'));
@@ -1683,11 +1026,9 @@ firebase.auth().onAuthStateChanged(function(user){
         b.classList.add('img-only'); b.appendChild(thumb);
       }
 
-      b.onclick = async ()=>{
-        if (decided) return;
+      b.onclick = ()=>{
         if (b.classList.contains('matched')) return;
-        if (!selectedLeftBtn){ toast('Choose a word first.'); return; }
-
+        if (!selectedLeftBtn){ toast('Choose a word first 🙂'); return; }
         const leftVal  = selectedLeftVal;
         const rightVal = item.value;
         const ok = normalize(leftVal) === normalize(rightVal);
@@ -1706,47 +1047,27 @@ firebase.auth().onAuthStateChanged(function(user){
           selectedLeftVal = null;
 
           if (matched.size === sourcePairs.length){
-            decided = true;
-
-            const finalCorrect = !anyWrong;
-            logAnswer(q, finalCorrect);
-
-            if (finalCorrect){
-              try{
-                mediaBox.innerHTML = '';
-                const gif = new Image(); gif.src = './hannah_feliz.gif'; gif.alt = 'Hannah celebrating';
-                gif.setAttribute('draggable','false'); gif.style.pointerEvents = 'none';
-                mediaBox.appendChild(gif);
-              }catch(e){}
-              confetti(18);
-              (ensureAudio()? sfxCorrect() : sCorrect.play().catch(()=>{}));
-              speakFriendly(['Great!','Awesome!']);
-              liveEl.textContent = 'All pairs matched';
-
-              await applyReviewResult(q, true);
-            } else {
-              (ensureAudio()? sfxWrong() : sWrong.play().catch(()=>{}));
-              speakFriendly(['Try again next time!']);
-              liveEl.textContent = 'Match had an error';
-              await applyReviewResult(q, false);
-            }
-
-            lockAll();
+            try{
+              mediaBox.innerHTML = '';
+              const gif = new Image(); gif.src = './hannah_feliz.gif'; gif.alt = 'Hannah celebrating';
+              gif.setAttribute('draggable','false'); gif.style.pointerEvents = 'none';
+              mediaBox.appendChild(gif);
+            }catch(e){}
+            confetti(18);
+            (ensureAudio()? sfxCorrect() : sCorrect.play().catch(()=>{}));
+            speakFriendly(['Great!','Awesome!']);
+            liveEl.textContent = 'All pairs matched';
+            answered = true;
+            btnNext.disabled = false; btnNext.classList.add('ready');
+            Array.from(optionsEl.querySelectorAll('.option')).forEach(el => el.disabled = true);
+            logAnswer(q, true);
           }
         } else {
-          anyWrong = true;
-          decided = true;
-
           (ensureAudio()? sfxWrong() : sWrong.play().catch(()=>{}));
-          speakFriendly(['Try again next time!']);
+          speakFriendly(['Try again!']);
           b.classList.add('err');
           setTimeout(()=>b.classList.remove('err'), 250);
-          liveEl.textContent = 'Incorrect match';
-
           logAnswer(q, false);
-          await applyReviewResult(q, false);
-
-          lockAll();
         }
       };
       return b;
@@ -1758,20 +1079,12 @@ firebase.auth().onAuthStateChanged(function(user){
 
   /* =========================
      Selection flow for MCQ
-     - NO retries in review
   ========================= */
-  function disableOthers(keepBtn){
-    Array.from(optionsEl.children).forEach(el=>{
-      if(el!==keepBtn){ el.disabled = true; el.style.opacity = .5; }
-    });
-  }
-
-  async function handleAnswer(q, opt, btn){
+  function handleAnswer(q, opt, btn){
     if(answered) return;
-
     const isCorrect = normalize(opt.value) === normalize(q.answer);
 
-    // Log attempt (kept)
+    // registra tentativa (primeira, segunda, etc.)
     logAnswer(q, isCorrect);
 
     if(isCorrect){
@@ -1786,22 +1099,20 @@ firebase.auth().onAuthStateChanged(function(user){
         mediaBox.appendChild(gif);
       }catch(e){}
       liveEl.textContent = 'Correct answer';
-
+      answered = true;
+      btnNext.disabled = false; btnNext.classList.add('ready');
       disableOthers(btn);
-
-      await applyReviewResult(q, true);
-      lockAndEnableNext();
     } else {
       btn.classList.add('err');
       (ensureAudio()? sfxWrong() : sWrong.play().catch(()=>{}));
-      speakFriendly(['Not this one!','Almost!']);
-      liveEl.textContent = 'Incorrect answer';
-
-      disableOthers(btn);
-
-      await applyReviewResult(q, false);
-      lockAndEnableNext();
+      speakFriendly(['Hmm… try again!','Not this one!','Almost!']);
+      liveEl.textContent = 'Incorrect answer, try again';
     }
+  }
+  function disableOthers(keepBtn){
+    Array.from(optionsEl.children).forEach(el=>{
+      if(el!==keepBtn){ el.disabled = true; el.style.opacity = .5; }
+    });
   }
 
   function playPrompt(q){
@@ -1828,7 +1139,7 @@ firebase.auth().onAuthStateChanged(function(user){
 
     const finish = () => {
       isReading = false;
-      // We do NOT re-enable all options after a selection; the selection itself decides and locks.
+      if (!answered) allBtns.forEach(el => el.disabled = false);
       handleAnswer(q, o, btn);
     };
 
@@ -1866,115 +1177,94 @@ firebase.auth().onAuthStateChanged(function(user){
   }
 
   /* =========================
-     Finish of a ROUND
-     - Round ends after answering current batch (<=15)
-     - Then we check pending:
-        if empty => complete + unlock
-        else => increment round counter and show Continue (or Take a break)
+     Finish + Back
   ========================= */
-  async function finishRound(){
+  function onActivityComplete(){
+    if(window.activityCompleted) return;
+    window.activityCompleted = true;
+    (ensureAudio()? sfxWin() : sCorrect.play().catch(()=>{}));
+    markPhaseCompleted();
+  }
+  function finish(){
     try { stopAllAudio(); } catch(e){} try { speechSynthesis.cancel(); } catch(e){}
     isReading = false;
 
     bar.style.width = '100%';
+    promptEl.textContent = "🎉 Congratulations! You've completed all the questions!";
+    mediaBox.innerHTML = '<div style="font-size:44px">🏅</div>';
     optionsEl.innerHTML = '';
+    btnNext.disabled = true; btnNext.classList.remove('ready');
+    statusPill.textContent = `Completed • ${questions.length}/${questions.length}`;
+    confetti(30);
+    speakFriendly(['Great! You finished!','Amazing work!']);
 
+    // Desabilita o ícone de áudio do prompt e esconde o LISTEN de resposta
     btnPlayPrompt.disabled = true;
     btnListenAnswer.classList.add('is-hidden');
     btnListenAnswer.disabled = true;
 
-    showLoader(true);
-    try{
-      await new Promise((resolve)=>ensureUserIsAuthenticated(()=>resolve()));
-      if (!currentUserId){
-        renderNoContentState("User not authenticated.", "Please login again.");
-        return;
-      }
-
-      const pendingMap = await getPendingMap(currentUserId, levelDir, unitDir);
-      const remainingCount = Object.keys(pendingMap || {}).length;
-
-      if (remainingCount === 0){
-        resetReviewRoundCounter(levelDir, unitDir, currentUserId);
-        renderReviewCompleteState();
-        markPhaseCompleted();
-        return;
-      }
-
-      incrementReviewRoundCounter(levelDir, unitDir, currentUserId);
-      const rounds = getReviewRoundCounter(levelDir, unitDir, currentUserId);
-
-      if (rounds >= MAX_ROUNDS){
-        renderTakeABreakState();
-        return;
-      }
-
-      renderContinueReviewState(remainingCount);
-
-    }catch(err){
-      console.error("[Review] Finish failed:", err);
-      renderNoContentState("Could not load review data.", "Please try again.");
-    }finally{
-      showLoader(false);
-    }
+    onActivityComplete();
   }
 
-  /* =========================
-     Init review
-     - ensure queue exists (build from history if empty)
-     - then build current round from pending
-  ========================= */
-  async function initReview(){
-    showLoader(true);
-    try{
-      await new Promise((resolve)=>ensureUserIsAuthenticated(()=>resolve()));
-      if (!currentUserId){
-        renderNoContentState("User not authenticated.", "Please login again.");
-        return;
-      }
-
-      const title = await loadTitleFromFile();
-      subtitle.textContent = title ? `${title} — Review` : "Review mode";
-
-      const rounds = getReviewRoundCounter(levelDir, unitDir, currentUserId);
-      if (rounds >= MAX_ROUNDS){
-        renderTakeABreakState();
-        return;
-      }
-
-      await ensureReviewQueue({ uid: currentUserId, levelKey: levelDir, unitKey: unitDir });
-
-      const plan = await buildRoundFromPending({ uid: currentUserId, levelKey: levelDir, unitKey: unitDir });
-      if (plan.status === "complete" || !plan.selected.length){
-        resetReviewRoundCounter(levelDir, unitDir, currentUserId);
-        renderReviewCompleteState();
-        markPhaseCompleted();
-        return;
-      }
-
-      questions = plan.selected;
-      idx = 0;
-      hideFallbackButtons();
-      renderQuestion();
-
-    }catch(err){
-      console.error("[Review] Init failed:", err);
-      renderNoContentState("Could not load review.", "Please try again.");
-    }finally{
-      showLoader(false);
+  function confetti(n=16){
+    if(!confettiEl) return;
+    for(let i=0;i<n;i++){
+      const p=document.createElement('div'); p.className='piece';
+      const left = Math.random()*100;
+      const dur = 1200 + Math.random()*1400;
+      const delay = Math.random()*100;
+      p.style.left = left+'%';
+      p.style.setProperty('--h', Math.floor(Math.random()*360));
+      p.style.animationDuration = dur+'ms';
+      p.style.animationDelay = delay+'ms';
+      confettiEl.appendChild(p);
+      setTimeout(()=>p.remove(), dur+delay+200);
     }
   }
+  function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
+  function normalize(v){ return String(v ?? '').trim().toLowerCase(); }
+  function absPath(p){ if(!p) return p; if(p.startsWith('http')) return p; if(p.startsWith('/')) return p; return `${BASE}/${p}`.replace(/\/+/g,'/'); }
+  function showLoader(v){ if (loadingEl) loadingEl.style.display = v ? 'flex' : 'none'; }
 
-  /* =========================
-     Boot
-  ========================= */
+  window.activityCompleted = false;
   window.addEventListener('load', function(){
     window.activityCompleted = false;
-    initReview();
+    initActivity();
   });
+
+  /* Back button (confirmations) */
+  window.goBack = async function goBack(){
+    const { level, unit, fase } = getParams();
+
+    if(!window.activityCompleted){
+      const leave = confirm("You haven't completed this phase yet. Do you want to go back?");
+      if(leave){ window.history.back(); }
+      return;
+    }
+    if(!level || !unit || !fase){ window.history.back(); return; }
+
+    firebase.auth().onAuthStateChanged(async (user)=>{
+      if(!user){ window.history.back(); return; }
+      const nextPhase = `fase${parseInt((fase||'').replace(/\D/g,''),10)+1}`;
+      try{
+        const snapshot = await firebase.database()
+          .ref(`usuarios/${user.uid}/progresso/${level}/${unit}/${nextPhase}`)
+          .once("value");
+        if(snapshot.val() === true){
+          window.history.back();
+        } else {
+          const confirmExit = confirm("The next phase is locked. Do you still want to go back?");
+          if(confirmExit){ window.history.back(); }
+        }
+      }catch(err){
+        console.error("[Back] Firebase error:", err);
+        const confirmExit = confirm("Could not verify progress. Do you want to go back anyway?");
+        if(confirmExit){ window.history.back(); }
+      }
+    });
+  };
 
 })();
 </script>
-
 </body>
 </html>
