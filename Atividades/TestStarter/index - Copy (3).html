@@ -291,13 +291,6 @@ firebase.auth().onAuthStateChanged(function(user){
   const MAX_TOTAL_TEST = 40;
   const MIN_TOTAL_TEST = 10; // informational; do not fill artificially
 
-  /* =========================
-     audio_mcq behavior (UI/runtime)
-     - Same grading rules as mcq
-     - Prompt audio (q.promptAudio) is primary. If missing/unplayable, TTS fallback.
-     - Optional auto-play on load: q.autoplayPrompt (default true for audio_mcq)
-  ========================= */
-
   /* ======= Estado do teste ======= */
   let userAnswers = [];    // por índice da questão
   let correctAnswers = []; // {type, value}
@@ -803,6 +796,7 @@ firebase.auth().onAuthStateChanged(function(user){
     if (!allUniqueIds.length) return [];
 
     // Fetch all questions once (needed for difficulty + final build)
+    // NOTE: This is heavy but predictable and matches your robust behavior.
     const snaps = await Promise.all(
       allUniqueIds.map(function(id){
         return firebase.database().ref(`questions/${id}`).once('value');
@@ -962,7 +956,7 @@ firebase.auth().onAuthStateChanged(function(user){
         });
         return {type:'match', value: canon.sort().map(String) };
       } else {
-        // choice/fillblank/audio_mcq robusto (string | array | objeto)
+        // choice/fillblank robusto (string | array | objeto)
         if (Array.isArray(q.answer)) {
           return { type:'choice', value: q.answer.map(String) };
         } else if (q.answer && typeof q.answer === 'object') {
@@ -1024,11 +1018,8 @@ firebase.auth().onAuthStateChanged(function(user){
   }
   function buildSpokenPrompt(q){
     if (q.tts && String(q.tts).trim()) return stripQuotesForTTS(q.tts);
-
-    // audio_mcq: if promptAudio exists, we still keep a spoken fallback text.
     let text = String(q.prompt || '');
     if (q.type !== 'fillblank'){ return stripQuotesForTTS(ttsSanitize(text)); }
-
     const optMap = new Map();
     (Array.isArray(q.options) ? q.options : []).forEach(op=>{
       const o = (typeof op === 'string') ? {label:op, value:op} : Object.assign({}, op);
@@ -1039,7 +1030,6 @@ firebase.auth().onAuthStateChanged(function(user){
       const o = optMap.get(key);
       return stripQuotesForTTS((o && (o.tts || o.label || o.value)) || String(val||''));
     };
-
     text = text.replace(/\{b(\d+)\}/gi, (_m, nStr)=>{
       const n = parseInt(nStr,10);
       let ans = null;
@@ -1048,7 +1038,6 @@ firebase.auth().onAuthStateChanged(function(user){
       else ans = q.answer;
       return speakValue(ans);
     });
-
     const seqAnswers = (()=>{
       if (Array.isArray(q.answer)) return q.answer.slice();
       if (q.answer && typeof q.answer==='object'){
@@ -1061,14 +1050,12 @@ firebase.auth().onAuthStateChanged(function(user){
       }
       return [q.answer];
     })();
-
     let seqIdx = 0;
     text = text.replace(/\{blank\}|_{3,}/g, ()=>{
       const val = seqAnswers[Math.min(seqIdx, seqAnswers.length-1)];
       seqIdx++;
       return speakValue(val);
     });
-
     return stripQuotesForTTS(text);
   }
 
@@ -1109,12 +1096,7 @@ firebase.auth().onAuthStateChanged(function(user){
     bar.style.width = pct + '%';
     statusPill.textContent = `Question ${idx+1}/${questions.length}`;
 
-    // Default prompt behavior
-    let rawPrompt = q.prompt || '—';
-    if (q.type === 'audio_mcq' && (!rawPrompt || rawPrompt === '—')) {
-      rawPrompt = 'Listen. Choose.';
-    }
-
+    const rawPrompt = q.prompt || '—';
     promptEl.innerHTML = renderPromptWithBlanks(rawPrompt);
     if (q.type === 'fillblank' && !/\{blank\}|\{b\d+\}|_{3,}/i.test(rawPrompt)) {
       const span = document.createElement('span');
@@ -1154,23 +1136,10 @@ firebase.auth().onAuthStateChanged(function(user){
       if (idx >= questions.length) { finish(); return; }
       renderQuestion();
     };
-
-    // audio_mcq: autoplay prompt by default (can be disabled per question)
-    if (q.type === 'audio_mcq') {
-      const auto = (q.autoplayPrompt !== false);
-      if (auto) {
-        setTimeout(() => {
-          // don't autoplay if user already answered or moved
-          if (questions[idx] === q && !answered && !isReading) {
-            playPrompt(q);
-          }
-        }, 250);
-      }
-    }
   }
 
   /* =========================
-     Multiple-choice / Fillblank / audio_mcq
+     Multiple-choice / Fillblank
      - Single blank: 1 click = lock
      - Multi blank: collect selections until all blanks are filled, then grade once.
   ========================= */
@@ -1548,7 +1517,6 @@ firebase.auth().onAuthStateChanged(function(user){
   function playPrompt(q){
     stopAllAudio();
     const spoken = buildSpokenPrompt(q);
-
     if (q.promptAudio){
       const a = new Audio(absPathQ(q.promptAudio));
       currentAudio = a;
@@ -1701,7 +1669,6 @@ firebase.auth().onAuthStateChanged(function(user){
       return arraysEqual(got, expected);
     }
 
-    // mcq + audio_mcq (same grading)
     const expected = expArr[0] ?? '';
     return normalize(ans) === normalize(expected);
   }
