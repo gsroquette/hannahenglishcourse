@@ -269,27 +269,8 @@ firebase.auth().onAuthStateChanged(function(user){
   const TEST_DB_KEY = "test"; // NÃO alterar a chave
   const TEST_DISPLAY_NAME = "Grammar Test";
 
-  /* =========================
-     NEW OFFICIAL RULES (Grammar Test)
-     - Priority 1: Distribution by phase
-       * default: 2 questions per phase
-       * no repeats within test
-     - Global constraints:
-       * min absolute: 10 (but showing less is allowed; never invent/fill)
-       * max absolute: 40
-     - Special for very large units:
-       * if number of phases > 40:
-         - pick 40 random phases, 1 question per phase (max diversity)
-         - total = up to 40
-     - Difficulty is secondary:
-       * target ratio: 50% easy, 40% medium, 10% hard
-       * apply after initial selection via swaps within same phase
-       * never exceed phase limit (2 per phase or 1 per phase in >40 mode)
-       * fallback allowed if not enough difficulty
-  ========================= */
-
-  const MAX_TOTAL_TEST = 40;
-  const MIN_TOTAL_TEST = 10; // informational; do not fill artificially
+  // Mesmo tamanho do Mixed Review (Hannah Questions — Review)
+  const MAX_PER_TEST = 15;
 
   /* ======= Estado do teste ======= */
   let userAnswers = [];    // por índice da questão
@@ -334,7 +315,7 @@ firebase.auth().onAuthStateChanged(function(user){
     const a = Array.isArray(arr) ? arr : [];
     for(let i=a.length-1;i>0;i--){
       const j = Math.floor(Math.random()*(i+1));
-      const tmp = a[i]; a[i]=a[j]; a[j]=tmp;
+      [a[i],a[j]]=[a[j],a[i]];
     }
     return a;
   }
@@ -456,43 +437,15 @@ firebase.auth().onAuthStateChanged(function(user){
   restartBtn.onclick = () => resetTest();
 
   /* ============================================================
-     FIREBASE FETCH (UPDATED TO NEW OFFICIAL RULES)
-     Source:
-       - activities: {LevelX_UnitY_FaseN}.questionIds
-       - questions/{id}: the question data
-     Algorithm:
-       1) Build phase -> questionIds map for the unit
-       2) Initial selection by phase:
-          - if phases > 40: pick 40 random phases, 1 per phase
-          - else: up to 2 per phase
-          - never repeat question id globally
-          - do not invent/fill if less than 10 total available
-          - cap at 40
-       3) Difficulty balancing after selection (secondary):
-          target ratio: 50% easy, 40% medium, 10% hard
-          swap within same phase without exceeding phase limit
-          fallback if not enough questions of a difficulty
+     FIREBASE FETCH (EXATAMENTE A MESMA LÓGICA DO REVIEW)
+     - Puxa questionIds de activities do CURRENT UNIT (todas as fases)
+     - Carrega /questions/{id}
+     - Bucket por difficulty (easy/medium/hard)
+     - Seleção proporcional 6/5/4 com fallback
+     - Sem duplicatas; se tiver menos que 15 disponíveis, usa menos
   ============================================================ */
 
-  function normalizeDifficulty(d){
-    const raw = String(d || '').trim().toLowerCase();
-    if (raw === 'easy' || raw === 'e') return 'easy';
-    if (raw === 'medium' || raw === 'med' || raw === 'm') return 'medium';
-    if (raw === 'hard' || raw === 'difficult' || raw === 'h') return 'hard';
-    return 'easy';
-  }
-
-  // Assets das QUESTÕES: mantém comportamento (não prefixa DataTest)
-  function absPathQ(p){
-    const s = String(p ?? '').trim();
-    if (!s) return s;
-    if (/^https?:\/\//i.test(s)) return s;
-    if (s.startsWith('/')) return s;
-    if (s.startsWith('../')) return s;
-    return s;
-  }
-
-  async function getQuestionIdsByPhaseForUnit(levelKey, unitKey){
+  async function getAllQuestionIdsForUnit(levelKey, unitKey){
     const prefix = `${levelKey}_${unitKey}_Fase`;
     const snap = await firebase.database()
       .ref("activities")
@@ -502,373 +455,167 @@ firebase.auth().onAuthStateChanged(function(user){
       .once("value");
 
     const obj = snap.val() || {};
-    const phaseKeys = Object.keys(obj).sort(function(a,b){
-      // natural-ish sort by last number
-      const na = parseInt(String(a).replace(/\D/g,''),10) || 0;
-      const nb = parseInt(String(b).replace(/\D/g,''),10) || 0;
-      return na-nb;
-    });
+    const set = new Set();
 
-    const phaseToIds = {};
-    phaseKeys.forEach(function(k){
+    Object.keys(obj).forEach(k => {
       const a = obj[k];
-      const ids = (a && Array.isArray(a.questionIds)) ? a.questionIds.filter(Boolean) : [];
-      phaseToIds[k] = ids.slice();
+      if (!a || !Array.isArray(a.questionIds)) return;
+      a.questionIds.forEach(id => { if (id) set.add(id); });
     });
 
-    return { phaseKeys, phaseToIds };
+    return Array.from(set);
   }
 
-  function pickDistinctRandomFromArray(arr, n, excludeSet){
+  function normalizeDifficulty(d){
+    const raw = String(d || '').trim().toLowerCase();
+    if (raw === 'easy' || raw === 'e') return 'easy';
+    if (raw === 'medium' || raw === 'med' || raw === 'm') return 'medium';
+    if (raw === 'hard' || raw === 'difficult' || raw === 'h') return 'hard';
+    return 'easy';
+  }
+
+  function takeN(arr, n){
     const out = [];
-    const pool = shuffle((arr || []).slice());
-    for (let i=0; i<pool.length && out.length<n; i++){
-      const id = pool[i];
-      if (!id) continue;
-      if (excludeSet && excludeSet.has(id)) continue;
-      out.push(id);
-      if (excludeSet) excludeSet.add(id);
-    }
+    const k = Math.max(0, Math.min(n, arr.length));
+    for (let i=0; i<k; i++) out.push(arr.shift());
     return out;
   }
 
-  function buildInitialSelectionByPhase(phaseKeys, phaseToIds){
-    const selected = [];
-    const selectedSet = new Set();
-    const modePhasesOver40 = phaseKeys.length > 40;
+  function buildProportionalSelection({ easyIds, mediumIds, hardIds, maxTotal }){
+    const targetEasy = 6;
+    const targetMed  = 5;
+    const targetHard = 4;
 
-    if (modePhasesOver40){
-      const chosenPhases = shuffle(phaseKeys.slice()).slice(0, 40);
-      chosenPhases.forEach(function(phaseKey){
-        const ids = phaseToIds[phaseKey] || [];
-        const picked = pickDistinctRandomFromArray(ids, 1, selectedSet);
-        if (picked.length) selected.push(picked[0]);
-      });
-      return { selectedIds: selected.slice(0, MAX_TOTAL_TEST), phaseLimit: 1, modePhasesOver40: true, chosenPhases };
+    const picked = [];
+
+    // Step 1: pick from target buckets
+    const pHard = takeN(hardIds, Math.min(targetHard, hardIds.length));
+    picked.push(...pHard);
+    let hardDef = targetHard - pHard.length;
+
+    const pMed  = takeN(mediumIds, Math.min(targetMed, mediumIds.length));
+    picked.push(...pMed);
+    let medDef = targetMed - pMed.length;
+
+    const pEasy = takeN(easyIds, Math.min(targetEasy, easyIds.length));
+    picked.push(...pEasy);
+    let easyDef = targetEasy - pEasy.length;
+
+    // Step 2: fill deficits by fallback order
+    // hard deficit -> medium -> easy
+    if (hardDef > 0){
+      const a = takeN(mediumIds, Math.min(hardDef, mediumIds.length));
+      picked.push(...a);
+      hardDef -= a.length;
+    }
+    if (hardDef > 0){
+      const a = takeN(easyIds, Math.min(hardDef, easyIds.length));
+      picked.push(...a);
+      hardDef -= a.length;
     }
 
-    // Normal mode: up to 2 per phase
-    phaseKeys.forEach(function(phaseKey){
-      const ids = phaseToIds[phaseKey] || [];
-      const picked = pickDistinctRandomFromArray(ids, 2, selectedSet);
-      for (let i=0;i<picked.length;i++) selected.push(picked[i]);
-    });
-
-    // Cap at 40 (should only happen if huge number of phases, but rule says cap)
-    if (selected.length > MAX_TOTAL_TEST){
-      // If exceeded, prioritize diversity by applying the >40 strategy
-      const chosenPhases = shuffle(phaseKeys.slice()).slice(0, 40);
-      const reset = [];
-      const resetSet = new Set();
-      chosenPhases.forEach(function(phaseKey){
-        const ids = phaseToIds[phaseKey] || [];
-        const picked = pickDistinctRandomFromArray(ids, 1, resetSet);
-        if (picked.length) reset.push(picked[0]);
-      });
-      return { selectedIds: reset.slice(0, MAX_TOTAL_TEST), phaseLimit: 1, modePhasesOver40: true, chosenPhases };
+    // medium deficit -> easy
+    if (medDef > 0){
+      const a = takeN(easyIds, Math.min(medDef, easyIds.length));
+      picked.push(...a);
+      medDef -= a.length;
+    }
+    // if still medium deficit (no easy), fill with hard (as "what exists")
+    if (medDef > 0){
+      const a = takeN(hardIds, Math.min(medDef, hardIds.length));
+      picked.push(...a);
+      medDef -= a.length;
     }
 
-    return { selectedIds: selected, phaseLimit: 2, modePhasesOver40: false, chosenPhases: phaseKeys.slice() };
+    // easy deficit -> medium -> hard
+    if (easyDef > 0){
+      const a = takeN(mediumIds, Math.min(easyDef, mediumIds.length));
+      picked.push(...a);
+      easyDef -= a.length;
+    }
+    if (easyDef > 0){
+      const a = takeN(hardIds, Math.min(easyDef, hardIds.length));
+      picked.push(...a);
+      easyDef -= a.length;
+    }
+
+    // Step 3: top up with whatever remains (random) up to maxTotal
+    const remainingPool = [...easyIds, ...mediumIds, ...hardIds];
+    shuffle(remainingPool);
+
+    const need = Math.max(0, maxTotal - picked.length);
+    if (need > 0){
+      picked.push(...takeN(remainingPool, Math.min(need, remainingPool.length)));
+    }
+
+    return picked.slice(0, maxTotal);
   }
 
-  function computeDifficultyTargets(total){
-    // Rounding rules:
-    // Easy -> ceil, Hard -> floor, Medium -> remainder
-    const easy = Math.ceil(total * 0.50);
-    const hard = Math.floor(total * 0.10);
-    const medium = Math.max(0, total - easy - hard);
-    return { easy, medium, hard };
-  }
-
-  function countDifficulties(selectedIds, questionById){
-    const c = { easy:0, medium:0, hard:0 };
-    for (let i=0;i<selectedIds.length;i++){
-      const id = selectedIds[i];
-      const q = questionById[id];
-      const d = normalizeDifficulty(q && q.difficulty);
-      if (d === 'hard') c.hard++;
-      else if (d === 'medium') c.medium++;
-      else c.easy++;
-    }
-    return c;
-  }
-
-  function buildSelectedByPhase(selectedIds, phaseOfId){
-    const map = {};
-    for (let i=0;i<selectedIds.length;i++){
-      const id = selectedIds[i];
-      const phase = phaseOfId[id] || '_unknown';
-      if (!map[phase]) map[phase] = [];
-      map[phase].push(id);
-    }
-    return map;
-  }
-
-  function buildAvailableByPhaseDifficulty(allIdsByPhase, questionById){
-    const map = {};
-    const phases = Object.keys(allIdsByPhase);
-    for (let i=0;i<phases.length;i++){
-      const phase = phases[i];
-      const ids = allIdsByPhase[phase] || [];
-      if (!map[phase]) map[phase] = { easy:[], medium:[], hard:[] };
-      for (let j=0;j<ids.length;j++){
-        const id = ids[j];
-        const q = questionById[id];
-        const d = normalizeDifficulty(q && q.difficulty);
-        if (d === 'hard') map[phase].hard.push(id);
-        else if (d === 'medium') map[phase].medium.push(id);
-        else map[phase].easy.push(id);
-      }
-      shuffle(map[phase].easy);
-      shuffle(map[phase].medium);
-      shuffle(map[phase].hard);
-    }
-    return map;
-  }
-
-  function pickCandidateInSamePhase(phase, needDiff, availableByPhaseDiff, selectedSet){
-    const bucket = (availableByPhaseDiff[phase] && availableByPhaseDiff[phase][needDiff]) ? availableByPhaseDiff[phase][needDiff] : [];
-    for (let i=0;i<bucket.length;i++){
-      const id = bucket[i];
-      if (!selectedSet.has(id)) return id;
-    }
-    return null;
-  }
-
-  function findRemovableInPhase(phaseSelectedIds, questionById, priorityDiffs){
-    // returns an id from phaseSelectedIds whose difficulty matches first available in priority list
-    for (let p=0;p<priorityDiffs.length;p++){
-      const want = priorityDiffs[p];
-      for (let i=0;i<phaseSelectedIds.length;i++){
-        const id = phaseSelectedIds[i];
-        const q = questionById[id];
-        const d = normalizeDifficulty(q && q.difficulty);
-        if (d === want) return id;
-      }
-    }
-    return null;
-  }
-
-  function adjustDifficultyBySwaps(selectedIds, phaseOfId, questionById, availableByPhaseDiff, phaseLimit){
-    // Build helper structures
-    const selectedSet = new Set(selectedIds);
-    const selectedByPhase = buildSelectedByPhase(selectedIds, phaseOfId);
-    const phasesInTest = Object.keys(selectedByPhase);
-
-    // Targets
-    const total = selectedIds.length;
-    const target = computeDifficultyTargets(total);
-
-    // Current counts
-    let counts = countDifficulties(selectedIds, questionById);
-
-    function deficitOf(diff){ return Math.max(0, (target[diff]||0) - (counts[diff]||0)); }
-
-    // Swaps must never exceed phaseLimit; we swap within same phase so count per phase remains same.
-    function trySwapForNeed(needDiff){
-      // Randomize phase iteration each attempt to keep test varied
-      const phaseOrder = shuffle(phasesInTest.slice());
-
-      for (let k=0;k<phaseOrder.length;k++){
-        const phase = phaseOrder[k];
-        const phaseSelected = selectedByPhase[phase] || [];
-        if (!phaseSelected.length) continue;
-
-        // Candidate of needDiff in SAME phase and outside selected
-        const candidate = pickCandidateInSamePhase(phase, needDiff, availableByPhaseDiff, selectedSet);
-        if (!candidate) continue;
-
-        // Choose removable within same phase according to rules (fallback internal)
-        let removePriority = null;
-
-        if (needDiff === 'hard'){
-          // remove medium first, then easy
-          removePriority = ['medium','easy'];
-        } else if (needDiff === 'medium'){
-          // remove easy (preferred). If none, do not force; skip phase.
-          removePriority = ['easy'];
-        } else if (needDiff === 'easy'){
-          // remove medium first, then hard
-          removePriority = ['medium','hard'];
-        } else {
-          continue;
-        }
-
-        const removable = findRemovableInPhase(phaseSelected, questionById, removePriority);
-        if (!removable) continue;
-
-        // Perform swap (replace removable with candidate)
-        // Safety: do not violate phaseLimit (we keep same count)
-        if (phaseSelected.length > phaseLimit) {
-          // Defensive; should not happen
-          continue;
-        }
-
-        // Update selectedIds list (global)
-        const idxRemove = selectedIds.indexOf(removable);
-        if (idxRemove === -1) continue;
-
-        selectedIds[idxRemove] = candidate;
-
-        // Update sets/maps
-        selectedSet.delete(removable);
-        selectedSet.add(candidate);
-
-        // Update selectedByPhase
-        const pArr = selectedByPhase[phase];
-        for (let i=0;i<pArr.length;i++){
-          if (pArr[i] === removable){ pArr[i] = candidate; break; }
-        }
-
-        // Update counts
-        const dRemove = normalizeDifficulty(questionById[removable] && questionById[removable].difficulty);
-        const dAdd = normalizeDifficulty(questionById[candidate] && questionById[candidate].difficulty);
-        if (dRemove === 'hard') counts.hard--; else if (dRemove === 'medium') counts.medium--; else counts.easy--;
-        if (dAdd === 'hard') counts.hard++; else if (dAdd === 'medium') counts.medium++; else counts.easy++;
-
-        return true;
-      }
-      return false;
-    }
-
-    // Adjustment order: Hard -> Medium -> Easy (practical)
-    // Stop if no progress possible.
-    const maxIterations = Math.max(20, selectedIds.length * 4);
-    let iterations = 0;
-
-    while (iterations < maxIterations){
-      iterations++;
-
-      const hardDef = deficitOf('hard');
-      const medDef  = deficitOf('medium');
-      const easyDef = deficitOf('easy');
-
-      if (hardDef<=0 && medDef<=0 && easyDef<=0) break;
-
-      let progressed = false;
-
-      if (hardDef > 0){
-        progressed = trySwapForNeed('hard');
-        if (progressed) continue; // recompute deficits next loop
-      }
-
-      if (medDef > 0){
-        progressed = trySwapForNeed('medium');
-        if (progressed) continue;
-      }
-
-      if (easyDef > 0){
-        progressed = trySwapForNeed('easy');
-        if (progressed) continue;
-      }
-
-      // No progress possible -> exit (fallback: accept what exists)
-      break;
-    }
-
-    return selectedIds;
+  // Assets das QUESTÕES: no Review, absPath não força prefixo de pasta.
+  function absPathQ(p){
+    const s = String(p ?? '').trim();
+    if (!s) return s;
+    if (/^https?:\/\//i.test(s)) return s;
+    if (s.startsWith('/')) return s;
+    if (s.startsWith('../')) return s;
+    // Se vier relativo, mantém relativo (igual Review). Não prefixa DataTest.
+    return s;
   }
 
   async function buildTestForUnitFromFirebase(){
-    const fetched = await getQuestionIdsByPhaseForUnit(levelDir, unitDir);
-    const phaseKeys = fetched.phaseKeys || [];
-    const phaseToIds = fetched.phaseToIds || {};
+    const allIds = await getAllQuestionIdsForUnit(levelDir, unitDir);
+    if (!allIds.length) return [];
 
-    // No phases / no activities found
-    if (!phaseKeys.length){
-      return [];
-    }
+    const shuffledIds = shuffle([...allIds]);
 
-    // Build phaseOfId (first phase encountered wins) + all unique ids
-    const phaseOfId = {};
-    const allUniqueIdsSet = new Set();
-    for (let p=0;p<phaseKeys.length;p++){
-      const phaseKey = phaseKeys[p];
-      const ids = phaseToIds[phaseKey] || [];
-      for (let i=0;i<ids.length;i++){
-        const id = ids[i];
-        if (!id) continue;
-        if (!phaseOfId[id]) phaseOfId[id] = phaseKey;
-        allUniqueIdsSet.add(id);
-      }
-    }
-    const allUniqueIds = Array.from(allUniqueIdsSet);
-    if (!allUniqueIds.length) return [];
-
-    // Fetch all questions once (needed for difficulty + final build)
-    // NOTE: This is heavy but predictable and matches your robust behavior.
+    // Carrega todas para bucket por difficulty (mesma lógica do Review)
     const snaps = await Promise.all(
-      allUniqueIds.map(function(id){
-        return firebase.database().ref(`questions/${id}`).once('value');
-      })
+      shuffledIds.map(id => firebase.database().ref(`questions/${id}`).once('value'))
     );
 
-    const questionById = {};
-    for (let i=0;i<snaps.length;i++){
-      const s = snaps[i];
-      const v = s.val();
-      if (!v) continue;
-      const id = allUniqueIds[i];
-      questionById[id] = v;
-    }
+    const easyIds = [];
+    const mediumIds = [];
+    const hardIds = [];
 
-    // Filter phaseToIds to only ids that actually exist in questions/{id}
-    const cleanPhaseToIds = {};
-    for (let p=0;p<phaseKeys.length;p++){
-      const phaseKey = phaseKeys[p];
-      const ids = phaseToIds[phaseKey] || [];
-      const out = [];
-      for (let i=0;i<ids.length;i++){
-        const id = ids[i];
-        if (id && questionById[id]) out.push(id);
-      }
-      cleanPhaseToIds[phaseKey] = out;
-    }
+    snaps.forEach((snap, i) => {
+      const v = snap.val();
+      if (!v) return;
 
-    // Build initial selection by phase (priority rule #1)
-    const initial = buildInitialSelectionByPhase(phaseKeys, cleanPhaseToIds);
-    let selectedIds = initial.selectedIds || [];
-    const phaseLimit = initial.phaseLimit || 2;
+      const id = shuffledIds[i];
+      const d = normalizeDifficulty(v.difficulty);
 
-    // If still somehow > 40, cap.
-    if (selectedIds.length > MAX_TOTAL_TEST) selectedIds = selectedIds.slice(0, MAX_TOTAL_TEST);
+      if (d === 'hard') hardIds.push(id);
+      else if (d === 'medium') mediumIds.push(id);
+      else easyIds.push(id);
+    });
 
-    // If nothing selected (phases exist but questions missing)
+    shuffle(easyIds);
+    shuffle(mediumIds);
+    shuffle(hardIds);
+
+    const selectedIds = buildProportionalSelection({
+      easyIds,
+      mediumIds,
+      hardIds,
+      maxTotal: MAX_PER_TEST
+    });
+
     if (!selectedIds.length) return [];
 
-    // Difficulty adjustment AFTER selection by phase
-    const availableByPhaseDiff = buildAvailableByPhaseDifficulty(cleanPhaseToIds, questionById);
-    selectedIds = adjustDifficultyBySwaps(selectedIds.slice(), phaseOfId, questionById, availableByPhaseDiff, phaseLimit);
+    const selectedSnaps = await Promise.all(
+      selectedIds.map(id => firebase.database().ref(`questions/${id}`).once("value"))
+    );
 
-    // Build final question list from selected ids
-    // No forced padding to MIN_TOTAL_TEST; showing less is acceptable.
-    // Also ensure no duplicates
-    const finalSet = new Set();
-    const finalIds = [];
-    for (let i=0;i<selectedIds.length;i++){
-      const id = selectedIds[i];
-      if (!id) continue;
-      if (finalSet.has(id)) continue;
-      if (!questionById[id]) continue;
-      finalSet.add(id);
-      finalIds.push(id);
-      if (finalIds.length >= MAX_TOTAL_TEST) break;
-    }
-
-    // Convert to list of questions with required fields
     const list = [];
-    for (let i=0;i<finalIds.length;i++){
-      const id = finalIds[i];
-      const v = questionById[id];
-      if (!v) continue;
+    selectedSnaps.forEach((s, i) => {
+      const v = s.val();
+      if (!v) return;
 
-      const q = Object.assign({}, v);
-      q.id = q.id || id;
+      const q = { ...v };
+      q.id = q.id || selectedIds[i];
       q.level = q.level || levelDir;
       q.unit  = q.unit  || unitDir;
-
-      // Keep phase info available (helpful for debugging/analytics). If absent in question, infer from activities.
-      q.fase  = q.fase || phaseOfId[id] || null;
+      q.fase  = q.fase || null;
 
       if (!q.type) q.type = "mcq";
       if (!Array.isArray(q.options)) q.options = [];
@@ -876,9 +623,9 @@ firebase.auth().onAuthStateChanged(function(user){
       q.difficulty = normalizeDifficulty(q.difficulty);
 
       list.push(q);
-    }
+    });
 
-    // Shuffle final list (keeps overall randomness; still respects phase distribution by selection)
+    // Shuffle final (mesma lógica do Review)
     shuffle(list);
 
     return list;
@@ -984,9 +731,11 @@ firebase.auth().onAuthStateChanged(function(user){
       .replace(/_{3,}/g,     '<span class="blank" aria-hidden="true"></span>');
   }
 
+  // ======= IMPORTANT: Match Review behavior for multi-blank fillblank =======
   function countBlanksInPrompt(prompt){
     const s = String(prompt ?? '');
 
+    // If using {b1}{b2}... count by max index (safer than count occurrences)
     const bTags = (s.match(/\{b\d+\}/gi) || []);
     if (bTags.length){
       const nums = bTags.map(t => {
@@ -998,6 +747,8 @@ firebase.auth().onAuthStateChanged(function(user){
 
     const blanks = (s.match(/\{blank\}/g) || []).length;
     const underscores = (s.match(/_{3,}/g) || []).length;
+
+    // If prompt has no markers but question.type is fillblank, we treat as 1 blank
     return Math.max(1, blanks + underscores);
   }
 
@@ -1022,7 +773,7 @@ firebase.auth().onAuthStateChanged(function(user){
     if (q.type !== 'fillblank'){ return stripQuotesForTTS(ttsSanitize(text)); }
     const optMap = new Map();
     (Array.isArray(q.options) ? q.options : []).forEach(op=>{
-      const o = (typeof op === 'string') ? {label:op, value:op} : Object.assign({}, op);
+      const o = (typeof op === 'string') ? {label:op, value:op} : {...op};
       optMap.set(normalize(o.value), o);
     });
     const speakValue = (val)=>{
@@ -1117,6 +868,7 @@ firebase.auth().onAuthStateChanged(function(user){
       mediaBox.appendChild(img);
     }
 
+    // ==== opções (com fix para garantir label visível) ====
     optionsEl.innerHTML = '';
     optionsEl.classList.remove('is-order');
 
@@ -1141,14 +893,16 @@ firebase.auth().onAuthStateChanged(function(user){
   /* =========================
      Multiple-choice / Fillblank
      - Single blank: 1 click = lock
-     - Multi blank: collect selections until all blanks are filled, then grade once.
+     - Multi blank (Review behavior): collect selections until all blanks are filled, then grade once.
   ========================= */
   function makeOption(q, opt){
-    const o0 = (typeof opt === 'string') ? { label: opt, value: opt } : Object.assign({}, opt);
-    const o = Object.assign({}, o0, {
+    // normaliza o objeto e garante rótulos
+    const o0 = (typeof opt === 'string') ? { label: opt, value: opt } : { ...opt };
+    const o = {
+      ...o0,
       label: (o0.label != null && String(o0.label).trim() !== '') ? String(o0.label) : String(o0.value ?? ''),
       value: (o0.value != null && String(o0.value).trim() !== '') ? String(o0.value) : String(o0.label ?? '')
-    });
+    };
 
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -1186,6 +940,7 @@ firebase.auth().onAuthStateChanged(function(user){
     const commit = () => {
       if (TEST_MODE && lockedQuestion[idx]) return;
 
+      // ===== Multi-blank detection (Review-like) =====
       const blanksTotal = (q.type === 'fillblank') ? countBlanksInPrompt(q.prompt) : 1;
       const chosenVal = String(o.value ?? o.label ?? '');
 
@@ -1194,13 +949,16 @@ firebase.auth().onAuthStateChanged(function(user){
           userAnswers[idx] = chosenVal;
           lockedQuestion[idx] = true;
         } else {
+          // collect
           if (!Array.isArray(userAnswers[idx])) userAnswers[idx] = [];
           userAnswers[idx].push(chosenVal);
 
+          // lock only when all blanks are collected
           const done = userAnswers[idx].length;
           if (done >= blanksTotal){
             lockedQuestion[idx] = true;
           } else {
+            // In-progress: prevent picking same option repeatedly (practical UX)
             btn.dataset.chosen = '1';
             btn.disabled = true;
             btn.style.opacity = .65;
@@ -1315,9 +1073,9 @@ firebase.auth().onAuthStateChanged(function(user){
   function renderMatchQuestion(q){
     const sourcePairs = Array.isArray(q.pairs) ? q.pairs : [];
 
-    const normItem = (_side, it) => {
+    const normItem = (side, it) => {
       if (typeof it === 'string') return { label: it, value: it };
-      const o = Object.assign({}, it);
+      const o = {...it};
       if (!o.value) o.value = o.label || o.image || String(Math.random());
       return o;
     };
@@ -1325,8 +1083,8 @@ firebase.auth().onAuthStateChanged(function(user){
     const leftItems  = sourcePairs.map(p => normItem('left',  p.left));
     const rightItems = sourcePairs.map(p => normItem('right', p.right));
 
-    const leftShuf  = shuffle(leftItems.slice());
-    const rightShuf = shuffle(rightItems.slice());
+    const leftShuf  = shuffle([...leftItems]);
+    const rightShuf = shuffle([...rightItems]);
 
     const grid = document.createElement('div'); grid.className = 'match-grid';
     const colL = document.createElement('div'); colL.className = 'match-col';
@@ -1448,6 +1206,7 @@ firebase.auth().onAuthStateChanged(function(user){
     if (correct?.type==='choice'){
       const expArr = expectedChoiceArray(correct);
 
+      // Multi-blank only applies to fillblank (matching Review behavior)
       const blanksTotal = (q.type === 'fillblank') ? countBlanksInPrompt(q.prompt) : 1;
 
       if (blanksTotal <= 1){
@@ -1459,13 +1218,16 @@ firebase.auth().onAuthStateChanged(function(user){
         const done = chosenArr.length;
 
         if (done < blanksTotal){
+          // Not finished yet: keep collecting (Next stays locked)
           const msg = `Blank ${done}/${blanksTotal}`;
           toast(msg);
           liveEl.textContent = msg;
 
+          // Ensure Next remains blocked
           btnNext.disabled = true;
           btnNext.classList.remove('ready');
 
+          // Re-enable remaining options (keep already chosen disabled)
           Array.from(optionsEl.querySelectorAll('.option')).forEach(el=>{
             if (el.dataset && el.dataset.chosen === '1') return;
             el.disabled = false;
@@ -1475,6 +1237,7 @@ firebase.auth().onAuthStateChanged(function(user){
           return;
         }
 
+        // Finished: grade once (array vs array)
         const expected = expArr.slice(0, blanksTotal).map(String);
         const got = chosenArr.slice(0, blanksTotal).map(String);
         isCorrect = arraysEqual(got, expected);
@@ -1499,6 +1262,7 @@ firebase.auth().onAuthStateChanged(function(user){
       speakFriendly(['We will learn with this one.']);
       liveEl.textContent = 'Recorded for grading';
     } else {
+      // Defensive: if isCorrect is undefined (non-choice types), do nothing
       return;
     }
 
@@ -1507,6 +1271,7 @@ firebase.auth().onAuthStateChanged(function(user){
       lockedQuestion[idx] = true;
       btnNext.disabled = false; btnNext.classList.add('ready');
 
+      // Disable all options (including those previously chosen in multi-blank)
       Array.from(optionsEl.querySelectorAll('.option')).forEach(el=>{
         if(el!==btn){ el.disabled = true; el.style.opacity = .65; }
         else { el.disabled = true; }
@@ -1540,6 +1305,7 @@ firebase.auth().onAuthStateChanged(function(user){
       isReading = false;
       commit();
 
+      // If the question was not finalized (multi-blank still collecting), re-enable remaining
       if (!answered){
         Array.from(optionsEl.querySelectorAll('.option')).forEach(el=>{
           if (el.dataset && el.dataset.chosen === '1') return;
@@ -1654,6 +1420,7 @@ firebase.auth().onAuthStateChanged(function(user){
       return arraysEqual(got, canon);
     }
 
+    // choice / fillblank
     const expArr = expectedChoiceArray(corr);
 
     if (q.type === 'fillblank'){
@@ -1669,6 +1436,7 @@ firebase.auth().onAuthStateChanged(function(user){
       return arraysEqual(got, expected);
     }
 
+    // Non-fillblank choice behaves as single
     const expected = expArr[0] ?? '';
     return normalize(ans) === normalize(expected);
   }
@@ -1721,8 +1489,10 @@ firebase.auth().onAuthStateChanged(function(user){
       : `Your Grade: ${grade}% — Insufficient score for the ${TEST_DISPLAY_NAME}.`;
     gradeEl.innerHTML = base;
 
+    // Política do botão de restart + mensagem
     if (linked){
-      // aluno com professor: regras tratadas em loadExistingGrade()
+      // aluno com professor: só pode clicar se NÃO houver nota (ausente/zero)
+      // a habilitação visual será tratada em loadExistingGrade() também
     }
   }
 
@@ -1739,6 +1509,8 @@ firebase.auth().onAuthStateChanged(function(user){
     const snap = await ref.once('value');
     const existing = snap.val() ?? 0;
 
+    // linked: só grava se ainda não existir nota (==0)
+    // unlinked: grava a MAIOR nota
     if(linked){
       canOverwrite = existing === 0;
       if(existing===0){
@@ -1766,8 +1538,10 @@ firebase.auth().onAuthStateChanged(function(user){
         const has = snap.exists();
         const g = has ? (snap.val()||0) : 0;
 
+        // política do restart
         if(isLinked){
           if(!has || g===0){
+            // professor apagou / sem nota => pode recomeçar
             restartBtn.disabled = false;
             restartNote.textContent = "";
           }else{
@@ -1779,6 +1553,7 @@ firebase.auth().onAuthStateChanged(function(user){
             }
           }
         }else{
+          // sem professor: pode refazer sempre (grava maior nota)
           restartBtn.disabled = false;
           restartNote.textContent = "";
         }
@@ -1795,6 +1570,7 @@ firebase.auth().onAuthStateChanged(function(user){
      Restart Test
   ========================= */
   function resetTest(){
+    // linked: só permite se habilitado (ou seja, professor limpou nota)
     if(isLinked && restartBtn.disabled){
       toast("Your teacher needs to clear your grade before you can retake the test.");
       return;
