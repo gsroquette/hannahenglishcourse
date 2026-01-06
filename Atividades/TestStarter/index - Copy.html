@@ -269,6 +269,9 @@ firebase.auth().onAuthStateChanged(function(user){
   const TEST_DB_KEY = "test"; // NÃO alterar a chave
   const TEST_DISPLAY_NAME = "Grammar Test";
 
+  // Mesmo tamanho do Mixed Review (Hannah Questions — Review)
+  const MAX_PER_TEST = 15;
+
   /* ======= Estado do teste ======= */
   let userAnswers = [];    // por índice da questão
   let correctAnswers = []; // {type, value}
@@ -295,11 +298,26 @@ firebase.auth().onAuthStateChanged(function(user){
     return prefix + (onlyNum || fallbackNum);
   }
   function showLoader(v){ if (loadingEl) loadingEl.style.display = v ? 'flex' : 'none'; }
-  function normalize(v){ return String(v ?? '').trim().toLowerCase(); }
+  function normalize(v){
+    return String(v ?? '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g,' ')
+      .replace(/[“”"]/g,'"');
+  }
   function arraysEqual(a,b){
     if(!Array.isArray(a) || !Array.isArray(b) || a.length!==b.length) return false;
     for(let i=0;i<a.length;i++){ if(normalize(a[i])!==normalize(b[i])) return false; }
     return true;
+  }
+
+  function shuffle(arr){
+    const a = Array.isArray(arr) ? arr : [];
+    for(let i=a.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [a[i],a[j]]=[a[j],a[i]];
+    }
+    return a;
   }
 
   /* WebAudio SFX */
@@ -375,8 +393,9 @@ firebase.auth().onAuthStateChanged(function(user){
   const { level, unit, fase } = getParams();
   const levelDir = normalizeDir('Level', level || '0', '0');
   const unitDir  = normalizeDir('Unit',  unit  || '1', '1');
-  const BASE  = `../../${levelDir}/${unitDir}/DataTest`;
-  const QFILE = `${BASE}/questions.txt`;
+
+  // Mantém SFX do TESTE vindo do DataTest (como antes)
+  const BASE_TEST_SFX = `../../${levelDir}/${unitDir}/DataTest`;
 
   const pill = document.getElementById('pill');
   pill.textContent = `${levelDir} • ${unitDir}${fase ? ' • Phase '+fase : ''}`;
@@ -409,41 +428,256 @@ firebase.auth().onAuthStateChanged(function(user){
   const overlayEl  = document.getElementById('overlay');
   const modalEl    = document.getElementById('completion-modal');
 
-  const sCorrect = new Audio(`${BASE}/sounds/correct.mp3`);
-  const sWrong   = new Audio(`${BASE}/sounds/wrong.mp3`);
-  const sTap     = new Audio(`${BASE}/sounds/tap.mp3`);
-  const sNext    = new Audio(`${BASE}/sounds/next.mp3`);
+  const sCorrect = new Audio(`${BASE_TEST_SFX}/sounds/correct.mp3`);
+  const sWrong   = new Audio(`${BASE_TEST_SFX}/sounds/wrong.mp3`);
+  const sTap     = new Audio(`${BASE_TEST_SFX}/sounds/tap.mp3`);
+  const sNext    = new Audio(`${BASE_TEST_SFX}/sounds/next.mp3`);
   [sCorrect,sWrong,sTap,sNext].forEach(a=>{a.preload='auto'});
 
   restartBtn.onclick = () => resetTest();
 
+  /* ============================================================
+     FIREBASE FETCH (EXATAMENTE A MESMA LÓGICA DO REVIEW)
+     - Puxa questionIds de activities do CURRENT UNIT (todas as fases)
+     - Carrega /questions/{id}
+     - Bucket por difficulty (easy/medium/hard)
+     - Seleção proporcional 6/5/4 com fallback
+     - Sem duplicatas; se tiver menos que 15 disponíveis, usa menos
+  ============================================================ */
+
+  async function getAllQuestionIdsForUnit(levelKey, unitKey){
+    const prefix = `${levelKey}_${unitKey}_Fase`;
+    const snap = await firebase.database()
+      .ref("activities")
+      .orderByKey()
+      .startAt(prefix)
+      .endAt(prefix + "\uf8ff")
+      .once("value");
+
+    const obj = snap.val() || {};
+    const set = new Set();
+
+    Object.keys(obj).forEach(k => {
+      const a = obj[k];
+      if (!a || !Array.isArray(a.questionIds)) return;
+      a.questionIds.forEach(id => { if (id) set.add(id); });
+    });
+
+    return Array.from(set);
+  }
+
+  function normalizeDifficulty(d){
+    const raw = String(d || '').trim().toLowerCase();
+    if (raw === 'easy' || raw === 'e') return 'easy';
+    if (raw === 'medium' || raw === 'med' || raw === 'm') return 'medium';
+    if (raw === 'hard' || raw === 'difficult' || raw === 'h') return 'hard';
+    return 'easy';
+  }
+
+  function takeN(arr, n){
+    const out = [];
+    const k = Math.max(0, Math.min(n, arr.length));
+    for (let i=0; i<k; i++) out.push(arr.shift());
+    return out;
+  }
+
+  function buildProportionalSelection({ easyIds, mediumIds, hardIds, maxTotal }){
+    const targetEasy = 6;
+    const targetMed  = 5;
+    const targetHard = 4;
+
+    const picked = [];
+
+    // Step 1: pick from target buckets
+    const pHard = takeN(hardIds, Math.min(targetHard, hardIds.length));
+    picked.push(...pHard);
+    let hardDef = targetHard - pHard.length;
+
+    const pMed  = takeN(mediumIds, Math.min(targetMed, mediumIds.length));
+    picked.push(...pMed);
+    let medDef = targetMed - pMed.length;
+
+    const pEasy = takeN(easyIds, Math.min(targetEasy, easyIds.length));
+    picked.push(...pEasy);
+    let easyDef = targetEasy - pEasy.length;
+
+    // Step 2: fill deficits by fallback order
+    // hard deficit -> medium -> easy
+    if (hardDef > 0){
+      const a = takeN(mediumIds, Math.min(hardDef, mediumIds.length));
+      picked.push(...a);
+      hardDef -= a.length;
+    }
+    if (hardDef > 0){
+      const a = takeN(easyIds, Math.min(hardDef, easyIds.length));
+      picked.push(...a);
+      hardDef -= a.length;
+    }
+
+    // medium deficit -> easy
+    if (medDef > 0){
+      const a = takeN(easyIds, Math.min(medDef, easyIds.length));
+      picked.push(...a);
+      medDef -= a.length;
+    }
+    // if still medium deficit (no easy), fill with hard (as "what exists")
+    if (medDef > 0){
+      const a = takeN(hardIds, Math.min(medDef, hardIds.length));
+      picked.push(...a);
+      medDef -= a.length;
+    }
+
+    // easy deficit -> medium -> hard
+    if (easyDef > 0){
+      const a = takeN(mediumIds, Math.min(easyDef, mediumIds.length));
+      picked.push(...a);
+      easyDef -= a.length;
+    }
+    if (easyDef > 0){
+      const a = takeN(hardIds, Math.min(easyDef, hardIds.length));
+      picked.push(...a);
+      easyDef -= a.length;
+    }
+
+    // Step 3: top up with whatever remains (random) up to maxTotal
+    const remainingPool = [...easyIds, ...mediumIds, ...hardIds];
+    shuffle(remainingPool);
+
+    const need = Math.max(0, maxTotal - picked.length);
+    if (need > 0){
+      picked.push(...takeN(remainingPool, Math.min(need, remainingPool.length)));
+    }
+
+    return picked.slice(0, maxTotal);
+  }
+
+  // Assets das QUESTÕES: no Review, absPath não força prefixo de pasta.
+  function absPathQ(p){
+    const s = String(p ?? '').trim();
+    if (!s) return s;
+    if (/^https?:\/\//i.test(s)) return s;
+    if (s.startsWith('/')) return s;
+    if (s.startsWith('../')) return s;
+    // Se vier relativo, mantém relativo (igual Review). Não prefixa DataTest.
+    return s;
+  }
+
+  async function buildTestForUnitFromFirebase(){
+    const allIds = await getAllQuestionIdsForUnit(levelDir, unitDir);
+    if (!allIds.length) return [];
+
+    const shuffledIds = shuffle([...allIds]);
+
+    // Carrega todas para bucket por difficulty (mesma lógica do Review)
+    const snaps = await Promise.all(
+      shuffledIds.map(id => firebase.database().ref(`questions/${id}`).once('value'))
+    );
+
+    const easyIds = [];
+    const mediumIds = [];
+    const hardIds = [];
+
+    snaps.forEach((snap, i) => {
+      const v = snap.val();
+      if (!v) return;
+
+      const id = shuffledIds[i];
+      const d = normalizeDifficulty(v.difficulty);
+
+      if (d === 'hard') hardIds.push(id);
+      else if (d === 'medium') mediumIds.push(id);
+      else easyIds.push(id);
+    });
+
+    shuffle(easyIds);
+    shuffle(mediumIds);
+    shuffle(hardIds);
+
+    const selectedIds = buildProportionalSelection({
+      easyIds,
+      mediumIds,
+      hardIds,
+      maxTotal: MAX_PER_TEST
+    });
+
+    if (!selectedIds.length) return [];
+
+    const selectedSnaps = await Promise.all(
+      selectedIds.map(id => firebase.database().ref(`questions/${id}`).once("value"))
+    );
+
+    const list = [];
+    selectedSnaps.forEach((s, i) => {
+      const v = s.val();
+      if (!v) return;
+
+      const q = { ...v };
+      q.id = q.id || selectedIds[i];
+      q.level = q.level || levelDir;
+      q.unit  = q.unit  || unitDir;
+      q.fase  = q.fase || null;
+
+      if (!q.type) q.type = "mcq";
+      if (!Array.isArray(q.options)) q.options = [];
+
+      q.difficulty = normalizeDifficulty(q.difficulty);
+
+      list.push(q);
+    });
+
+    // Shuffle final (mesma lógica do Review)
+    shuffle(list);
+
+    return list;
+  }
+
   /* =========================
-     Load questions
+     Init (REMOVIDO questions.txt)
   ========================= */
-  showLoader(true);
-  fetch(QFILE, {cache:'no-store'})
-    .then(r => { if(!r.ok) throw new Error(`Could not load ${QFILE} (HTTP ${r.status})`); return r.text(); })
-    .then(text => {
-      const data = JSON.parse(text);
-      if(!data || !Array.isArray(data.questions)) throw new Error('Invalid format in questions.txt');
-      questions = data.questions;
-      subtitle.textContent = data.title || `${TEST_DISPLAY_NAME} — answer carefully.`;
+  async function initTest(){
+    showLoader(true);
+    try{
+      await new Promise((resolve)=>ensureUserIsAuthenticated(()=>resolve()));
+      if(!currentUserId){
+        subtitle.textContent = "User not authenticated.";
+        promptEl.textContent = "Please login again.";
+        mediaBox.innerHTML = '';
+        optionsEl.innerHTML = '';
+        return;
+      }
+
+      subtitle.textContent = `${TEST_DISPLAY_NAME} — answer carefully.`;
+
+      const list = await buildTestForUnitFromFirebase();
+      if(!list.length){
+        subtitle.textContent = "No questions found.";
+        promptEl.textContent = "This unit has no questions available yet.";
+        mediaBox.innerHTML = '<div style="padding:10px;text-align:center;color:#334155">Please check if activities + questions exist in Firebase for this unit.</div>';
+        optionsEl.innerHTML = '';
+        return;
+      }
+
+      questions = list;
+
       initTestArrays(questions.length);
       buildCorrectAnswers();
       idx = 0;
       renderQuestion();
+
       // Carrega nota existente (se houver) e define políticas de restart
       loadExistingGrade();
-    })
-    .catch(err=>{
-      console.error('[Q&A] Load failed:', err);
-      toast('Error loading questions. Check level, unit and questions.txt.');
-      subtitle.textContent = 'Failed to load content';
-      promptEl.textContent = `Path not found.\nBASE: ${BASE}\nFile: ${QFILE}`;
+
+    }catch(err){
+      console.error("[TEST] Init failed:", err);
+      toast("Error loading questions from Firebase.");
+      subtitle.textContent = "Failed to load content";
+      promptEl.textContent = "Could not load test content from Firebase. Please try again.";
       mediaBox.innerHTML = '';
       optionsEl.innerHTML = '';
-    })
-    .finally(()=> showLoader(false));
+    }finally{
+      showLoader(false);
+    }
+  }
 
   function initTestArrays(n){
     userAnswers   = Array(n).fill(null);
@@ -600,7 +834,7 @@ firebase.auth().onAuthStateChanged(function(user){
     mediaBox.innerHTML = '';
     if(q.image){
       const img = new Image(); img.alt = 'Question image';
-      img.src = absPath(q.image); mediaBox.appendChild(img);
+      img.src = absPathQ(q.image); mediaBox.appendChild(img);
     } else {
       const img = new Image(); img.src = './hannah_pensando.png'; img.alt = 'Hannah thinking';
       mediaBox.appendChild(img);
@@ -648,7 +882,7 @@ firebase.auth().onAuthStateChanged(function(user){
     const thumb = document.createElement('div');
     thumb.className = 'thumb';
     if (o.image){
-      const img = new Image(); img.src = absPath(o.image); img.alt = o.label || '';
+      const img = new Image(); img.src = absPathQ(o.image); img.alt = o.label || '';
       thumb.appendChild(img);
     } else if (o.emoji){
       thumb.textContent = o.emoji;
@@ -660,8 +894,8 @@ firebase.auth().onAuthStateChanged(function(user){
     }
 
     const textWrap = document.createElement('div');
-    textWrap.style.flex = '1';         /* <<< evita colapso */
-    textWrap.style.minWidth = '0';     /* <<< garante render do label */
+    textWrap.style.flex = '1';
+    textWrap.style.minWidth = '0';
     const label = document.createElement('div');
     label.className = 'label';
     label.textContent = o.label || o.value;
@@ -838,7 +1072,7 @@ firebase.auth().onAuthStateChanged(function(user){
 
       const thumb = document.createElement('div'); thumb.className = 'thumb';
       if (item.image){
-        const img = new Image(); img.src = absPath(item.image); img.alt = item.label || '';
+        const img = new Image(); img.src = absPathQ(item.image); img.alt = item.label || '';
         thumb.appendChild(img);
       } else {
         thumb.textContent = item.label ? '🔤' : '❔';
@@ -953,7 +1187,7 @@ firebase.auth().onAuthStateChanged(function(user){
     stopAllAudio();
     const spoken = buildSpokenPrompt(q);
     if (q.promptAudio){
-      const a = new Audio(absPath(q.promptAudio));
+      const a = new Audio(absPathQ(q.promptAudio));
       currentAudio = a;
       a.onended = () => { currentAudio = null; };
       a.onerror  = () => { currentAudio = null; speak(spoken); };
@@ -981,7 +1215,7 @@ firebase.auth().onAuthStateChanged(function(user){
 
     if (o.audio){
       try{
-        const a = new Audio(absPath(o.audio));
+        const a = new Audio(absPathQ(o.audio));
         currentAudio = a;
         let done = false;
         const safeFinish = () => { if (!done){ done = true; currentAudio = null; finish(); } };
@@ -1046,12 +1280,6 @@ firebase.auth().onAuthStateChanged(function(user){
       confettiEl.appendChild(p);
       setTimeout(()=>p.remove(), dur+delay+200);
     }
-  }
-  function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
-  function absPath(p){
-    if(!p) return p;
-    if (p.startsWith('http') || p.startsWith('/') || p.startsWith('../')) return p;
-    return `${BASE}/${p}`.replace(/\/+/g,'/');
   }
 
   window.activityCompleted = false;
@@ -1199,7 +1427,7 @@ firebase.auth().onAuthStateChanged(function(user){
             if(g < PASSING_GRADE){
               restartNote.textContent = "Your score is below the minimum. Please contact your teacher to clear your current attempt so you can retake the Grammar Test.";
             }else{
-              restartNote.textContent = ""; // aprovado — não precisa mensagem
+              restartNote.textContent = "";
             }
           }
         }else{
@@ -1243,6 +1471,14 @@ firebase.auth().onAuthStateChanged(function(user){
 
     try{ window.scrollTo({top:0, behavior:'smooth'}); }catch(e){}
   }
+
+  /* =========================
+     Boot
+  ========================= */
+  window.addEventListener('load', function(){
+    window.activityCompleted = false;
+    initTest();
+  });
 
 })();
 </script>
