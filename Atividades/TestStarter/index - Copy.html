@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -269,20 +269,6 @@ firebase.auth().onAuthStateChanged(function(user){
   const TEST_DB_KEY = "test"; // NÃO alterar a chave
   const TEST_DISPLAY_NAME = "Grammar Test";
 
-  /* =========================
-     NEW: Selection rules
-     - Base rule: 2 questions per phase
-     - Min/Max test size: 10..40
-     - If phases > 40: pick 40 phases randomly, 1 question per picked phase
-     - Difficulty target: 50% easy, 40% medium, 10% hard
-     - difficulty missing/invalid => easy
-     - If hard is missing => becomes medium, if medium is missing => becomes easy
-  ========================= */
-  const TEST_MIN_Q = 10;
-  const TEST_MAX_Q = 40;
-  const PHASES_CAP_FOR_OPTION1 = 40; // if phases > 40 => option 1
-  const TARGET_RATIO = { easy: 0.50, medium: 0.40, hard: 0.10 };
-
   /* ======= Estado do teste ======= */
   let userAnswers = [];    // por índice da questão
   let correctAnswers = []; // {type, value}
@@ -389,11 +375,8 @@ firebase.auth().onAuthStateChanged(function(user){
   const { level, unit, fase } = getParams();
   const levelDir = normalizeDir('Level', level || '0', '0');
   const unitDir  = normalizeDir('Unit',  unit  || '1', '1');
-
-  // IMPORTANT: keep DataTest base for SFX and local assets for the test UI
-  const BASE_TEST  = `../../${levelDir}/${unitDir}/DataTest`;
-  // NEW: unit base (where QA folders live)
-  const BASE_UNIT  = `../../${levelDir}/${unitDir}`;
+  const BASE  = `../../${levelDir}/${unitDir}/DataTest`;
+  const QFILE = `${BASE}/questions.txt`;
 
   const pill = document.getElementById('pill');
   pill.textContent = `${levelDir} • ${unitDir}${fase ? ' • Phase '+fase : ''}`;
@@ -426,508 +409,41 @@ firebase.auth().onAuthStateChanged(function(user){
   const overlayEl  = document.getElementById('overlay');
   const modalEl    = document.getElementById('completion-modal');
 
-  const sCorrect = new Audio(`${BASE_TEST}/sounds/correct.mp3`);
-  const sWrong   = new Audio(`${BASE_TEST}/sounds/wrong.mp3`);
-  const sTap     = new Audio(`${BASE_TEST}/sounds/tap.mp3`);
-  const sNext    = new Audio(`${BASE_TEST}/sounds/next.mp3`);
+  const sCorrect = new Audio(`${BASE}/sounds/correct.mp3`);
+  const sWrong   = new Audio(`${BASE}/sounds/wrong.mp3`);
+  const sTap     = new Audio(`${BASE}/sounds/tap.mp3`);
+  const sNext    = new Audio(`${BASE}/sounds/next.mp3`);
   [sCorrect,sWrong,sTap,sNext].forEach(a=>{a.preload='auto'});
 
   restartBtn.onclick = () => resetTest();
 
   /* =========================
-     NEW: question history logging (per answered question)
-     - Non-breaking: writes to a dedicated push-list node
-  ========================= */
-  function recordQuestionHistory(payload){
-    ensureUserIsAuthenticated(async (userId)=>{
-      try{
-        const { level, unit } = getParams();
-        if(!level || !unit) return;
-        const ref = firebase.database().ref(`usuarios/${userId}/historico_respostas/${level}/${unit}/${TEST_DB_KEY}`).push();
-        await ref.set({
-          ...payload,
-          ts: firebase.database.ServerValue.TIMESTAMP
-        });
-      }catch(e){
-        console.warn("[History] Could not record question history:", e);
-      }
-    });
-  }
-
-  /* =========================
-     Load questions (UPDATED)
-     - Loads ALL phases in the unit from QA folders
-     - Builds a randomized test that respects:
-       * phase representativity (base rule)
-       * min/max question count
-       * difficulty targets with fallback
+     Load questions
   ========================= */
   showLoader(true);
-  (async function boot(){
-    try{
-      const banks = await loadAllPhaseBanks();
-      if(!banks.length){
-        throw new Error(`No QA phase banks were found in ${BASE_UNIT}. Expected folders like QA1/questions.txt, QA2/questions.txt, ...`);
-      }
-
-      const built = buildTestFromBanks(banks);
-
-      if(!built.questions.length){
-        throw new Error('No questions could be selected from the available phase banks.');
-      }
-
-      questions = built.questions;
-      subtitle.textContent = built.title || `${TEST_DISPLAY_NAME} — answer carefully.`;
+  fetch(QFILE, {cache:'no-store'})
+    .then(r => { if(!r.ok) throw new Error(`Could not load ${QFILE} (HTTP ${r.status})`); return r.text(); })
+    .then(text => {
+      const data = JSON.parse(text);
+      if(!data || !Array.isArray(data.questions)) throw new Error('Invalid format in questions.txt');
+      questions = data.questions;
+      subtitle.textContent = data.title || `${TEST_DISPLAY_NAME} — answer carefully.`;
       initTestArrays(questions.length);
       buildCorrectAnswers();
       idx = 0;
       renderQuestion();
       // Carrega nota existente (se houver) e define políticas de restart
       loadExistingGrade();
-
-      if(built.warnings && built.warnings.length){
-        console.warn("[TEST] Build warnings:", built.warnings);
-      }
-    }catch(err){
+    })
+    .catch(err=>{
       console.error('[Q&A] Load failed:', err);
-      toast('Error loading questions. Check level, unit and QA folders.');
+      toast('Error loading questions. Check level, unit and questions.txt.');
       subtitle.textContent = 'Failed to load content';
-      promptEl.textContent = `Path not found or invalid format.\nBASE_UNIT: ${BASE_UNIT}\nDetails: ${String(err?.message || err)}`;
+      promptEl.textContent = `Path not found.\nBASE: ${BASE}\nFile: ${QFILE}`;
       mediaBox.innerHTML = '';
       optionsEl.innerHTML = '';
-    }finally{
-      showLoader(false);
-    }
-  })();
-
-  /* =========================
-     Phase bank loader (QA1..)
-     - Attempts QA1..QA80 (safe ceiling)
-     - Stops after "miss streak" once we have found at least one bank
-  ========================= */
-  async function loadAllPhaseBanks(){
-    const MAX_TRIES = 80;
-    const STOP_MISS_STREAK = 6; // after found banks, stop when we miss several in a row
-    let foundAny = false;
-    let missStreak = 0;
-    const banks = [];
-
-    for(let p=1; p<=MAX_TRIES; p++){
-      const qfile = `${BASE_UNIT}/QA${p}/questions.txt`;
-      try{
-        const r = await fetch(qfile, { cache: 'no-store' });
-        if(!r.ok) throw new Error(`HTTP ${r.status}`);
-        const text = await r.text();
-        const data = JSON.parse(text);
-        if(!data || !Array.isArray(data.questions)) throw new Error('Invalid format');
-        const qs = data.questions.map(q => ({
-          ...q,
-          __phase: p,
-          __qaDir: `QA${p}`,
-          __source: qfile
-        }));
-        banks.push({
-          phase: p,
-          qaDir: `QA${p}`,
-          title: data.title || '',
-          questions: qs
-        });
-        foundAny = true;
-        missStreak = 0;
-      }catch(e){
-        if(foundAny){
-          missStreak++;
-          if(missStreak >= STOP_MISS_STREAK) break;
-        }
-      }
-    }
-
-    // Sort by phase number
-    banks.sort((a,b)=>a.phase-b.phase);
-    return banks;
-  }
-
-  /* =========================
-     Test builder
-  ========================= */
-  function buildTestFromBanks(banks){
-    const warnings = [];
-
-    // Flatten and normalize difficulty (invalid/absent => easy)
-    for(const b of banks){
-      b.questions = (b.questions || []).filter(Boolean).map(q=>{
-        const d = normalizeDifficulty(q.difficulty);
-        return { ...q, difficulty: d };
-      });
-    }
-
-    const phases = banks.map(b=>b.phase);
-    const phaseCount = phases.length;
-
-    // Determine test size
-    // Base rule: 2 per phase, but clamp to 10..40
-    // Special: if phases > 40 => option 1: pick 40 phases randomly, 1 per phase (size = 40)
-    let perPhaseBase = 2;
-    let selectedPhaseIds = phases.slice();
-
-    let desiredCount;
-    let minPerPhase;
-    let mode = "two-per-phase";
-
-    if(phaseCount > PHASES_CAP_FOR_OPTION1){
-      mode = "one-per-random-40-phases";
-      selectedPhaseIds = shuffle(phases.slice()).slice(0, PHASES_CAP_FOR_OPTION1).sort((a,b)=>a-b);
-      perPhaseBase = 1;
-      desiredCount = PHASES_CAP_FOR_OPTION1; // exactly 40
-      minPerPhase = 1;
-    }else{
-      // normal mode
-      desiredCount = clamp(perPhaseBase * phaseCount, TEST_MIN_Q, TEST_MAX_Q);
-
-      // If clamped UP (few phases), we need to distribute extra across phases
-      // Minimum representativity is still 2 per phase, unless desiredCount < 2*phaseCount (clamped down)
-      if(desiredCount < perPhaseBase * phaseCount){
-        // clamped down (many phases): we cannot do 2 per phase
-        // keep representativity: 1 per phase first, then distribute remaining
-        mode = "one-per-phase-plus";
-        minPerPhase = 1;
-      }else{
-        minPerPhase = perPhaseBase; // 2 per phase
-      }
-    }
-
-    // Build a map phase->bank for quick access
-    const bankByPhase = new Map(banks.map(b=>[b.phase,b]));
-
-    // Prepare initial picks by phase
-    const picksByPhase = new Map();
-    const usedKey = new Set();
-
-    // Helper to build a stable key to prevent duplicates (within the test)
-    const qKey = (q) => {
-      // prefer explicit id if present; otherwise use source+prompt+type+answer
-      const id = (q && (q.id || q.qid || q.questionId)) ? String(q.id || q.qid || q.questionId) : '';
-      if(id) return `${q.__qaDir}::${id}`;
-      const prompt = String(q.prompt || '').slice(0,220);
-      const type = String(q.type || '');
-      const ans  = JSON.stringify(q.answer ?? '');
-      return `${q.__qaDir}::${type}::${prompt}::${ans}`.slice(0,900);
-    };
-
-    function takeRandomFromPhase(phase, n, filterFn){
-      const bank = bankByPhase.get(phase);
-      if(!bank || !Array.isArray(bank.questions) || !bank.questions.length) return [];
-      const pool = bank.questions.filter(q=>{
-        if(filterFn && !filterFn(q)) return false;
-        const key = qKey(q);
-        return !usedKey.has(key);
-      });
-      if(!pool.length) return [];
-
-      const out = [];
-      const sh = shuffle(pool.slice());
-      for(const q of sh){
-        if(out.length >= n) break;
-        const key = qKey(q);
-        if(usedKey.has(key)) continue;
-        usedKey.add(key);
-        out.push(q);
-      }
-      return out;
-    }
-
-    // Determine how many questions per phase initially
-    const phasePlan = new Map();
-
-    if(mode === "one-per-random-40-phases"){
-      // exactly 1 per selected phase
-      for(const ph of selectedPhaseIds) phasePlan.set(ph, 1);
-    }else if(mode === "two-per-phase"){
-      // 2 each; then distribute extras if desiredCount > 2*phaseCount
-      for(const ph of selectedPhaseIds) phasePlan.set(ph, 2);
-
-      let current = 2 * selectedPhaseIds.length;
-      let needExtra = Math.max(0, desiredCount - current);
-      // distribute extras round-robin across phases (keeps representation)
-      let i = 0;
-      while(needExtra > 0 && selectedPhaseIds.length){
-        const ph = selectedPhaseIds[i % selectedPhaseIds.length];
-        phasePlan.set(ph, (phasePlan.get(ph) || 0) + 1);
-        needExtra--;
-        i++;
-      }
-    }else{
-      // one-per-phase-plus (many phases; desiredCount < 2*phaseCount)
-      // 1 per phase first, then distribute remaining to random phases
-      for(const ph of selectedPhaseIds) phasePlan.set(ph, 1);
-
-      let current = selectedPhaseIds.length;
-      let remain = Math.max(0, desiredCount - current);
-
-      const order = shuffle(selectedPhaseIds.slice());
-      let i = 0;
-      while(remain > 0 && order.length){
-        const ph = order[i % order.length];
-        phasePlan.set(ph, (phasePlan.get(ph) || 0) + 1);
-        remain--;
-        i++;
-      }
-    }
-
-    // Initial selection by phasePlan
-    for(const ph of selectedPhaseIds){
-      const want = phasePlan.get(ph) || 0;
-      if(want <= 0) continue;
-      const got = takeRandomFromPhase(ph, want);
-      if(!got.length){
-        warnings.push(`Phase ${ph}: no questions found.`);
-        picksByPhase.set(ph, []);
-      }else{
-        picksByPhase.set(ph, got);
-      }
-    }
-
-    // Flatten current selection
-    let selected = [];
-    for(const ph of selectedPhaseIds){
-      const list = picksByPhase.get(ph) || [];
-      selected.push(...list);
-    }
-
-    // If we are short (some phases lack enough questions), we accept smaller test
-    // (explicitly per your rule: show fewer questions instead of repeating)
-    if(selected.length < TEST_MIN_Q){
-      warnings.push(`Selected only ${selected.length} questions (min target is ${TEST_MIN_Q}). Test will run with fewer questions because the unit has limited inventory.`);
-    }
-
-    // Now enforce difficulty proportions with representativity preservation
-    // Target: 50% easy, 40% medium, 10% hard (with fallback hard->medium->easy)
-    selected = enforceDifficultyTargets({
-      selected,
-      picksByPhase,
-      bankByPhase,
-      selectedPhaseIds,
-      phasePlan,
-      qKey,
-      usedKey,
-      minPerPhase,
-      desiredCount: selected.length, // after shortages, target what we have
-      warnings
-    });
-
-    // Final shuffle to randomize order in the test
-    selected = shuffle(selected.slice());
-
-    // Build title
-    const unitTitle = banks.find(b=>b.title && b.title.trim())?.title || '';
-    const title = unitTitle ? `${unitTitle} — ${TEST_DISPLAY_NAME}` : `${TEST_DISPLAY_NAME} — ${levelDir} ${unitDir}`;
-
-    return { title, questions: selected, warnings };
-  }
-
-  function enforceDifficultyTargets(cfg){
-    let {
-      selected, picksByPhase, bankByPhase, selectedPhaseIds, phasePlan,
-      qKey, usedKey, minPerPhase, desiredCount, warnings
-    } = cfg;
-
-    if(!selected.length) return selected;
-
-    const N = desiredCount;
-
-    const targets = computeTargets(N, TARGET_RATIO);
-    // Note: fallback rule means: hard shortage is allowed and "turns into medium",
-    // and medium shortage turns into easy. We implement by trying to reach hard first,
-    // then medium, and whatever remains is easy.
-
-    const countNow = () => {
-      const c = { easy:0, medium:0, hard:0 };
-      for(const q of selected){
-        c[normalizeDifficulty(q.difficulty)]++;
-      }
-      return c;
-    };
-
-    // Helper: try replace within same phase first
-    function tryReplaceWithinPhase(phase, wantDiff){
-      const curList = picksByPhase.get(phase) || [];
-      if(!curList.length) return false;
-
-      // Find an index that we can swap out (prefer easy when adding hard; prefer easy when adding medium)
-      // but do not reduce representativity below minPerPhase (we keep list length same)
-      let outIdx = -1;
-      for(let i=0;i<curList.length;i++){
-        const d = normalizeDifficulty(curList[i].difficulty);
-        if(wantDiff === 'hard' && d !== 'hard'){ outIdx = i; break; }
-        if(wantDiff === 'medium' && d === 'easy'){ outIdx = i; break; }
-      }
-      if(outIdx < 0){
-        // fallback: swap anything not already wantDiff
-        for(let i=0;i<curList.length;i++){
-          const d = normalizeDifficulty(curList[i].difficulty);
-          if(d !== wantDiff){ outIdx = i; break; }
-        }
-      }
-      if(outIdx < 0) return false;
-
-      const bank = bankByPhase.get(phase);
-      if(!bank) return false;
-
-      const pool = (bank.questions || []).filter(q=>{
-        if(normalizeDifficulty(q.difficulty) !== wantDiff) return false;
-        const key = qKey(q);
-        return !usedKey.has(key);
-      });
-      if(!pool.length) return false;
-
-      const pick = shuffle(pool.slice())[0];
-      if(!pick) return false;
-
-      // Do swap
-      const removed = curList[outIdx];
-      const remKey = qKey(removed);
-      // We keep usedKey strict (no duplicates), but allow removed back into availability? (safer to keep usedKey)
-      // We will not delete remKey to avoid re-adding the same question elsewhere.
-      const newKey = qKey(pick);
-      usedKey.add(newKey);
-      curList[outIdx] = pick;
-      picksByPhase.set(phase, curList);
-
-      // Rebuild flat selected
-      selected = [];
-      for(const ph of selectedPhaseIds){
-        const list = picksByPhase.get(ph) || [];
-        selected.push(...list);
-      }
-      return true;
-    }
-
-    // Helper: if we must add a hard/medium and can't within phase, try a phase that has >minPerPhase selected
-    // so we can swap there without losing representativity in other phases.
-    function tryReplaceInFlexiblePhase(wantDiff){
-      const flexible = selectedPhaseIds.filter(ph => (picksByPhase.get(ph)||[]).length > minPerPhase);
-      const order = shuffle(flexible.slice());
-      for(const ph of order){
-        if(tryReplaceWithinPhase(ph, wantDiff)) return true;
-      }
-      // if still not, last attempt: within ANY phase (still keeps 1-per-phase since it is swap, not remove)
-      const anyOrder = shuffle(selectedPhaseIds.slice());
-      for(const ph of anyOrder){
-        if(tryReplaceWithinPhase(ph, wantDiff)) return true;
-      }
-      return false;
-    }
-
-    // Main adjustment loop with safety cap
-    const SAFETY = 2000;
-    let iter = 0;
-
-    // First, try to reach HARD target
-    while(iter < SAFETY){
-      iter++;
-      const c = countNow();
-      if(c.hard >= targets.hard) break;
-
-      const ok = tryReplaceInFlexiblePhase('hard');
-      if(!ok){
-        warnings.push('Not enough HARD questions to meet target. Falling back to MEDIUM/EASY as available.');
-        break;
-      }
-    }
-
-    // Then, try to reach MEDIUM target (after hard adjustments)
-    iter = 0;
-    while(iter < SAFETY){
-      iter++;
-      const c = countNow();
-      if(c.medium >= targets.medium) break;
-
-      const ok = tryReplaceInFlexiblePhase('medium');
-      if(!ok){
-        warnings.push('Not enough MEDIUM questions to meet target. Falling back to EASY.');
-        break;
-      }
-    }
-
-    // Final: whatever is not hard/medium is easy by definition (we do not force more easy)
-    return selected;
-  }
-
-  function normalizeDifficulty(d){
-    const v = normalize(d);
-    if(v === 'hard' || v === 'difficult' || v === 'dificil' || v === 'dificil.' ) return 'hard';
-    if(v === 'medium' || v === 'mid' || v === 'middle' || v === 'medio' || v === 'médio' ) return 'medium';
-    if(v === 'easy' || v === 'facil' || v === 'fácil' ) return 'easy';
-    return 'easy'; // absent/invalid => easy
-  }
-
-  function computeTargets(N, ratio){
-    // Rounding rule:
-    // - compute exact values
-    // - take floors
-    // - distribute remaining by largest fractional part, priority: hard then medium then easy (stable)
-    const rEasy = ratio.easy ?? 0;
-    const rMed  = ratio.medium ?? 0;
-    const rHard = ratio.hard ?? 0;
-
-    const exact = {
-      hard: N * rHard,
-      medium: N * rMed,
-      easy: N * rEasy
-    };
-
-    const base = {
-      hard: Math.floor(exact.hard),
-      medium: Math.floor(exact.medium),
-      easy: Math.floor(exact.easy)
-    };
-
-    let sum = base.hard + base.medium + base.easy;
-    let remain = N - sum;
-
-    const frac = [
-      {k:'hard',   f: exact.hard - base.hard},
-      {k:'medium', f: exact.medium - base.medium},
-      {k:'easy',   f: exact.easy - base.easy}
-    ];
-
-    // deterministic tie-breaker priority: hard > medium > easy
-    frac.sort((a,b)=>{
-      if(b.f !== a.f) return b.f - a.f;
-      const pr = { hard:3, medium:2, easy:1 };
-      return pr[b.k]-pr[a.k];
-    });
-
-    let i = 0;
-    while(remain > 0){
-      const k = frac[i % frac.length].k;
-      base[k] += 1;
-      remain--;
-      i++;
-    }
-
-    // guard against rounding weirdness
-    sum = base.hard + base.medium + base.easy;
-    if(sum !== N){
-      base.easy += (N - sum);
-    }
-
-    // Ensure non-negative
-    base.hard = Math.max(0, base.hard);
-    base.medium = Math.max(0, base.medium);
-    base.easy = Math.max(0, base.easy);
-
-    // Fix sum again if needed
-    sum = base.hard + base.medium + base.easy;
-    if(sum !== N){
-      base.easy += (N - sum);
-      base.easy = Math.max(0, base.easy);
-    }
-
-    return base;
-  }
-
-  function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
+    })
+    .finally(()=> showLoader(false));
 
   function initTestArrays(n){
     userAnswers   = Array(n).fill(null);
@@ -1234,22 +750,6 @@ firebase.auth().onAuthStateChanged(function(user){
         userAnswers[idx] = built.slice();
         lockedQuestion[idx] = true;
       }
-
-      // NEW: history record
-      try{
-        recordQuestionHistory({
-          kind: "test",
-          index: idx,
-          phase: q.__phase || null,
-          qaDir: q.__qaDir || null,
-          type: q.type || null,
-          difficulty: normalizeDifficulty(q.difficulty),
-          prompt: q.prompt || null,
-          chosen: built.slice(),
-          correct: !!ok
-        });
-      }catch(e){}
-
       if(ok){
         try{
           mediaBox.innerHTML = '';
@@ -1375,23 +875,6 @@ firebase.auth().onAuthStateChanged(function(user){
               userAnswers[idx] = { pairs: Array.from(matched).sort(), wrongs };
               lockedQuestion[idx] = true;
             }
-
-            // NEW: history record
-            try{
-              const allOk = wrongs===0;
-              recordQuestionHistory({
-                kind: "test",
-                index: idx,
-                phase: q.__phase || null,
-                qaDir: q.__qaDir || null,
-                type: q.type || null,
-                difficulty: normalizeDifficulty(q.difficulty),
-                prompt: q.prompt || null,
-                chosen: { pairs: Array.from(matched).sort(), wrongs },
-                correct: !!allOk
-              });
-            }catch(e){}
-
             const okAll = wrongs===0;
             if(okAll){
               confetti(18);
@@ -1437,23 +920,6 @@ firebase.auth().onAuthStateChanged(function(user){
       const expected = Array.isArray(correct.value) ? correct.value[0] : correct.value; // 1 blank (seu caso atual)
       isCorrect = normalize(chosen) === normalize(expected);
     }
-
-    // NEW: history record for choice/fillblank
-    try{
-      if(TEST_MODE){
-        recordQuestionHistory({
-          kind: "test",
-          index: idx,
-          phase: q.__phase || null,
-          qaDir: q.__qaDir || null,
-          type: q.type || null,
-          difficulty: normalizeDifficulty(q.difficulty),
-          prompt: q.prompt || null,
-          chosen: (opt && (opt.value ?? opt.label)) ?? userAnswers[idx],
-          correct: isCorrect === true
-        });
-      }
-    }catch(e){}
 
     if(isCorrect === true){
       btn?.classList?.add('ok');
@@ -1582,14 +1048,10 @@ firebase.auth().onAuthStateChanged(function(user){
     }
   }
   function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
-
   function absPath(p){
     if(!p) return p;
     if (p.startsWith('http') || p.startsWith('/') || p.startsWith('../')) return p;
-    // For test-local assets (if any question uses relative paths), anchor under unit by default.
-    // This keeps legacy compatibility and avoids breaking existing absolute paths.
-    // (Most of your question assets are absolute like /LevelX/UnitY/QA... which is already handled above.)
-    return `${BASE_UNIT}/${p}`.replace(/\/+/g,'/');
+    return `${BASE}/${p}`.replace(/\/+/g,'/');
   }
 
   window.activityCompleted = false;
