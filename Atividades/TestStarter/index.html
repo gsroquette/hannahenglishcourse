@@ -56,37 +56,52 @@
 
   .q-top{display:flex;flex-direction:column;gap:14px}
 
-  /* Prompt line now holds an inline audio icon */
+  /* ===== Prompt row with icon (NEW) ===== */
+  .prompt-row{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+  }
   .q-prompt{
     font-size:22px;font-weight:800;line-height:1.3;word-break:break-word;
-    display:flex; gap:10px; align-items:flex-start;
+    flex:1;
+    min-width:0;
   }
   .prompt-audio{
-    border:none; background:#e6f0ff; color:#0f3ea8;
-    width:36px; height:36px; border-radius:12px;
-    cursor:pointer; font-weight:800; flex:0 0 auto;
-    display:inline-flex; align-items:center; justify-content:center;
-    box-shadow:0 4px 10px rgba(0,0,0,.06);
+    border:none;
+    background:#e6f0ff;
+    color:#0f3ea8;
+    width:40px;
+    height:40px;
+    border-radius:12px;
+    cursor:pointer;
+    flex:0 0 40px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:900;
+    box-shadow:0 4px 12px rgba(0,0,0,.06);
+    user-select:none;
   }
-  .prompt-audio:active{ transform: translateY(1px); }
-  .prompt-audio[disabled]{opacity:.4; pointer-events:none}
-  .prompt-text{flex:1 1 auto; min-width:0}
+  .prompt-audio:active{transform:translateY(1px)}
+  .prompt-audio[disabled]{opacity:.4;pointer-events:none}
 
   .q-media{width:100%;aspect-ratio:16/10;background:#eef4ff;border:1px dashed #cfe0ff;border-radius:14px;padding:8px;overflow:hidden;display:block}
   .q-media img{width:100%;height:100%;object-fit:contain;display:block}
   @supports not (aspect-ratio:16/10){.q-media{height:220px}}
 
+  /* Controls row: only used for audio_mcq (NEW) */
   .q-controls{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
   .icon-btn{border:none;background:#e6f0ff;color:#0f3ea8;padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:700}
   .icon-btn:active{transform:translateY(1px)}
+  .icon-btn[disabled]{opacity:.4;pointer-events:none}
 
   .options{display:grid;gap:10px;margin-top:6px;grid-template-columns:repeat(2,minmax(0,1fr))}
   .option{
     display:flex;align-items:center;gap:12px;background:#fff;border:2px solid #e9eef7;border-radius:18px;
     padding:12px;cursor:pointer;user-select:none;min-height:78px;
     box-shadow:0 4px 12px rgba(0,0,0,.03);
-    transition:transform .06s ease,border-color .15s ease,box-shadow .15s ease;
-    position:relative;
+    transition:transform .06s ease,border-color .15s ease,box-shadow .15s ease
   }
   .option:hover{transform:translateY(-1px);box-shadow:0 8px 18px rgba(0,0,0,.06)}
   .option:active{transform:translateY(0)}
@@ -138,20 +153,7 @@
   .loading{position:fixed;inset:0;background:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(2px);font-weight:700;color:#334155}
   .spinner{width:42px;height:42px;border-radius:50%;border:4px solid #c7d2fe;border-top-color:#3b82f6;animation:spin 1s linear infinite;margin-right:10px}
   @keyframes spin{to{transform:rotate(360deg)}}
-  .icon-btn[disabled]{opacity:.4;pointer-events:none}
   .is-hidden{display:none!important}
-
-  /* audio_mcq option listen button (inside option) */
-  .opt-listen{
-    position:absolute; top:10px; right:10px;
-    width:34px; height:34px; border-radius:12px;
-    border:none; background:#eef2ff; color:#0f3ea8;
-    cursor:pointer; font-weight:800;
-    display:inline-flex; align-items:center; justify-content:center;
-    box-shadow:0 4px 10px rgba(0,0,0,.06);
-  }
-  .opt-listen:active{ transform: translateY(1px); }
-  .opt-listen[disabled]{opacity:.45; pointer-events:none}
 
   @media (max-width:720px){
     .options{grid-template-columns:1fr}
@@ -221,9 +223,18 @@
       <div class="question-card">
         <div class="q-top">
           <div>
-            <div class="q-prompt" id="prompt">—</div>
-            <!-- Removed: old Listen button + Repeat button -->
+            <!-- Prompt row with icon (NEW) -->
+            <div class="prompt-row">
+              <div class="q-prompt" id="prompt">—</div>
+              <button class="prompt-audio" id="promptAudioBtn" type="button" title="Listen to prompt" aria-label="Listen to prompt">🔊</button>
+            </div>
+
+            <!-- NEW: only for audio_mcq (Listen answer audio) -->
+            <div class="q-controls" id="audioMcqControls" style="display:none">
+              <button class="icon-btn" id="btnListenAnswer" type="button" title="Listen (audio question)">🔊 Listen</button>
+            </div>
           </div>
+
           <div class="q-media" id="mediaBox" aria-label="Question image"></div>
         </div>
 
@@ -323,7 +334,7 @@ firebase.auth().onAuthStateChanged(function(user){
      - Same grading rules as mcq
      - Prompt audio (q.promptAudio) is primary. If missing/unplayable, TTS fallback.
      - Optional auto-play on load: q.autoplayPrompt (default true for audio_mcq)
-     - NEW: For audio_mcq, student listens to alternatives via a listen control (per option).
+     - NEW: audio_mcq has ONE "Listen" button to play the correct option audio (answer), then student chooses.
   ========================= */
 
   /* ======= Estado do teste ======= */
@@ -466,6 +477,10 @@ firebase.auth().onAuthStateChanged(function(user){
   const subtitle   = document.getElementById('subtitle');
   const bar        = document.getElementById('bar');
   const promptEl   = document.getElementById('prompt');
+  const promptAudioBtn = document.getElementById('promptAudioBtn');
+  const audioMcqControls = document.getElementById('audioMcqControls');
+  const btnListenAnswer  = document.getElementById('btnListenAnswer');
+
   const mediaBox   = document.getElementById('mediaBox');
   const optionsEl  = document.getElementById('options');
   const btnNext    = document.getElementById('btnNext');
@@ -490,21 +505,6 @@ firebase.auth().onAuthStateChanged(function(user){
 
   /* ============================================================
      FIREBASE FETCH (UPDATED TO NEW OFFICIAL RULES)
-     Source:
-       - activities: {LevelX_UnitY_FaseN}.questionIds
-       - questions/{id}: the question data
-     Algorithm:
-       1) Build phase -> questionIds map for the unit
-       2) Initial selection by phase:
-          - if phases > 40: pick 40 random phases, 1 per phase
-          - else: up to 2 per phase
-          - never repeat question id globally
-          - do not invent/fill if less than 10 total available
-          - cap at 40
-       3) Difficulty balancing after selection (secondary):
-          target ratio: 50% easy, 40% medium, 10% hard
-          swap within same phase without exceeding phase limit
-          fallback if not enough questions of a difficulty
   ============================================================ */
 
   function normalizeDifficulty(d){
@@ -536,7 +536,6 @@ firebase.auth().onAuthStateChanged(function(user){
 
     const obj = snap.val() || {};
     const phaseKeys = Object.keys(obj).sort(function(a,b){
-      // natural-ish sort by last number
       const na = parseInt(String(a).replace(/\D/g,''),10) || 0;
       const nb = parseInt(String(b).replace(/\D/g,''),10) || 0;
       return na-nb;
@@ -580,16 +579,13 @@ firebase.auth().onAuthStateChanged(function(user){
       return { selectedIds: selected.slice(0, MAX_TOTAL_TEST), phaseLimit: 1, modePhasesOver40: true, chosenPhases };
     }
 
-    // Normal mode: up to 2 per phase
     phaseKeys.forEach(function(phaseKey){
       const ids = phaseToIds[phaseKey] || [];
       const picked = pickDistinctRandomFromArray(ids, 2, selectedSet);
       for (let i=0;i<picked.length;i++) selected.push(picked[i]);
     });
 
-    // Cap at 40 (should only happen if huge number of phases, but rule says cap)
     if (selected.length > MAX_TOTAL_TEST){
-      // If exceeded, prioritize diversity by applying the >40 strategy
       const chosenPhases = shuffle(phaseKeys.slice()).slice(0, 40);
       const reset = [];
       const resetSet = new Set();
@@ -605,8 +601,6 @@ firebase.auth().onAuthStateChanged(function(user){
   }
 
   function computeDifficultyTargets(total){
-    // Rounding rules:
-    // Easy -> ceil, Hard -> floor, Medium -> remainder
     const easy = Math.ceil(total * 0.50);
     const hard = Math.floor(total * 0.10);
     const medium = Math.max(0, total - easy - hard);
@@ -669,7 +663,6 @@ firebase.auth().onAuthStateChanged(function(user){
   }
 
   function findRemovableInPhase(phaseSelectedIds, questionById, priorityDiffs){
-    // returns an id from phaseSelectedIds whose difficulty matches first available in priority list
     for (let p=0;p<priorityDiffs.length;p++){
       const want = priorityDiffs[p];
       for (let i=0;i<phaseSelectedIds.length;i++){
@@ -683,23 +676,18 @@ firebase.auth().onAuthStateChanged(function(user){
   }
 
   function adjustDifficultyBySwaps(selectedIds, phaseOfId, questionById, availableByPhaseDiff, phaseLimit){
-    // Build helper structures
     const selectedSet = new Set(selectedIds);
     const selectedByPhase = buildSelectedByPhase(selectedIds, phaseOfId);
     const phasesInTest = Object.keys(selectedByPhase);
 
-    // Targets
     const total = selectedIds.length;
     const target = computeDifficultyTargets(total);
 
-    // Current counts
     let counts = countDifficulties(selectedIds, questionById);
 
     function deficitOf(diff){ return Math.max(0, (target[diff]||0) - (counts[diff]||0)); }
 
-    // Swaps must never exceed phaseLimit; we swap within same phase so count per phase remains same.
     function trySwapForNeed(needDiff){
-      // Randomize phase iteration each attempt to keep test varied
       const phaseOrder = shuffle(phasesInTest.slice());
 
       for (let k=0;k<phaseOrder.length;k++){
@@ -707,21 +695,16 @@ firebase.auth().onAuthStateChanged(function(user){
         const phaseSelected = selectedByPhase[phase] || [];
         if (!phaseSelected.length) continue;
 
-        // Candidate of needDiff in SAME phase and outside selected
         const candidate = pickCandidateInSamePhase(phase, needDiff, availableByPhaseDiff, selectedSet);
         if (!candidate) continue;
 
-        // Choose removable within same phase according to rules (fallback internal)
         let removePriority = null;
 
         if (needDiff === 'hard'){
-          // remove medium first, then easy
           removePriority = ['medium','easy'];
         } else if (needDiff === 'medium'){
-          // remove easy (preferred). If none, do not force; skip phase.
           removePriority = ['easy'];
         } else if (needDiff === 'easy'){
-          // remove medium first, then hard
           removePriority = ['medium','hard'];
         } else {
           continue;
@@ -730,30 +713,21 @@ firebase.auth().onAuthStateChanged(function(user){
         const removable = findRemovableInPhase(phaseSelected, questionById, removePriority);
         if (!removable) continue;
 
-        // Perform swap (replace removable with candidate)
-        // Safety: do not violate phaseLimit (we keep same count)
-        if (phaseSelected.length > phaseLimit) {
-          // Defensive; should not happen
-          continue;
-        }
+        if (phaseSelected.length > phaseLimit) continue;
 
-        // Update selectedIds list (global)
         const idxRemove = selectedIds.indexOf(removable);
         if (idxRemove === -1) continue;
 
         selectedIds[idxRemove] = candidate;
 
-        // Update sets/maps
         selectedSet.delete(removable);
         selectedSet.add(candidate);
 
-        // Update selectedByPhase
         const pArr = selectedByPhase[phase];
         for (let i=0;i<pArr.length;i++){
           if (pArr[i] === removable){ pArr[i] = candidate; break; }
         }
 
-        // Update counts
         const dRemove = normalizeDifficulty(questionById[removable] && questionById[removable].difficulty);
         const dAdd = normalizeDifficulty(questionById[candidate] && questionById[candidate].difficulty);
         if (dRemove === 'hard') counts.hard--; else if (dRemove === 'medium') counts.medium--; else counts.easy--;
@@ -764,8 +738,6 @@ firebase.auth().onAuthStateChanged(function(user){
       return false;
     }
 
-    // Adjustment order: Hard -> Medium -> Easy (practical)
-    // Stop if no progress possible.
     const maxIterations = Math.max(20, selectedIds.length * 4);
     let iterations = 0;
 
@@ -782,7 +754,7 @@ firebase.auth().onAuthStateChanged(function(user){
 
       if (hardDef > 0){
         progressed = trySwapForNeed('hard');
-        if (progressed) continue; // recompute deficits next loop
+        if (progressed) continue;
       }
 
       if (medDef > 0){
@@ -795,7 +767,6 @@ firebase.auth().onAuthStateChanged(function(user){
         if (progressed) continue;
       }
 
-      // No progress possible -> exit (fallback: accept what exists)
       break;
     }
 
@@ -807,12 +778,10 @@ firebase.auth().onAuthStateChanged(function(user){
     const phaseKeys = fetched.phaseKeys || [];
     const phaseToIds = fetched.phaseToIds || {};
 
-    // No phases / no activities found
     if (!phaseKeys.length){
       return [];
     }
 
-    // Build phaseOfId (first phase encountered wins) + all unique ids
     const phaseOfId = {};
     const allUniqueIdsSet = new Set();
     for (let p=0;p<phaseKeys.length;p++){
@@ -828,7 +797,6 @@ firebase.auth().onAuthStateChanged(function(user){
     const allUniqueIds = Array.from(allUniqueIdsSet);
     if (!allUniqueIds.length) return [];
 
-    // Fetch all questions once (needed for difficulty + final build)
     const snaps = await Promise.all(
       allUniqueIds.map(function(id){
         return firebase.database().ref(`questions/${id}`).once('value');
@@ -844,7 +812,6 @@ firebase.auth().onAuthStateChanged(function(user){
       questionById[id] = v;
     }
 
-    // Filter phaseToIds to only ids that actually exist in questions/{id}
     const cleanPhaseToIds = {};
     for (let p=0;p<phaseKeys.length;p++){
       const phaseKey = phaseKeys[p];
@@ -857,24 +824,16 @@ firebase.auth().onAuthStateChanged(function(user){
       cleanPhaseToIds[phaseKey] = out;
     }
 
-    // Build initial selection by phase (priority rule #1)
     const initial = buildInitialSelectionByPhase(phaseKeys, cleanPhaseToIds);
     let selectedIds = initial.selectedIds || [];
     const phaseLimit = initial.phaseLimit || 2;
 
-    // If still somehow > 40, cap.
     if (selectedIds.length > MAX_TOTAL_TEST) selectedIds = selectedIds.slice(0, MAX_TOTAL_TEST);
-
-    // If nothing selected (phases exist but questions missing)
     if (!selectedIds.length) return [];
 
-    // Difficulty adjustment AFTER selection by phase
     const availableByPhaseDiff = buildAvailableByPhaseDifficulty(cleanPhaseToIds, questionById);
     selectedIds = adjustDifficultyBySwaps(selectedIds.slice(), phaseOfId, questionById, availableByPhaseDiff, phaseLimit);
 
-    // Build final question list from selected ids
-    // No forced padding to MIN_TOTAL_TEST; showing less is acceptable.
-    // Also ensure no duplicates
     const finalSet = new Set();
     const finalIds = [];
     for (let i=0;i<selectedIds.length;i++){
@@ -887,7 +846,6 @@ firebase.auth().onAuthStateChanged(function(user){
       if (finalIds.length >= MAX_TOTAL_TEST) break;
     }
 
-    // Convert to list of questions with required fields
     const list = [];
     for (let i=0;i<finalIds.length;i++){
       const id = finalIds[i];
@@ -898,8 +856,6 @@ firebase.auth().onAuthStateChanged(function(user){
       q.id = q.id || id;
       q.level = q.level || levelDir;
       q.unit  = q.unit  || unitDir;
-
-      // Keep phase info available (helpful for debugging/analytics). If absent in question, infer from activities.
       q.fase  = q.fase || phaseOfId[id] || null;
 
       if (!q.type) q.type = "mcq";
@@ -910,9 +866,7 @@ firebase.auth().onAuthStateChanged(function(user){
       list.push(q);
     }
 
-    // Shuffle final list (keeps overall randomness; still respects phase distribution by selection)
     shuffle(list);
-
     return list;
   }
 
@@ -949,7 +903,6 @@ firebase.auth().onAuthStateChanged(function(user){
       idx = 0;
       renderQuestion();
 
-      // Carrega nota existente (se houver) e define políticas de restart
       loadExistingGrade();
 
     }catch(err){
@@ -988,7 +941,6 @@ firebase.auth().onAuthStateChanged(function(user){
         });
         return {type:'match', value: canon.sort().map(String) };
       } else {
-        // choice/fillblank/audio_mcq robusto (string | array | objeto)
         if (Array.isArray(q.answer)) {
           return { type:'choice', value: q.answer.map(String) };
         } else if (q.answer && typeof q.answer === 'object') {
@@ -1051,7 +1003,6 @@ firebase.auth().onAuthStateChanged(function(user){
   function buildSpokenPrompt(q){
     if (q.tts && String(q.tts).trim()) return stripQuotesForTTS(q.tts);
 
-    // audio_mcq: if promptAudio exists, we still keep a spoken fallback text.
     let text = String(q.prompt || '');
     if (q.type !== 'fillblank'){ return stripQuotesForTTS(ttsSanitize(text)); }
 
@@ -1119,26 +1070,55 @@ firebase.auth().onAuthStateChanged(function(user){
   }
   function speakFriendly(pool){ const pick = pool[(Math.random()*pool.length)|0]; speak(pick); }
 
-  /* =========================
-     NEW: prompt icon renderer
-  ========================= */
-  function renderPromptLine(q, rawPrompt){
-    promptEl.innerHTML = '';
+  function playAudioOrTTS(audioPath, fallbackText){
+    stopAllAudio();
+    const t = String(fallbackText || '').trim();
+    if (audioPath){
+      const a = new Audio(absPathQ(audioPath));
+      currentAudio = a;
+      a.onended = () => { currentAudio = null; };
+      a.onerror  = () => { currentAudio = null; if(t) speak(t); };
+      a.play().catch(() => { currentAudio = null; if(t) speak(t); });
+    } else {
+      if(t) speak(t);
+    }
+  }
 
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'prompt-audio';
-    btn.setAttribute('aria-label','Listen to prompt');
-    btn.title = 'Listen';
-    btn.textContent = '🔊';
-    btn.onclick = () => { if (!isReading) playPrompt(q); };
+  /* Prompt icon (NEW) */
+  function playPrompt(q){
+    const spoken = buildSpokenPrompt(q);
+    playAudioOrTTS(q.promptAudio, spoken);
+  }
 
-    const textSpan = document.createElement('span');
-    textSpan.className = 'prompt-text';
-    textSpan.innerHTML = renderPromptWithBlanks(rawPrompt);
+  /* NEW: audio_mcq Listen button plays correct option audio (answer) */
+  function getAudioMcqAnswerValue(q){
+    const corr = correctAnswers[idx];
+    const expArr = expectedChoiceArray(corr);
+    return String((expArr && expArr.length ? expArr[0] : (q.answer ?? '')) ?? '');
+  }
 
-    promptEl.appendChild(btn);
-    promptEl.appendChild(textSpan);
+  function playAudioMcqAnswer(q){
+    const ansValue = normalize(getAudioMcqAnswerValue(q));
+    const opts = Array.isArray(q.options) ? q.options : [];
+    let best = null;
+
+    for (let i=0;i<opts.length;i++){
+      const o0 = (typeof opts[i] === 'string') ? { label: opts[i], value: opts[i] } : Object.assign({}, opts[i]);
+      const value = (o0.value != null && String(o0.value).trim() !== '') ? String(o0.value) : String(o0.label ?? '');
+      if (normalize(value) === ansValue){
+        best = o0;
+        break;
+      }
+    }
+
+    // fallback: if no match, just speak the answer value
+    if (!best){
+      playAudioOrTTS(null, stripQuotesForTTS(ansValue));
+      return;
+    }
+
+    const ttsText = stripQuotesForTTS(String(best.tts || best.label || best.value || ''));
+    playAudioOrTTS(best.audio, ttsText);
   }
 
   /* =========================
@@ -1161,18 +1141,29 @@ firebase.auth().onAuthStateChanged(function(user){
       rawPrompt = 'Listen. Choose.';
     }
 
-    renderPromptLine(q, rawPrompt);
-
-    // Ensure at least one blank if fillblank prompt does not contain blank markers
+    promptEl.innerHTML = renderPromptWithBlanks(rawPrompt);
     if (q.type === 'fillblank' && !/\{blank\}|\{b\d+\}|_{3,}/i.test(rawPrompt)) {
-      // append a visual blank at end (keep prompt icon + text span structure)
-      const textSpan = promptEl.querySelector('.prompt-text');
-      if (textSpan){
-        const span = document.createElement('span');
-        span.className = 'blank'; span.setAttribute('aria-hidden','true');
-        textSpan.appendChild(document.createTextNode(' '));
-        textSpan.appendChild(span);
-      }
+      const span = document.createElement('span');
+      span.className = 'blank'; span.setAttribute('aria-hidden','true');
+      promptEl.appendChild(document.createTextNode(' '));
+      promptEl.appendChild(span);
+    }
+
+    // Prompt icon always exists
+    promptAudioBtn.disabled = false;
+    promptAudioBtn.onclick = () => { if (!isReading) playPrompt(q); };
+
+    // audio_mcq controls visibility + behavior
+    if (q.type === 'audio_mcq') {
+      audioMcqControls.style.display = 'flex';
+      btnListenAnswer.disabled = false;
+      btnListenAnswer.onclick = () => {
+        (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
+        playAudioMcqAnswer(q);
+      };
+    } else {
+      audioMcqControls.style.display = 'none';
+      btnListenAnswer.onclick = null;
     }
 
     mediaBox.innerHTML = '';
@@ -1209,7 +1200,6 @@ firebase.auth().onAuthStateChanged(function(user){
       const auto = (q.autoplayPrompt !== false);
       if (auto) {
         setTimeout(() => {
-          // don't autoplay if user already answered or moved
           if (questions[idx] === q && !answered && !isReading) {
             playPrompt(q);
           }
@@ -1222,10 +1212,6 @@ firebase.auth().onAuthStateChanged(function(user){
      Multiple-choice / Fillblank / audio_mcq
      - Single blank: 1 click = lock
      - Multi blank: collect selections until all blanks are filled, then grade once.
-     - NEW:
-       * audio_mcq:
-         - option click commits selection (no forced audio playback)
-         - each option includes a "Listen" control to hear the alternative (audio -> TTS fallback)
   ========================= */
   function makeOption(q, opt){
     const o0 = (typeof opt === 'string') ? { label: opt, value: opt } : Object.assign({}, opt);
@@ -1267,26 +1253,6 @@ firebase.auth().onAuthStateChanged(function(user){
 
     btn.appendChild(thumb); btn.appendChild(textWrap);
 
-    // For audio_mcq, provide a listen control for alternatives (audio -> TTS fallback)
-    let optListenBtn = null;
-    if (q.type === 'audio_mcq') {
-      optListenBtn = document.createElement('button');
-      optListenBtn.type = 'button';
-      optListenBtn.className = 'opt-listen';
-      optListenBtn.setAttribute('aria-label', 'Listen to this option');
-      optListenBtn.title = 'Listen';
-      optListenBtn.textContent = '🔊';
-
-      optListenBtn.onclick = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
-        playAlternativeForAudioMCQ(o, optListenBtn);
-      };
-
-      btn.appendChild(optListenBtn);
-    }
-
     const commit = () => {
       if (TEST_MODE && lockedQuestion[idx]) return;
 
@@ -1315,27 +1281,22 @@ firebase.auth().onAuthStateChanged(function(user){
       handleAnswer(q, o, btn);
     };
 
-    // OPTION CLICK BEHAVIOR
-    // - audio_mcq: student should listen via listen button and THEN choose; so click commits without playing option audio.
-    // - others: keep previous behavior (speak/play option then commit)
+    // IMPORTANT: audio_mcq options do NOT play audio on click (audio is via the question Listen button)
     btn.onclick = () => {
       (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
       if (q.type === 'audio_mcq') {
-        if (answered || isReading) return;
         commit();
       } else {
         speakSelectedThenCheck(q, o, btn, commit);
       }
     };
 
-    // thumb click keeps same behavior as option click (but for audio_mcq we do not play audio here)
     thumb.style.cursor = 'pointer';
     thumb.title = 'Choose';
     thumb.onclick = (e) => {
       e.preventDefault(); e.stopPropagation();
       (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
       if (q.type === 'audio_mcq') {
-        if (answered || isReading) return;
         commit();
       } else {
         speakSelectedThenCheck(q, o, btn, commit);
@@ -1343,53 +1304,6 @@ firebase.auth().onAuthStateChanged(function(user){
     };
 
     return btn;
-  }
-
-  function playAlternativeForAudioMCQ(o, btnEl){
-    if (answered || isReading) return;
-    isReading = true;
-
-    // Disable only listen buttons while playing (keep choosing possible but we guard with isReading)
-    const listenBtns = Array.from(document.querySelectorAll('.opt-listen'));
-    listenBtns.forEach(b => b.disabled = true);
-    if (btnEl) btnEl.disabled = true;
-
-    const finish = () => {
-      isReading = false;
-      listenBtns.forEach(b => b.disabled = false);
-    };
-
-    const say = (o.tts || o.label || o.value || '').toString().trim();
-    stopAllAudio();
-
-    if (o.audio){
-      try{
-        const a = new Audio(absPathQ(o.audio));
-        currentAudio = a;
-        let done = false;
-        const safeFinish = () => { if (!done){ done = true; currentAudio = null; finish(); } };
-        a.onended = safeFinish;
-        a.onerror = safeFinish;
-        a.onloadedmetadata = () => {
-          const guard = Math.max(1500, Math.round((a.duration||0)*1000) + 1500);
-          setTimeout(safeFinish, guard + 500);
-        };
-        a.play().catch(safeFinish);
-      }catch{
-        setTimeout(finish, 800);
-      }
-    } else {
-      try{
-        const u = new SpeechSynthesisUtterance(say || ' ');
-        u.lang = 'en-US'; u.rate = 0.95; u.pitch = 1.0;
-        u.onend   = finish;
-        u.onerror = finish;
-        speechSynthesis.cancel(); speechSynthesis.speak(u);
-        setTimeout(()=>{ if(isReading) finish(); }, 15000);
-      }catch{
-        setTimeout(finish, 800);
-      }
-    }
   }
 
   /* =========================
@@ -1677,24 +1591,6 @@ firebase.auth().onAuthStateChanged(function(user){
         if(el!==btn){ el.disabled = true; el.style.opacity = .65; }
         else { el.disabled = true; }
       });
-
-      // also disable any per-option listen buttons after answering (audio_mcq)
-      Array.from(optionsEl.querySelectorAll('.opt-listen')).forEach(el => { el.disabled = true; });
-    }
-  }
-
-  function playPrompt(q){
-    stopAllAudio();
-    const spoken = buildSpokenPrompt(q);
-
-    if (q.promptAudio){
-      const a = new Audio(absPathQ(q.promptAudio));
-      currentAudio = a;
-      a.onended = () => { currentAudio = null; };
-      a.onerror  = () => { currentAudio = null; speak(spoken); };
-      a.play().catch(() => { currentAudio = null; speak(spoken); });
-    } else {
-      speak(spoken);
     }
   }
 
@@ -1768,7 +1664,10 @@ firebase.auth().onAuthStateChanged(function(user){
     confetti(22);
     speakFriendly(['You may review your result now.']);
 
-    // Calcula e salva automaticamente ao final
+    // disable prompt icon when finished
+    promptAudioBtn.disabled = true;
+    audioMcqControls.style.display = 'none';
+
     checkCompletion(false);
   }
 
@@ -1836,7 +1735,6 @@ firebase.auth().onAuthStateChanged(function(user){
       return arraysEqual(got, expected);
     }
 
-    // mcq + audio_mcq (same grading)
     const expected = expArr[0] ?? '';
     return normalize(ans) === normalize(expected);
   }
