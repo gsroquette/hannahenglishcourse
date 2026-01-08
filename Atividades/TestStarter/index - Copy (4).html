@@ -55,27 +55,10 @@
   .question-card{ background:#f9fbff;border:1px solid #e5eaf5;border-radius:16px;padding:14px; margin: 0 auto; }
 
   .q-top{display:flex;flex-direction:column;gap:14px}
-
-  /* Prompt line now holds an inline audio icon */
-  .q-prompt{
-    font-size:22px;font-weight:800;line-height:1.3;word-break:break-word;
-    display:flex; gap:10px; align-items:flex-start;
-  }
-  .prompt-audio{
-    border:none; background:#e6f0ff; color:#0f3ea8;
-    width:36px; height:36px; border-radius:12px;
-    cursor:pointer; font-weight:800; flex:0 0 auto;
-    display:inline-flex; align-items:center; justify-content:center;
-    box-shadow:0 4px 10px rgba(0,0,0,.06);
-  }
-  .prompt-audio:active{ transform: translateY(1px); }
-  .prompt-audio[disabled]{opacity:.4; pointer-events:none}
-  .prompt-text{flex:1 1 auto; min-width:0}
-
+  .q-prompt{font-size:22px;font-weight:800;line-height:1.3;word-break:break-word}
   .q-media{width:100%;aspect-ratio:16/10;background:#eef4ff;border:1px dashed #cfe0ff;border-radius:14px;padding:8px;overflow:hidden;display:block}
   .q-media img{width:100%;height:100%;object-fit:contain;display:block}
   @supports not (aspect-ratio:16/10){.q-media{height:220px}}
-
   .q-controls{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
   .icon-btn{border:none;background:#e6f0ff;color:#0f3ea8;padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:700}
   .icon-btn:active{transform:translateY(1px)}
@@ -85,8 +68,7 @@
     display:flex;align-items:center;gap:12px;background:#fff;border:2px solid #e9eef7;border-radius:18px;
     padding:12px;cursor:pointer;user-select:none;min-height:78px;
     box-shadow:0 4px 12px rgba(0,0,0,.03);
-    transition:transform .06s ease,border-color .15s ease,box-shadow .15s ease;
-    position:relative;
+    transition:transform .06s ease,border-color .15s ease,box-shadow .15s ease
   }
   .option:hover{transform:translateY(-1px);box-shadow:0 8px 18px rgba(0,0,0,.06)}
   .option:active{transform:translateY(0)}
@@ -140,18 +122,6 @@
   @keyframes spin{to{transform:rotate(360deg)}}
   .icon-btn[disabled]{opacity:.4;pointer-events:none}
   .is-hidden{display:none!important}
-
-  /* audio_mcq option listen button (inside option) */
-  .opt-listen{
-    position:absolute; top:10px; right:10px;
-    width:34px; height:34px; border-radius:12px;
-    border:none; background:#eef2ff; color:#0f3ea8;
-    cursor:pointer; font-weight:800;
-    display:inline-flex; align-items:center; justify-content:center;
-    box-shadow:0 4px 10px rgba(0,0,0,.06);
-  }
-  .opt-listen:active{ transform: translateY(1px); }
-  .opt-listen[disabled]{opacity:.45; pointer-events:none}
 
   @media (max-width:720px){
     .options{grid-template-columns:1fr}
@@ -222,7 +192,10 @@
         <div class="q-top">
           <div>
             <div class="q-prompt" id="prompt">—</div>
-            <!-- Removed: old Listen button + Repeat button -->
+            <div class="q-controls">
+              <button class="icon-btn" id="btnPlayPrompt" title="Listen to question">🔊 Listen</button>
+              <button class="icon-btn" id="btnRepeat" title="Repeat aloud (optional)">🎤 Repeat</button>
+            </div>
           </div>
           <div class="q-media" id="mediaBox" aria-label="Question image"></div>
         </div>
@@ -323,7 +296,6 @@ firebase.auth().onAuthStateChanged(function(user){
      - Same grading rules as mcq
      - Prompt audio (q.promptAudio) is primary. If missing/unplayable, TTS fallback.
      - Optional auto-play on load: q.autoplayPrompt (default true for audio_mcq)
-     - NEW: For audio_mcq, student listens to alternatives via a listen control (per option).
   ========================= */
 
   /* ======= Estado do teste ======= */
@@ -468,6 +440,8 @@ firebase.auth().onAuthStateChanged(function(user){
   const promptEl   = document.getElementById('prompt');
   const mediaBox   = document.getElementById('mediaBox');
   const optionsEl  = document.getElementById('options');
+  const btnPlayPrompt = document.getElementById('btnPlayPrompt');
+  const btnRepeat  = document.getElementById('btnRepeat');
   const btnNext    = document.getElementById('btnNext');
   const statusPill = document.getElementById('statusPill');
   const confettiEl = document.getElementById('confetti');
@@ -1120,33 +1094,13 @@ firebase.auth().onAuthStateChanged(function(user){
   function speakFriendly(pool){ const pick = pool[(Math.random()*pool.length)|0]; speak(pick); }
 
   /* =========================
-     NEW: prompt icon renderer
-  ========================= */
-  function renderPromptLine(q, rawPrompt){
-    promptEl.innerHTML = '';
-
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'prompt-audio';
-    btn.setAttribute('aria-label','Listen to prompt');
-    btn.title = 'Listen';
-    btn.textContent = '🔊';
-    btn.onclick = () => { if (!isReading) playPrompt(q); };
-
-    const textSpan = document.createElement('span');
-    textSpan.className = 'prompt-text';
-    textSpan.innerHTML = renderPromptWithBlanks(rawPrompt);
-
-    promptEl.appendChild(btn);
-    promptEl.appendChild(textSpan);
-  }
-
-  /* =========================
      Render current question
   ========================= */
   function renderQuestion(){
     answered = false;
     btnNext.disabled = true; btnNext.classList.remove('ready');
+    btnPlayPrompt.disabled = false; btnRepeat.disabled = false;
+    btnPlayPrompt.classList.remove('is-hidden'); btnRepeat.classList.remove('is-hidden');
 
     const q = questions[idx];
     if(!q){ finish(); return; }
@@ -1161,19 +1115,16 @@ firebase.auth().onAuthStateChanged(function(user){
       rawPrompt = 'Listen. Choose.';
     }
 
-    renderPromptLine(q, rawPrompt);
-
-    // Ensure at least one blank if fillblank prompt does not contain blank markers
+    promptEl.innerHTML = renderPromptWithBlanks(rawPrompt);
     if (q.type === 'fillblank' && !/\{blank\}|\{b\d+\}|_{3,}/i.test(rawPrompt)) {
-      // append a visual blank at end (keep prompt icon + text span structure)
-      const textSpan = promptEl.querySelector('.prompt-text');
-      if (textSpan){
-        const span = document.createElement('span');
-        span.className = 'blank'; span.setAttribute('aria-hidden','true');
-        textSpan.appendChild(document.createTextNode(' '));
-        textSpan.appendChild(span);
-      }
+      const span = document.createElement('span');
+      span.className = 'blank'; span.setAttribute('aria-hidden','true');
+      promptEl.appendChild(document.createTextNode(' '));
+      promptEl.appendChild(span);
     }
+
+    btnPlayPrompt.onclick = () => { if (!isReading) playPrompt(q); };
+    btnRepeat.onclick     = () => { if (isReading) return; stopAllAudio(); speak(buildSpokenPrompt(q)); };
 
     mediaBox.innerHTML = '';
     if(q.image){
@@ -1222,10 +1173,6 @@ firebase.auth().onAuthStateChanged(function(user){
      Multiple-choice / Fillblank / audio_mcq
      - Single blank: 1 click = lock
      - Multi blank: collect selections until all blanks are filled, then grade once.
-     - NEW:
-       * audio_mcq:
-         - option click commits selection (no forced audio playback)
-         - each option includes a "Listen" control to hear the alternative (audio -> TTS fallback)
   ========================= */
   function makeOption(q, opt){
     const o0 = (typeof opt === 'string') ? { label: opt, value: opt } : Object.assign({}, opt);
@@ -1267,26 +1214,6 @@ firebase.auth().onAuthStateChanged(function(user){
 
     btn.appendChild(thumb); btn.appendChild(textWrap);
 
-    // For audio_mcq, provide a listen control for alternatives (audio -> TTS fallback)
-    let optListenBtn = null;
-    if (q.type === 'audio_mcq') {
-      optListenBtn = document.createElement('button');
-      optListenBtn.type = 'button';
-      optListenBtn.className = 'opt-listen';
-      optListenBtn.setAttribute('aria-label', 'Listen to this option');
-      optListenBtn.title = 'Listen';
-      optListenBtn.textContent = '🔊';
-
-      optListenBtn.onclick = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
-        playAlternativeForAudioMCQ(o, optListenBtn);
-      };
-
-      btn.appendChild(optListenBtn);
-    }
-
     const commit = () => {
       if (TEST_MODE && lockedQuestion[idx]) return;
 
@@ -1315,81 +1242,19 @@ firebase.auth().onAuthStateChanged(function(user){
       handleAnswer(q, o, btn);
     };
 
-    // OPTION CLICK BEHAVIOR
-    // - audio_mcq: student should listen via listen button and THEN choose; so click commits without playing option audio.
-    // - others: keep previous behavior (speak/play option then commit)
     btn.onclick = () => {
       (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
-      if (q.type === 'audio_mcq') {
-        if (answered || isReading) return;
-        commit();
-      } else {
-        speakSelectedThenCheck(q, o, btn, commit);
-      }
+      speakSelectedThenCheck(q, o, btn, commit);
     };
-
-    // thumb click keeps same behavior as option click (but for audio_mcq we do not play audio here)
     thumb.style.cursor = 'pointer';
-    thumb.title = 'Choose';
+    thumb.title = 'Play & choose';
     thumb.onclick = (e) => {
       e.preventDefault(); e.stopPropagation();
       (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
-      if (q.type === 'audio_mcq') {
-        if (answered || isReading) return;
-        commit();
-      } else {
-        speakSelectedThenCheck(q, o, btn, commit);
-      }
+      speakSelectedThenCheck(q, o, btn, commit);
     };
 
     return btn;
-  }
-
-  function playAlternativeForAudioMCQ(o, btnEl){
-    if (answered || isReading) return;
-    isReading = true;
-
-    // Disable only listen buttons while playing (keep choosing possible but we guard with isReading)
-    const listenBtns = Array.from(document.querySelectorAll('.opt-listen'));
-    listenBtns.forEach(b => b.disabled = true);
-    if (btnEl) btnEl.disabled = true;
-
-    const finish = () => {
-      isReading = false;
-      listenBtns.forEach(b => b.disabled = false);
-    };
-
-    const say = (o.tts || o.label || o.value || '').toString().trim();
-    stopAllAudio();
-
-    if (o.audio){
-      try{
-        const a = new Audio(absPathQ(o.audio));
-        currentAudio = a;
-        let done = false;
-        const safeFinish = () => { if (!done){ done = true; currentAudio = null; finish(); } };
-        a.onended = safeFinish;
-        a.onerror = safeFinish;
-        a.onloadedmetadata = () => {
-          const guard = Math.max(1500, Math.round((a.duration||0)*1000) + 1500);
-          setTimeout(safeFinish, guard + 500);
-        };
-        a.play().catch(safeFinish);
-      }catch{
-        setTimeout(finish, 800);
-      }
-    } else {
-      try{
-        const u = new SpeechSynthesisUtterance(say || ' ');
-        u.lang = 'en-US'; u.rate = 0.95; u.pitch = 1.0;
-        u.onend   = finish;
-        u.onerror = finish;
-        speechSynthesis.cancel(); speechSynthesis.speak(u);
-        setTimeout(()=>{ if(isReading) finish(); }, 15000);
-      }catch{
-        setTimeout(finish, 800);
-      }
-    }
   }
 
   /* =========================
@@ -1677,9 +1542,6 @@ firebase.auth().onAuthStateChanged(function(user){
         if(el!==btn){ el.disabled = true; el.style.opacity = .65; }
         else { el.disabled = true; }
       });
-
-      // also disable any per-option listen buttons after answering (audio_mcq)
-      Array.from(optionsEl.querySelectorAll('.opt-listen')).forEach(el => { el.disabled = true; });
     }
   }
 
@@ -1767,6 +1629,9 @@ firebase.auth().onAuthStateChanged(function(user){
     statusPill.textContent = `Completed • ${questions.length}/${questions.length}`;
     confetti(22);
     speakFriendly(['You may review your result now.']);
+
+    btnPlayPrompt.disabled = true; btnRepeat.disabled = true;
+    btnPlayPrompt.classList.add('is-hidden'); btnRepeat.classList.add('is-hidden');
 
     // Calcula e salva automaticamente ao final
     checkCompletion(false);
