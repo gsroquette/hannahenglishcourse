@@ -221,21 +221,6 @@
     gap:10px 12px;
     margin-bottom:8px;
   }
-
-  /* ==== NOVO: filtros opcionais da busca ==== */
-  .filter-row{
-    display:grid;
-    grid-template-columns:repeat(4,minmax(0,1fr));
-    gap:10px 12px;
-    margin:10px 0 8px;
-    align-items:end;
-  }
-  .filter-actions{
-    display:flex;
-    justify-content:flex-end;
-    gap:8px;
-  }
-
   .results-list{
     margin-top:8px;
     display:flex;
@@ -291,41 +276,10 @@
     color:#b91c1c;
   }
 
-  /* ==== agrupamento por fase ==== */
-  .phase-group{
-    border:1px solid #e5e7eb;
-    border-radius:14px;
-    padding:10px 10px 8px;
-    background:#ffffff;
-  }
-  .phase-header{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:10px;
-    margin-bottom:8px;
-  }
-  .phase-title{
-    font-weight:800;
-    font-size:13px;
-    color:#111827;
-  }
-  .phase-meta{
-    font-size:11px;
-    color:var(--muted);
-  }
-  .phase-items{
-    display:flex;
-    flex-direction:column;
-    gap:8px;
-  }
-
   @media(max-width:720px){
     .app{padding:14px 10px 18px;}
     form{grid-template-columns:1fr;}
     .search-row{grid-template-columns:1fr;}
-    .filter-row{grid-template-columns:1fr;}
-    .filter-actions{justify-content:flex-start;}
   }
 </style>
 </head>
@@ -449,8 +403,8 @@
   <div class="section-box">
     <div class="section-title">Pesquisar / editar questões existentes</div>
     <div class="section-sub">
-      Informe Level e Unit. Se você preencher também a Fase, o sistema lista apenas aquela atividade.
-      Se deixar a Fase em branco, ele mostra todas as fases encontradas dentro da Unit, agrupadas por fase.
+      Informe Level, Unit e Fase para ver todas as questões daquela atividade.
+      Você pode carregar qualquer questão para o formulário acima ou apagá-la.
     </div>
 
     <div class="search-row">
@@ -463,62 +417,13 @@
         <input id="search-unit" type="text" placeholder="Ex.: Unit1" />
       </div>
       <div class="field">
-        <label for="search-fase">Fase (opcional)</label>
+        <label for="search-fase">Fase</label>
         <input id="search-fase" type="number" min="1" step="1" placeholder="Ex.: 7" />
       </div>
     </div>
 
-    <!-- ===== NOVO: FILTROS OPCIONAIS ===== -->
-    <div class="filter-row">
-      <div class="field">
-        <label for="search-type">type (filtro opcional)</label>
-        <select id="search-type">
-          <option value="">— todos —</option>
-          <option value="__missing__">(sem valor)</option>
-          <option value="mcq">mcq</option>
-          <option value="yesno">yesno</option>
-          <option value="truefalse">truefalse</option>
-          <option value="image_mcq">image_mcq</option>
-          <option value="audio_mcq">audio_mcq</option>
-          <option value="fillblank">fillblank</option>
-          <option value="order">order</option>
-          <option value="match">match</option>
-        </select>
-      </div>
-
-      <div class="field">
-        <label for="search-skillType">skillType (filtro opcional)</label>
-        <select id="search-skillType">
-          <option value="">— todos —</option>
-          <option value="__missing__">(sem valor)</option>
-          <option value="listening_reading">listening_reading</option>
-          <option value="vocabulary">vocabulary</option>
-          <option value="writing">writing</option>
-          <option value="grammar">grammar</option>
-          <option value="conversation">conversation</option>
-        </select>
-      </div>
-
-      <div class="field">
-        <label for="search-difficulty">difficulty (filtro opcional)</label>
-        <select id="search-difficulty">
-          <option value="">— todos —</option>
-          <option value="__missing__">(sem valor)</option>
-          <option value="easy">easy</option>
-          <option value="medium">medium</option>
-          <option value="hard">hard</option>
-        </select>
-      </div>
-
-      <div class="filter-actions">
-        <button type="button" class="btn-secondary" id="btnClearFilters">
-          Limpar filtros
-        </button>
-      </div>
-    </div>
-
     <button type="button" class="btn-secondary" id="btnSearchQuestions">
-      🔍 Carregar questões
+      🔍 Carregar questões da fase
     </button>
 
     <div id="searchResults" class="results-list"></div>
@@ -598,18 +503,6 @@
     if (btnSearch) btnSearch.disabled = !!flag;
   }
 
-  function safeParseInt(val){
-    const n = parseInt(String(val || "").trim(), 10);
-    return isNaN(n) ? null : n;
-  }
-
-  function parseFaseFromActivityKey(activityKey){
-    // esperado: LevelX_UnitY_FaseN
-    const m = String(activityKey || "").match(/_Fase(\d+)$/i);
-    if (!m) return null;
-    const n = parseInt(m[1], 10);
-    return isNaN(n) ? null : n;
-  }
   // ==== Regra híbrida de validação de type ====
   const VALID_TYPES = [
     "mcq",
@@ -893,6 +786,8 @@
       order: orderNum || 1,
       skillType: skillSel,
       difficulty: diffSel
+      // basePath (opcional) pode ser adicionado aqui se você quiser
+      // basePath: ""
     };
 
     // título do preview
@@ -1171,7 +1066,8 @@
         const finalIds = existingIds.slice();
         finalIds.splice(insertAt, 0, ...newIds);
 
-        // ajusta order dos novos
+        // agora que temos a ordem final, ajusta q.order dos novos (DENTRO do objeto),
+        // sem criar paths filhos no mesmo update (evita conflito de ancestor path)
         for (let i = 0; i < newIds.length; i++){
           const id = newIds[i];
           const pos = finalIds.indexOf(id);
@@ -1216,6 +1112,7 @@
       showLoading(false);
     }
   });
+
   // ===== BUSCA / LISTAGEM =====
   const searchLevelEl = document.getElementById('search-level');
   const searchUnitEl  = document.getElementById('search-unit');
@@ -1223,164 +1120,20 @@
   const searchBtn     = document.getElementById('btnSearchQuestions');
   const resultsEl     = document.getElementById('searchResults');
 
-  // filtros
-  const searchTypeEl       = document.getElementById('search-type');
-  const searchSkillTypeEl  = document.getElementById('search-skillType');
-  const searchDifficultyEl = document.getElementById('search-difficulty');
-  const btnClearFilters    = document.getElementById('btnClearFilters');
-
-  /*
-    lastSearch:
-      - mode: "single" | "unit"
-      - levelKey, unitKey
-      - faseKey (single)
-      - activityKey (single)
-      - prefix (unit)
-      - rawItems (single)
-      - rawGroups (unit)  // faseKey -> { faseNum, faseKey, activityKey, items:[...] }
-  */
-  let lastSearch = null;
-
-  function getActiveFilters(){
-    return {
-      type: (searchTypeEl ? String(searchTypeEl.value || "") : ""),
-      skillType: (searchSkillTypeEl ? String(searchSkillTypeEl.value || "") : ""),
-      difficulty: (searchDifficultyEl ? String(searchDifficultyEl.value || "") : "")
-    };
-  }
-
-  function isMissingValueFilter(v){
-    return String(v || "").toLowerCase() === "__missing__";
-  }
-
-  function matchesFieldFilter(q, field, selectedValue){
-    if (!selectedValue) return true; // sem filtro
-
-    const v = q ? q[field] : undefined;
-
-    if (isMissingValueFilter(selectedValue)){
-      return (v == null || String(v).trim() === "");
-    }
-
-    return String(v || "") === String(selectedValue);
-  }
-
-  function applyFiltersToItems(items, filters){
-    const list = Array.isArray(items) ? items : [];
-    return list.filter(it => {
-      const q = (it && it.data) ? it.data : {};
-      return (
-        matchesFieldFilter(q, "type", filters.type) &&
-        matchesFieldFilter(q, "skillType", filters.skillType) &&
-        matchesFieldFilter(q, "difficulty", filters.difficulty)
-      );
-    });
-  }
-
-  function applyFiltersToGroupsKeepEmpty(groups, filters){
-    const src = groups || {};
-    const out = {};
-
-    Object.keys(src).forEach(fk => {
-      const g = src[fk] || {};
-      const rawItems = Array.isArray(g.items) ? g.items : [];
-      const filteredItems = applyFiltersToItems(rawItems, filters);
-
-      // IMPORTANTE: mantém o grupo mesmo vazio
-      out[fk] = {
-        faseNum: g.faseNum != null ? g.faseNum : null,
-        faseKey: g.faseKey != null ? g.faseKey : fk,
-        activityKey: g.activityKey || "",
-        items: filteredItems
-      };
-    });
-
-    return out;
-  }
-
-  function reRenderFromLastSearch(){
-    if (!lastSearch) return;
-
-    const filters = getActiveFilters();
-
-    if (lastSearch.mode === "single"){
-      const base = Array.isArray(lastSearch.rawItems) ? lastSearch.rawItems : [];
-      const filtered = applyFiltersToItems(base, filters);
-      renderResults(lastSearch.activityKey, filtered);
-
-      setStatus(
-        "<b>Status:</b> " +
-        "carregadas " + base.length + " questão(ões); " +
-        "após filtro: <b>" + filtered.length + "</b>."
-      );
-      return;
-    }
-
-    if (lastSearch.mode === "unit"){
-      const baseGroups = lastSearch.rawGroups || {};
-      const filteredGroups = applyFiltersToGroupsKeepEmpty(baseGroups, filters);
-
-      renderResultsGrouped(filteredGroups);
-
-      const totalFases = Object.keys(filteredGroups).length;
-
-      let totalBase = 0;
-      Object.keys(baseGroups).forEach(fk => totalBase += (baseGroups[fk].items || []).length);
-
-      let totalAfter = 0;
-      Object.keys(filteredGroups).forEach(fk => totalAfter += (filteredGroups[fk].items || []).length);
-
-      setStatus(
-        "<b>Status:</b> " +
-        "encontradas <b>" + totalFases + "</b> fase(s) em <code>" + lastSearch.levelKey + "/" + lastSearch.unitKey + "</code>. " +
-        "Questões: " + totalBase + " (antes) → <b>" + totalAfter + "</b> (após filtro)."
-      );
-      return;
-    }
-  }
-
-  function clearFilters(){
-    if (searchTypeEl) searchTypeEl.value = "";
-    if (searchSkillTypeEl) searchSkillTypeEl.value = "";
-    if (searchDifficultyEl) searchDifficultyEl.value = "";
-    reRenderFromLastSearch();
-  }
-
-  if (btnClearFilters){
-    btnClearFilters.addEventListener('click', () => clearFilters());
-  }
-
-  // refiltra automaticamente ao mudar qualquer filtro
-  if (searchTypeEl){
-    searchTypeEl.addEventListener('change', () => reRenderFromLastSearch());
-  }
-  if (searchSkillTypeEl){
-    searchSkillTypeEl.addEventListener('change', () => reRenderFromLastSearch());
-  }
-  if (searchDifficultyEl){
-    searchDifficultyEl.addEventListener('change', () => reRenderFromLastSearch());
-  }
+  let lastSearch = null; // guarda última busca (para recarregar após apagar)
 
   async function performSearch(levelRaw, unitRaw, faseRaw){
-    const lvl = String(levelRaw || "").trim();
-    const unt = String(unitRaw  || "").trim();
-    const fs  = String(faseRaw  || "").trim();
+    const lvl = levelRaw.trim();
+    const unt = unitRaw.trim();
+    const fs  = faseRaw.trim();
 
-    if (!lvl || !unt){
-      showToast("Preencha Level e Unit para buscar.");
+    if (!lvl || !unt || !fs){
+      showToast("Preencha Level, Unit e Fase para buscar.");
       return;
     }
 
     const levelKey = normalizeDir("Level", lvl, "0");
     const unitKey  = normalizeDir("Unit",  unt, "1");
-
-    // Se fase estiver vazia: buscar todas as fases da Unit
-    if (!fs){
-      await performSearchAllFases(levelKey, unitKey);
-      return;
-    }
-
-    // Caso contrário: modo antigo (uma fase)
     const faseKey  = String(parseInt(fs,10) || 1);
     const activityKey = `${levelKey}_${unitKey}_Fase${faseKey}`;
 
@@ -1394,49 +1147,32 @@
       const act  = snap.val();
 
       if (!act || !Array.isArray(act.questionIds) || act.questionIds.length === 0){
-        // cache vazio
-        lastSearch = {
-          mode:"single",
-          activityKey,
-          levelKey,
-          unitKey,
-          faseKey,
-          rawItems: []
-        };
-
-        // ainda assim renderiza vazio
-        renderResults(activityKey, []);
-        setStatus("<b>Status:</b> nenhuma questão encontrada em <code>activities/"+activityKey+"</code>.");
+        resultsEl.innerHTML = "<div class='hint'>Nenhuma questão cadastrada para esta atividade ainda.</div>";
+        setStatus("<b>Status:</b> nenhuma questão encontrado em <code>activities/"+activityKey+"</code>.");
+        lastSearch = {activityKey, levelKey, unitKey, faseKey, items: []};
         return;
       }
 
       const ids = act.questionIds;
-
       const promises = ids.map(id => firebase.database().ref("questions/"+id).once("value"));
       const snaps = await Promise.all(promises);
 
-      const rawItems = snaps.map((s, index) => {
+      const items = snaps.map((s, index) => {
         const data = s.val() || {};
         return {
-          activityKey,
-          faseKey,
           id: ids[index],
           data,
           pos: index + 1
         };
       });
 
-      lastSearch = {
-        mode:"single",
-        activityKey,
-        levelKey,
-        unitKey,
-        faseKey,
-        rawItems
-      };
+      lastSearch = {activityKey, levelKey, unitKey, faseKey, items};
+      renderResults(activityKey, items);
 
-      // render já aplicando filtros
-      reRenderFromLastSearch();
+      setStatus(
+        "<b>Status:</b> carregadas " + items.length +
+        " questão(ões) de <code>activities/"+activityKey+"</code>."
+      );
     } catch(err){
       console.error("Erro ao buscar questões:", err);
       showToast("Erro ao buscar questões. Veja o console.");
@@ -1446,106 +1182,10 @@
     }
   }
 
-  // Novo: busca TODAS as fases daquela Unit
-  async function performSearchAllFases(levelKey, unitKey){
-    const prefix = `${levelKey}_${unitKey}_Fase`;
-
-    showLoading(true);
-    resultsEl.innerHTML = "";
-    setStatus("<b>Status:</b> buscando todas as fases em <code>activities/</code> com prefixo <code>" + prefix + "</code>…");
-
-    try{
-      // Realtime DB: buscar por prefixo no "key"
-      const ref = firebase.database().ref("activities")
-        .orderByKey()
-        .startAt(prefix)
-        .endAt(prefix + "\uf8ff");
-
-      const snap = await ref.once("value");
-      const map = snap.val() || {};
-
-      const activityKeys = Object.keys(map || {});
-      if (activityKeys.length === 0){
-        lastSearch = { mode:"unit", levelKey, unitKey, prefix, rawGroups: {} };
-        renderResultsGrouped({});
-        setStatus("<b>Status:</b> nenhuma fase encontrada com prefixo <code>" + prefix + "</code>.");
-        return;
-      }
-
-      // Monta lista de fases encontradas
-      const acts = activityKeys.map(k => {
-        const act = map[k] || {};
-        const faseNum = safeParseInt(act.fase) || parseFaseFromActivityKey(k) || null;
-        const faseKey = (faseNum != null ? String(faseNum) : null);
-        const ids = Array.isArray(act.questionIds) ? act.questionIds.slice() : [];
-        return { activityKey: k, faseNum, faseKey, ids };
-      });
-
-      // Ordena por fase numérica (quando existir), senão por key
-      acts.sort((a,b) => {
-        if (a.faseNum != null && b.faseNum != null) return a.faseNum - b.faseNum;
-        if (a.faseNum != null) return -1;
-        if (b.faseNum != null) return 1;
-        return String(a.activityKey).localeCompare(String(b.activityKey));
-      });
-
-      // Busca todas as questões (em paralelo por fase) e monta rawGroups
-      const rawGroups = {}; // faseKey -> { faseNum, faseKey, activityKey, items:[] }
-
-      for (const a of acts){
-        const faseLabel = (a.faseNum != null ? String(a.faseNum) : (a.faseKey || "—"));
-        const fk = (a.faseKey || faseLabel);
-
-        if (!rawGroups[fk]){
-          rawGroups[fk] = {
-            faseNum: a.faseNum,
-            faseKey: fk,
-            activityKey: a.activityKey,
-            items: []
-          };
-        }
-
-        if (!a.ids || a.ids.length === 0){
-          // fase sem questões: mantém grupo vazio
-          rawGroups[fk].items = [];
-          continue;
-        }
-
-        const promises = a.ids.map(id => firebase.database().ref("questions/"+id).once("value"));
-        const snaps = await Promise.all(promises);
-
-        const items = snaps.map((s, index) => {
-          const data = s.val() || {};
-          return {
-            activityKey: a.activityKey,
-            faseKey: fk,
-            id: a.ids[index],
-            data,
-            pos: index + 1
-          };
-        });
-
-        rawGroups[fk].items = items;
-      }
-
-      lastSearch = { mode:"unit", levelKey, unitKey, prefix, rawGroups };
-
-      // render já aplicando filtros e mantendo fases vazias
-      reRenderFromLastSearch();
-
-    } catch(err){
-      console.error("Erro ao buscar fases da unit:", err);
-      showToast("Erro ao buscar fases/questões. Veja o console.");
-      setStatus("<b>Status:</b> erro ao buscar fases/questões.<span class='pill-err'>Erro</span>");
-    } finally{
-      showLoading(false);
-    }
-  }
-
   function renderResults(activityKey, items){
     resultsEl.innerHTML = "";
     if (!items || items.length === 0){
-      resultsEl.innerHTML = "<div class='hint'>Nenhuma questão encontrada com os filtros atuais.</div>";
+      resultsEl.innerHTML = "<div class='hint'>Nenhuma questão encontrada.</div>";
       return;
     }
 
@@ -1604,160 +1244,28 @@
     });
   }
 
-  // Render agrupado por fase — mantém fases mesmo vazias
-  function renderResultsGrouped(groups){
-    resultsEl.innerHTML = "";
-    const faseKeys = Object.keys(groups || {});
-    if (faseKeys.length === 0){
-      resultsEl.innerHTML = "<div class='hint'>Nenhuma fase encontrada.</div>";
-      return;
-    }
-
-    // ordenação fase numérica se possível
-    faseKeys.sort((a,b) => {
-      const ga = groups[a] || {};
-      const gb = groups[b] || {};
-      const na = (ga.faseNum != null ? ga.faseNum : safeParseInt(a));
-      const nb = (gb.faseNum != null ? gb.faseNum : safeParseInt(b));
-      if (na != null && nb != null) return na - nb;
-      if (na != null) return -1;
-      if (nb != null) return 1;
-      return String(a).localeCompare(String(b));
-    });
-
-    faseKeys.forEach(fk => {
-      const g = groups[fk] || {};
-      const items = Array.isArray(g.items) ? g.items : [];
-
-      const wrap = document.createElement('div');
-      wrap.className = 'phase-group';
-
-      const head = document.createElement('div');
-      head.className = 'phase-header';
-
-      const title = document.createElement('div');
-      title.className = 'phase-title';
-      title.textContent = "Fase " + (g.faseNum != null ? g.faseNum : fk);
-
-      const meta = document.createElement('div');
-      meta.className = 'phase-meta';
-      meta.textContent = (items.length) + " questão(ões)";
-
-      head.appendChild(title);
-      head.appendChild(meta);
-      wrap.appendChild(head);
-
-      const list = document.createElement('div');
-      list.className = 'phase-items';
-
-      if (items.length === 0){
-        const empty = document.createElement('div');
-        empty.className = 'hint';
-        empty.textContent = "Nenhuma questão cadastrada nesta fase.";
-        list.appendChild(empty);
-      } else {
-        items.forEach(item => {
-          const q   = item.data || {};
-          const div = document.createElement('div');
-          div.className = 'q-row';
-
-          const header = document.createElement('div');
-          header.className = 'q-row-header';
-
-          const idSpan = document.createElement('div');
-          idSpan.className = 'q-row-id';
-          idSpan.textContent = item.id;
-
-          const m = document.createElement('div');
-          m.className = 'q-row-meta';
-          const ord = (q.order != null ? q.order : item.pos);
-          m.textContent =
-            "ordem: " + ord +
-            (q.type ? " | type: " + q.type : "") +
-            (q.skillType ? " | skillType: " + q.skillType : "") +
-            (q.difficulty ? " | difficulty: " + q.difficulty : "");
-
-          header.appendChild(idSpan);
-          header.appendChild(m);
-          div.appendChild(header);
-
-          if (q.prompt){
-            const p = document.createElement('div');
-            p.className = 'q-row-prompt';
-            p.textContent = q.prompt;
-            div.appendChild(p);
-          }
-
-          const btnRow = document.createElement('div');
-          btnRow.className = 'row-buttons';
-
-          const btnEdit = document.createElement('button');
-          btnEdit.type = 'button';
-          btnEdit.className = 'btn-secondary btn-xs';
-          btnEdit.textContent = '✏️ Editar';
-          btnEdit.onclick = () => editQuestionFromList(item.id);
-
-          const btnDel = document.createElement('button');
-          btnDel.type = 'button';
-          btnDel.className = 'btn-danger btn-xs';
-          btnDel.textContent = '🗑️ Apagar';
-          btnDel.onclick = () => deleteQuestionFromList(item.activityKey, item.id);
-
-          btnRow.appendChild(btnEdit);
-          btnRow.appendChild(btnDel);
-          div.appendChild(btnRow);
-
-          list.appendChild(div);
-        });
-      }
-
-      wrap.appendChild(list);
-      resultsEl.appendChild(wrap);
-    });
-  }
-
   searchBtn.addEventListener('click', () => {
     performSearch(
       searchLevelEl.value || document.getElementById('level').value || "",
       searchUnitEl.value  || document.getElementById('unit').value  || "",
-      searchFaseEl.value  || "" // fase é opcional agora
+      searchFaseEl.value  || document.getElementById('fase').value  || ""
     );
   });
 
   // ===== Editar: carrega dados para o formulário principal =====
   function editQuestionFromList(questionId){
-    if (!lastSearch) return;
-
-    let item = null;
-
-    if (lastSearch.mode === "single"){
-      item = (lastSearch.rawItems || []).find(it => it.id === questionId);
-    } else if (lastSearch.mode === "unit"){
-      const groups = lastSearch.rawGroups || {};
-      const gks = Object.keys(groups);
-      for (const fk of gks){
-        const found = (groups[fk].items || []).find(it => it.id === questionId);
-        if (found){
-          item = found;
-          break;
-        }
-      }
-    }
-
+    if (!lastSearch || !lastSearch.items) return;
+    const item = lastSearch.items.find(it => it.id === questionId);
     if (!item){
       showToast("Questão não encontrada no cache da busca.");
       return;
     }
-
     const q = item.data || {};
 
-    // Preenche Level/Unit com base na última busca
-    if (lastSearch.levelKey) document.getElementById('level').value = lastSearch.levelKey;
-    if (lastSearch.unitKey)  document.getElementById('unit').value  = lastSearch.unitKey;
-
-    // fase: se vier no item/grupo, usa. senão tenta do próprio q.fase
-    const faseVal = item.faseKey || (q.fase != null ? String(q.fase) : "");
-    if (faseVal) document.getElementById('fase').value  = faseVal;
+    // Preenche Level/Unit/Fase com base na última busca
+    document.getElementById('level').value = lastSearch.levelKey;
+    document.getElementById('unit').value  = lastSearch.unitKey;
+    document.getElementById('fase').value  = lastSearch.faseKey;
 
     document.getElementById('questionId').value = questionId;
     document.getElementById('order').value      = (q.order != null ? q.order : item.pos) || "";
@@ -1798,13 +1306,8 @@
       showToast("Questão apagada.");
       setStatus("<b>Status:</b> questão apagada de <code>questions/"+questionId+"</code> e atualizada em <code>activities/"+activityKey+"</code>.");
 
-      // Recarrega a última busca (single ou unit)
       if (lastSearch){
-        if (lastSearch.mode === "single"){
-          await performSearch(lastSearch.levelKey, lastSearch.unitKey, lastSearch.faseKey);
-        } else if (lastSearch.mode === "unit"){
-          await performSearchAllFases(lastSearch.levelKey, lastSearch.unitKey);
-        }
+        await performSearch(lastSearch.levelKey, lastSearch.unitKey, lastSearch.faseKey);
       }
     } catch(err){
       console.error("Erro ao apagar questão:", err);
