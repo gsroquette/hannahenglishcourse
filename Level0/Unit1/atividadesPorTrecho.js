@@ -3,15 +3,13 @@
 function getActivitiesByTrecho(trecho, level, unit) {
     switch (trecho) {
         case "trecho1":
-            return [
-                { id: 1, name: "StoryCards", path: `/Atividades/StoryCards/index.html?level=${level}&unit=${unit}&fase=1`, img: "../../imagens/botoes/storycards_button.png", unlocked: false },
+            return [                
                 { id: 2, name: "Flashcards", path: `/Atividades/Flashcards/index.html?level=${level}&unit=${unit}&fase=2`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
                 { id: 3, name: "Flashcards2", path: `/Atividades/Flashcards2/index.html?level=${level}&unit=${unit}&fase=3`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
                 { id: 4, name: "Flashcards3", path: `/Atividades/Flashcards3/index.html?level=${level}&unit=${unit}&fase=4`, img: "../../imagens/botoes/flashcards_button.png", unlocked: false },
                 { id: 4, name: "Word Drop Express", path: `/Atividades/word%20drop%20express/index.html?level=${level}&unit=${unit}&fase=4`, img: "../../imagens/botoes/ballonGame.png", unlocked: false }, 
                 { id: 5, name: "Word Drop Express2", path: `/Atividades/word%20drop%20express2/index.html?level=${level}&unit=${unit}&fase=5`, img: "../../imagens/botoes/ballonGame.png", unlocked: false },
-                { id: 5, name: "Word Drop Express2", path: `/Atividades/word%20drop%20express3/index.html?level=${level}&unit=${unit}&fase=5`, img: "../../imagens/botoes/ballonGame.png", unlocked: false },
-                { id: 6, name: "OrdenarSC", path: `/Atividades/ordenarsc/index.html?level=${level}&unit=${unit}&fase=6`, img: "../../imagens/botoes/hannah_sequence_game.png", unlocked: false },         
+                { id: 5, name: "Word Drop Express2", path: `/Atividades/word%20drop%20express3/index.html?level=${level}&unit=${unit}&fase=5`, img: "../../imagens/botoes/ballonGame.png", unlocked: false },                         
                 { id: 7, name: "Perguntas Starter", path: `/Atividades/perguntas%20starter/index.html?level=${level}&unit=${unit}&fase=7`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
             ];
         case "trecho2":
@@ -37,8 +35,7 @@ function getActivitiesByTrecho(trecho, level, unit) {
                 { id: 19, name: "Perguntas Starter5", path: `/Atividades/perguntas%20starter/index.html?level=${level}&unit=${unit}&fase=19`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
             ];
         case "trecho4":
-            return [
-                { id: 20, name: "GrammarStarter", path: `/Atividades/GrammarStarter/index.html?level=${level}&unit=${unit}&fase=20`, img: "../../imagens/botoes/grammar_button.png", unlocked: false },
+            return [                
                 { id: 21, name: "Perguntas Starter6", path: `/Atividades/perguntas%20starter/index.html?level=${level}&unit=${unit}&fase=21`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
                 { id: 22, name: "Speak", path: `/Atividades/Speak/index.html?level=${level}&unit=${unit}&fase=22`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
                 { id: 23, name: "Speak2", path: `/Atividades/Speak2/index.html?level=${level}&unit=${unit}&fase=23`, img: "../../imagens/botoes/speak_button.png", unlocked: false },
@@ -46,10 +43,8 @@ function getActivitiesByTrecho(trecho, level, unit) {
                 { id: 24, name: "Perguntas Starter7", path: `/Atividades/perguntas%20starter/index.html?level=${level}&unit=${unit}&fase=24`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
             ];
         case "trecho5":
-            return [
-                { id: 25, name: "GrammarStarterDialogo", path: `/Atividades/GrammarStarterDialogo/index.html?level=${level}&unit=${unit}&fase=25`, img: "../../imagens/botoes/grammar_button.png", unlocked: false },
-                { id: 26, name: "Perguntas Starter8", path: `/Atividades/perguntas%20starter/index.html?level=${level}&unit=${unit}&fase=26`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
-                { id: 27, name: "Diálogo", path: `/Atividades/Dialogo/index.html?level=${level}&unit=${unit}&fase=27`, img: "../../imagens/botoes/dialogo_button.png", unlocked: false },
+            return [                
+                { id: 26, name: "Perguntas Starter8", path: `/Atividades/perguntas%20starter/index.html?level=${level}&unit=${unit}&fase=26`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },                
                 { id: 28, name: "Perguntas Starter9", path: `/Atividades/perguntas%20starter/index.html?level=${level}&unit=${unit}&fase=28`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
 
             ];
