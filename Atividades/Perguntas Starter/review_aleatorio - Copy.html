@@ -1,9 +1,9 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Hannah Questions — Fill in the Blanks</title>
+<title>Hannah Questions — Review</title>
 <style>
   :root{
     --bg:#f7f9fc; --card:#ffffff; --text:#1f2937; --muted:#6b7280;
@@ -179,9 +179,21 @@
 
   .footer{margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
   .pill{background:#eef2ff;color:#3949ab;padding:8px 12px;border-radius:999px;font-size:12px;border:1px solid #d7defc}
-  .next-btn{border:none;background:linear-gradient(90deg,#3b82f6,#22c55e);color:#fff;font-weight:800;padding:12px 16px;border-radius:14px;cursor:pointer;box-shadow:0 10px 18px rgba(34,197,94,.25);opacity:.3;pointer-events:none;transition:opacity .2s ease,transform .06s ease}
+  .next-btn{
+    border:none;background:linear-gradient(90deg,#3b82f6,#22c55e);
+    color:#fff;font-weight:800;padding:12px 16px;border-radius:14px;
+    cursor:pointer;box-shadow:0 10px 18px rgba(34,197,94,.25);
+    opacity:.3;pointer-events:none;transition:opacity .2s ease,transform .06s ease
+  }
   .next-btn.ready{opacity:1;pointer-events:auto}
   .next-btn:active{transform:translateY(1px)}
+
+  .secondary-btn{
+    border:none;background:#eef2ff;color:#0f3ea8;font-weight:800;
+    padding:12px 16px;border-radius:14px;cursor:pointer;
+    box-shadow:0 10px 18px rgba(15,62,168,.12);
+  }
+  .secondary-btn:active{transform:translateY(1px)}
 
   .confetti{position:absolute;inset:0;pointer-events:none;overflow:hidden}
   .piece{position:absolute;width:10px;height:10px;background:hsl(var(--h) 80% 60%);top:-12px;border-radius:2px;animation:drop linear forwards}
@@ -274,7 +286,7 @@
     <div class="header">
       <div class="avatar" id="avatar" aria-hidden="true">🤖</div>
       <div class="title-wrap">
-        <div class="title">Hannah Questions</div>
+        <div class="title">Hannah Questions — Review</div>
         <div class="subtitle" id="subtitle">Loading content…</div>
         <div class="progress"><div id="bar"></div></div>
       </div>
@@ -318,9 +330,12 @@
 
         <div class="options" id="options"></div>
 
-        <div class="footer">
+        <div class="footer" id="footerBar">
           <span class="pill" id="statusPill">Question —/—</span>
-          <button class="next-btn" id="btnNext" disabled>Next</button>
+
+          <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; align-items:center;">
+            <button class="next-btn" id="btnNext" disabled>Next</button>
+          </div>
         </div>
       </div>
     </div>
@@ -362,6 +377,22 @@ firebase.auth().onAuthStateChanged(function(user){
 
 <script>
 (function(){
+  /* ============================================================
+     NEW PHASE: MIXED QUIZ WITH DIFFICULTY PROPORTION (SIMPLIFIED)
+     - On entry, automatically builds a random quiz from the CURRENT UNIT
+     - Target for 15 questions:
+         6 easy, 5 medium, 4 hard
+     - Pulls from ALL phases in the unit (activities keys LevelX_UnitY_Fase...)
+     - No reviewState/pending, no rounds, no "oldest", no historical-priority queue
+     - If a bucket is missing/insufficient, it falls back to what exists:
+         hard deficit -> medium -> easy
+         medium deficit -> easy
+         easy deficit -> medium -> hard
+     - No duplicates; if total unique available < 15, show fewer (no repeats)
+     - Keeps logging userAnswers history normally
+     - Keeps phase unlocking logic (markPhaseCompleted)
+  ============================================================ */
+
   /* =========================
      Helpers essenciais
   ========================= */
@@ -369,7 +400,7 @@ firebase.auth().onAuthStateChanged(function(user){
     const url = new URL(location.href);
     const level = url.searchParams.get('level');
     const unit  = url.searchParams.get('unit');
-    const fase  = url.searchParams.get('fase');
+    const fase  = url.searchParams.get('fase'); // used for progress unlock/back check
     return { level, unit, fase };
   }
   function normalizeDir(prefix, value, fallbackNum){
@@ -380,9 +411,54 @@ firebase.auth().onAuthStateChanged(function(user){
     return prefix + (onlyNum || fallbackNum);
   }
 
+  function escapeHtml(str){
+    return String(str ?? '')
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#039;');
+  }
+
+  function normalize(v){
+    return String(v ?? '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g,' ')
+      .replace(/[“”"]/g,'"');
+  }
+
+  function shuffle(arr){
+    const a = Array.isArray(arr) ? arr : [];
+    for (let i = a.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function absPath(p){
+    const s = String(p ?? '').trim();
+    if (!s) return s;
+    if (/^https?:\/\//i.test(s)) return s;
+    if (s.startsWith('/')) return s;
+    return s;
+  }
+
+  function showLoader(show){
+    const el = document.getElementById('loading');
+    if (!el) return;
+    el.style.display = show ? 'flex' : 'none';
+  }
+
   /* WebAudio SFX */
   let audioCtx = null;
-  function ensureAudio(){ if(!audioCtx){ try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return !!audioCtx; }
+  function ensureAudio(){
+    if(!audioCtx){
+      try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){}
+    }
+    return !!audioCtx;
+  }
   function tone(freq, durMs, type){
     if(!ensureAudio()) return;
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
@@ -417,28 +493,86 @@ firebase.auth().onAuthStateChanged(function(user){
       else { console.error("[Auth] User not authenticated"); }
     });
   }
-  function markPhaseCompleted(){ ensureUserIsAuthenticated(updateNextPhase); }
+
   async function updateNextPhase(userId){
     const { level, unit, fase } = getParams();
     if(!level || !unit || !fase){ console.warn("[Progress] Missing URL params."); return; }
-    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}`);
+
+    const levelKey = normalizeDir('Level', level || '0', '0');
+    const unitKey  = normalizeDir('Unit',  unit  || '1', '1');
+
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${levelKey}/${unitKey}`);
     try{
       if(fase === "last"){
-        const nextUnit = `Unit${parseInt((unit||'').replace(/\D/g,''),10) + 1}`;
-        await firebase.database().ref(`usuarios/${userId}/progresso/${level}/${nextUnit}`).set({ fase1: true });
+        const nextUnit = `Unit${parseInt((unitKey||'').replace(/\D/g,''),10) + 1}`;
+        await firebase.database().ref(`usuarios/${userId}/progresso/${levelKey}/${nextUnit}`).set({ fase1: true });
       } else if(fase === "end"){
-        const nextLevel = `Level${parseInt((level||'').replace(/\D/g,''),10) + 1}`;
-
+        const nextLevel = `Level${parseInt((levelKey||'').replace(/\D/g,''),10) + 1}`;
         await firebase.database().ref(`usuarios/${userId}/progresso/${nextLevel}/Unit1`).set({ fase1: true });
       } else {
-        const nextPhase = parseInt(fase,10) + 1;
-        await dbRef.update({ [`fase${fase}`]: true, [`fase${nextPhase}`]: true });
+        const cur = parseInt(fase,10);
+        const nextPhase = cur + 1;
+        await dbRef.update({ [`fase${cur}`]: true, [`fase${nextPhase}`]: true });
       }
       console.log("[Progress] Update successful.");
     } catch(err){
       console.error("[Progress] Error updating next phase:", err);
     }
   }
+
+  function markPhaseCompleted(){
+    ensureUserIsAuthenticated(function(uid){
+      if (uid) updateNextPhase(uid);
+    });
+  }
+
+  /* Back button rule:
+     - If activityCompleted => always back
+     - Else, check if next phase is unlocked; if not, confirm in English
+  */
+  window.activityCompleted = false;
+  window.goBack = async function goBack(){
+    try{
+      if (window.activityCompleted){
+        history.back();
+        return;
+      }
+
+      await new Promise((resolve)=>ensureUserIsAuthenticated(()=>resolve()));
+      if (!currentUserId){
+        const ok = confirm("You are not logged in. Do you want to go back anyway?");
+        if (ok) history.back();
+        return;
+      }
+
+      const { level, unit, fase } = getParams();
+      const levelKey = normalizeDir('Level', level || '0', '0');
+      const unitKey  = normalizeDir('Unit',  unit  || '1', '1');
+
+      const cur = parseInt(fase, 10);
+      if (!Number.isFinite(cur)){
+        const ok = confirm("Next phase status cannot be checked here. Do you want to go back anyway?");
+        if (ok) history.back();
+        return;
+      }
+
+      const nextPhase = cur + 1;
+      const ref = firebase.database().ref(`usuarios/${currentUserId}/progresso/${levelKey}/${unitKey}/fase${nextPhase}`);
+      const snap = await ref.once('value');
+      const unlocked = snap.val() === true;
+
+      if (unlocked){
+        history.back();
+      } else {
+        const ok = confirm("Next phase is not unlocked yet. Do you want to go back anyway?");
+        if (ok) history.back();
+      }
+    }catch(err){
+      console.warn("[Back] Fallback due to error:", err);
+      const ok = confirm("Could not verify next phase. Do you want to go back anyway?");
+      if (ok) history.back();
+    }
+  };
 
   /* =========================
      Avatar + paths
@@ -470,6 +604,8 @@ firebase.auth().onAuthStateChanged(function(user){
   let idx = 0;
   let answered = false;
 
+  const MAX_PER_ROUND = 15; // keep name, used as "quiz length"
+
   const subtitle   = document.getElementById('subtitle');
   const bar        = document.getElementById('bar');
   const promptEl   = document.getElementById('prompt');
@@ -481,7 +617,6 @@ firebase.auth().onAuthStateChanged(function(user){
   const statusPill = document.getElementById('statusPill');
   const confettiEl = document.getElementById('confetti');
   const liveEl     = document.getElementById('live');
-  const loadingEl  = document.getElementById('loading');
 
   const sCorrect = new Audio(`${BASE}/sounds/correct.mp3`);
   const sWrong   = new Audio(`${BASE}/sounds/wrong.mp3`);
@@ -490,7 +625,26 @@ firebase.auth().onAuthStateChanged(function(user){
   [sCorrect,sWrong,sTap,sNext].forEach(a=>{a.preload='auto'});
 
   /* =========================
-     Firebase: título + questões
+     Confetti
+  ========================= */
+  function confetti(n){
+    const count = Math.max(0, Math.min(80, Number(n || 18)));
+    confettiEl.innerHTML = '';
+    const w = confettiEl.clientWidth || 600;
+    for(let i=0;i<count;i++){
+      const p = document.createElement('div');
+      p.className = 'piece';
+      p.style.left = Math.round(Math.random()*w) + 'px';
+      p.style.setProperty('--h', String(Math.round(Math.random()*360)));
+      p.style.animationDuration = (900 + Math.random()*900) + 'ms';
+      p.style.opacity = String(0.85 + Math.random()*0.15);
+      confettiEl.appendChild(p);
+      setTimeout(()=>{ try{ p.remove(); }catch(e){} }, 2200);
+    }
+  }
+
+  /* =========================
+     Firebase: título (de questions.txt)
   ========================= */
   async function loadTitleFromFile(){
     try{
@@ -507,59 +661,148 @@ firebase.auth().onAuthStateChanged(function(user){
     return null;
   }
 
-  async function loadActivityQuestionsFromFirebase(levelKey, unitKey, faseParam){
-    const faseKey = faseParam || '1';
-    const activityKey = `${levelKey}_${unitKey}_Fase${faseKey}`;
+  /* =========================
+     Get all questionIds for unit (all phases)
+  ========================= */
+  async function getAllQuestionIdsForUnit(levelKey, unitKey){
+    const prefix = `${levelKey}_${unitKey}_Fase`;
+    const snap = await firebase.database()
+      .ref("activities")
+      .orderByKey()
+      .startAt(prefix)
+      .endAt(prefix + "\uf8ff")
+      .once("value");
 
-    const activitySnap = await firebase.database()
-      .ref(`activities/${activityKey}`)
-      .once('value');
-    const activity = activitySnap.val();
+    const obj = snap.val() || {};
+    const set = new Set();
 
-    if (!activity || !Array.isArray(activity.questionIds) || activity.questionIds.length === 0){
-      throw new Error(`No questionIds configured for activity ${activityKey}`);
-    }
-
-    const questionIds = activity.questionIds;
-    const snaps = await Promise.all(
-      questionIds.map(id =>
-        firebase.database().ref(`questions/${id}`).once('value')
-      )
-    );
-
-    const list = [];
-    snaps.forEach((snap, index) => {
-      const val = snap.val();
-      if (!val) return;
-      const q = { ...val };
-
-      q.id = q.id || questionIds[index];
-      q.level = q.level || levelKey;
-      q.unit  = q.unit  || unitKey;
-      q.fase  = q.fase  || faseKey;
-
-      if (!q.type) q.type = 'mcq';
-      if (!Array.isArray(q.options)) q.options = [];
-
-      list.push(q);
+    Object.keys(obj).forEach(k => {
+      const a = obj[k];
+      if (!a || !Array.isArray(a.questionIds)) return;
+      a.questionIds.forEach(id => { if (id) set.add(id); });
     });
 
-    if (!list.length){
-      throw new Error(`Questions not found in database for activity ${activityKey}`);
-    }
-    return list;
+    return Array.from(set);
   }
 
   /* =========================
-     Log de respostas do aluno
+     Difficulty normalization
+     - Uses question.difficulty
+     - If missing/invalid => easy
+  ========================= */
+  function normalizeDifficulty(d){
+    const raw = String(d || '').trim().toLowerCase();
+    if (raw === 'easy' || raw === 'e') return 'easy';
+    if (raw === 'medium' || raw === 'med' || raw === 'm') return 'medium';
+    if (raw === 'hard' || raw === 'difficult' || raw === 'h') return 'hard';
+    return 'easy';
+  }
+
+  /* =========================
+     Build proportional random quiz (6 easy, 5 medium, 4 hard)
+     - No duplicates
+     - If insufficient buckets, fallback:
+        hard -> medium -> easy
+        medium -> easy
+        easy -> medium -> hard
+     - If total available < 15, return fewer (no repeats)
+  ========================= */
+  function takeN(arr, n){
+    const out = [];
+    const k = Math.max(0, Math.min(n, arr.length));
+    for (let i=0; i<k; i++) out.push(arr.shift());
+    return out;
+  }
+
+  function buildProportionalSelection({ easyIds, mediumIds, hardIds, maxTotal }){
+    // shuffle in-place already expected
+    const targetEasy = 6;
+    const targetMed  = 5;
+    const targetHard = 4;
+
+    const picked = [];
+
+    // Step 1: pick from target buckets
+    const pHard = takeN(hardIds, Math.min(targetHard, hardIds.length));
+    picked.push(...pHard);
+    let hardDef = targetHard - pHard.length;
+
+    const pMed  = takeN(mediumIds, Math.min(targetMed, mediumIds.length));
+    picked.push(...pMed);
+    let medDef = targetMed - pMed.length;
+
+    const pEasy = takeN(easyIds, Math.min(targetEasy, easyIds.length));
+    picked.push(...pEasy);
+    let easyDef = targetEasy - pEasy.length;
+
+    // Step 2: fill deficits by fallback order
+    // hard deficit -> medium -> easy
+    if (hardDef > 0){
+      const a = takeN(mediumIds, Math.min(hardDef, mediumIds.length));
+      picked.push(...a);
+      hardDef -= a.length;
+    }
+    if (hardDef > 0){
+      const a = takeN(easyIds, Math.min(hardDef, easyIds.length));
+      picked.push(...a);
+      hardDef -= a.length;
+    }
+
+    // medium deficit -> easy
+    if (medDef > 0){
+      const a = takeN(easyIds, Math.min(medDef, easyIds.length));
+      picked.push(...a);
+      medDef -= a.length;
+    }
+    // if still medium deficit (no easy), fill with hard (as "what exists")
+    if (medDef > 0){
+      const a = takeN(hardIds, Math.min(medDef, hardIds.length));
+      picked.push(...a);
+      medDef -= a.length;
+    }
+
+    // easy deficit -> medium -> hard
+    if (easyDef > 0){
+      const a = takeN(mediumIds, Math.min(easyDef, mediumIds.length));
+      picked.push(...a);
+      easyDef -= a.length;
+    }
+    if (easyDef > 0){
+      const a = takeN(hardIds, Math.min(easyDef, hardIds.length));
+      picked.push(...a);
+      easyDef -= a.length;
+    }
+
+    // Step 3: if still under maxTotal (because targets couldn't be met),
+    // top up with whatever remains, without exceeding maxTotal.
+    const remainingPool = [...easyIds, ...mediumIds, ...hardIds];
+    // We want randomness in the top-up too:
+    shuffle(remainingPool);
+
+    const need = Math.max(0, maxTotal - picked.length);
+    if (need > 0){
+      picked.push(...takeN(remainingPool, Math.min(need, remainingPool.length)));
+    }
+
+    // Never exceed maxTotal
+    return picked.slice(0, maxTotal);
+  }
+
+  /* =========================
+     Log de respostas do aluno (kept for analytics/history)
+     - This continues updating userAnswers normally.
   ========================= */
   function logAnswer(question, isCorrect){
     if (!question || !question.id) return;
+
     ensureUserIsAuthenticated(function(uid){
       if (!uid) return;
+
       const ref = firebase.database().ref(`userAnswers/${uid}/${question.id}`);
+
       ref.transaction(prev => {
         const now = Date.now();
+
         const meta = {
           level:      question.level || levelDir,
           unit:       question.unit  || unitDir,
@@ -569,6 +812,13 @@ firebase.auth().onAuthStateChanged(function(user){
           difficulty: question.difficulty || null
         };
 
+        const prevStreak = Number(prev && prev.correctStreak ? prev.correctStreak : 0);
+        const prevLastAttempt = (prev && prev.lastAttemptResult) ? String(prev.lastAttemptResult) : null;
+
+        const nextStreak = isCorrect
+          ? (prevLastAttempt === 'correct' ? (prevStreak + 1) : 1)
+          : 0;
+
         if (!prev){
           return {
             ...meta,
@@ -576,7 +826,11 @@ firebase.auth().onAuthStateChanged(function(user){
             correctAttempts: isCorrect ? 1 : 0,
             firstAttemptResult: isCorrect ? 'correct' : 'wrong',
             lastIsCorrect: isCorrect,
-            lastTimestamp: now
+            lastAttemptResult: isCorrect ? 'correct' : 'wrong',
+            correctStreak: nextStreak,
+            lastTimestamp: now,
+            lastCorrectTimestamp: isCorrect ? now : null,
+            lastWrongTimestamp: isCorrect ? null : now
           };
         }
 
@@ -591,36 +845,14 @@ firebase.auth().onAuthStateChanged(function(user){
           correctAttempts,
           firstAttemptResult,
           lastIsCorrect: isCorrect,
-          lastTimestamp: now
+          lastAttemptResult: isCorrect ? 'correct' : 'wrong',
+          correctStreak: nextStreak,
+          lastTimestamp: now,
+          lastCorrectTimestamp: isCorrect ? now : (prev.lastCorrectTimestamp || null),
+          lastWrongTimestamp: isCorrect ? (prev.lastWrongTimestamp || null) : now
         };
       });
     });
-  }
-
-  /* =========================
-     Init (carrega título + questões)
-  ========================= */
-  async function initActivity(){
-    showLoader(true);
-    try{
-      const title = await loadTitleFromFile();
-      subtitle.textContent = title || 'Practice answering quickly and carefully!';
-
-      const loadedQuestions = await loadActivityQuestionsFromFirebase(levelDir, unitDir, fase);
-      questions = loadedQuestions;
-      idx = 0;
-      renderQuestion();
-    }catch(err){
-      console.error('[Q&A] Init failed:', err);
-      toast('Error loading questions. Please check database configuration.');
-      subtitle.textContent = 'Failed to load content';
-      promptEl.textContent =
-        `Could not load questions from database.\nLevel: ${levelDir}\nUnit: ${unitDir}\nPhase: ${fase || '-'}`;
-      mediaBox.innerHTML = '';
-      optionsEl.innerHTML = '';
-    }finally{
-      showLoader(false);
-    }
   }
 
   /* =========================
@@ -643,27 +875,21 @@ firebase.auth().onAuthStateChanged(function(user){
     return String(str ?? '').replace(/[“”"]/g,'').replace(/\s{2,}/g,' ').trim();
   }
 
-  // IMPORTANTE:
-  // - Para audio_mcq: o ícone 🔊 SEMPRE lê o PROMPT (promptAudio ou TTS do prompt),
-  //   ignorando q.tts (que pode estar configurado para a resposta).
   function buildSpokenPrompt(q){
     if (!q) return '';
 
-    // audio_mcq -> sempre falar o prompt
     if (q.type === 'audio_mcq'){
       const raw = typeof q.prompt === 'string' ? q.prompt : '';
       return stripQuotesForTTS(ttsSanitize(raw));
     }
 
-    // Demais tipos podem usar q.tts, se houver
     if (q.tts && String(q.tts).trim()) return stripQuotesForTTS(q.tts);
 
     let text = String(q.prompt || '');
-    if (q.type !== 'fillblank'){ 
-      return stripQuotesForTTS(ttsSanitize(text)); 
+    if (q.type !== 'fillblank'){
+      return stripQuotesForTTS(ttsSanitize(text));
     }
 
-    // fillblank: substitui blanks pelas respostas para o TTS
     const optMap = new Map();
     (Array.isArray(q.options) ? q.options : []).forEach(op=>{
       const o = (typeof op === 'string') ? {label:op, value:op} : {...op};
@@ -674,6 +900,7 @@ firebase.auth().onAuthStateChanged(function(user){
       const o = optMap.get(key);
       return stripQuotesForTTS((o && (o.tts || o.label || o.value)) || String(val||''));
     };
+
     text = text.replace(/\{b(\d+)\}/gi, (_m, nStr)=>{
       const n = parseInt(nStr,10);
       let ans = null;
@@ -682,6 +909,7 @@ firebase.auth().onAuthStateChanged(function(user){
       else ans = q.answer;
       return speakValue(ans);
     });
+
     const seqAnswers = (()=>{
       if (Array.isArray(q.answer)) return q.answer.slice();
       if (q.answer && typeof q.answer==='object'){
@@ -694,12 +922,14 @@ firebase.auth().onAuthStateChanged(function(user){
       }
       return [q.answer];
     })();
+
     let seqIdx = 0;
     text = text.replace(/\{blank\}|_{3,}/g, ()=>{
       const val = seqAnswers[Math.min(seqIdx, seqAnswers.length-1)];
       seqIdx++;
       return speakValue(val);
     });
+
     return stripQuotesForTTS(text);
   }
 
@@ -722,7 +952,11 @@ firebase.auth().onAuthStateChanged(function(user){
       speechSynthesis.cancel(); speechSynthesis.speak(u);
     }catch(e){}
   }
-  function speakFriendly(pool){ const pick = pool[(Math.random()*pool.length)|0]; speak(pick); }
+  function speakFriendly(pool){
+    const list = Array.isArray(pool) && pool.length ? pool : ['Great job!'];
+    const pick = list[(Math.random()*list.length)|0];
+    speak(pick);
+  }
 
   /* =========================
      Audio da RESPOSTA (apenas audio_mcq)
@@ -730,9 +964,7 @@ firebase.auth().onAuthStateChanged(function(user){
   function playAnswerAudio(q){
     stopAllAudio();
 
-    if (!q || !Array.isArray(q.options)) {
-      return;
-    }
+    if (!q || !Array.isArray(q.options)) return;
 
     const correctOpt = q.options.find(opt => normalize(opt.value) === normalize(q.answer));
     if (!correctOpt){
@@ -759,24 +991,78 @@ firebase.auth().onAuthStateChanged(function(user){
   }
 
   /* =========================
+     UI states
+  ========================= */
+  function renderQuizCompleteState(){
+    stopAllAudio();
+    isReading = false;
+    answered = true;
+
+    bar.style.width = "100%";
+    optionsEl.innerHTML = "";
+    btnPlayPrompt.disabled = true;
+    btnListenAnswer.classList.add("is-hidden");
+    btnListenAnswer.disabled = true;
+    btnNext.disabled = true;
+    btnNext.classList.remove("ready");
+
+    statusPill.textContent = "Completed";
+
+    promptEl.textContent =
+      "🎉 Great job!\n" +
+      "You completed this mixed review.\n" +
+      "You are ready to continue.";
+
+    mediaBox.innerHTML = '<div style="font-size:44px">🏅</div>';
+    confetti(30);
+    (ensureAudio()? sfxWin() : sCorrect.play().catch(()=>{}));
+    speakFriendly(["Great job!", "Awesome!", "You did it!"]);
+
+    window.activityCompleted = true;
+  }
+
+  function renderNoContentState(title, subtitleText){
+    stopAllAudio();
+    isReading = false;
+    answered = true;
+
+    bar.style.width = "0%";
+    optionsEl.innerHTML = "";
+    btnPlayPrompt.disabled = true;
+    btnListenAnswer.classList.add("is-hidden");
+    btnListenAnswer.disabled = true;
+    btnNext.disabled = true;
+    btnNext.classList.remove("ready");
+
+    statusPill.textContent = "Review";
+
+    promptEl.textContent = String(title || "No content.");
+    mediaBox.innerHTML = `<div style="padding:10px;text-align:center;color:#334155">
+      ${escapeHtml(String(subtitleText || ""))}
+    </div>`;
+
+    window.activityCompleted = false;
+  }
+
+  /* =========================
      Render current question
   ========================= */
   function renderQuestion(){
     answered = false;
     btnNext.disabled = true; btnNext.classList.remove('ready');
+    btnNext.textContent = "Next";
     btnPlayPrompt.disabled = false;
 
-    // reset botão de ouvir RESPOSTA (audio_mcq)
     btnListenAnswer.classList.add('is-hidden');
     btnListenAnswer.disabled = true;
     btnListenAnswer.onclick = null;
 
     const q = questions[idx];
-    if(!q){ finish(); return; }
+    if(!q){ finishRound(); return; }
 
-    // Progresso baseado na questão atual (1-based)
     const pct = Math.round(((idx + 1)/questions.length)*100);
     bar.style.width = pct + '%';
+
     statusPill.textContent = `Question ${idx+1}/${questions.length}`;
 
     const rawPrompt = q.prompt || '—';
@@ -788,10 +1074,8 @@ firebase.auth().onAuthStateChanged(function(user){
       promptEl.appendChild(span);
     }
 
-    // Ícone de áudio do PROMPT: sempre lê o prompt (via promptAudio ou TTS)
     btnPlayPrompt.onclick = () => { if (!isReading) playPrompt(q); };
 
-    // Se for audio_mcq, mostrar botão LISTEN que lê a RESPOSTA correta
     if (q.type === 'audio_mcq'){
       btnListenAnswer.classList.remove('is-hidden');
       btnListenAnswer.disabled = false;
@@ -825,7 +1109,7 @@ firebase.auth().onAuthStateChanged(function(user){
     btnNext.onclick = () => {
       (ensureAudio()? sfxTick() : sNext.play().catch(()=>{}));
       idx++;
-      if (idx >= questions.length) { finish(); return; }
+      if (idx >= questions.length) { finishRound(); return; }
       renderQuestion();
     };
   }
@@ -877,8 +1161,17 @@ firebase.auth().onAuthStateChanged(function(user){
     return btn;
   }
 
+  function lockAndEnableNext(){
+    answered = true;
+    btnNext.disabled = false;
+    btnNext.classList.add('ready');
+    Array.from(optionsEl.querySelectorAll('.option')).forEach(el => {
+      try{ el.disabled = true; }catch(e){}
+    });
+  }
+
   /* =========================
-     Order type
+     ORDER type (no retries)
   ========================= */
   function renderOrderQuestion(q){
     optionsEl.classList.add('is-order');
@@ -886,6 +1179,7 @@ firebase.auth().onAuthStateChanged(function(user){
     const words = (q.options || []).map(w => String(w));
     const answerSeq = Array.isArray(q.answer) ? q.answer.map(String) : [];
     let built = [];
+    let decided = false; // lock after first full attempt
 
     const wrap = document.createElement('div'); wrap.className = 'build-wrap';
     const tray = document.createElement('div'); tray.className = 'build-tray'; tray.id = 'buildTray';
@@ -903,8 +1197,9 @@ firebase.auth().onAuthStateChanged(function(user){
     words.forEach(w=>{
       const b = document.createElement('button');
       b.type='button'; b.className='option word-only';
-      b.innerHTML = `<div class="label">${w}</div>`;
+      b.innerHTML = `<div class="label">${escapeHtml(w)}</div>`;
       b.onclick = ()=>{
+        if (decided) return;
         (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
         if (built.length >= answerSeq.length) return;
         built.push(w);
@@ -914,8 +1209,16 @@ firebase.auth().onAuthStateChanged(function(user){
       grid.appendChild(b);
     });
 
-    undoBtn.onclick = ()=>{ built.pop(); drawTray(); btnNext.disabled = true; btnNext.classList.remove('ready'); };
-    clearBtn.onclick = ()=>{ built = []; drawTray(); btnNext.disabled = true; btnNext.classList.remove('ready'); };
+    undoBtn.onclick = ()=>{
+      if (decided) return;
+      built.pop(); drawTray();
+      btnNext.disabled = true; btnNext.classList.remove('ready');
+    };
+    clearBtn.onclick = ()=>{
+      if (decided) return;
+      built = []; drawTray();
+      btnNext.disabled = true; btnNext.classList.remove('ready');
+    };
 
     function drawTray(){
       tray.innerHTML = '';
@@ -926,10 +1229,18 @@ firebase.auth().onAuthStateChanged(function(user){
         tray.appendChild(chip);
       });
     }
-    function checkBuilt(){
+
+    async function checkBuilt(){
       const sameLen = built.length === answerSeq.length;
-      if (!sameLen) return;
+      if (!sameLen || decided) return;
+
+      decided = true;
+
       const ok = built.every((w,i)=> normalize(w) === normalize(answerSeq[i]));
+
+      // Log attempt (kept)
+      logAnswer(q, ok);
+
       if (ok){
         try{
           mediaBox.innerHTML = '';
@@ -941,27 +1252,30 @@ firebase.auth().onAuthStateChanged(function(user){
         (ensureAudio()? sfxCorrect() : sCorrect.play().catch(()=>{}));
         speakFriendly(['Great!','Awesome!']);
         liveEl.textContent = 'Correct order';
-        btnNext.disabled = false; btnNext.classList.add('ready');
-        answered = true;
-        Array.from(optionsEl.querySelectorAll('.option')).forEach(el=> el.disabled = true);
-        undoBtn.disabled = true; clearBtn.disabled = true;
-        logAnswer(q, true);
       } else {
         (ensureAudio()? sfxWrong() : sWrong.play().catch(()=>{}));
-        speakFriendly(['Try again!']);
-        liveEl.textContent = 'Incorrect order, try again';
-        logAnswer(q, false);
+        speakFriendly(['Try again next time!']);
+        liveEl.textContent = 'Incorrect order';
       }
+
+      // lock UI & enable next (no retries)
+      Array.from(optionsEl.querySelectorAll('.option')).forEach(el => { try{ el.disabled = true; }catch(e){} });
+      undoBtn.disabled = true; clearBtn.disabled = true;
+
+      btnNext.disabled = false; btnNext.classList.add('ready');
+      answered = true;
     }
   }
 
   /* =========================
-     Match type
+     MATCH type (no retries)
+     - first wrong attempt ends
+     - only if completes all pairs correctly without a wrong attempt -> correct
   ========================= */
   function renderMatchQuestion(q){
     const sourcePairs = Array.isArray(q.pairs) ? q.pairs : [];
 
-    const normItem = (side, it) => {
+    const normItem = (_side, it) => {
       if (typeof it === 'string') return { label: it, value: it };
       const o = {...it};
       if (!o.value) o.value = o.label || o.image || String(Math.random());
@@ -983,6 +1297,14 @@ firebase.auth().onAuthStateChanged(function(user){
     let selectedLeftBtn = null;
     let selectedLeftVal = null;
     let matched = new Set();
+    let decided = false;
+    let anyWrong = false;
+
+    const lockAll = ()=>{
+      Array.from(optionsEl.querySelectorAll('.option')).forEach(el => { try{ el.disabled = true; }catch(e){} });
+      answered = true;
+      btnNext.disabled = false; btnNext.classList.add('ready');
+    };
 
     const makeLeftBtn = (item) => {
       const b = document.createElement('button');
@@ -994,6 +1316,7 @@ firebase.auth().onAuthStateChanged(function(user){
       b.appendChild(label);
 
       b.onclick = () => {
+        if (decided) return;
         if (b.classList.contains('matched')) return;
         (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
         Array.from(colL.children).forEach(el => el.classList.remove('selected'));
@@ -1026,9 +1349,11 @@ firebase.auth().onAuthStateChanged(function(user){
         b.classList.add('img-only'); b.appendChild(thumb);
       }
 
-      b.onclick = ()=>{
+      b.onclick = async ()=>{
+        if (decided) return;
         if (b.classList.contains('matched')) return;
-        if (!selectedLeftBtn){ toast('Choose a word first 🙂'); return; }
+        if (!selectedLeftBtn){ toast('Choose a word first.'); return; }
+
         const leftVal  = selectedLeftVal;
         const rightVal = item.value;
         const ok = normalize(leftVal) === normalize(rightVal);
@@ -1047,27 +1372,43 @@ firebase.auth().onAuthStateChanged(function(user){
           selectedLeftVal = null;
 
           if (matched.size === sourcePairs.length){
-            try{
-              mediaBox.innerHTML = '';
-              const gif = new Image(); gif.src = './hannah_feliz.gif'; gif.alt = 'Hannah celebrating';
-              gif.setAttribute('draggable','false'); gif.style.pointerEvents = 'none';
-              mediaBox.appendChild(gif);
-            }catch(e){}
-            confetti(18);
-            (ensureAudio()? sfxCorrect() : sCorrect.play().catch(()=>{}));
-            speakFriendly(['Great!','Awesome!']);
-            liveEl.textContent = 'All pairs matched';
-            answered = true;
-            btnNext.disabled = false; btnNext.classList.add('ready');
-            Array.from(optionsEl.querySelectorAll('.option')).forEach(el => el.disabled = true);
-            logAnswer(q, true);
+            decided = true;
+
+            const finalCorrect = !anyWrong;
+            logAnswer(q, finalCorrect);
+
+            if (finalCorrect){
+              try{
+                mediaBox.innerHTML = '';
+                const gif = new Image(); gif.src = './hannah_feliz.gif'; gif.alt = 'Hannah celebrating';
+                gif.setAttribute('draggable','false'); gif.style.pointerEvents = 'none';
+                mediaBox.appendChild(gif);
+              }catch(e){}
+              confetti(18);
+              (ensureAudio()? sfxCorrect() : sCorrect.play().catch(()=>{}));
+              speakFriendly(['Great!','Awesome!']);
+              liveEl.textContent = 'All pairs matched';
+            } else {
+              (ensureAudio()? sfxWrong() : sWrong.play().catch(()=>{}));
+              speakFriendly(['Try again next time!']);
+              liveEl.textContent = 'Match had an error';
+            }
+
+            lockAll();
           }
         } else {
+          anyWrong = true;
+          decided = true;
+
           (ensureAudio()? sfxWrong() : sWrong.play().catch(()=>{}));
-          speakFriendly(['Try again!']);
+          speakFriendly(['Try again next time!']);
           b.classList.add('err');
           setTimeout(()=>b.classList.remove('err'), 250);
+          liveEl.textContent = 'Incorrect match';
+
           logAnswer(q, false);
+
+          lockAll();
         }
       };
       return b;
@@ -1079,12 +1420,20 @@ firebase.auth().onAuthStateChanged(function(user){
 
   /* =========================
      Selection flow for MCQ
+     - NO retries
   ========================= */
-  function handleAnswer(q, opt, btn){
+  function disableOthers(keepBtn){
+    Array.from(optionsEl.children).forEach(el=>{
+      if(el!==keepBtn){ el.disabled = true; el.style.opacity = .5; }
+    });
+  }
+
+  async function handleAnswer(q, opt, btn){
     if(answered) return;
+
     const isCorrect = normalize(opt.value) === normalize(q.answer);
 
-    // registra tentativa (primeira, segunda, etc.)
+    // Log attempt (kept)
     logAnswer(q, isCorrect);
 
     if(isCorrect){
@@ -1099,20 +1448,18 @@ firebase.auth().onAuthStateChanged(function(user){
         mediaBox.appendChild(gif);
       }catch(e){}
       liveEl.textContent = 'Correct answer';
-      answered = true;
-      btnNext.disabled = false; btnNext.classList.add('ready');
+
       disableOthers(btn);
+      lockAndEnableNext();
     } else {
       btn.classList.add('err');
       (ensureAudio()? sfxWrong() : sWrong.play().catch(()=>{}));
-      speakFriendly(['Hmm… try again!','Not this one!','Almost!']);
-      liveEl.textContent = 'Incorrect answer, try again';
+      speakFriendly(['Not this one!','Almost!']);
+      liveEl.textContent = 'Incorrect answer';
+
+      disableOthers(btn);
+      lockAndEnableNext();
     }
-  }
-  function disableOthers(keepBtn){
-    Array.from(optionsEl.children).forEach(el=>{
-      if(el!==keepBtn){ el.disabled = true; el.style.opacity = .5; }
-    });
   }
 
   function playPrompt(q){
@@ -1139,7 +1486,7 @@ firebase.auth().onAuthStateChanged(function(user){
 
     const finish = () => {
       isReading = false;
-      if (!answered) allBtns.forEach(el => el.disabled = false);
+      // We do NOT re-enable all options after a selection; the selection itself decides and locks.
       handleAnswer(q, o, btn);
     };
 
@@ -1177,94 +1524,148 @@ firebase.auth().onAuthStateChanged(function(user){
   }
 
   /* =========================
-     Finish + Back
+     Finish of the QUIZ
+     - When ends, show completed state + unlock phase
   ========================= */
-  function onActivityComplete(){
-    if(window.activityCompleted) return;
-    window.activityCompleted = true;
-    (ensureAudio()? sfxWin() : sCorrect.play().catch(()=>{}));
-    markPhaseCompleted();
-  }
-  function finish(){
+  async function finishRound(){
     try { stopAllAudio(); } catch(e){} try { speechSynthesis.cancel(); } catch(e){}
     isReading = false;
 
     bar.style.width = '100%';
-    promptEl.textContent = "🎉 Congratulations! You've completed all the questions!";
-    mediaBox.innerHTML = '<div style="font-size:44px">🏅</div>';
     optionsEl.innerHTML = '';
-    btnNext.disabled = true; btnNext.classList.remove('ready');
-    statusPill.textContent = `Completed • ${questions.length}/${questions.length}`;
-    confetti(30);
-    speakFriendly(['Great! You finished!','Amazing work!']);
 
-    // Desabilita o ícone de áudio do prompt e esconde o LISTEN de resposta
     btnPlayPrompt.disabled = true;
     btnListenAnswer.classList.add('is-hidden');
     btnListenAnswer.disabled = true;
 
-    onActivityComplete();
+    renderQuizCompleteState();
+    markPhaseCompleted();
   }
 
-  function confetti(n=16){
-    if(!confettiEl) return;
-    for(let i=0;i<n;i++){
-      const p=document.createElement('div'); p.className='piece';
-      const left = Math.random()*100;
-      const dur = 1200 + Math.random()*1400;
-      const delay = Math.random()*100;
-      p.style.left = left+'%';
-      p.style.setProperty('--h', Math.floor(Math.random()*360));
-      p.style.animationDuration = dur+'ms';
-      p.style.animationDelay = delay+'ms';
-      confettiEl.appendChild(p);
-      setTimeout(()=>p.remove(), dur+delay+200);
+  /* =========================
+     Build quiz list for current unit
+     - Collect ids from activities
+     - Load questions from /questions/{id}
+     - Bucket by difficulty
+     - Select 6/5/4 with fallback
+  ========================= */
+  async function buildMixedQuizForUnit(){
+    const allIds = await getAllQuestionIdsForUnit(levelDir, unitDir);
+    if (!allIds.length) return [];
+
+    // Randomize the overall pool so DB reads don't always follow same pattern
+    const shuffled = shuffle([...allIds]);
+
+    // Load all questions for proper bucketing by difficulty
+    // (Keeps correct distribution rules; if unit is huge, this is still acceptable for typical QA sizes.)
+    const snaps = await Promise.all(
+      shuffled.map(id => firebase.database().ref(`questions/${id}`).once('value'))
+    );
+
+    const easyIds = [];
+    const mediumIds = [];
+    const hardIds = [];
+
+    snaps.forEach((snap, i) => {
+      const v = snap.val();
+      if (!v) return;
+
+      const id = shuffled[i];
+      const d = normalizeDifficulty(v.difficulty);
+
+      if (d === 'hard') hardIds.push(id);
+      else if (d === 'medium') mediumIds.push(id);
+      else easyIds.push(id);
+    });
+
+    // shuffle buckets (random within bucket)
+    shuffle(easyIds);
+    shuffle(mediumIds);
+    shuffle(hardIds);
+
+    const selectedIds = buildProportionalSelection({
+      easyIds,
+      mediumIds,
+      hardIds,
+      maxTotal: MAX_PER_ROUND
+    });
+
+    if (!selectedIds.length) return [];
+
+    const selectedSnaps = await Promise.all(
+      selectedIds.map(id => firebase.database().ref(`questions/${id}`).once("value"))
+    );
+
+    const list = [];
+    selectedSnaps.forEach((s, i) => {
+      const v = s.val();
+      if (!v) return;
+
+      const q = { ...v };
+      q.id = q.id || selectedIds[i];
+      q.level = q.level || levelDir;
+      q.unit  = q.unit  || unitDir;
+      q.fase  = q.fase || null;
+
+      if (!q.type) q.type = "mcq";
+      if (!Array.isArray(q.options)) q.options = [];
+
+      // Ensure difficulty normalized for logging/consistency (does not change DB)
+      q.difficulty = normalizeDifficulty(q.difficulty);
+
+      list.push(q);
+    });
+
+    // Final shuffle of selected list to keep the quiz mixed
+    shuffle(list);
+
+    return list;
+  }
+
+  /* =========================
+     Init
+  ========================= */
+  async function initMixedPhase(){
+    showLoader(true);
+    try{
+      await new Promise((resolve)=>ensureUserIsAuthenticated(()=>resolve()));
+      if (!currentUserId){
+        renderNoContentState("User not authenticated.", "Please login again.");
+        return;
+      }
+
+      const title = await loadTitleFromFile();
+      subtitle.textContent = title ? `${title} — Mixed Review` : "Mixed review mode";
+
+      const list = await buildMixedQuizForUnit();
+      if (!list.length){
+        renderNoContentState("No questions found.", "This unit has no questions available yet.");
+        return;
+      }
+
+      questions = list;
+      idx = 0;
+      window.activityCompleted = false;
+      renderQuestion();
+
+    }catch(err){
+      console.error("[Mixed] Init failed:", err);
+      renderNoContentState("Could not load mixed review.", "Please try again.");
+    }finally{
+      showLoader(false);
     }
   }
-  function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
-  function normalize(v){ return String(v ?? '').trim().toLowerCase(); }
-  function absPath(p){ if(!p) return p; if(p.startsWith('http')) return p; if(p.startsWith('/')) return p; return `${BASE}/${p}`.replace(/\/+/g,'/'); }
-  function showLoader(v){ if (loadingEl) loadingEl.style.display = v ? 'flex' : 'none'; }
 
-  window.activityCompleted = false;
+  /* =========================
+     Boot
+  ========================= */
   window.addEventListener('load', function(){
     window.activityCompleted = false;
-    initActivity();
+    initMixedPhase();
   });
-
-  /* Back button (confirmations) */
-  window.goBack = async function goBack(){
-    const { level, unit, fase } = getParams();
-
-    if(!window.activityCompleted){
-      const leave = confirm("You haven't completed this phase yet. Do you want to go back?");
-      if(leave){ window.history.back(); }
-      return;
-    }
-    if(!level || !unit || !fase){ window.history.back(); return; }
-
-    firebase.auth().onAuthStateChanged(async (user)=>{
-      if(!user){ window.history.back(); return; }
-      const nextPhase = `fase${parseInt((fase||'').replace(/\D/g,''),10)+1}`;
-      try{
-        const snapshot = await firebase.database()
-          .ref(`usuarios/${user.uid}/progresso/${level}/${unit}/${nextPhase}`)
-          .once("value");
-        if(snapshot.val() === true){
-          window.history.back();
-        } else {
-          const confirmExit = confirm("The next phase is locked. Do you still want to go back?");
-          if(confirmExit){ window.history.back(); }
-        }
-      }catch(err){
-        console.error("[Back] Firebase error:", err);
-        const confirmExit = confirm("Could not verify progress. Do you want to go back anyway?");
-        if(confirmExit){ window.history.back(); }
-      }
-    });
-  };
 
 })();
 </script>
+
 </body>
 </html>

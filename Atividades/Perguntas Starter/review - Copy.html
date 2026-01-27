@@ -380,17 +380,20 @@ firebase.auth().onAuthStateChanged(function(user){
 <script>
 (function(){
   /* ============================================================
-     REVIEW MODE (FIXED + COMPLETE)
-     - Single consistent review system (no duplicated "round" engines)
-     - Uses userAnswers + activities for the whole Unit (all phases)
-     - Only attempted questions enter the review pool
-     - Difficulty score computed from userAnswers
-     - Up to 15 per round (hardest), presented easier->harder
-     - After finishing a round:
-         - if no difficulty remains => unlock next phase and show completion
-         - else => Continue Review (and counts a round)
-         - after 3 rounds => Take a break (no unlock)
-     - Back button checks whether next phase is unlocked; if not, confirm
+     REVIEW MODE (UPDATED to "FINAL LIST")
+     - Entry/pool comes from activity history (userAnswers) and activities list
+     - Review is binary:
+        correct in review => remove from review queue
+        wrong in review   => stays in review queue
+     - No multiple attempts in review (MCQ/order/match):
+        first decision counts, then Next is enabled
+     - Historical attempts are used ONLY for:
+        (1) who enters review
+        (2) priority ordering
+     - Review queue is stored in Firebase under:
+        reviewState/{uid}/{LevelX}/{UnitY}/pending/{questionId}: true
+     - Up to 15 per round: hardest 15 (priority), presented easier->harder
+     - Round counter: sessionStorage, after 3 rounds => Take a break (no unlock)
   ============================================================ */
 
   /* =========================
@@ -441,9 +444,8 @@ firebase.auth().onAuthStateChanged(function(user){
     const s = String(p ?? '').trim();
     if (!s) return s;
     if (/^https?:\/\//i.test(s)) return s;
-    // Root paths ("/Level0/...") should work on Netlify/Vercel site root
     if (s.startsWith('/')) return s;
-    return s; // keep relative as-is
+    return s;
   }
 
   function showLoader(show){
@@ -550,7 +552,6 @@ firebase.auth().onAuthStateChanged(function(user){
       const levelKey = normalizeDir('Level', level || '0', '0');
       const unitKey  = normalizeDir('Unit',  unit  || '1', '1');
 
-      // If fase is not numeric, we cannot reliably check "next phase"
       const cur = parseInt(fase, 10);
       if (!Number.isFinite(cur)){
         const ok = confirm("Next phase status cannot be checked here. Do you want to go back anyway?");
@@ -691,84 +692,127 @@ firebase.auth().onAuthStateChanged(function(user){
   }
 
   /* =========================
-     REVIEW: scoring (same as yours)
+     REVIEW STATE (Firebase)
+     reviewState/{uid}/{levelKey}/{unitKey}/pending/{qid}: true
   ========================= */
-const SCORE_THRESHOLD = 25;
-
-// NEW: quantos acertos seguidos “limpam” a penalidade do primeiro erro
-const STREAK_MASTERY = 3;
-
-function scoreFromStats(stats){
-  const total = Math.max(1, Number(stats.totalAttempts || 0));
-  const correct = Math.max(0, Number(stats.correctAttempts || 0));
-  const accuracy = correct / total; // 0–1
-
-  const streak = Math.max(0, Number(stats.correctStreak || 0));
-
-  let score = (1 - accuracy) * 100;
-
-  // REGRA PRINCIPAL:
-  // Se o aluno já acertou N vezes seguidas, não faz sentido manter o peso do firstAttemptResult.
-  if (streak < STREAK_MASTERY){
-    if (stats.firstAttemptResult === "wrong") score += 20;
+  function reviewRootRef(uid, levelKey, unitKey){
+    return firebase.database().ref(`reviewState/${uid}/${levelKey}/${unitKey}`);
   }
-
-  // Se o último foi errado, continua entrando como sinal de dificuldade recente
-  if (stats.lastIsCorrect === false) score += 15;
-
-  // “peso por tentativas” continua, mas quando há domínio recente, reduzimos o impacto
-  // (isso evita que totalAttempts alto mantenha score alto mesmo com streak alto)
-  if (streak >= STREAK_MASTERY){
-    score += Math.min(total, 5) * 1;   // era *3, agora *1 quando já dominou
-    score -= 25;                       // bônus de domínio: empurra score pra baixo
-  } else {
-    score += Math.min(total, 5) * 3;
+  async function getPendingMap(uid, levelKey, unitKey){
+    const snap = await reviewRootRef(uid, levelKey, unitKey).child('pending').once('value');
+    return snap.val() || {};
   }
-
-  if (!Number.isFinite(score)) score = 0;
-  return Math.max(0, Math.round(score));
-}
+  async function setPendingFromList(uid, levelKey, unitKey, ids){
+    const root = reviewRootRef(uid, levelKey, unitKey);
+    const pending = {};
+    (ids || []).forEach(id => { if (id) pending[id] = true; });
+    await root.update({
+      createdAt: firebase.database.ServerValue.TIMESTAMP,
+      updatedAt: firebase.database.ServerValue.TIMESTAMP,
+      pending
+    });
+  }
+  async function removeFromPending(uid, levelKey, unitKey, qid){
+    const root = reviewRootRef(uid, levelKey, unitKey);
+    const pRef = root.child('pending').child(String(qid));
+    await pRef.remove();
+    await root.update({ updatedAt: firebase.database.ServerValue.TIMESTAMP });
+  }
 
   /* =========================
-     REVIEW: compute a round plan
-     - Only attempted questions
-     - Needs review if score >= threshold
-     - Select top 15 hardest by score desc
-     - Present easier->harder (score asc)
+     ENTRY CRITERIA + PRIORITY (HISTORY ONLY)
+     Criteria (conservative):
+       - at least 1 wrong (wrongAttempts >= 1)
+       - AND (totalAttempts < 3 OR wrongAttempts >= correctAttempts)
   ========================= */
-  async function recomputeReviewPlan({ levelKey, unitKey }){
-    const allIds = await getAllQuestionIdsForUnit(levelKey, unitKey);
+  function statsToCounts(stats){
+    const total = Math.max(0, Number(stats && stats.totalAttempts || 0));
+    const correct = Math.max(0, Number(stats && stats.correctAttempts || 0));
+    const wrong = Math.max(0, total - correct);
+    const accuracy = total > 0 ? (correct / total) : 0;
+    const lastIsCorrect = (stats && typeof stats.lastIsCorrect === 'boolean') ? stats.lastIsCorrect : null;
+    const firstAttemptResult = (stats && stats.firstAttemptResult) ? String(stats.firstAttemptResult) : null;
+    return { total, correct, wrong, accuracy, lastIsCorrect, firstAttemptResult };
+  }
 
+  function eligibleForReview(stats){
+    const c = statsToCounts(stats);
+    if (c.total <= 0) return false; // not attempted
+    if (c.wrong < 1) return false;  // never wrong => not in review
+    if (c.total < 3) return true;   // conservative rule for early attempts
+    return (c.wrong >= c.correct);  // conservative tie/greater wrong
+  }
+
+  // Priority: higher means harder (history only)
+  function priorityScoreFromHistory(stats){
+    const c = statsToCounts(stats);
+    // Weighted: wrong count matters most, then low accuracy, then recent wrong
+    let score = 0;
+    score += c.wrong * 30;                 // wrong weight
+    score += Math.round((1 - c.accuracy) * 100); // accuracy penalty
+    if (c.lastIsCorrect === false) score += 15;  // recent difficulty
+    if (c.firstAttemptResult === "wrong") score += 10; // early struggle
+    score += Math.min(c.total, 10) * 2;   // small weight for more exposure
+    return score;
+  }
+
+  /* =========================
+     BUILD / LOAD REVIEW QUEUE
+     - If pending exists -> use it
+     - Else create pending using eligibility from userAnswers for unit questionIds
+  ========================= */
+  async function ensureReviewQueue({ uid, levelKey, unitKey }){
+    const existing = await getPendingMap(uid, levelKey, unitKey);
+    const existingIds = Object.keys(existing || {});
+    if (existingIds.length) return { pendingIds: existingIds, created: false };
+
+    const allIds = await getAllQuestionIdsForUnit(levelKey, unitKey);
     if (!allIds.length){
-      return { status:"complete", remainingCount:0, selected:[] };
+      await setPendingFromList(uid, levelKey, unitKey, []);
+      return { pendingIds: [], created: true };
     }
 
-    const userAnsSnap = await firebase.database()
-      .ref(`userAnswers/${currentUserId}`)
-      .once("value");
+    const userAnsSnap = await firebase.database().ref(`userAnswers/${uid}`).once('value');
     const userAnsAll = userAnsSnap.val() || {};
 
-    const triedIds = allIds.filter(id => !!userAnsAll[id]);
-    if (!triedIds.length){
-      return { status:"complete", remainingCount:0, selected:[] };
+    const attempted = allIds.filter(id => !!userAnsAll[id]);
+    if (!attempted.length){
+      await setPendingFromList(uid, levelKey, unitKey, []);
+      return { pendingIds: [], created: true };
     }
 
-    const scored = triedIds.map(id => {
-      const stats = userAnsAll[id] || {};
-      const score = scoreFromStats(stats);
-      return { id, score, stats };
+    const eligible = attempted.filter(id => eligibleForReview(userAnsAll[id]));
+    await setPendingFromList(uid, levelKey, unitKey, eligible);
+
+    return { pendingIds: eligible, created: true };
+  }
+
+  /* =========================
+     SELECT ROUND (up to 15)
+     - choose hardest 15 by history priority (from userAnswers snapshot)
+     - present easier->harder
+  ========================= */
+  async function buildRoundFromPending({ uid, levelKey, unitKey }){
+    const pendingMap = await getPendingMap(uid, levelKey, unitKey);
+    const pendingIds = Object.keys(pendingMap || {});
+    if (!pendingIds.length){
+      return { status: "complete", remainingCount: 0, selected: [] };
+    }
+
+    const uaSnap = await firebase.database().ref(`userAnswers/${uid}`).once('value');
+    const uaAll = uaSnap.val() || {};
+
+    const scored = pendingIds.map(id => {
+      const stats = uaAll[id] || {};
+      const pr = priorityScoreFromHistory(stats);
+      return { id, pr, stats };
     });
 
-    const needsReview = scored.filter(x => x.score >= SCORE_THRESHOLD);
-    if (!needsReview.length){
-      return { status:"complete", remainingCount:0, selected:[] };
-    }
-
-    const topHardest = needsReview
-      .sort((a,b)=> b.score - a.score)
+    const topHardest = scored
+      .sort((a,b)=> b.pr - a.pr)
       .slice(0, MAX_PER_ROUND);
 
-    const orderedForStudent = [...topHardest].sort((a,b)=> a.score - b.score);
+    const orderedForStudent = [...topHardest].sort((a,b)=> a.pr - b.pr);
 
     const qSnaps = await Promise.all(
       orderedForStudent.map(x => firebase.database().ref(`questions/${x.id}`).once("value"))
@@ -790,13 +834,13 @@ function scoreFromStats(stats){
       if (!q.type) q.type = "mcq";
       if (!Array.isArray(q.options)) q.options = [];
 
-      q._reviewScore = orderedForStudent[i].score;
+      q._priority = orderedForStudent[i].pr;
       selectedQuestions.push(q);
     });
 
     return {
       status: "needs_review",
-      remainingCount: needsReview.length,
+      remainingCount: pendingIds.length,
       selected: selectedQuestions
     };
   }
@@ -822,65 +866,71 @@ function scoreFromStats(stats){
   }
 
   /* =========================
-     Log de respostas do aluno
+     Log de respostas do aluno (kept for analytics/history)
+     - This continues updating userAnswers normally.
   ========================= */
-function logAnswer(question, isCorrect){
-  if (!question || !question.id) return;
+  function logAnswer(question, isCorrect){
+    if (!question || !question.id) return;
 
-  ensureUserIsAuthenticated(function(uid){
-    if (!uid) return;
+    ensureUserIsAuthenticated(function(uid){
+      if (!uid) return;
 
-    const ref = firebase.database().ref(`userAnswers/${uid}/${question.id}`);
+      const ref = firebase.database().ref(`userAnswers/${uid}/${question.id}`);
 
-    ref.transaction(prev => {
-      const now = Date.now();
+      ref.transaction(prev => {
+        const now = Date.now();
 
-      const meta = {
-        level:      question.level || levelDir,
-        unit:       question.unit  || unitDir,
-        fase:       question.fase  || (fase || null),
-        grammarTag: question.grammarTag || null,
-        skillType:  question.skillType  || null,
-        difficulty: question.difficulty || null
-      };
-
-      // ===== NEW: streak de acertos (domínio recente) =====
-      // - Se acertou: incrementa
-      // - Se errou: zera
-      const prevStreak = Number(prev && prev.correctStreak ? prev.correctStreak : 0);
-      const nextStreak = isCorrect ? (prevStreak + 1) : 0;
-
-      if (!prev){
-        return {
-          ...meta,
-          totalAttempts: 1,
-          correctAttempts: isCorrect ? 1 : 0,
-          firstAttemptResult: isCorrect ? 'correct' : 'wrong',
-          lastIsCorrect: isCorrect,
-          lastAttemptResult: isCorrect ? 'correct' : 'wrong', // NEW (útil p/ regras futuras)
-          correctStreak: nextStreak,                          // NEW
-          lastTimestamp: now
+        const meta = {
+          level:      question.level || levelDir,
+          unit:       question.unit  || unitDir,
+          fase:       question.fase  || (fase || null),
+          grammarTag: question.grammarTag || null,
+          skillType:  question.skillType  || null,
+          difficulty: question.difficulty || null
         };
-      }
 
-      const totalAttempts   = (prev.totalAttempts   || 0) + 1;
-      const correctAttempts = (prev.correctAttempts || 0) + (isCorrect ? 1 : 0);
-      const firstAttemptResult = prev.firstAttemptResult || (isCorrect ? 'correct' : 'wrong');
+        const prevStreak = Number(prev && prev.correctStreak ? prev.correctStreak : 0);
+        const prevLastAttempt = (prev && prev.lastAttemptResult) ? String(prev.lastAttemptResult) : null;
 
-      return {
-        ...prev,
-        ...meta,
-        totalAttempts,
-        correctAttempts,
-        firstAttemptResult,
-        lastIsCorrect: isCorrect,
-        lastAttemptResult: isCorrect ? 'correct' : 'wrong', // NEW
-        correctStreak: nextStreak,                          // NEW
-        lastTimestamp: now
-      };
+        const nextStreak = isCorrect
+          ? (prevLastAttempt === 'correct' ? (prevStreak + 1) : 1)
+          : 0;
+
+        if (!prev){
+          return {
+            ...meta,
+            totalAttempts: 1,
+            correctAttempts: isCorrect ? 1 : 0,
+            firstAttemptResult: isCorrect ? 'correct' : 'wrong',
+            lastIsCorrect: isCorrect,
+            lastAttemptResult: isCorrect ? 'correct' : 'wrong',
+            correctStreak: nextStreak,
+            lastTimestamp: now,
+            lastCorrectTimestamp: isCorrect ? now : null,
+            lastWrongTimestamp: isCorrect ? null : now
+          };
+        }
+
+        const totalAttempts   = (prev.totalAttempts   || 0) + 1;
+        const correctAttempts = (prev.correctAttempts || 0) + (isCorrect ? 1 : 0);
+        const firstAttemptResult = prev.firstAttemptResult || (isCorrect ? 'correct' : 'wrong');
+
+        return {
+          ...prev,
+          ...meta,
+          totalAttempts,
+          correctAttempts,
+          firstAttemptResult,
+          lastIsCorrect: isCorrect,
+          lastAttemptResult: isCorrect ? 'correct' : 'wrong',
+          correctStreak: nextStreak,
+          lastTimestamp: now,
+          lastCorrectTimestamp: isCorrect ? now : (prev.lastCorrectTimestamp || null),
+          lastWrongTimestamp: isCorrect ? (prev.lastWrongTimestamp || null) : now
+        };
+      });
     });
-  });
-}
+  }
 
   /* =========================
      Prompt/blank utils + TTS builder
@@ -902,9 +952,6 @@ function logAnswer(question, isCorrect){
     return String(str ?? '').replace(/[“”"]/g,'').replace(/\s{2,}/g,' ').trim();
   }
 
-  // IMPORTANTE:
-  // - Para audio_mcq: o ícone 🔊 SEMPRE lê o PROMPT (promptAudio ou TTS do prompt),
-  //   ignorando q.tts (que pode estar configurado para a resposta).
   function buildSpokenPrompt(q){
     if (!q) return '';
 
@@ -1021,425 +1068,6 @@ function logAnswer(question, isCorrect){
   }
 
   /* =========================
-     Render current question
-  ========================= */
-  function renderQuestion(){
-    answered = false;
-    btnNext.disabled = true; btnNext.classList.remove('ready');
-    btnNext.textContent = "Next";
-    btnPlayPrompt.disabled = false;
-
-    btnListenAnswer.classList.add('is-hidden');
-    btnListenAnswer.disabled = true;
-    btnListenAnswer.onclick = null;
-
-    hideFallbackButtons();
-
-    const q = questions[idx];
-    if(!q){ finishRound(); return; }
-
-    const pct = Math.round(((idx + 1)/questions.length)*100);
-    bar.style.width = pct + '%';
-
-    const roundsDone = getReviewRoundCounter(levelDir, unitDir, currentUserId);
-    const roundDisplay = Math.min(roundsDone + 1, MAX_ROUNDS);
-    statusPill.textContent = `Round ${roundDisplay} • Question ${idx+1}/${questions.length}`;
-
-    const rawPrompt = q.prompt || '—';
-    promptEl.innerHTML = renderPromptWithBlanks(rawPrompt);
-    if (q.type === 'fillblank' && !/\{blank\}|\{b\d+\}|_{3,}/i.test(rawPrompt)) {
-      const span = document.createElement('span');
-      span.className = 'blank'; span.setAttribute('aria-hidden','true');
-      promptEl.appendChild(document.createTextNode(' '));
-      promptEl.appendChild(span);
-    }
-
-    btnPlayPrompt.onclick = () => { if (!isReading) playPrompt(q); };
-
-    if (q.type === 'audio_mcq'){
-      btnListenAnswer.classList.remove('is-hidden');
-      btnListenAnswer.disabled = false;
-      btnListenAnswer.onclick = () => {
-        if (isReading) return;
-        playAnswerAudio(q);
-      };
-    }
-
-    mediaBox.innerHTML = '';
-    if(q.image){
-      const img = new Image(); img.alt = 'Question image';
-      img.src = absPath(q.image); mediaBox.appendChild(img);
-    } else {
-      const img = new Image(); img.src = './hannah_pensando.png'; img.alt = 'Hannah thinking';
-      mediaBox.appendChild(img);
-    }
-
-    optionsEl.innerHTML = '';
-    optionsEl.classList.remove('is-order');
-
-    if (q.type === 'order') {
-      renderOrderQuestion(q);
-    } else if (q.type === 'match') {
-      renderMatchQuestion(q);
-    } else {
-      const opts = (q.shuffleOptions===false) ? q.options : shuffle([...q.options]);
-      opts.forEach(opt => optionsEl.appendChild(makeOption(q, opt)));
-    }
-
-    btnNext.onclick = () => {
-      (ensureAudio()? sfxTick() : sNext.play().catch(()=>{}));
-      idx++;
-      if (idx >= questions.length) { finishRound(); return; }
-      renderQuestion();
-    };
-  }
-
-  /* =========================
-     Multiple-choice option
-  ========================= */
-  function makeOption(q, opt){
-    const o = (typeof opt === 'string') ? { label: opt, value: opt } : { ...opt };
-
-    const btn = document.createElement('button');
-    btn.type = 'button'; btn.className = 'option';
-    btn.setAttribute('aria-label', o.aria || o.label || 'option');
-
-    const thumb = document.createElement('div'); thumb.className = 'thumb';
-    if (o.image){
-      const img = new Image(); img.src = absPath(o.image); img.alt = o.label || '';
-      thumb.appendChild(img);
-    } else if (o.emoji){
-      thumb.textContent = o.emoji;
-    } else {
-      const box = document.createElement('span');
-      box.className = 'square-outline';
-      box.style.setProperty('--sq', '#7c3aed');
-      thumb.textContent = ''; thumb.appendChild(box);
-    }
-
-    const textWrap = document.createElement('div');
-    const label = document.createElement('div'); label.className = 'label'; label.textContent = o.label || '';
-    textWrap.appendChild(label);
-    if (typeof o.sub === 'string' && o.sub.trim()){
-      const sub = document.createElement('div'); sub.className = 'sub'; sub.textContent = o.sub;
-      textWrap.appendChild(sub);
-    }
-
-    btn.appendChild(thumb); btn.appendChild(textWrap);
-
-    btn.onclick = () => {
-      (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
-      speakSelectedThenCheck(q, o, btn);
-    };
-    thumb.style.cursor = 'pointer'; thumb.title = 'Play & choose';
-    thumb.onclick = (e) => {
-      e.preventDefault(); e.stopPropagation();
-      (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
-      speakSelectedThenCheck(q, o, btn);
-    };
-
-    return btn;
-  }
-
-  /* =========================
-     Order type
-  ========================= */
-  function renderOrderQuestion(q){
-    optionsEl.classList.add('is-order');
-
-    const words = (q.options || []).map(w => String(w));
-    const answerSeq = Array.isArray(q.answer) ? q.answer.map(String) : [];
-    let built = [];
-
-    const wrap = document.createElement('div'); wrap.className = 'build-wrap';
-    const tray = document.createElement('div'); tray.className = 'build-tray'; tray.id = 'buildTray';
-    tray.setAttribute('aria-label','Sentence tray');
-    const actions = document.createElement('div'); actions.className = 'build-actions';
-    const undoBtn = document.createElement('button'); undoBtn.className = 'build-btn'; undoBtn.textContent = 'Undo';
-    const clearBtn = document.createElement('button'); clearBtn.className = 'build-btn'; clearBtn.textContent = 'Clear';
-    actions.appendChild(undoBtn); actions.appendChild(clearBtn);
-    wrap.appendChild(tray); wrap.appendChild(actions);
-    optionsEl.appendChild(wrap);
-
-    const grid = document.createElement('div'); grid.className = 'build-grid';
-    optionsEl.appendChild(grid);
-
-    words.forEach(w=>{
-      const b = document.createElement('button');
-      b.type='button'; b.className='option word-only';
-      b.innerHTML = `<div class="label">${escapeHtml(w)}</div>`;
-      b.onclick = ()=>{
-        (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
-        if (built.length >= answerSeq.length) return;
-        built.push(w);
-        drawTray();
-        checkBuilt();
-      };
-      grid.appendChild(b);
-    });
-
-    undoBtn.onclick = ()=>{ built.pop(); drawTray(); btnNext.disabled = true; btnNext.classList.remove('ready'); };
-    clearBtn.onclick = ()=>{ built = []; drawTray(); btnNext.disabled = true; btnNext.classList.remove('ready'); };
-
-    function drawTray(){
-      tray.innerHTML = '';
-      built.forEach(word=>{
-        const chip = document.createElement('span');
-        chip.className='word-chip';
-        chip.textContent = word;
-        tray.appendChild(chip);
-      });
-    }
-    function checkBuilt(){
-      const sameLen = built.length === answerSeq.length;
-      if (!sameLen) return;
-      const ok = built.every((w,i)=> normalize(w) === normalize(answerSeq[i]));
-      if (ok){
-        try{
-          mediaBox.innerHTML = '';
-          const gif = new Image(); gif.src = './hannah_feliz.gif'; gif.alt = 'Hannah celebrating';
-          gif.setAttribute('draggable','false'); gif.style.pointerEvents = 'none';
-          mediaBox.appendChild(gif);
-        }catch(e){}
-        confetti(18);
-        (ensureAudio()? sfxCorrect() : sCorrect.play().catch(()=>{}));
-        speakFriendly(['Great!','Awesome!']);
-        liveEl.textContent = 'Correct order';
-        btnNext.disabled = false; btnNext.classList.add('ready');
-        answered = true;
-        Array.from(optionsEl.querySelectorAll('.option')).forEach(el=> el.disabled = true);
-        undoBtn.disabled = true; clearBtn.disabled = true;
-        logAnswer(q, true);
-      } else {
-        (ensureAudio()? sfxWrong() : sWrong.play().catch(()=>{}));
-        speakFriendly(['Try again!']);
-        liveEl.textContent = 'Incorrect order, try again';
-        logAnswer(q, false);
-      }
-    }
-  }
-
-  /* =========================
-     Match type
-  ========================= */
-  function renderMatchQuestion(q){
-    const sourcePairs = Array.isArray(q.pairs) ? q.pairs : [];
-
-    const normItem = (_side, it) => {
-      if (typeof it === 'string') return { label: it, value: it };
-      const o = {...it};
-      if (!o.value) o.value = o.label || o.image || String(Math.random());
-      return o;
-    };
-
-    const leftItems  = sourcePairs.map(p => normItem('left',  p.left));
-    const rightItems = sourcePairs.map(p => normItem('right', p.right));
-
-    const leftShuf  = shuffle([...leftItems]);
-    const rightShuf = shuffle([...rightItems]);
-
-    const grid = document.createElement('div'); grid.className = 'match-grid';
-    const colL = document.createElement('div'); colL.className = 'match-col';
-    const colR = document.createElement('div'); colR.className = 'match-col';
-    grid.appendChild(colL); grid.appendChild(colR);
-    optionsEl.appendChild(grid);
-
-    let selectedLeftBtn = null;
-    let selectedLeftVal = null;
-    let matched = new Set();
-
-    const makeLeftBtn = (item) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'option word-only';
-      b.dataset.value = item.value;
-
-      const label = document.createElement('div'); label.className = 'label'; label.textContent = item.label || item.value;
-      b.appendChild(label);
-
-      b.onclick = () => {
-        if (b.classList.contains('matched')) return;
-        (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
-        Array.from(colL.children).forEach(el => el.classList.remove('selected'));
-        b.classList.add('selected');
-        selectedLeftBtn = b;
-        selectedLeftVal = item.value;
-      };
-      return b;
-    };
-
-    const makeRightBtn = (item) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'option';
-      b.dataset.value = item.value;
-
-      const thumb = document.createElement('div'); thumb.className = 'thumb';
-      if (item.image){
-        const img = new Image(); img.src = absPath(item.image); img.alt = item.label || '';
-        thumb.appendChild(img);
-      } else {
-        thumb.textContent = item.label ? '🔤' : '❔';
-      }
-
-      const hasLabel = !!(item.label && String(item.label).trim());
-      if (hasLabel){
-        const label = document.createElement('div'); label.className = 'label'; label.textContent = item.label;
-        b.appendChild(thumb); b.appendChild(label);
-      } else {
-        b.classList.add('img-only'); b.appendChild(thumb);
-      }
-
-      b.onclick = ()=>{
-        if (b.classList.contains('matched')) return;
-        if (!selectedLeftBtn){ toast('Choose a word first.'); return; }
-        const leftVal  = selectedLeftVal;
-        const rightVal = item.value;
-        const ok = normalize(leftVal) === normalize(rightVal);
-
-        if (ok){
-          (ensureAudio()? sfxCorrect() : sCorrect.play().catch(()=>{}));
-          confetti(10);
-          speakFriendly(['Great!','Nice!']);
-
-          b.classList.add('matched');
-          selectedLeftBtn.classList.add('matched');
-          selectedLeftBtn.classList.remove('selected');
-          matched.add(leftVal);
-
-          selectedLeftBtn = null;
-          selectedLeftVal = null;
-
-          if (matched.size === sourcePairs.length){
-            try{
-              mediaBox.innerHTML = '';
-              const gif = new Image(); gif.src = './hannah_feliz.gif'; gif.alt = 'Hannah celebrating';
-              gif.setAttribute('draggable','false'); gif.style.pointerEvents = 'none';
-              mediaBox.appendChild(gif);
-            }catch(e){}
-            confetti(18);
-            (ensureAudio()? sfxCorrect() : sCorrect.play().catch(()=>{}));
-            speakFriendly(['Great!','Awesome!']);
-            liveEl.textContent = 'All pairs matched';
-            answered = true;
-            btnNext.disabled = false; btnNext.classList.add('ready');
-            Array.from(optionsEl.querySelectorAll('.option')).forEach(el => el.disabled = true);
-            logAnswer(q, true);
-          }
-        } else {
-          (ensureAudio()? sfxWrong() : sWrong.play().catch(()=>{}));
-          speakFriendly(['Try again!']);
-          b.classList.add('err');
-          setTimeout(()=>b.classList.remove('err'), 250);
-          logAnswer(q, false);
-        }
-      };
-      return b;
-    };
-
-    leftShuf.forEach(item => colL.appendChild(makeLeftBtn(item)));
-    rightShuf.forEach(item => colR.appendChild(makeRightBtn(item)));
-  }
-
-  /* =========================
-     Selection flow for MCQ
-  ========================= */
-  function handleAnswer(q, opt, btn){
-    if(answered) return;
-    const isCorrect = normalize(opt.value) === normalize(q.answer);
-
-    logAnswer(q, isCorrect);
-
-    if(isCorrect){
-      btn.classList.add('ok');
-      (ensureAudio()? sfxCorrect() : sCorrect.play().catch(()=>{}));
-      confetti(18);
-      speakFriendly(['Yes! Great job!','Awesome!','You did it!']);
-      try{
-        mediaBox.innerHTML = '';
-        const gif = new Image(); gif.src = './hannah_feliz.gif'; gif.alt = 'Hannah celebrating';
-        gif.setAttribute('draggable','false'); gif.style.pointerEvents = 'none';
-        mediaBox.appendChild(gif);
-      }catch(e){}
-      liveEl.textContent = 'Correct answer';
-      answered = true;
-      btnNext.disabled = false; btnNext.classList.add('ready');
-      disableOthers(btn);
-    } else {
-      btn.classList.add('err');
-      (ensureAudio()? sfxWrong() : sWrong.play().catch(()=>{}));
-      speakFriendly(['Hmm… try again!','Not this one!','Almost!']);
-      liveEl.textContent = 'Incorrect answer, try again';
-    }
-  }
-  function disableOthers(keepBtn){
-    Array.from(optionsEl.children).forEach(el=>{
-      if(el!==keepBtn){ el.disabled = true; el.style.opacity = .5; }
-    });
-  }
-
-  function playPrompt(q){
-    stopAllAudio();
-    const spoken = buildSpokenPrompt(q);
-    if (q.promptAudio){
-      const a = new Audio(absPath(q.promptAudio));
-      currentAudio = a;
-      a.onended = () => { currentAudio = null; };
-      a.onerror  = () => { currentAudio = null; speak(spoken); };
-      a.play().catch(() => { currentAudio = null; speak(spoken); });
-    } else {
-      speak(spoken);
-    }
-  }
-
-  function speakSelectedThenCheck(q, o, btn){
-    if (answered || isReading) return;
-    isReading = true;
-
-    const allBtns = Array.from(document.querySelectorAll('.option'));
-    allBtns.forEach(el => el.disabled = true);
-    btnNext.disabled = true; btnNext.classList.remove('ready');
-
-    const finish = () => {
-      isReading = false;
-      if (!answered) allBtns.forEach(el => el.disabled = false);
-      handleAnswer(q, o, btn);
-    };
-
-    const say = (o.tts || o.label || o.value || '').toString().trim();
-    stopAllAudio();
-
-    if (o.audio){
-      try{
-        const a = new Audio(absPath(o.audio));
-        currentAudio = a;
-        let done = false;
-        const safeFinish = () => { if (!done){ done = true; currentAudio = null; finish(); } };
-        a.onended = safeFinish;
-        a.onerror = safeFinish;
-        a.onloadedmetadata = () => {
-          const guard = Math.max(1500, Math.round((a.duration||0)*1000) + 1500);
-          setTimeout(safeFinish, guard + 500);
-        };
-        a.play().catch(safeFinish);
-      }catch{
-        setTimeout(finish, 800);
-      }
-    } else {
-      try{
-        const u = new SpeechSynthesisUtterance(say || ' ');
-        u.lang = 'en-US'; u.rate = 0.95; u.pitch = 1.0;
-        u.onend   = finish;
-        u.onerror = finish;
-        speechSynthesis.cancel(); speechSynthesis.speak(u);
-        setTimeout(()=>{ if(isReading) finish(); }, 15000);
-      }catch{
-        setTimeout(finish, 800);
-      }
-    }
-  }
-
-  /* =========================
      Fallback buttons (optional tools)
   ========================= */
   function showFallbackButtons(){
@@ -1455,7 +1083,6 @@ function logAnswer(question, isCorrect){
 
   function wireFallbackButtons(){
     btnAlt1.onclick = async ()=>{
-      // Review Oldest: up to 15 attempted questions with oldest lastTimestamp
       showLoader(true);
       try{
         await new Promise((resolve) => ensureUserIsAuthenticated(()=>resolve()));
@@ -1516,7 +1143,6 @@ function logAnswer(question, isCorrect){
     };
 
     btnAlt2.onclick = async ()=>{
-      // Mixed Quiz: random up to 15 from unit questionIds (attempted + not attempted)
       showLoader(true);
       try{
         const allIds = await getAllQuestionIdsForUnit(levelDir, unitDir);
@@ -1655,9 +1281,9 @@ function logAnswer(question, isCorrect){
     statusPill.textContent = "Review round completed";
 
     const msg =
-  `Good job!\n` +
-  `You are getting better.\n\n` +
-  `Questions that still need review: ${remainingCount}`;
+      `Good job!\n` +
+      `You are getting better.\n\n` +
+      `Questions that still need review: ${remainingCount}`;
 
     promptEl.textContent = msg;
 
@@ -1678,10 +1304,9 @@ function logAnswer(question, isCorrect){
       b.onclick = async () => {
         showLoader(true);
         try{
-          const plan = await recomputeReviewPlan({ levelKey: levelDir, unitKey: unitDir });
+          const plan = await buildRoundFromPending({ uid: currentUserId, levelKey: levelDir, unitKey: unitDir });
 
           if (plan.status === "complete" || !plan.selected.length){
-            // completed => unlock + reset rounds
             resetReviewRoundCounter(levelDir, unitDir, currentUserId);
             renderReviewCompleteState();
             markPhaseCompleted();
@@ -1730,7 +1355,522 @@ function logAnswer(question, isCorrect){
   }
 
   /* =========================
+     Render current question
+  ========================= */
+  function renderQuestion(){
+    answered = false;
+    btnNext.disabled = true; btnNext.classList.remove('ready');
+    btnNext.textContent = "Next";
+    btnPlayPrompt.disabled = false;
+
+    btnListenAnswer.classList.add('is-hidden');
+    btnListenAnswer.disabled = true;
+    btnListenAnswer.onclick = null;
+
+    hideFallbackButtons();
+
+    const q = questions[idx];
+    if(!q){ finishRound(); return; }
+
+    const pct = Math.round(((idx + 1)/questions.length)*100);
+    bar.style.width = pct + '%';
+
+    const roundsDone = getReviewRoundCounter(levelDir, unitDir, currentUserId);
+    const roundDisplay = Math.min(roundsDone + 1, MAX_ROUNDS);
+    statusPill.textContent = `Round ${roundDisplay} • Question ${idx+1}/${questions.length}`;
+
+    const rawPrompt = q.prompt || '—';
+    promptEl.innerHTML = renderPromptWithBlanks(rawPrompt);
+    if (q.type === 'fillblank' && !/\{blank\}|\{b\d+\}|_{3,}/i.test(rawPrompt)) {
+      const span = document.createElement('span');
+      span.className = 'blank'; span.setAttribute('aria-hidden','true');
+      promptEl.appendChild(document.createTextNode(' '));
+      promptEl.appendChild(span);
+    }
+
+    btnPlayPrompt.onclick = () => { if (!isReading) playPrompt(q); };
+
+    if (q.type === 'audio_mcq'){
+      btnListenAnswer.classList.remove('is-hidden');
+      btnListenAnswer.disabled = false;
+      btnListenAnswer.onclick = () => {
+        if (isReading) return;
+        playAnswerAudio(q);
+      };
+    }
+
+    mediaBox.innerHTML = '';
+    if(q.image){
+      const img = new Image(); img.alt = 'Question image';
+      img.src = absPath(q.image); mediaBox.appendChild(img);
+    } else {
+      const img = new Image(); img.src = './hannah_pensando.png'; img.alt = 'Hannah thinking';
+      mediaBox.appendChild(img);
+    }
+
+    optionsEl.innerHTML = '';
+    optionsEl.classList.remove('is-order');
+
+    if (q.type === 'order') {
+      renderOrderQuestion(q);
+    } else if (q.type === 'match') {
+      renderMatchQuestion(q);
+    } else {
+      const opts = (q.shuffleOptions===false) ? q.options : shuffle([...q.options]);
+      opts.forEach(opt => optionsEl.appendChild(makeOption(q, opt)));
+    }
+
+    btnNext.onclick = () => {
+      (ensureAudio()? sfxTick() : sNext.play().catch(()=>{}));
+      idx++;
+      if (idx >= questions.length) { finishRound(); return; }
+      renderQuestion();
+    };
+  }
+
+  /* =========================
+     Multiple-choice option
+  ========================= */
+  function makeOption(q, opt){
+    const o = (typeof opt === 'string') ? { label: opt, value: opt } : { ...opt };
+
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'option';
+    btn.setAttribute('aria-label', o.aria || o.label || 'option');
+
+    const thumb = document.createElement('div'); thumb.className = 'thumb';
+    if (o.image){
+      const img = new Image(); img.src = absPath(o.image); img.alt = o.label || '';
+      thumb.appendChild(img);
+    } else if (o.emoji){
+      thumb.textContent = o.emoji;
+    } else {
+      const box = document.createElement('span');
+      box.className = 'square-outline';
+      box.style.setProperty('--sq', '#7c3aed');
+      thumb.textContent = ''; thumb.appendChild(box);
+    }
+
+    const textWrap = document.createElement('div');
+    const label = document.createElement('div'); label.className = 'label'; label.textContent = o.label || '';
+    textWrap.appendChild(label);
+    if (typeof o.sub === 'string' && o.sub.trim()){
+      const sub = document.createElement('div'); sub.className = 'sub'; sub.textContent = o.sub;
+      textWrap.appendChild(sub);
+    }
+
+    btn.appendChild(thumb); btn.appendChild(textWrap);
+
+    btn.onclick = () => {
+      (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
+      speakSelectedThenCheck(q, o, btn);
+    };
+    thumb.style.cursor = 'pointer'; thumb.title = 'Play & choose';
+    thumb.onclick = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
+      speakSelectedThenCheck(q, o, btn);
+    };
+
+    return btn;
+  }
+
+  /* =========================
+     REVIEW RULE: no retries
+     - After first decision:
+         correct -> remove from pending, enable Next
+         wrong   -> keep in pending, enable Next
+  ========================= */
+  async function applyReviewResult(q, isCorrect){
+    try{
+      if (!currentUserId || !q || !q.id) return;
+      if (isCorrect){
+        await removeFromPending(currentUserId, levelDir, unitDir, q.id);
+      }
+    }catch(err){
+      console.warn("[Review] Could not update pending:", err);
+    }
+  }
+
+  function lockAndEnableNext(){
+    answered = true;
+    btnNext.disabled = false;
+    btnNext.classList.add('ready');
+    Array.from(optionsEl.querySelectorAll('.option')).forEach(el => {
+      try{ el.disabled = true; }catch(e){}
+    });
+  }
+
+  /* =========================
+     ORDER type (no retries)
+  ========================= */
+  function renderOrderQuestion(q){
+    optionsEl.classList.add('is-order');
+
+    const words = (q.options || []).map(w => String(w));
+    const answerSeq = Array.isArray(q.answer) ? q.answer.map(String) : [];
+    let built = [];
+    let decided = false; // lock after first full attempt
+
+    const wrap = document.createElement('div'); wrap.className = 'build-wrap';
+    const tray = document.createElement('div'); tray.className = 'build-tray'; tray.id = 'buildTray';
+    tray.setAttribute('aria-label','Sentence tray');
+    const actions = document.createElement('div'); actions.className = 'build-actions';
+    const undoBtn = document.createElement('button'); undoBtn.className = 'build-btn'; undoBtn.textContent = 'Undo';
+    const clearBtn = document.createElement('button'); clearBtn.className = 'build-btn'; clearBtn.textContent = 'Clear';
+    actions.appendChild(undoBtn); actions.appendChild(clearBtn);
+    wrap.appendChild(tray); wrap.appendChild(actions);
+    optionsEl.appendChild(wrap);
+
+    const grid = document.createElement('div'); grid.className = 'build-grid';
+    optionsEl.appendChild(grid);
+
+    words.forEach(w=>{
+      const b = document.createElement('button');
+      b.type='button'; b.className='option word-only';
+      b.innerHTML = `<div class="label">${escapeHtml(w)}</div>`;
+      b.onclick = ()=>{
+        if (decided) return;
+        (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
+        if (built.length >= answerSeq.length) return;
+        built.push(w);
+        drawTray();
+        checkBuilt();
+      };
+      grid.appendChild(b);
+    });
+
+    undoBtn.onclick = ()=>{
+      if (decided) return;
+      built.pop(); drawTray();
+      btnNext.disabled = true; btnNext.classList.remove('ready');
+    };
+    clearBtn.onclick = ()=>{
+      if (decided) return;
+      built = []; drawTray();
+      btnNext.disabled = true; btnNext.classList.remove('ready');
+    };
+
+    function drawTray(){
+      tray.innerHTML = '';
+      built.forEach(word=>{
+        const chip = document.createElement('span');
+        chip.className='word-chip';
+        chip.textContent = word;
+        tray.appendChild(chip);
+      });
+    }
+
+    async function checkBuilt(){
+      const sameLen = built.length === answerSeq.length;
+      if (!sameLen || decided) return;
+
+      decided = true;
+
+      const ok = built.every((w,i)=> normalize(w) === normalize(answerSeq[i]));
+
+      // Log attempt (kept)
+      logAnswer(q, ok);
+
+      if (ok){
+        try{
+          mediaBox.innerHTML = '';
+          const gif = new Image(); gif.src = './hannah_feliz.gif'; gif.alt = 'Hannah celebrating';
+          gif.setAttribute('draggable','false'); gif.style.pointerEvents = 'none';
+          mediaBox.appendChild(gif);
+        }catch(e){}
+        confetti(18);
+        (ensureAudio()? sfxCorrect() : sCorrect.play().catch(()=>{}));
+        speakFriendly(['Great!','Awesome!']);
+        liveEl.textContent = 'Correct order';
+
+        await applyReviewResult(q, true);
+      } else {
+        (ensureAudio()? sfxWrong() : sWrong.play().catch(()=>{}));
+        speakFriendly(['Try again next time!']);
+        liveEl.textContent = 'Incorrect order';
+        await applyReviewResult(q, false);
+      }
+
+      // lock UI & enable next (no retries)
+      Array.from(optionsEl.querySelectorAll('.option')).forEach(el => { try{ el.disabled = true; }catch(e){} });
+      undoBtn.disabled = true; clearBtn.disabled = true;
+
+      btnNext.disabled = false; btnNext.classList.add('ready');
+      answered = true;
+    }
+  }
+
+  /* =========================
+     MATCH type (no retries)
+     - first wrong attempt ends (keeps in pending)
+     - only if completes all pairs correctly without a wrong attempt -> correct
+  ========================= */
+  function renderMatchQuestion(q){
+    const sourcePairs = Array.isArray(q.pairs) ? q.pairs : [];
+
+    const normItem = (_side, it) => {
+      if (typeof it === 'string') return { label: it, value: it };
+      const o = {...it};
+      if (!o.value) o.value = o.label || o.image || String(Math.random());
+      return o;
+    };
+
+    const leftItems  = sourcePairs.map(p => normItem('left',  p.left));
+    const rightItems = sourcePairs.map(p => normItem('right', p.right));
+
+    const leftShuf  = shuffle([...leftItems]);
+    const rightShuf = shuffle([...rightItems]);
+
+    const grid = document.createElement('div'); grid.className = 'match-grid';
+    const colL = document.createElement('div'); colL.className = 'match-col';
+    const colR = document.createElement('div'); colR.className = 'match-col';
+    grid.appendChild(colL); grid.appendChild(colR);
+    optionsEl.appendChild(grid);
+
+    let selectedLeftBtn = null;
+    let selectedLeftVal = null;
+    let matched = new Set();
+    let decided = false;
+    let anyWrong = false;
+
+    const lockAll = ()=>{
+      Array.from(optionsEl.querySelectorAll('.option')).forEach(el => { try{ el.disabled = true; }catch(e){} });
+      answered = true;
+      btnNext.disabled = false; btnNext.classList.add('ready');
+    };
+
+    const makeLeftBtn = (item) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'option word-only';
+      b.dataset.value = item.value;
+
+      const label = document.createElement('div'); label.className = 'label'; label.textContent = item.label || item.value;
+      b.appendChild(label);
+
+      b.onclick = () => {
+        if (decided) return;
+        if (b.classList.contains('matched')) return;
+        (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
+        Array.from(colL.children).forEach(el => el.classList.remove('selected'));
+        b.classList.add('selected');
+        selectedLeftBtn = b;
+        selectedLeftVal = item.value;
+      };
+      return b;
+    };
+
+    const makeRightBtn = (item) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'option';
+      b.dataset.value = item.value;
+
+      const thumb = document.createElement('div'); thumb.className = 'thumb';
+      if (item.image){
+        const img = new Image(); img.src = absPath(item.image); img.alt = item.label || '';
+        thumb.appendChild(img);
+      } else {
+        thumb.textContent = item.label ? '🔤' : '❔';
+      }
+
+      const hasLabel = !!(item.label && String(item.label).trim());
+      if (hasLabel){
+        const label = document.createElement('div'); label.className = 'label'; label.textContent = item.label;
+        b.appendChild(thumb); b.appendChild(label);
+      } else {
+        b.classList.add('img-only'); b.appendChild(thumb);
+      }
+
+      b.onclick = async ()=>{
+        if (decided) return;
+        if (b.classList.contains('matched')) return;
+        if (!selectedLeftBtn){ toast('Choose a word first.'); return; }
+
+        const leftVal  = selectedLeftVal;
+        const rightVal = item.value;
+        const ok = normalize(leftVal) === normalize(rightVal);
+
+        if (ok){
+          (ensureAudio()? sfxCorrect() : sCorrect.play().catch(()=>{}));
+          confetti(10);
+          speakFriendly(['Great!','Nice!']);
+
+          b.classList.add('matched');
+          selectedLeftBtn.classList.add('matched');
+          selectedLeftBtn.classList.remove('selected');
+          matched.add(leftVal);
+
+          selectedLeftBtn = null;
+          selectedLeftVal = null;
+
+          if (matched.size === sourcePairs.length){
+            decided = true;
+
+            const finalCorrect = !anyWrong;
+            logAnswer(q, finalCorrect);
+
+            if (finalCorrect){
+              try{
+                mediaBox.innerHTML = '';
+                const gif = new Image(); gif.src = './hannah_feliz.gif'; gif.alt = 'Hannah celebrating';
+                gif.setAttribute('draggable','false'); gif.style.pointerEvents = 'none';
+                mediaBox.appendChild(gif);
+              }catch(e){}
+              confetti(18);
+              (ensureAudio()? sfxCorrect() : sCorrect.play().catch(()=>{}));
+              speakFriendly(['Great!','Awesome!']);
+              liveEl.textContent = 'All pairs matched';
+
+              await applyReviewResult(q, true);
+            } else {
+              (ensureAudio()? sfxWrong() : sWrong.play().catch(()=>{}));
+              speakFriendly(['Try again next time!']);
+              liveEl.textContent = 'Match had an error';
+              await applyReviewResult(q, false);
+            }
+
+            lockAll();
+          }
+        } else {
+          anyWrong = true;
+          decided = true;
+
+          (ensureAudio()? sfxWrong() : sWrong.play().catch(()=>{}));
+          speakFriendly(['Try again next time!']);
+          b.classList.add('err');
+          setTimeout(()=>b.classList.remove('err'), 250);
+          liveEl.textContent = 'Incorrect match';
+
+          logAnswer(q, false);
+          await applyReviewResult(q, false);
+
+          lockAll();
+        }
+      };
+      return b;
+    };
+
+    leftShuf.forEach(item => colL.appendChild(makeLeftBtn(item)));
+    rightShuf.forEach(item => colR.appendChild(makeRightBtn(item)));
+  }
+
+  /* =========================
+     Selection flow for MCQ
+     - NO retries in review
+  ========================= */
+  function disableOthers(keepBtn){
+    Array.from(optionsEl.children).forEach(el=>{
+      if(el!==keepBtn){ el.disabled = true; el.style.opacity = .5; }
+    });
+  }
+
+  async function handleAnswer(q, opt, btn){
+    if(answered) return;
+
+    const isCorrect = normalize(opt.value) === normalize(q.answer);
+
+    // Log attempt (kept)
+    logAnswer(q, isCorrect);
+
+    if(isCorrect){
+      btn.classList.add('ok');
+      (ensureAudio()? sfxCorrect() : sCorrect.play().catch(()=>{}));
+      confetti(18);
+      speakFriendly(['Yes! Great job!','Awesome!','You did it!']);
+      try{
+        mediaBox.innerHTML = '';
+        const gif = new Image(); gif.src = './hannah_feliz.gif'; gif.alt = 'Hannah celebrating';
+        gif.setAttribute('draggable','false'); gif.style.pointerEvents = 'none';
+        mediaBox.appendChild(gif);
+      }catch(e){}
+      liveEl.textContent = 'Correct answer';
+
+      disableOthers(btn);
+
+      await applyReviewResult(q, true);
+      lockAndEnableNext();
+    } else {
+      btn.classList.add('err');
+      (ensureAudio()? sfxWrong() : sWrong.play().catch(()=>{}));
+      speakFriendly(['Not this one!','Almost!']);
+      liveEl.textContent = 'Incorrect answer';
+
+      disableOthers(btn);
+
+      await applyReviewResult(q, false);
+      lockAndEnableNext();
+    }
+  }
+
+  function playPrompt(q){
+    stopAllAudio();
+    const spoken = buildSpokenPrompt(q);
+    if (q.promptAudio){
+      const a = new Audio(absPath(q.promptAudio));
+      currentAudio = a;
+      a.onended = () => { currentAudio = null; };
+      a.onerror  = () => { currentAudio = null; speak(spoken); };
+      a.play().catch(() => { currentAudio = null; speak(spoken); });
+    } else {
+      speak(spoken);
+    }
+  }
+
+  function speakSelectedThenCheck(q, o, btn){
+    if (answered || isReading) return;
+    isReading = true;
+
+    const allBtns = Array.from(document.querySelectorAll('.option'));
+    allBtns.forEach(el => el.disabled = true);
+    btnNext.disabled = true; btnNext.classList.remove('ready');
+
+    const finish = () => {
+      isReading = false;
+      // We do NOT re-enable all options after a selection; the selection itself decides and locks.
+      handleAnswer(q, o, btn);
+    };
+
+    const say = (o.tts || o.label || o.value || '').toString().trim();
+    stopAllAudio();
+
+    if (o.audio){
+      try{
+        const a = new Audio(absPath(o.audio));
+        currentAudio = a;
+        let done = false;
+        const safeFinish = () => { if (!done){ done = true; currentAudio = null; finish(); } };
+        a.onended = safeFinish;
+        a.onerror = safeFinish;
+        a.onloadedmetadata = () => {
+          const guard = Math.max(1500, Math.round((a.duration||0)*1000) + 1500);
+          setTimeout(safeFinish, guard + 500);
+        };
+        a.play().catch(safeFinish);
+      }catch{
+        setTimeout(finish, 800);
+      }
+    } else {
+      try{
+        const u = new SpeechSynthesisUtterance(say || ' ');
+        u.lang = 'en-US'; u.rate = 0.95; u.pitch = 1.0;
+        u.onend   = finish;
+        u.onerror = finish;
+        speechSynthesis.cancel(); speechSynthesis.speak(u);
+        setTimeout(()=>{ if(isReading) finish(); }, 15000);
+      }catch{
+        setTimeout(finish, 800);
+      }
+    }
+  }
+
+  /* =========================
      Finish of a ROUND
+     - Round ends after answering current batch (<=15)
+     - Then we check pending:
+        if empty => complete + unlock
+        else => increment round counter and show Continue (or Take a break)
   ========================= */
   async function finishRound(){
     try { stopAllAudio(); } catch(e){} try { speechSynthesis.cancel(); } catch(e){}
@@ -1751,16 +1891,16 @@ function logAnswer(question, isCorrect){
         return;
       }
 
-      const outcome = await recomputeReviewPlan({ levelKey: levelDir, unitKey: unitDir });
+      const pendingMap = await getPendingMap(currentUserId, levelDir, unitDir);
+      const remainingCount = Object.keys(pendingMap || {}).length;
 
-      if (outcome.status === "complete"){
+      if (remainingCount === 0){
         resetReviewRoundCounter(levelDir, unitDir, currentUserId);
         renderReviewCompleteState();
         markPhaseCompleted();
         return;
       }
 
-      // still difficult => counts a round completion
       incrementReviewRoundCounter(levelDir, unitDir, currentUserId);
       const rounds = getReviewRoundCounter(levelDir, unitDir, currentUserId);
 
@@ -1769,10 +1909,10 @@ function logAnswer(question, isCorrect){
         return;
       }
 
-      renderContinueReviewState(outcome.remainingCount);
+      renderContinueReviewState(remainingCount);
 
     }catch(err){
-      console.error("[Review] Finish/recompute failed:", err);
+      console.error("[Review] Finish failed:", err);
       renderNoContentState("Could not load review data.", "Please try again.");
     }finally{
       showLoader(false);
@@ -1781,6 +1921,8 @@ function logAnswer(question, isCorrect){
 
   /* =========================
      Init review
+     - ensure queue exists (build from history if empty)
+     - then build current round from pending
   ========================= */
   async function initReview(){
     showLoader(true);
@@ -1800,10 +1942,10 @@ function logAnswer(question, isCorrect){
         return;
       }
 
-      const plan = await recomputeReviewPlan({ levelKey: levelDir, unitKey: unitDir });
+      await ensureReviewQueue({ uid: currentUserId, levelKey: levelDir, unitKey: unitDir });
 
+      const plan = await buildRoundFromPending({ uid: currentUserId, levelKey: levelDir, unitKey: unitDir });
       if (plan.status === "complete" || !plan.selected.length){
-        // no difficulty => completed
         resetReviewRoundCounter(levelDir, unitDir, currentUserId);
         renderReviewCompleteState();
         markPhaseCompleted();

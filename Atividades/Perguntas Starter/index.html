@@ -507,6 +507,37 @@ firebase.auth().onAuthStateChanged(function(user){
     return null;
   }
 
+function hydrateAudioMcq(q){
+  if (!q || q.type !== 'audio_mcq') return q;
+
+  const norm = (v) => String(v ?? '').trim().toLowerCase();
+
+  // 1) Garante options array
+  if (!Array.isArray(q.options)) q.options = [];
+
+  // 2) Se existir optionAudios, injeta audio em cada option
+  if (q.optionAudios && typeof q.optionAudios === 'object'){
+    q.options = q.options.map(op => {
+      const o = (typeof op === 'string') ? { label: op, value: op } : { ...op };
+      const key = norm(o.value);
+      const fromMap = q.optionAudios[key] || q.optionAudios[o.value];
+      if (!o.audio && fromMap) o.audio = fromMap;
+      return o;
+    });
+  }
+
+  // 3) Define/resolve answerAudio (prioridade: q.answerAudio > audio do option correto > optionAudios[answer])
+  if (!q.answerAudio){
+    const ansKey = norm(q.answer);
+    const correctOpt = q.options.find(op => norm(op.value) === ansKey);
+    const fromOpt = correctOpt && correctOpt.audio;
+    const fromMap = (q.optionAudios && (q.optionAudios[ansKey] || q.optionAudios[q.answer])) || null;
+    q.answerAudio = fromOpt || fromMap || null;
+  }
+
+  return q;
+}
+
   async function loadActivityQuestionsFromFirebase(levelKey, unitKey, faseParam){
     const faseKey = faseParam || '1';
     const activityKey = `${levelKey}_${unitKey}_Fase${faseKey}`;
@@ -540,6 +571,8 @@ firebase.auth().onAuthStateChanged(function(user){
 
       if (!q.type) q.type = 'mcq';
       if (!Array.isArray(q.options)) q.options = [];
+
+      hydrateAudioMcq(q);
 
       list.push(q);
     });
@@ -722,41 +755,66 @@ firebase.auth().onAuthStateChanged(function(user){
       speechSynthesis.cancel(); speechSynthesis.speak(u);
     }catch(e){}
   }
+function fallbackSpeakAnswer(q){
+  // tenta falar a resposta correta de forma amigável
+  const correctOpt = Array.isArray(q.options)
+    ? q.options.find(opt => normalize(opt.value) === normalize(q.answer))
+    : null;
+
+  const phrase =
+    (correctOpt && (correctOpt.tts || correctOpt.label || correctOpt.value)) ||
+    (q.tts) || // se você usar q.tts como fallback
+    (q.answer) ||
+    '';
+
+  if (phrase) speak(String(phrase).trim());
+}
   function speakFriendly(pool){ const pick = pool[(Math.random()*pool.length)|0]; speak(pick); }
 
   /* =========================
      Audio da RESPOSTA (apenas audio_mcq)
   ========================= */
-  function playAnswerAudio(q){
-    stopAllAudio();
+ function playAnswerAudio(q){
+  stopAllAudio();
 
-    if (!q || !Array.isArray(q.options)) {
+  if (!q) return;
+
+  // ✅ prioridade 1: answerAudio explícito
+  if (q.answerAudio){
+    try{
+      const a = new Audio(absPath(q.answerAudio));
+      currentAudio = a;
+      a.onended = () => { currentAudio = null; };
+      a.onerror = () => { currentAudio = null; fallbackSpeakAnswer(q); };
+      a.play().catch(() => { currentAudio = null; fallbackSpeakAnswer(q); });
+      return;
+    }catch(e){
+      fallbackSpeakAnswer(q);
       return;
     }
+  }
 
+  // prioridade 2: áudio no option correto (se já foi hidratado)
+  if (Array.isArray(q.options)){
     const correctOpt = q.options.find(opt => normalize(opt.value) === normalize(q.answer));
-    if (!correctOpt){
-      const fallback = (q.options[0] && (q.options[0].tts || q.options[0].label || q.options[0].value)) || '';
-      if (fallback) speak(fallback);
-      return;
-    }
-
-    const phrase = (correctOpt.tts || correctOpt.label || correctOpt.value || '').toString().trim();
-
-    if (correctOpt.audio){
+    if (correctOpt && correctOpt.audio){
       try{
         const a = new Audio(absPath(correctOpt.audio));
         currentAudio = a;
         a.onended = () => { currentAudio = null; };
-        a.onerror  = () => { currentAudio = null; if (phrase) speak(phrase); };
-        a.play().catch(() => { currentAudio = null; if (phrase) speak(phrase); });
+        a.onerror  = () => { currentAudio = null; fallbackSpeakAnswer(q); };
+        a.play().catch(() => { currentAudio = null; fallbackSpeakAnswer(q); });
+        return;
       }catch(e){
-        if (phrase) speak(phrase);
+        fallbackSpeakAnswer(q);
+        return;
       }
-    } else {
-      if (phrase) speak(phrase);
     }
   }
+
+  // prioridade 3: fala (tts/label/value)
+  fallbackSpeakAnswer(q);
+}
 
   /* =========================
      Render current question
