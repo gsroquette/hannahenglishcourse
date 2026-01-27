@@ -538,35 +538,42 @@
      Audio da RESPOSTA (apenas audio_mcq)
   ========================= */
   function playAnswerAudio(q){
-    stopAllAudio();
+  stopAllAudio();
 
-    if (!q || !Array.isArray(q.options)) {
-      return;
-    }
+  if (!q) return;
 
-    const correctOpt = q.options.find(opt => normalize(opt.value) === normalize(q.answer));
-    if (!correctOpt){
-      const fallback = (q.options[0] && (q.options[0].tts || q.options[0].label || q.options[0].value)) || '';
-      if (fallback) speak(fallback);
-      return;
-    }
+  // acha a opção correta (para pegar tts/label/value como fallback)
+  const correctOpt = Array.isArray(q.options)
+    ? q.options.find(opt => normalize(opt.value) === normalize(q.answer))
+    : null;
 
-    const phrase = (correctOpt.tts || correctOpt.label || correctOpt.value || '').toString().trim();
+  const phrase = (correctOpt && (correctOpt.tts || correctOpt.label || correctOpt.value))
+    ? String(correctOpt.tts || correctOpt.label || correctOpt.value).trim()
+    : String(q.tts || '').trim();
 
-    if (correctOpt.audio){
-      try{
-        const a = new Audio(absPath(correctOpt.audio));
-        currentAudio = a;
-        a.onended = () => { currentAudio = null; };
-        a.onerror  = () => { currentAudio = null; if (phrase) speak(phrase); };
-        a.play().catch(() => { currentAudio = null; if (phrase) speak(phrase); });
-      }catch(e){
-        if (phrase) speak(phrase);
-      }
-    } else {
+  // 1) prioridade: áudio explícito da resposta no nível da questão
+  const directAnswerAudio =
+    q.answerAudio || q.answer_sound || q.answerSound || q.audio || null;
+
+  // 2) fallback: se existir áudio dentro da option (compatibilidade antiga)
+  const optAudio = correctOpt && correctOpt.audio ? correctOpt.audio : null;
+
+  const audioPath = directAnswerAudio || optAudio;
+
+  if (audioPath){
+    try{
+      const a = new Audio(absPath(audioPath));
+      currentAudio = a;
+      a.onended = () => { currentAudio = null; };
+      a.onerror = () => { currentAudio = null; if (phrase) speak(phrase); };
+      a.play().catch(() => { currentAudio = null; if (phrase) speak(phrase); });
+    }catch(e){
       if (phrase) speak(phrase);
     }
+  } else {
+    if (phrase) speak(phrase);
   }
+}
 
   /* =========================
      Render da questão atual
@@ -959,51 +966,60 @@
   }
 
   function speakSelectedThenCheck(q, o, btn){
-    if (answered || isReading) return;
-    isReading = true;
+  if (answered || isReading) return;
+  isReading = true;
 
-    const allBtns = Array.from(document.querySelectorAll('.option'));
-    allBtns.forEach(el => el.disabled = true);
-    btnNext.disabled = true; btnNext.classList.remove('ready');
+  const allBtns = Array.from(document.querySelectorAll('.option'));
+  allBtns.forEach(el => el.disabled = true);
+  btnNext.disabled = true; btnNext.classList.remove('ready');
 
-    const finish = () => {
-      isReading = false;
-      if (!answered) allBtns.forEach(el => el.disabled = false);
-      handleAnswer(q, o, btn);
-    };
+  const finish = () => {
+    isReading = false;
+    if (!answered) allBtns.forEach(el => el.disabled = false);
+    handleAnswer(q, o, btn);
+  };
 
-    const say = (o.tts || o.label || o.value || '').toString().trim();
-    stopAllAudio();
+  const say = (o.tts || o.label || o.value || '').toString().trim();
+  stopAllAudio();
 
-    if (o.audio){
-      try{
-        const a = new Audio(absPath(o.audio));
-        currentAudio = a;
-        let done = false;
-        const safeFinish = () => { if (!done){ done = true; currentAudio = null; finish(); } };
-        a.onended = safeFinish;
-        a.onerror = safeFinish;
-        a.onloadedmetadata = () => {
-          const guard = Math.max(1500, Math.round((a.duration||0)*1000) + 1500);
-          setTimeout(safeFinish, guard + 500);
-        };
-        a.play().catch(safeFinish);
-      }catch{
-        setTimeout(finish, 800);
-      }
-    } else {
-      try{
-        const u = new SpeechSynthesisUtterance(say || ' ');
-        u.lang = 'en-US'; u.rate = 0.95; u.pitch = 1.0;
-        u.onend   = finish;
-        u.onerror = finish;
-        speechSynthesis.cancel(); speechSynthesis.speak(u);
-        setTimeout(()=>{ if(isReading) finish(); }, 15000);
-      }catch{
-        setTimeout(finish, 800);
-      }
+  // Para audio_mcq: o áudio pode vir de:
+  // 1) o.audio (padrão antigo/MCQ)
+  // 2) q.optionAudios[value] (padrão novo e compatível com loader estrito)
+  const key = normalize(o.value);
+  const mapAudio =
+    (q && q.optionAudios && (q.optionAudios[key] || q.optionAudios[o.value])) || null;
+
+  const optAudio = o.audio || mapAudio;
+
+  if (optAudio){
+    try{
+      const a = new Audio(absPath(optAudio));
+      currentAudio = a;
+      let done = false;
+      const safeFinish = () => { if (!done){ done = true; currentAudio = null; finish(); } };
+      a.onended = safeFinish;
+      a.onerror = safeFinish;
+      a.onloadedmetadata = () => {
+        const guard = Math.max(1500, Math.round((a.duration||0)*1000) + 1500);
+        setTimeout(safeFinish, guard + 500);
+      };
+      a.play().catch(safeFinish);
+    }catch{
+      setTimeout(finish, 800);
+    }
+  } else {
+    try{
+      const u = new SpeechSynthesisUtterance(say || ' ');
+      u.lang = 'en-US'; u.rate = 0.95; u.pitch = 1.0;
+      u.onend   = finish;
+      u.onerror = finish;
+      speechSynthesis.cancel(); speechSynthesis.speak(u);
+      setTimeout(()=>{ if(isReading) finish(); }, 15000);
+    }catch{
+      setTimeout(finish, 800);
     }
   }
+}
 
   /* =========================
      Finish (preview)

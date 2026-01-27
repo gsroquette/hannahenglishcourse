@@ -80,14 +80,74 @@
   }
 
   .q-top{display:flex;flex-direction:column;gap:14px}
-  .q-prompt{font-size:22px;font-weight:800;line-height:1.3;word-break:break-word}
+
+  /* Prompt + ícone de áudio do prompt */
+  .q-prompt-row{
+    display:flex;
+    align-items:flex-start;
+    gap:8px;
+  }
+  .q-prompt{
+    font-size:22px;
+    font-weight:800;
+    line-height:1.3;
+    word-break:break-word;
+    flex:1 1 auto;
+  }
+  .prompt-audio-btn{
+    flex:0 0 auto;
+    border:none;
+    background:transparent;
+    cursor:pointer;
+    font-size:22px;
+    line-height:1;
+    padding:6px;
+    border-radius:999px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    transition:background .15s ease, transform .1s ease, opacity .15s ease;
+    opacity:0.85;
+  }
+  .prompt-audio-btn:hover{
+    background:rgba(37,99,235,.08);
+    opacity:1;
+  }
+  .prompt-audio-btn:active{
+    transform:scale(.92);
+  }
+
   .q-media{width:100%;aspect-ratio:16/10;background:#eef4ff;border:1px dashed #cfe0ff;border-radius:14px;padding:8px;overflow:hidden;display:block}
   .q-media img{width:100%;height:100%;object-fit:contain;display:block}
   @supports not (aspect-ratio:16/10){.q-media{height:220px}}
 
   .q-controls{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
-  .icon-btn{border:none;background:#e6f0ff;color:#0f3ea8;padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:700}
-  .icon-btn:active{transform:translateY(1px)}
+
+  /* LISTEN da RESPOSTA (audio_mcq) */
+  .listen-audio-btn{
+    border:none;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    padding:10px 18px;
+    border-radius:999px;
+    background:linear-gradient(90deg,#3b82f6,#22c55e);
+    color:#fff;
+    font-weight:900;
+    font-size:15px;
+    cursor:pointer;
+    box-shadow:0 8px 16px rgba(34,197,94,.35);
+  }
+  .listen-audio-btn .listen-icon{
+    font-size:20px;
+  }
+  .listen-audio-btn .listen-label{
+    letter-spacing:.08em;
+  }
+  .listen-audio-btn:active{
+    transform:translateY(1px);
+  }
 
   .options{display:grid;gap:10px;margin-top:6px;grid-template-columns:repeat(2,minmax(0,1fr))}
   .option{
@@ -116,6 +176,23 @@
 
   .footer{margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
   .pill{background:#eef2ff;color:#3949ab;padding:8px 12px;border-radius:999px;font-size:12px;border:1px solid #d7defc}
+
+  /* ====== NAV BUTTONS (Prev/Next) ====== */
+  .nav-actions{display:flex;gap:8px;align-items:center}
+  .nav-btn{
+    border:none;
+    background:#e6f0ff;
+    color:#0f3ea8;
+    font-weight:800;
+    padding:12px 14px;
+    border-radius:14px;
+    cursor:pointer;
+    box-shadow:0 6px 14px rgba(0,0,0,.06);
+    transition:opacity .2s ease,transform .06s ease;
+  }
+  .nav-btn:active{transform:translateY(1px)}
+  .nav-btn[disabled]{opacity:.35;pointer-events:none}
+
   .next-btn{border:none;background:linear-gradient(90deg,#3b82f6,#22c55e);color:#fff;font-weight:800;padding:12px 16px;border-radius:14px;cursor:pointer;box-shadow:0 10px 18px rgba(34,197,94,.25);opacity:.3;pointer-events:none;transition:opacity .2s ease,transform .06s ease}
   .next-btn.ready{opacity:1;pointer-events:auto}
   .next-btn:active{transform:translateY(1px)}
@@ -222,10 +299,28 @@
       <div class="question-card">
         <div class="q-top">
           <div>
-            <div class="q-prompt" id="prompt">—</div>
+            <div class="q-prompt-row">
+              <div class="q-prompt" id="prompt">—</div>
+              <button
+                class="prompt-audio-btn"
+                id="btnPlayPrompt"
+                type="button"
+                title="Listen to question"
+                aria-label="Listen to the question"
+              >
+                🔊
+              </button>
+            </div>
             <div class="q-controls">
-              <button class="icon-btn" id="btnPlayPrompt" title="Listen to question">🔊 Listen</button>
-              <button class="icon-btn" id="btnRepeat" title="Repeat aloud (optional)">🎤 Repeat</button>
+              <button
+                class="listen-audio-btn is-hidden"
+                id="btnListenAnswer"
+                type="button"
+                title="Listen to the answer"
+              >
+                <span class="listen-icon">🎧</span>
+                <span class="listen-label">LISTEN</span>
+              </button>
             </div>
           </div>
           <div class="q-media" id="mediaBox" aria-label="Question image"></div>
@@ -235,7 +330,12 @@
 
         <div class="footer">
           <span class="pill" id="statusPill">Question —/—</span>
-          <button class="next-btn" id="btnNext" disabled>Next</button>
+
+          <!-- ===== NAV ACTIONS (Prev + Next) ===== -->
+          <div class="nav-actions">
+            <button class="nav-btn" id="btnPrev" disabled>Prev</button>
+            <button class="next-btn" id="btnNext" disabled>Next</button>
+          </div>
         </div>
       </div>
     </div>
@@ -272,14 +372,16 @@
   let currentAudio = null;
   let BASE = '';          // basePath opcional vindo do upload
   let metaInfo = {};      // level, unit, fase etc.
+  let previewTitle = 'Preview';
 
   const subtitle   = document.getElementById('subtitle');
   const bar        = document.getElementById('bar');
   const promptEl   = document.getElementById('prompt');
   const mediaBox   = document.getElementById('mediaBox');
   const optionsEl  = document.getElementById('options');
-  const btnPlayPrompt = document.getElementById('btnPlayPrompt');
-  const btnRepeat  = document.getElementById('btnRepeat');
+  const btnPlayPrompt   = document.getElementById('btnPlayPrompt');
+  const btnListenAnswer = document.getElementById('btnListenAnswer');
+  const btnPrev    = document.getElementById('btnPrev');
   const btnNext    = document.getElementById('btnNext');
   const statusPill = document.getElementById('statusPill');
   const confettiEl = document.getElementById('confetti');
@@ -340,6 +442,7 @@
   function stripQuotesForTTS(str){
     return String(str ?? '').replace(/[“”"]/g,'').replace(/\s{2,}/g,' ').trim();
   }
+
   function buildSpokenPrompt(q){
     if (q.tts && String(q.tts).trim()) return stripQuotesForTTS(q.tts);
     let text = String(q.prompt || '');
@@ -383,6 +486,14 @@
     return stripQuotesForTTS(text);
   }
 
+  // Prompt TTS específico: para audio_mcq NUNCA fala a resposta, só o prompt
+  function buildPromptTTS(q){
+    if (q.type === 'audio_mcq'){
+      return stripQuotesForTTS(ttsSanitize(q.prompt || ''));
+    }
+    return buildSpokenPrompt(q);
+  }
+
   function stopAllAudio(){
     try { speechSynthesis.cancel(); } catch(e){}
     if (currentAudio){
@@ -418,21 +529,70 @@
   }
   function showLoader(v){ if (loadingEl) loadingEl.style.display = v ? 'flex' : 'none'; }
 
+  function clampIndex(n){
+    if(!questions.length) return 0;
+    return Math.max(0, Math.min(n, questions.length - 1));
+  }
+
+  /* =========================
+     Audio da RESPOSTA (apenas audio_mcq)
+  ========================= */
+  function playAnswerAudio(q){
+    stopAllAudio();
+
+    if (!q || !Array.isArray(q.options)) {
+      return;
+    }
+
+    const correctOpt = q.options.find(opt => normalize(opt.value) === normalize(q.answer));
+    if (!correctOpt){
+      const fallback = (q.options[0] && (q.options[0].tts || q.options[0].label || q.options[0].value)) || '';
+      if (fallback) speak(fallback);
+      return;
+    }
+
+    const phrase = (correctOpt.tts || correctOpt.label || correctOpt.value || '').toString().trim();
+
+    if (correctOpt.audio){
+      try{
+        const a = new Audio(absPath(correctOpt.audio));
+        currentAudio = a;
+        a.onended = () => { currentAudio = null; };
+        a.onerror  = () => { currentAudio = null; if (phrase) speak(phrase); };
+        a.play().catch(() => { currentAudio = null; if (phrase) speak(phrase); });
+      }catch(e){
+        if (phrase) speak(phrase);
+      }
+    } else {
+      if (phrase) speak(phrase);
+    }
+  }
+
   /* =========================
      Render da questão atual
   ========================= */
   function renderQuestion(){
     answered = false;
     btnNext.disabled = true; btnNext.classList.remove('ready');
-    btnPlayPrompt.disabled = false; btnRepeat.disabled = false;
-    btnPlayPrompt.classList.remove('is-hidden'); btnRepeat.classList.remove('is-hidden');
+
+    btnPlayPrompt.disabled = false;
+    btnPlayPrompt.classList.remove('is-hidden');
+
+    // reset LISTEN da resposta (audio_mcq)
+    btnListenAnswer.classList.add('is-hidden');
+    btnListenAnswer.disabled = true;
+    btnListenAnswer.onclick  = null;
 
     const q = questions[idx];
     if(!q){ finish(); return; }
 
-    const pct = Math.round(((idx)/questions.length)*100);
+    // progresso: posição atual (idx+1)/total
+    const pct = Math.round(((idx + 1) / questions.length) * 100);
     bar.style.width = pct + '%';
+
     statusPill.textContent = `Question ${idx+1}/${questions.length}`;
+
+    updateNavButtons();
 
     const rawPrompt = q.prompt || '—';
     promptEl.innerHTML = renderPromptWithBlanks(rawPrompt);
@@ -443,8 +603,18 @@
       promptEl.appendChild(span);
     }
 
+    // Botão de áudio do PROMPT: lê SEMPRE o prompt (promptAudio ou TTS do prompt)
     btnPlayPrompt.onclick = () => { if (!isReading) playPrompt(q); };
-    btnRepeat.onclick     = () => { if (isReading) return; stopAllAudio(); speak(buildSpokenPrompt(q)); };
+
+    // Se for audio_mcq, mostrar LISTEN para RESPOSTA
+    if (q.type === 'audio_mcq'){
+      btnListenAnswer.classList.remove('is-hidden');
+      btnListenAnswer.disabled = false;
+      btnListenAnswer.onclick = () => {
+        if (isReading) return;
+        playAnswerAudio(q);
+      };
+    }
 
     mediaBox.innerHTML = '';
     if(q.image){
@@ -467,8 +637,18 @@
       opts.forEach(opt => optionsEl.appendChild(makeOption(q, opt)));
     }
 
+    // Prev: volta uma questão (não exige answered)
+    btnPrev.onclick = () => {
+      (ensureAudio()? sfxTick() : null);
+      stopAllAudio();
+      idx = clampIndex(idx - 1);
+      renderQuestion();
+    };
+
+    // Next: por padrão só fica liberado quando answered
     btnNext.onclick = () => {
       (ensureAudio()? sfxTick() : null);
+      stopAllAudio();
       idx++;
       if (idx >= questions.length) { finish(); return; }
       renderQuestion();
@@ -755,15 +935,26 @@
 
   function playPrompt(q){
     stopAllAudio();
-    const spoken = buildSpokenPrompt(q);
+    const spoken = buildPromptTTS(q);
+
     if (q.promptAudio){
-      const a = new Audio(absPath(q.promptAudio));
-      currentAudio = a;
-      a.onended = () => { currentAudio = null; };
-      a.onerror  = () => { currentAudio = null; speak(spoken); };
-      a.play().catch(() => { currentAudio = null; speak(spoken); });
+      try{
+        const a = new Audio(absPath(q.promptAudio));
+        currentAudio = a;
+        a.onended = () => { currentAudio = null; };
+        a.onerror  = () => {
+          currentAudio = null;
+          if (spoken) speak(spoken);
+        };
+        a.play().catch(() => {
+          currentAudio = null;
+          if (spoken) speak(spoken);
+        });
+      }catch(e){
+        if (spoken) speak(spoken);
+      }
     } else {
-      speak(spoken);
+      if (spoken) speak(spoken);
     }
   }
 
@@ -826,11 +1017,14 @@
     mediaBox.innerHTML = '<div style="font-size:44px">🏅</div>';
     optionsEl.innerHTML = '';
     btnNext.disabled = true; btnNext.classList.remove('ready');
+    btnPrev.disabled = (questions.length <= 1); // se quiser voltar, permite
     statusPill.textContent = `Preview • ${questions.length}/${questions.length}`;
     confetti(30);
     speakFriendly(['Great! You finished the preview!','Looks good!']);
-    btnPlayPrompt.disabled = true; btnRepeat.disabled = true;
-    btnPlayPrompt.classList.add('is-hidden'); btnRepeat.classList.add('is-hidden');
+    btnPlayPrompt.disabled = true;
+    btnPlayPrompt.classList.add('is-hidden');
+    btnListenAnswer.classList.add('is-hidden');
+    btnListenAnswer.disabled = true;
     (ensureAudio()? sfxWin() : null);
   }
 
@@ -848,6 +1042,11 @@
       confettiEl.appendChild(p);
       setTimeout(()=>p.remove(), dur+delay+200);
     }
+  }
+
+  function updateNavButtons(){
+    btnPrev.disabled = (idx <= 0);
+    // Next continua controlado por answered
   }
 
   /* =========================
@@ -876,16 +1075,20 @@
       let title = 'Preview';
       let qList = [];
 
-      if (Array.isArray(data.questions)){
+      // 1) modo lote: { title, meta, questions: [...] }
+      if (data && typeof data === 'object' && Array.isArray(data.questions)){
         qList = data.questions;
         if(data.title) title = data.title;
         metaInfo = data.meta || {};
-      } else if (data && typeof data === 'object' && data.question){
+      }
+      // 2) modo single: { meta, question }
+      else if (data && typeof data === 'object' && data.question){
         qList = [data.question];
         if(data.title) title = data.title;
         metaInfo = data.meta || {};
-      } else if (data && typeof data === 'object'){
-        // Pode ser um objeto de questão direto (mais simples)
+      }
+      // 3) fallback: objeto de questão direto
+      else if (data && typeof data === 'object'){
         qList = [data];
         title = data.title || 'Preview';
         metaInfo = data.meta || {};
@@ -902,7 +1105,9 @@
       BASE = metaInfo.basePath || '';
 
       // Subtitle + pill (level/unit/fase)
+      previewTitle = title;
       subtitle.textContent = title;
+
       const pillParts = [];
       if(metaInfo.level) pillParts.push(metaInfo.level);
       if(metaInfo.unit)  pillParts.push(metaInfo.unit);
@@ -911,6 +1116,12 @@
 
       questions = qList;
       idx = 0;
+
+      // prepara nav
+      btnPrev.disabled = true;
+      btnNext.disabled = true;
+      btnNext.classList.remove('ready');
+
       renderQuestion();
     }finally{
       showLoader(false);
