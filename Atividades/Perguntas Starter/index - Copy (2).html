@@ -746,7 +746,6 @@ function hydrateAudioMcq(q){
       currentAudio = null;
     }
   }
-
   function speak(text){
     const t = String(text || '').trim();
     if(!t) return;
@@ -756,72 +755,21 @@ function hydrateAudioMcq(q){
       speechSynthesis.cancel(); speechSynthesis.speak(u);
     }catch(e){}
   }
+function fallbackSpeakAnswer(q){
+  // tenta falar a resposta correta de forma amigável
+  const correctOpt = Array.isArray(q.options)
+    ? q.options.find(opt => normalize(opt.value) === normalize(q.answer))
+    : null;
 
-  function fallbackSpeakAnswer(q){
-    // tenta falar a resposta correta de forma amigável
-    const correctOpt = Array.isArray(q.options)
-      ? q.options.find(opt => normalize(opt.value) === normalize(q.answer))
-      : null;
+  const phrase =
+    (correctOpt && (correctOpt.tts || correctOpt.label || correctOpt.value)) ||
+    (q.tts) || // se você usar q.tts como fallback
+    (q.answer) ||
+    '';
 
-    const phrase =
-      (correctOpt && (correctOpt.tts || correctOpt.label || correctOpt.value)) ||
-      (q.tts) || // se você usar q.tts como fallback
-      (q.answer) ||
-      '';
-
-    if (phrase) speak(String(phrase).trim());
-  }
-
-  // ✅ Map: frase fixa -> mp3 (mesma pasta do HTML)
-  const FIXED_VOICE_MP3 = {
-    "Yes! Great job!": "./yes!-great-job!.mp3",
-    "Awesome!": "./awesome!.mp3",
-    "You did it!": "./you-did-it!.mp3",
-
-    // ✅ cobre os 2 tipos de reticências (… e ...)
-    "Hmm… try again!": "./hmm...-try-again!.mp3",
-    "Hmm... try again!": "./hmm...-try-again!.mp3",
-
-    "Not this one!": "./not-this-one!.mp3",
-    "Almost!": "./almost!.mp3",
-    "Try again!": "./try-again!.mp3",
-
-    "Great!": "./great!.mp3",
-    "Nice!": "./nice!.mp3",
-
-    "Great! You finished!": "./great!-you-finished!.mp3",
-    "Amazing work!": "./amazing-work!.mp3",
-  };
-
-  // ✅ Toca mp3 se a frase existir no mapa; senão, cai no TTS (fallback)
-  function playFixedVoiceLine(text){
-    const key = String(text || "").trim();
-    const src = FIXED_VOICE_MP3[key];
-
-    if (!src) {
-      // fallback (caso apareça alguma frase nova)
-      speak(key);
-      return;
-    }
-
-    stopAllAudio(); // para TTS/áudios atuais antes de tocar
-
-    try {
-      const a = new Audio(src); // mesma pasta do HTML
-      currentAudio = a;
-      a.onended = () => { currentAudio = null; };
-      a.onerror = () => { currentAudio = null; speak(key); }; // fallback
-      a.play().catch(() => { currentAudio = null; speak(key); }); // fallback iOS
-    } catch (e) {
-      speak(key);
-    }
-  }
-
-  // ✅ Substitui o speakFriendly: agora ele toca MP3 das frases prontas
-  function speakFriendly(pool){
-    const pick = pool[(Math.random() * pool.length) | 0];
-    playFixedVoiceLine(pick);
-  }
+  if (phrase) speak(String(phrase).trim());
+}
+  function speakFriendly(pool){ const pick = pool[(Math.random()*pool.length)|0]; speak(pick); }
 
   /* =========================
      Audio da RESPOSTA (apenas audio_mcq)
