@@ -56,7 +56,7 @@ function getActivitiesByTrecho(trecho, level, unit) {
             ];
         case "trecho6":      
             return [                
-                { id: 37, name: "Perguntas Starter15", path: `/Atividades/perguntas%20starter/review.html?level=${level}&unit=${unit}&fase=37`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
+                { id: 37, name: "Perguntas Starter15", path: `/Atividades/perguntas%20starter/review.html?level=${level}&unit=${unit}&fase=37`, img: "../../imagens/botoes/review_button.png", unlocked: false },
                 { id: 38, name: "TestStarter", path: `/Atividades/TestStarter/index.html?level=${level}&unit=${unit}&fase=38`, img: "../../imagens/test.png", unlocked: false },
                 { id: 39, name: "TestwordB2CFacil", path: `/Atividades/TestwordB2CFacil/index.html?level=${level}&unit=${unit}&fase=39`, img: "../../imagens/test.png", unlocked: false },
                 { id: 40, name: "Testword2B2CFacil", path: `/Atividades/Testword2B2CFacil/index.html?level=${level}&unit=${unit}&fase=last`, img: "../../imagens/test.png", unlocked: false },
