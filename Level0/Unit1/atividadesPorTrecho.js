@@ -47,7 +47,7 @@ function getActivitiesByTrecho(trecho, level, unit) {
                 { id: 26, name: "TestStarter", path: `/Atividades/TestStarter/index.html?level=${level}&unit=${unit}&fase=26`, img: "../../imagens/test.png", unlocked: false },
                 { id: 27, name: "TestwordB2CFacil", path: `/Atividades/TestwordB2CFacil/index.html?level=${level}&unit=${unit}&fase=27`, img: "../../imagens/test.png", unlocked: false },
                 { id: 28, name: "Testword2B2CFacil", path: `/Atividades/Testword2B2CFacil/index.html?level=${level}&unit=${unit}&fase=28`, img: "../../imagens/test.png", unlocked: false },
-                { id: 29, name: "Testword3B2CFacil", path: `/Atividades/Testword2B2CFacil/index.html?level=${level}&unit=${unit}&fase=last`, img: "../../imagens/test.png", unlocked: false },
+                { id: 29, name: "Testword3B2CFacil", path: `/Atividades/Testword3B2CFacil/index.html?level=${level}&unit=${unit}&fase=last`, img: "../../imagens/test.png", unlocked: false },
             ];
         default:
             return []; // ou um fallback
