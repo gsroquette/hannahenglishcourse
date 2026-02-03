@@ -42,12 +42,12 @@ function getActivitiesByTrecho(trecho, level, unit) {
                 { id: 24, name: "Perguntas Starter9", path: `/Atividades/perguntas%20starter/index.html?level=${level}&unit=${unit}&fase=24`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
             ];
         case "trecho6":      
-            return [
-                { id: 25, name: "Perguntas Starter9", path: `/Atividades/perguntas%20starter/review_aleatorio.html?level=${level}&unit=${unit}&fase=25`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
-                { id: 26, name: "Perguntas Starter9", path: `/Atividades/perguntas%20starter/review.html?level=${level}&unit=${unit}&fase=26`, img: "../../imagens/botoes/hannah_exercises.png", unlocked: false },
-                { id: 27, name: "TestStarter", path: `/Atividades/TestStarter/index.html?level=${level}&unit=${unit}&fase=27`, img: "../../imagens/test.png", unlocked: false },
-                { id: 28, name: "TestwordB2CFacil", path: `/Atividades/TestwordB2CFacil/index.html?level=${level}&unit=${unit}&fase=28`, img: "../../imagens/test.png", unlocked: false },
-                { id: 29, name: "Testword2B2CFacil", path: `/Atividades/Testword2B2CFacil/index.html?level=${level}&unit=${unit}&fase=last`, img: "../../imagens/test.png", unlocked: false },
+            return [                
+                { id: 25, name: "Perguntas Starter9", path: `/Atividades/perguntas%20starter/review.html?level=${level}&unit=${unit}&fase=25`, img: "../../imagens/botoes/review_button.png", unlocked: false },
+                { id: 26, name: "TestStarter", path: `/Atividades/TestStarter/index.html?level=${level}&unit=${unit}&fase=26`, img: "../../imagens/test.png", unlocked: false },
+                { id: 27, name: "TestwordB2CFacil", path: `/Atividades/TestwordB2CFacil/index.html?level=${level}&unit=${unit}&fase=27`, img: "../../imagens/test.png", unlocked: false },
+                { id: 28, name: "Testword2B2CFacil", path: `/Atividades/Testword2B2CFacil/index.html?level=${level}&unit=${unit}&fase=28`, img: "../../imagens/test.png", unlocked: false },
+                { id: 29, name: "Testword3B2CFacil", path: `/Atividades/Testword2B2CFacil/index.html?level=${level}&unit=${unit}&fase=last`, img: "../../imagens/test.png", unlocked: false },
             ];
         default:
             return []; // ou um fallback
