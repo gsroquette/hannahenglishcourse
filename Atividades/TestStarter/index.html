@@ -56,7 +56,6 @@
 
   .q-top{display:flex;flex-direction:column;gap:14px}
 
-  /* Prompt line with icon */
   .prompt-row{
     display:flex; align-items:flex-start; gap:10px;
   }
@@ -170,7 +169,6 @@
     .option .label{ font-size:17px; }
   }
 
-  /* ===== Test extras (grade/restart/modal) ===== */
   #grade-display{
     display:none; text-align:center; font-size:1.1rem; font-weight:700; margin: 0 auto 8px auto;
     max-width:1140px;
@@ -214,13 +212,11 @@
       <div class="question-card">
         <div class="q-top">
           <div>
-            <!-- UPDATED: prompt icon + text (replaces old Listen/Repeat buttons) -->
             <div class="prompt-row">
               <button class="prompt-audio-icon" id="promptAudioIcon" title="Listen to prompt" aria-label="Listen to prompt">🔊</button>
               <div class="q-prompt" id="prompt">—</div>
             </div>
 
-            <!-- UPDATED: Only appears for audio_mcq -->
             <div class="q-controls">
               <button class="icon-btn is-hidden" id="btnListenCorrect" title="Listen to the correct answer">🔊 Listen</button>
             </div>
@@ -239,7 +235,6 @@
     </div>
   </div>
 
-  <!-- Nota + Restart + modal (sem Finish) -->
   <div id="grade-display"></div>
   <div id="restartWrap">
     <button id="restartButton">Restart Test</button>
@@ -253,7 +248,6 @@
     <button onclick="closeModal()">Close</button>
   </div>
 
-  <!-- Loader -->
   <div class="loading" id="loading" aria-live="polite" style="display:none">
     <div class="spinner" aria-hidden="true"></div>
     <span>Loading…</span>
@@ -266,7 +260,8 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
-<script>
+  <!-- SINGLE APP SCRIPT -->
+  <script>
 /* =========================
    Firebase init (v8)
 ========================= */
@@ -286,9 +281,7 @@ let currentUserId = null;
 firebase.auth().onAuthStateChanged(function(user){
   currentUserId = user ? user.uid : null;
 });
-</script>
 
-<script>
 (function(){
   /* =========================
      TEST MODE CONFIG
@@ -298,47 +291,16 @@ firebase.auth().onAuthStateChanged(function(user){
   const TEST_DB_KEY = "test"; // NÃO alterar a chave
   const TEST_DISPLAY_NAME = "Grammar Test";
 
-  /* =========================
-     NEW OFFICIAL RULES (Grammar Test)
-     - Priority 1: Distribution by phase
-       * default: 2 questions per phase
-       * no repeats within test
-     - Global constraints:
-       * min absolute: 10 (but showing less is allowed; never invent/fill)
-       * max absolute: 40
-     - Special for very large units:
-       * if number of phases > 40:
-         - pick 40 random phases, 1 question per phase (max diversity)
-         - total = up to 40
-     - Difficulty is secondary:
-       * target ratio: 50% easy, 40% medium, 10% hard
-       * apply after initial selection via swaps within same phase
-       * never exceed phase limit (2 per phase or 1 per phase in >40 mode)
-       * fallback allowed if not enough difficulty
-  ========================= */
-
   const MAX_TOTAL_TEST = 40;
   const MIN_TOTAL_TEST = 10; // informational; do not fill artificially
 
-  /* =========================
-     audio_mcq behavior (UI/runtime)
-     - Same grading rules as mcq
-     - Prompt audio (q.promptAudio) is primary. If missing/unplayable, TTS fallback.
-     - Optional auto-play on load: q.autoplayPrompt (default true for audio_mcq)
-     - NEW: button "Listen" (only for audio_mcq) plays the CORRECT option audio (or TTS fallback)
-  ========================= */
+  let userAnswers = [];
+  let correctAnswers = [];
+  let lockedQuestion = [];
+  let wrongTapCount = [];
+  let canOverwrite = true;
+  let isLinked = false;
 
-  /* ======= Estado do teste ======= */
-  let userAnswers = [];    // por índice da questão
-  let correctAnswers = []; // {type, value}
-  let lockedQuestion = []; // impede segunda tentativa
-  let wrongTapCount = [];  // para MATCH
-  let canOverwrite = true; // unlinked => true | linked => depende se já tem nota
-  let isLinked = false;    // aluno atrelado a professor?
-
-  /* =========================
-     Helpers essenciais
-  ========================= */
   function getParams(){
     const url = new URL(location.href);
     const level = url.searchParams.get('level');
@@ -366,7 +328,6 @@ firebase.auth().onAuthStateChanged(function(user){
     for(let i=0;i<a.length;i++){ if(normalize(a[i])!==normalize(b[i])) return false; }
     return true;
   }
-
   function shuffle(arr){
     const a = Array.isArray(arr) ? arr : [];
     for(let i=a.length-1;i>0;i--){
@@ -378,7 +339,12 @@ firebase.auth().onAuthStateChanged(function(user){
 
   /* WebAudio SFX */
   let audioCtx = null;
-  function ensureAudio(){ if(!audioCtx){ try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return !!audioCtx; }
+  function ensureAudio(){
+    if(!audioCtx){
+      try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){}
+    }
+    return !!audioCtx;
+  }
   function tone(freq, durMs, type){
     if(!ensureAudio()) return;
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
@@ -450,7 +416,6 @@ firebase.auth().onAuthStateChanged(function(user){
   const levelDir = normalizeDir('Level', level || '0', '0');
   const unitDir  = normalizeDir('Unit',  unit  || '1', '1');
 
-  // Mantém SFX do TESTE vindo do DataTest (como antes)
   const BASE_TEST_SFX = `../../${levelDir}/${unitDir}/DataTest`;
 
   const pill = document.getElementById('pill');
@@ -495,21 +460,6 @@ firebase.auth().onAuthStateChanged(function(user){
 
   /* ============================================================
      FIREBASE FETCH (UPDATED TO NEW OFFICIAL RULES)
-     Source:
-       - activities: {LevelX_UnitY_FaseN}.questionIds
-       - questions/{id}: the question data
-     Algorithm:
-       1) Build phase -> questionIds map for the unit
-       2) Initial selection by phase:
-          - if phases > 40: pick 40 random phases, 1 per phase
-          - else: up to 2 per phase
-          - never repeat question id globally
-          - do not invent/fill if less than 10 total available
-          - cap at 40
-       3) Difficulty balancing after selection (secondary):
-          target ratio: 50% easy, 40% medium, 10% hard
-          swap within same phase without exceeding phase limit
-          fallback if not enough questions of a difficulty
   ============================================================ */
 
   function normalizeDifficulty(d){
@@ -520,7 +470,6 @@ firebase.auth().onAuthStateChanged(function(user){
     return 'easy';
   }
 
-  // Assets das QUESTÕES: mantém comportamento (não prefixa DataTest)
   function absPathQ(p){
     const s = String(p ?? '').trim();
     if (!s) return s;
@@ -528,6 +477,17 @@ firebase.auth().onAuthStateChanged(function(user){
     if (s.startsWith('/')) return s;
     if (s.startsWith('../')) return s;
     return s;
+  }
+
+  /* ✅ FIX: extract ONLY phase number (avoids mixing Level/Unit digits) */
+  function extractPhaseNumber(key){
+    const s = String(key || '');
+    const m = s.match(/_Fase(\d+)\b/i);
+    if (m) return parseInt(m[1], 10) || 0;
+    // fallback: last number in string
+    const all = s.match(/(\d+)/g);
+    if (!all || !all.length) return 0;
+    return parseInt(all[all.length - 1], 10) || 0;
   }
 
   async function getQuestionIdsByPhaseForUnit(levelKey, unitKey){
@@ -541,10 +501,7 @@ firebase.auth().onAuthStateChanged(function(user){
 
     const obj = snap.val() || {};
     const phaseKeys = Object.keys(obj).sort(function(a,b){
-      // natural-ish sort by last number
-      const na = parseInt(String(a).replace(/\D/g,''),10) || 0;
-      const nb = parseInt(String(b).replace(/\D/g,''),10) || 0;
-      return na-nb;
+      return extractPhaseNumber(a) - extractPhaseNumber(b);
     });
 
     const phaseToIds = {};
@@ -585,16 +542,13 @@ firebase.auth().onAuthStateChanged(function(user){
       return { selectedIds: selected.slice(0, MAX_TOTAL_TEST), phaseLimit: 1, modePhasesOver40: true, chosenPhases };
     }
 
-    // Normal mode: up to 2 per phase
     phaseKeys.forEach(function(phaseKey){
       const ids = phaseToIds[phaseKey] || [];
       const picked = pickDistinctRandomFromArray(ids, 2, selectedSet);
       for (let i=0;i<picked.length;i++) selected.push(picked[i]);
     });
 
-    // Cap at 40 (should only happen if huge number of phases, but rule says cap)
     if (selected.length > MAX_TOTAL_TEST){
-      // If exceeded, prioritize diversity by applying the >40 strategy
       const chosenPhases = shuffle(phaseKeys.slice()).slice(0, 40);
       const reset = [];
       const resetSet = new Set();
@@ -610,8 +564,6 @@ firebase.auth().onAuthStateChanged(function(user){
   }
 
   function computeDifficultyTargets(total){
-    // Rounding rules:
-    // Easy -> ceil, Hard -> floor, Medium -> remainder
     const easy = Math.ceil(total * 0.50);
     const hard = Math.floor(total * 0.10);
     const medium = Math.max(0, total - easy - hard);
@@ -674,7 +626,6 @@ firebase.auth().onAuthStateChanged(function(user){
   }
 
   function findRemovableInPhase(phaseSelectedIds, questionById, priorityDiffs){
-    // returns an id from phaseSelectedIds whose difficulty matches first available in priority list
     for (let p=0;p<priorityDiffs.length;p++){
       const want = priorityDiffs[p];
       for (let i=0;i<phaseSelectedIds.length;i++){
@@ -688,23 +639,17 @@ firebase.auth().onAuthStateChanged(function(user){
   }
 
   function adjustDifficultyBySwaps(selectedIds, phaseOfId, questionById, availableByPhaseDiff, phaseLimit){
-    // Build helper structures
     const selectedSet = new Set(selectedIds);
     const selectedByPhase = buildSelectedByPhase(selectedIds, phaseOfId);
     const phasesInTest = Object.keys(selectedByPhase);
 
-    // Targets
     const total = selectedIds.length;
     const target = computeDifficultyTargets(total);
-
-    // Current counts
     let counts = countDifficulties(selectedIds, questionById);
 
     function deficitOf(diff){ return Math.max(0, (target[diff]||0) - (counts[diff]||0)); }
 
-    // Swaps must never exceed phaseLimit; we swap within same phase so count per phase remains same.
     function trySwapForNeed(needDiff){
-      // Randomize phase iteration each attempt to keep test varied
       const phaseOrder = shuffle(phasesInTest.slice());
 
       for (let k=0;k<phaseOrder.length;k++){
@@ -712,53 +657,33 @@ firebase.auth().onAuthStateChanged(function(user){
         const phaseSelected = selectedByPhase[phase] || [];
         if (!phaseSelected.length) continue;
 
-        // Candidate of needDiff in SAME phase and outside selected
         const candidate = pickCandidateInSamePhase(phase, needDiff, availableByPhaseDiff, selectedSet);
         if (!candidate) continue;
 
-        // Choose removable within same phase according to rules (fallback internal)
         let removePriority = null;
-
-        if (needDiff === 'hard'){
-          // remove medium first, then easy
-          removePriority = ['medium','easy'];
-        } else if (needDiff === 'medium'){
-          // remove easy (preferred). If none, do not force; skip phase.
-          removePriority = ['easy'];
-        } else if (needDiff === 'easy'){
-          // remove medium first, then hard
-          removePriority = ['medium','hard'];
-        } else {
-          continue;
-        }
+        if (needDiff === 'hard') removePriority = ['medium','easy'];
+        else if (needDiff === 'medium') removePriority = ['easy'];
+        else if (needDiff === 'easy') removePriority = ['medium','hard'];
+        else continue;
 
         const removable = findRemovableInPhase(phaseSelected, questionById, removePriority);
         if (!removable) continue;
 
-        // Perform swap (replace removable with candidate)
-        // Safety: do not violate phaseLimit (we keep same count)
-        if (phaseSelected.length > phaseLimit) {
-          // Defensive; should not happen
-          continue;
-        }
+        if (phaseSelected.length > phaseLimit) continue;
 
-        // Update selectedIds list (global)
         const idxRemove = selectedIds.indexOf(removable);
         if (idxRemove === -1) continue;
 
         selectedIds[idxRemove] = candidate;
 
-        // Update sets/maps
         selectedSet.delete(removable);
         selectedSet.add(candidate);
 
-        // Update selectedByPhase
         const pArr = selectedByPhase[phase];
         for (let i=0;i<pArr.length;i++){
           if (pArr[i] === removable){ pArr[i] = candidate; break; }
         }
 
-        // Update counts
         const dRemove = normalizeDifficulty(questionById[removable] && questionById[removable].difficulty);
         const dAdd = normalizeDifficulty(questionById[candidate] && questionById[candidate].difficulty);
         if (dRemove === 'hard') counts.hard--; else if (dRemove === 'medium') counts.medium--; else counts.easy--;
@@ -769,8 +694,6 @@ firebase.auth().onAuthStateChanged(function(user){
       return false;
     }
 
-    // Adjustment order: Hard -> Medium -> Easy (practical)
-    // Stop if no progress possible.
     const maxIterations = Math.max(20, selectedIds.length * 4);
     let iterations = 0;
 
@@ -787,20 +710,17 @@ firebase.auth().onAuthStateChanged(function(user){
 
       if (hardDef > 0){
         progressed = trySwapForNeed('hard');
-        if (progressed) continue; // recompute deficits next loop
+        if (progressed) continue;
       }
-
       if (medDef > 0){
         progressed = trySwapForNeed('medium');
         if (progressed) continue;
       }
-
       if (easyDef > 0){
         progressed = trySwapForNeed('easy');
         if (progressed) continue;
       }
 
-      // No progress possible -> exit (fallback: accept what exists)
       break;
     }
 
@@ -812,12 +732,8 @@ firebase.auth().onAuthStateChanged(function(user){
     const phaseKeys = fetched.phaseKeys || [];
     const phaseToIds = fetched.phaseToIds || {};
 
-    // No phases / no activities found
-    if (!phaseKeys.length){
-      return [];
-    }
+    if (!phaseKeys.length) return [];
 
-    // Build phaseOfId (first phase encountered wins) + all unique ids
     const phaseOfId = {};
     const allUniqueIdsSet = new Set();
     for (let p=0;p<phaseKeys.length;p++){
@@ -833,7 +749,6 @@ firebase.auth().onAuthStateChanged(function(user){
     const allUniqueIds = Array.from(allUniqueIdsSet);
     if (!allUniqueIds.length) return [];
 
-    // Fetch all questions once (needed for difficulty + final build)
     const snaps = await Promise.all(
       allUniqueIds.map(function(id){
         return firebase.database().ref(`questions/${id}`).once('value');
@@ -849,7 +764,6 @@ firebase.auth().onAuthStateChanged(function(user){
       questionById[id] = v;
     }
 
-    // Filter phaseToIds to only ids that actually exist in questions/{id}
     const cleanPhaseToIds = {};
     for (let p=0;p<phaseKeys.length;p++){
       const phaseKey = phaseKeys[p];
@@ -862,24 +776,16 @@ firebase.auth().onAuthStateChanged(function(user){
       cleanPhaseToIds[phaseKey] = out;
     }
 
-    // Build initial selection by phase (priority rule #1)
     const initial = buildInitialSelectionByPhase(phaseKeys, cleanPhaseToIds);
     let selectedIds = initial.selectedIds || [];
     const phaseLimit = initial.phaseLimit || 2;
 
-    // If still somehow > 40, cap.
     if (selectedIds.length > MAX_TOTAL_TEST) selectedIds = selectedIds.slice(0, MAX_TOTAL_TEST);
-
-    // If nothing selected (phases exist but questions missing)
     if (!selectedIds.length) return [];
 
-    // Difficulty adjustment AFTER selection by phase
     const availableByPhaseDiff = buildAvailableByPhaseDifficulty(cleanPhaseToIds, questionById);
     selectedIds = adjustDifficultyBySwaps(selectedIds.slice(), phaseOfId, questionById, availableByPhaseDiff, phaseLimit);
 
-    // Build final question list from selected ids
-    // No forced padding to MIN_TOTAL_TEST; showing less is acceptable.
-    // Also ensure no duplicates
     const finalSet = new Set();
     const finalIds = [];
     for (let i=0;i<selectedIds.length;i++){
@@ -892,7 +798,6 @@ firebase.auth().onAuthStateChanged(function(user){
       if (finalIds.length >= MAX_TOTAL_TEST) break;
     }
 
-    // Convert to list of questions with required fields
     const list = [];
     for (let i=0;i<finalIds.length;i++){
       const id = finalIds[i];
@@ -903,8 +808,6 @@ firebase.auth().onAuthStateChanged(function(user){
       q.id = q.id || id;
       q.level = q.level || levelDir;
       q.unit  = q.unit  || unitDir;
-
-      // Keep phase info available (helpful for debugging/analytics). If absent in question, infer from activities.
       q.fase  = q.fase || phaseOfId[id] || null;
 
       if (!q.type) q.type = "mcq";
@@ -915,15 +818,10 @@ firebase.auth().onAuthStateChanged(function(user){
       list.push(q);
     }
 
-    // Shuffle final list (keeps overall randomness; still respects phase distribution by selection)
     shuffle(list);
-
     return list;
   }
 
-  /* =========================
-     Init (REMOVIDO questions.txt)
-  ========================= */
   async function initTest(){
     showLoader(true);
     try{
@@ -954,7 +852,6 @@ firebase.auth().onAuthStateChanged(function(user){
       idx = 0;
       renderQuestion();
 
-      // Carrega nota existente (se houver) e define políticas de restart
       loadExistingGrade();
 
     }catch(err){
@@ -993,7 +890,6 @@ firebase.auth().onAuthStateChanged(function(user){
         });
         return {type:'match', value: canon.sort().map(String) };
       } else {
-        // choice/fillblank/audio_mcq robusto (string | array | objeto)
         if (Array.isArray(q.answer)) {
           return { type:'choice', value: q.answer.map(String) };
         } else if (q.answer && typeof q.answer === 'object') {
@@ -1010,9 +906,6 @@ firebase.auth().onAuthStateChanged(function(user){
     });
   }
 
-  /* =========================
-     Prompt/blank utils + TTS
-  ========================= */
   function renderPromptWithBlanks(str){
     const s = String(str ?? '');
     return s
@@ -1056,7 +949,6 @@ firebase.auth().onAuthStateChanged(function(user){
   function buildSpokenPrompt(q){
     if (q.tts && String(q.tts).trim()) return stripQuotesForTTS(q.tts);
 
-    // audio_mcq: if promptAudio exists, we still keep a spoken fallback text.
     let text = String(q.prompt || '');
     if (q.type !== 'fillblank'){ return stripQuotesForTTS(ttsSanitize(text)); }
 
@@ -1080,7 +972,7 @@ firebase.auth().onAuthStateChanged(function(user){
       return speakValue(ans);
     });
 
-    const seqAnswers = (()=>{
+    const seqAnswers = (()=> {
       if (Array.isArray(q.answer)) return q.answer.slice();
       if (q.answer && typeof q.answer==='object'){
         const keys = Object.keys(q.answer).sort((a,b)=>{
@@ -1103,9 +995,6 @@ firebase.auth().onAuthStateChanged(function(user){
     return stripQuotesForTTS(text);
   }
 
-  /* =========================
-     Audio helpers
-  ========================= */
   function stopAllAudio(){
     try { speechSynthesis.cancel(); } catch(e){}
     if (currentAudio){
@@ -1113,6 +1002,7 @@ firebase.auth().onAuthStateChanged(function(user){
       currentAudio = null;
     }
   }
+
   function speak(text){
     const t = String(text || '').trim();
     if(!t) return;
@@ -1122,7 +1012,56 @@ firebase.auth().onAuthStateChanged(function(user){
       speechSynthesis.cancel(); speechSynthesis.speak(u);
     }catch(e){}
   }
-  function speakFriendly(pool){ const pick = pool[(Math.random()*pool.length)|0]; speak(pick); }
+
+  const FIXED_PHRASE_MP3 = {
+    "Great!": "./great!.mp3",
+    "You may review your result now.": "./you-may-review-your-result-now.mp3",
+    "Awesome!": "./awesome!.mp3",
+    "We will learn with this one.": "./we-will-learn-with-this-one.mp3",
+    "Yes! Great job!": "./yes!-great-job!.mp3",
+    "You did it!": "./you-did-it!.mp3",
+  };
+
+  const fixedAudioCache = {};
+  Object.keys(FIXED_PHRASE_MP3).forEach((phrase) => {
+    const src = FIXED_PHRASE_MP3[phrase];
+    const a = new Audio(src);
+    a.preload = "auto";
+    fixedAudioCache[phrase] = a;
+  });
+
+  function playFixedPhrase(phrase){
+    const key = String(phrase || "").trim();
+    const src = FIXED_PHRASE_MP3[key];
+    if (!src){
+      console.warn("[FixedPhrase] No MP3 mapped for:", key);
+      return;
+    }
+
+    stopAllAudio();
+
+    let a;
+    try{
+      a = fixedAudioCache[key] ? fixedAudioCache[key].cloneNode(true) : new Audio(src);
+    }catch(e){
+      a = new Audio(src);
+    }
+
+    currentAudio = a;
+    a.onended = () => { currentAudio = null; };
+    a.onerror  = () => { currentAudio = null; console.warn("[FixedPhrase] MP3 failed:", src); };
+
+    a.play().catch((err) => {
+      console.warn("[FixedPhrase] play() blocked/failed:", err);
+    });
+  }
+
+  function playFixedFriendly(pool){
+    const arr = Array.isArray(pool) ? pool : [];
+    if (!arr.length) return;
+    const pick = arr[(Math.random() * arr.length) | 0];
+    playFixedPhrase(pick);
+  }
 
   function playPrompt(q){
     stopAllAudio();
@@ -1139,9 +1078,6 @@ firebase.auth().onAuthStateChanged(function(user){
     }
   }
 
-  /* =========================
-     NEW: audio_mcq "Listen" plays the CORRECT option audio (or fallback TTS)
-  ========================= */
   function getCorrectChoiceValueForIndex(i){
     const corr = correctAnswers[i];
     const expArr = expectedChoiceArray(corr);
@@ -1191,9 +1127,6 @@ firebase.auth().onAuthStateChanged(function(user){
     }
   }
 
-  /* =========================
-     Render current question
-  ========================= */
   function renderQuestion(){
     answered = false;
     btnNext.disabled = true; btnNext.classList.remove('ready');
@@ -1209,7 +1142,6 @@ firebase.auth().onAuthStateChanged(function(user){
     bar.style.width = pct + '%';
     statusPill.textContent = `Question ${idx+1}/${questions.length}`;
 
-    // Default prompt behavior
     let rawPrompt = q.prompt || '—';
     if (q.type === 'audio_mcq' && (!rawPrompt || rawPrompt === '—')) {
       rawPrompt = 'Listen. Choose.';
@@ -1223,10 +1155,8 @@ firebase.auth().onAuthStateChanged(function(user){
       promptEl.appendChild(span);
     }
 
-    // UPDATED: Prompt icon is the only prompt-audio trigger
     promptAudioIcon.onclick = () => { if (!isReading) playPrompt(q); };
 
-    // UPDATED: For audio_mcq only, show a "Listen" that plays the CORRECT option
     if (q.type === 'audio_mcq'){
       btnListenCorrect.classList.remove('is-hidden');
       btnListenCorrect.onclick = () => {
@@ -1265,12 +1195,10 @@ firebase.auth().onAuthStateChanged(function(user){
       renderQuestion();
     };
 
-    // audio_mcq: autoplay prompt by default (can be disabled per question)
     if (q.type === 'audio_mcq') {
       const auto = (q.autoplayPrompt !== false);
       if (auto) {
         setTimeout(() => {
-          // don't autoplay if user already answered or moved
           if (questions[idx] === q && !answered && !isReading) {
             playPrompt(q);
           }
@@ -1279,12 +1207,6 @@ firebase.auth().onAuthStateChanged(function(user){
     }
   }
 
-  /* =========================
-     Multiple-choice / Fillblank / audio_mcq
-     - Single blank: 1 click = lock
-     - Multi blank: collect selections until all blanks are filled, then grade once.
-     - UPDATED: option click no longer plays option audio/TTS (to preserve new audio design, especially for audio_mcq)
-  ========================= */
   function makeOption(q, opt){
     const o0 = (typeof opt === 'string') ? { label: opt, value: opt } : Object.assign({}, opt);
     const o = Object.assign({}, o0, {
@@ -1355,7 +1277,6 @@ firebase.auth().onAuthStateChanged(function(user){
 
     btn.onclick = () => {
       (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
-      // UPDATED: No speakSelectedThenCheck here; click commits directly
       commit();
     };
     thumb.style.cursor = 'pointer';
@@ -1369,9 +1290,6 @@ firebase.auth().onAuthStateChanged(function(user){
     return btn;
   }
 
-  /* =========================
-     Order type
-  ========================= */
   function renderOrderQuestion(q){
     optionsEl.classList.add('is-order');
 
@@ -1432,11 +1350,11 @@ firebase.auth().onAuthStateChanged(function(user){
         }catch(e){}
         confetti(18);
         (ensureAudio()? sfxCorrect() : sCorrect.play().catch(()=>{}));
-        speakFriendly(['Great!','Awesome!']);
+        playFixedFriendly(['Great!','Awesome!']);
         liveEl.textContent = 'Correct order';
       } else {
         (ensureAudio()? sfxWrong() : sWrong.play().catch(()=>{}));
-        speakFriendly(['We will learn with this one.']);
+        playFixedPhrase('We will learn with this one.');
         liveEl.textContent = 'Recorded order for grading';
       }
       btnNext.disabled = false; btnNext.classList.add('ready');
@@ -1452,458 +1370,435 @@ firebase.auth().onAuthStateChanged(function(user){
     }
   }
 
-  /* =========================
-     Match type
-  ========================= */
   function renderMatchQuestion(q){
-    const sourcePairs = Array.isArray(q.pairs) ? q.pairs : [];
+    const pairs = Array.isArray(q.pairs) ? q.pairs : [];
+    if(!pairs.length){
+      optionsEl.innerHTML = '<div style="padding:10px;color:#334155">No pairs found for this match question.</div>';
+      return;
+    }
 
-    const normItem = (_side, it) => {
-      if (typeof it === 'string') return { label: it, value: it };
-      const o = Object.assign({}, it);
-      if (!o.value) o.value = o.label || o.image || String(Math.random());
-      return o;
-    };
+    const leftItems = pairs.map(p => p.left);
+    const rightItems = pairs.map(p => p.right);
 
-    const leftItems  = sourcePairs.map(p => normItem('left',  p.left));
-    const rightItems = sourcePairs.map(p => normItem('right', p.right));
+    const leftShuffled  = shuffle(leftItems.slice());
+    const rightShuffled = shuffle(rightItems.slice());
 
-    const leftShuf  = shuffle(leftItems.slice());
-    const rightShuf = shuffle(rightItems.slice());
+    let selectedLeftIndex = null;
+    let selectedRightIndex = null;
 
-    const grid = document.createElement('div'); grid.className = 'match-grid';
-    const colL = document.createElement('div'); colL.className = 'match-col';
-    const colR = document.createElement('div'); colR.className = 'match-col';
-    grid.appendChild(colL); grid.appendChild(colR);
-    optionsEl.appendChild(grid);
+    const wrap = document.createElement('div');
+    wrap.className = 'match-grid';
 
-    let selectedLeftBtn = null;
-    let selectedLeftVal = null;
-    let matched = new Set();
-    let wrongs  = 0;
+    const colL = document.createElement('div');
+    colL.className = 'match-col';
+    const colR = document.createElement('div');
+    colR.className = 'match-col';
 
-    const makeLeftBtn = (item) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'option word-only';
-      b.dataset.value = item.value;
+    wrap.appendChild(colL);
+    wrap.appendChild(colR);
+    optionsEl.appendChild(wrap);
 
-      const label = document.createElement('div'); label.className = 'label'; label.textContent = item.label || item.value;
-      b.appendChild(label);
+    function itemToObj(x){
+      if(typeof x === 'string') return { label:x, value:x };
+      return Object.assign({}, x || {});
+    }
 
-      b.onclick = () => {
-        if (b.classList.contains('matched')) return;
-        if(TEST_MODE && lockedQuestion[idx]) return;
-        (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
-        Array.from(colL.children).forEach(el => el.classList.remove('selected'));
-        b.classList.add('selected');
-        selectedLeftBtn = b;
-        selectedLeftVal = item.value;
-      };
-      return b;
-    };
+    const leftButtons = [];
+    const rightButtons = [];
 
-    const makeRightBtn = (item) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'option';
-      b.dataset.value = item.value;
+    function clearSelections(){
+      selectedLeftIndex = null;
+      selectedRightIndex = null;
+      leftButtons.forEach(b=>b.classList.remove('selected'));
+      rightButtons.forEach(b=>b.classList.remove('selected'));
+    }
 
-      const thumb = document.createElement('div'); thumb.className = 'thumb';
-      if (item.image){
-        const img = new Image(); img.src = absPathQ(item.image); img.alt = item.label || '';
-        thumb.appendChild(img);
-      } else {
-        thumb.textContent = item.label ? '🔤' : '❔';
+    function markMatched(li, ri){
+      leftButtons[li].classList.add('matched');
+      rightButtons[ri].classList.add('matched');
+      leftButtons[li].disabled = true;
+      rightButtons[ri].disabled = true;
+      clearSelections();
+    }
+
+    function allMatched(){
+      return leftButtons.every(b => b.classList.contains('matched')) &&
+             rightButtons.every(b => b.classList.contains('matched'));
+    }
+
+    function commitMatch(){
+      if (selectedLeftIndex === null || selectedRightIndex === null) return;
+
+      const L = itemToObj(leftShuffled[selectedLeftIndex]);
+      const R = itemToObj(rightShuffled[selectedRightIndex]);
+
+      if(TEST_MODE){
+        if(!Array.isArray(userAnswers[idx])) userAnswers[idx] = [];
+        const chosen = String(R.value ?? R.label ?? '').trim();
+        userAnswers[idx].push(chosen);
       }
 
-      const hasLabel = !!(item.label && String(item.label).trim());
-      if (hasLabel){
-        const label = document.createElement('div'); label.className = 'label'; label.textContent = item.label;
-        b.appendChild(thumb); b.appendChild(label);
-      } else {
-        b.classList.add('img-only'); b.appendChild(thumb);
+      const leftVal  = normalize(String(L.value ?? L.label ?? ''));
+      const rightVal = normalize(String(R.value ?? R.label ?? ''));
+
+      const ok = pairs.some(p=>{
+        const pL = itemToObj(p.left);
+        const pR = itemToObj(p.right);
+        const pLv = normalize(String(pL.value ?? pL.label ?? ''));
+        const pRv = normalize(String(pR.value ?? pR.label ?? ''));
+        return (pLv === leftVal && pRv === rightVal);
+      });
+
+      if(ok){
+        markMatched(selectedLeftIndex, selectedRightIndex);
+        (ensureAudio()? sfxCorrect() : sCorrect.play().catch(()=>{}));
+        playFixedFriendly(['Great!','Awesome!']);
+        confetti(10);
+      }else{
+        wrongTapCount[idx] = (wrongTapCount[idx]||0) + 1;
+        (ensureAudio()? sfxWrong() : sWrong.play().catch(()=>{}));
+        playFixedPhrase('We will learn with this one.');
+        toast("Try again!");
+        clearSelections();
       }
 
-      b.onclick = ()=>{
-        if (b.classList.contains('matched')) return;
-        if(TEST_MODE && lockedQuestion[idx]) return;
-        if (!selectedLeftBtn){ toast('Choose a word first 🙂'); return; }
-        const leftVal  = selectedLeftVal;
-        const rightVal = item.value;
-        const ok = normalize(leftVal) === normalize(rightVal);
-
-        if (ok){
-          (ensureAudio()? sfxCorrect() : sCorrect.play().catch(()=>{}));
-          b.classList.add('matched');
-          selectedLeftBtn.classList.add('matched');
-          selectedLeftBtn.classList.remove('selected');
-          matched.add(leftVal);
-
-          selectedLeftBtn = null;
-          selectedLeftVal = null;
-
-          if (matched.size === sourcePairs.length){
-            if(TEST_MODE && !lockedQuestion[idx]){
-              userAnswers[idx] = { pairs: Array.from(matched).sort(), wrongs };
-              lockedQuestion[idx] = true;
-            }
-            const okAll = wrongs===0;
-            if(okAll){
-              confetti(18);
-              speakFriendly(['Great!','Awesome!']);
-              try{
-                mediaBox.innerHTML = '';
-                const gif = new Image(); gif.src = './hannah_feliz.gif'; gif.alt = 'Hannah celebrating';
-                gif.setAttribute('draggable','false'); gif.style.pointerEvents = 'none';
-                mediaBox.appendChild(gif);
-              }catch(e){}
-            }else{
-              (ensureAudio()? sfxWrong() : sWrong.play().catch(()=>{}));
-              speakFriendly(['We will learn with this one.']);
-            }
-            answered = true;
-            btnNext.disabled = false; btnNext.classList.add('ready');
-            Array.from(optionsEl.querySelectorAll('.option')).forEach(el => el.disabled = true);
-          }
-        } else {
-          wrongs++;
-          (ensureAudio()? sfxWrong() : sWrong.play().catch(()=>{}));
-          b.classList.add('err');
-          setTimeout(()=>b.classList.remove('err'), 250);
+      if(allMatched()){
+        if(TEST_MODE){
+          lockedQuestion[idx] = true;
+          if(Array.isArray(userAnswers[idx])) userAnswers[idx] = userAnswers[idx].slice().sort();
         }
-      };
-      return b;
-    };
-
-    leftShuf.forEach(item => colL.appendChild(makeLeftBtn(item)));
-    rightShuf.forEach(item => colR.appendChild(makeRightBtn(item)));
-  }
-
-  /* =========================
-     Selection flow common
-  ========================= */
-  function handleAnswer(q, opt, btn){
-    if(answered) return;
-    const correct = correctAnswers[idx];
-    let isCorrect;
-
-    if (correct?.type==='choice'){
-      const expArr = expectedChoiceArray(correct);
-
-      const blanksTotal = (q.type === 'fillblank') ? countBlanksInPrompt(q.prompt) : 1;
-
-      if (blanksTotal <= 1){
-        const chosen = (TEST_MODE ? userAnswers[idx] : (opt.value ?? opt.label ?? ''));
-        const expected = expArr[0] ?? '';
-        isCorrect = normalize(chosen) === normalize(expected);
-      } else {
-        const chosenArr = Array.isArray(userAnswers[idx]) ? userAnswers[idx].map(String) : [];
-        const done = chosenArr.length;
-
-        if (done < blanksTotal){
-          const msg = `Blank ${done}/${blanksTotal}`;
-          toast(msg);
-          liveEl.textContent = msg;
-
-          btnNext.disabled = true;
-          btnNext.classList.remove('ready');
-
-          Array.from(optionsEl.querySelectorAll('.option')).forEach(el=>{
-            if (el.dataset && el.dataset.chosen === '1') return;
-            el.disabled = false;
-            el.style.opacity = '';
-          });
-
-          return;
-        }
-
-        const expected = expArr.slice(0, blanksTotal).map(String);
-        const got = chosenArr.slice(0, blanksTotal).map(String);
-        isCorrect = arraysEqual(got, expected);
+        btnNext.disabled = false; btnNext.classList.add('ready');
+        answered = true;
+        liveEl.textContent = 'Match completed';
       }
     }
 
-    if(isCorrect === true){
-      btn?.classList?.add('ok');
+    function buildButtonFromItem(item, side){
+      const o = itemToObj(item);
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'option';
+      btn.setAttribute('aria-label', (o.aria || o.label || o.value || 'item'));
+
+      const thumb = document.createElement('div');
+      thumb.className = 'thumb';
+
+      if (o.image){
+        const img = new Image();
+        img.src = absPathQ(o.image);
+        img.alt = o.label || '';
+        thumb.appendChild(img);
+      } else if (o.emoji){
+        thumb.textContent = o.emoji;
+      } else {
+        const box = document.createElement('span');
+        box.className = 'square-outline';
+        box.style.setProperty('--sq', side === 'L' ? '#2563eb' : '#7c3aed');
+        thumb.appendChild(box);
+      }
+
+      const label = document.createElement('div');
+      label.className = 'label';
+      label.textContent = (o.label != null && String(o.label).trim() !== '') ? String(o.label) : String(o.value ?? '');
+
+      const textWrap = document.createElement('div');
+      textWrap.style.flex = '1';
+      textWrap.style.minWidth = '0';
+      textWrap.appendChild(label);
+
+      btn.appendChild(thumb);
+      btn.appendChild(textWrap);
+
+      return btn;
+    }
+
+    leftShuffled.forEach((item, i)=>{
+      const b = buildButtonFromItem(item,'L');
+      b.onclick = ()=>{
+        if(TEST_MODE && lockedQuestion[idx]) return;
+        if(b.classList.contains('matched')) return;
+        (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
+        leftButtons.forEach(x=>x.classList.remove('selected'));
+        b.classList.add('selected');
+        selectedLeftIndex = i;
+        if(selectedRightIndex !== null) commitMatch();
+      };
+      colL.appendChild(b);
+      leftButtons.push(b);
+    });
+
+    rightShuffled.forEach((item, i)=>{
+      const b = buildButtonFromItem(item,'R');
+      b.onclick = ()=>{
+        if(TEST_MODE && lockedQuestion[idx]) return;
+        if(b.classList.contains('matched')) return;
+        (ensureAudio()? sfxTick() : sTap.play().catch(()=>{}));
+        rightButtons.forEach(x=>x.classList.remove('selected'));
+        b.classList.add('selected');
+        selectedRightIndex = i;
+        if(selectedLeftIndex !== null) commitMatch();
+      };
+      colR.appendChild(b);
+      rightButtons.push(b);
+    });
+
+    btnNext.disabled = true; btnNext.classList.remove('ready');
+  }
+
+  function isCorrectForIndex(i){
+    const q = questions[i];
+    const corr = correctAnswers[i];
+    const ua = userAnswers[i];
+
+    if(!q || !corr) return false;
+
+    if(q.type === 'order'){
+      const expected = Array.isArray(corr.value) ? corr.value : [];
+      const given = Array.isArray(ua) ? ua : [];
+      if(given.length !== expected.length) return false;
+      for(let k=0;k<expected.length;k++){
+        if(normalize(given[k]) !== normalize(expected[k])) return false;
+      }
+      return true;
+    }
+
+    if(q.type === 'match'){
+      const expected = Array.isArray(corr.value) ? corr.value.slice().map(String).sort() : [];
+      const given = Array.isArray(ua) ? ua.slice().map(String).sort() : [];
+      return arraysEqual(expected, given);
+    }
+
+    const expectedArr = expectedChoiceArray(corr).map(String);
+
+    if(Array.isArray(expectedArr) && expectedArr.length > 1){
+      const given = Array.isArray(ua) ? ua.map(String) : [String(ua ?? '')];
+      if(given.length !== expectedArr.length) return false;
+      for(let k=0;k<expectedArr.length;k++){
+        if(normalize(given[k]) !== normalize(expectedArr[k])) return false;
+      }
+      return true;
+    }
+
+    return normalize(String(ua ?? '')) === normalize(String(expectedArr[0] ?? ''));
+  }
+
+  function computeScore(){
+    let correct = 0;
+    for(let i=0;i<questions.length;i++){
+      if(isCorrectForIndex(i)) correct++;
+    }
+    const pct = questions.length ? Math.round((correct / questions.length) * 100) : 0;
+    return { correct, total: questions.length, pct };
+  }
+
+  function finish(){
+    bar.style.width = '100%';
+    btnNext.disabled = true;
+    btnNext.classList.remove('ready');
+
+    const score = computeScore();
+
+    const passed = score.pct >= PASSING_GRADE;
+    const msg = `Score: ${score.correct}/${score.total} (${score.pct}%) — ${passed ? 'PASSED' : 'TRY AGAIN'}`;
+
+    gradeEl.style.display = 'block';
+    gradeEl.textContent = msg;
+
+    overlayEl.style.display = 'block';
+    modalEl.style.display = 'block';
+    modalEl.querySelector('p').textContent = msg;
+
+    if(passed){
+      try{
+        ensureUserIsAuthenticated((uid)=>updateNextPhase(uid));
+      }catch(e){}
+      (ensureAudio()? sfxWin() : sCorrect.play().catch(()=>{}));
+      playFixedFriendly(['You did it!','Yes! Great job!']);
+      confetti(26);
+    }else{
+      (ensureAudio()? sfxWrong() : sWrong.play().catch(()=>{}));
+      playFixedPhrase('You may review your result now.');
+    }
+
+    saveGrade(score.pct, score.correct, score.total, passed).catch(err=>{
+      console.warn("[TEST] saveGrade failed:", err);
+    });
+
+    updateRestartPolicy(passed);
+  }
+
+  function closeModal(){
+    overlayEl.style.display = 'none';
+    modalEl.style.display = 'none';
+  }
+  window.closeModal = closeModal;
+
+  function confetti(n){
+    const count = n || 18;
+    for(let i=0;i<count;i++){
+      const p = document.createElement('div');
+      p.className = 'piece';
+      p.style.left = (Math.random()*100)+'%';
+      p.style.setProperty('--h', String((Math.random()*360)|0));
+      const dur = 1.5 + Math.random()*1.3;
+      p.style.animationDuration = dur+'s';
+      p.style.opacity = String(0.75 + Math.random()*0.25);
+      confettiEl.appendChild(p);
+      setTimeout(()=>p.remove(), (dur*1000)+200);
+    }
+  }
+
+  async function saveGrade(pct, correct, total, passed){
+    if(!currentUserId) return;
+
+    const { level, unit } = getParams();
+    const levelKey = normalizeDir('Level', level || '0', '0');
+    const unitKey  = normalizeDir('Unit',  unit  || '1', '1');
+
+    const ref = firebase.database().ref(`usuarios/${currentUserId}/tests/${levelKey}/${unitKey}/${TEST_DB_KEY}`);
+    const payload = {
+      name: TEST_DISPLAY_NAME,
+      pct,
+      correct,
+      total,
+      passed: !!passed,
+      updatedAt: Date.now()
+    };
+
+    if(!canOverwrite){
+      console.log("[TEST] canOverwrite=false; not saving grade.");
+      return;
+    }
+
+    await ref.set(payload);
+  }
+
+  async function loadExistingGrade(){
+    if(!currentUserId) return;
+
+    const { level, unit } = getParams();
+    const levelKey = normalizeDir('Level', level || '0', '0');
+    const unitKey  = normalizeDir('Unit',  unit  || '1', '1');
+
+    try{
+      const ref = firebase.database().ref(`usuarios/${currentUserId}/tests/${levelKey}/${unitKey}/${TEST_DB_KEY}`);
+      const snap = await ref.once('value');
+      const v = snap.val();
+
+      if(v && typeof v.pct === 'number'){
+        canOverwrite = false;
+
+        gradeEl.style.display = 'block';
+        gradeEl.textContent = `Last score: ${v.correct}/${v.total} (${v.pct}%) — ${v.passed ? 'PASSED' : 'TRY AGAIN'}`;
+
+        restartNote.textContent = "A score already exists for this test. Restart may be disabled (depends on your policy).";
+        updateRestartPolicy(!!v.passed);
+      }else{
+        canOverwrite = true;
+        restartNote.textContent = "";
+      }
+    }catch(err){
+      console.warn("[TEST] loadExistingGrade error:", err);
+      canOverwrite = true;
+    }
+  }
+
+  function updateRestartPolicy(passed){
+    if(!canOverwrite){
+      restartBtn.disabled = true;
+      restartNote.textContent = "Restart disabled because this test already has a saved score.";
+      return;
+    }
+    restartBtn.disabled = false;
+    restartNote.textContent = passed
+      ? "You passed! You can restart if you want to practice."
+      : "You can restart to try again.";
+  }
+
+  function resetTest(){
+    closeModal();
+
+    idx = 0;
+    answered = false;
+    initTestArrays(questions.length);
+    buildCorrectAnswers();
+    bar.style.width = '0%';
+    renderQuestion();
+
+    toast("Test restarted.");
+  }
+
+  function handleAnswer(q, o, btn){
+    if (answered) return;
+
+    const corr = correctAnswers[idx];
+    const expected = expectedChoiceArray(corr).map(String);
+    const blanksTotal = (q.type === 'fillblank') ? countBlanksInPrompt(q.prompt) : 1;
+
+    if (q.type === 'fillblank' && blanksTotal > 1){
+      const ua = userAnswers[idx];
+      const done = Array.isArray(ua) ? ua.length : 0;
+
+      if (done < blanksTotal){
+        liveEl.textContent = `Selected ${done}/${blanksTotal}`;
+        return;
+      }
+    }
+
+    let ok = false;
+
+    if (q.type === 'fillblank' && blanksTotal > 1){
+      const given = Array.isArray(userAnswers[idx]) ? userAnswers[idx].map(String) : [];
+      if (given.length === expected.length){
+        ok = true;
+        for(let k=0;k<expected.length;k++){
+          if(normalize(given[k]) !== normalize(expected[k])) { ok = false; break; }
+        }
+      }
+    }else{
+      const chosen = String(o.value ?? o.label ?? '');
+      ok = normalize(chosen) === normalize(String(expected[0] ?? ''));
+      userAnswers[idx] = chosen;
+    }
+
+    answered = true;
+
+    const allButtons = Array.from(optionsEl.querySelectorAll('.option'));
+    allButtons.forEach(b=> b.disabled = true);
+
+    if(ok){
+      btn.classList.add('ok');
       (ensureAudio()? sfxCorrect() : sCorrect.play().catch(()=>{}));
-      confetti(18);
-      speakFriendly(['Yes! Great job!','Awesome!','You did it!']);
+      confetti(14);
+
       try{
         mediaBox.innerHTML = '';
         const gif = new Image(); gif.src = './hannah_feliz.gif'; gif.alt = 'Hannah celebrating';
         gif.setAttribute('draggable','false'); gif.style.pointerEvents = 'none';
         mediaBox.appendChild(gif);
       }catch(e){}
-      liveEl.textContent = 'Correct answer';
-    } else if (isCorrect === false){
-      btn?.classList?.add('err');
-      (ensureAudio()? sfxWrong() : sWrong.play().catch(()=>{}));
-      speakFriendly(['We will learn with this one.']);
-      liveEl.textContent = 'Recorded for grading';
-    } else {
-      return;
-    }
 
-    if(TEST_MODE){
-      answered = true;
-      lockedQuestion[idx] = true;
-      btnNext.disabled = false; btnNext.classList.add('ready');
-
-      Array.from(optionsEl.querySelectorAll('.option')).forEach(el=>{
-        if(el!==btn){ el.disabled = true; el.style.opacity = .65; }
-        else { el.disabled = true; }
-      });
-    }
-  }
-
-  /* =========================
-     Finish + Back
-  ========================= */
-  function finish(){
-    try { stopAllAudio(); } catch(e){} try { speechSynthesis.cancel(); } catch(e){}
-    isReading = false;
-
-    bar.style.width = '100%';
-    promptEl.textContent = "🎉 You've reached the end of the questions.";
-    mediaBox.innerHTML = '<div style="font-size:44px">🏁</div>';
-    optionsEl.innerHTML = '';
-    btnNext.disabled = true; btnNext.classList.remove('ready');
-    statusPill.textContent = `Completed • ${questions.length}/${questions.length}`;
-    confetti(22);
-    speakFriendly(['You may review your result now.']);
-
-    promptAudioIcon.disabled = true;
-    btnListenCorrect.disabled = true;
-    btnListenCorrect.classList.add('is-hidden');
-
-    // Calcula e salva automaticamente ao final
-    checkCompletion(false);
-  }
-
-  function confetti(n=16){
-    if(!confettiEl) return;
-    for(let i=0;i<n;i++){
-      const p=document.createElement('div'); p.className='piece';
-      const left = Math.random()*100;
-      const dur = 1200 + Math.random()*1400;
-      const delay = Math.random()*100;
-      p.style.left = left+'%';
-      p.style.setProperty('--h', Math.floor(Math.random()*360));
-      p.style.animationDuration = dur+'ms';
-      p.style.animationDelay = delay+'ms';
-      confettiEl.appendChild(p);
-      setTimeout(()=>p.remove(), dur+delay+200);
-    }
-  }
-
-  window.activityCompleted = false;
-  window.addEventListener('load', function(){ window.activityCompleted = false; });
-
-  window.goBack = function goBack(){
-    if(!window.activityCompleted){
-      const leave = confirm("This is a test. Do you want to go back without finishing?");
-      if(leave){ window.history.back(); }
-      return;
-    }
-    window.history.back();
-  };
-
-  /* =========================
-     ======== TEST KIT ========
-  ========================= */
-
-  function isAnswerCorrect(i){
-    const q = questions[i];
-    const corr = correctAnswers[i];
-    const ans  = userAnswers[i];
-
-    if(!q) return false;
-    if(corr?.type==='order'){
-      return Array.isArray(ans) && arraysEqual(ans, corr.value);
-    }
-    if(corr?.type==='match'){
-      if(!ans || !Array.isArray(ans.pairs)) return false;
-      if(ans.wrongs>0) return false;
-      const canon = corr.value;
-      const got   = ans.pairs.slice().sort();
-      return arraysEqual(got, canon);
-    }
-
-    const expArr = expectedChoiceArray(corr);
-
-    if (q.type === 'fillblank'){
-      const blanksTotal = countBlanksInPrompt(q.prompt);
-      if (blanksTotal <= 1){
-        const expected = expArr[0] ?? '';
-        return normalize(ans) === normalize(expected);
-      }
-      if (!Array.isArray(ans)) return false;
-      if (ans.length < blanksTotal) return false;
-      const got = ans.slice(0, blanksTotal).map(String);
-      const expected = expArr.slice(0, blanksTotal).map(String);
-      return arraysEqual(got, expected);
-    }
-
-    // mcq + audio_mcq (same grading)
-    const expected = expArr[0] ?? '';
-    return normalize(ans) === normalize(expected);
-  }
-
-  async function checkCompletion(showModalNow){
-    const total = questions.length;
-    let correctCount  = 0;
-    for(let i=0;i<total;i++){ if(isAnswerCorrect(i)) correctCount++; }
-    const grade = Math.round((correctCount / total) * 100);
-
-    ensureUserIsAuthenticated(async (userId)=>{
-      try{
-        const linked = await isStudentLinkedToProfessor(userId);
-        isLinked = linked;
-        await saveGradeToDatabase(userId, grade, linked);
-        if(grade >= PASSING_GRADE){
-          await updateNextPhase(userId);
-        }
-        displayGrade(grade, linked);
-        window.activityCompleted = true;
-
-        if(showModalNow){
-          const msg = grade>=PASSING_GRADE ? "Congratulations! You have passed this test."
-                                           : "Insufficient score.";
-          showModal(msg, grade);
-        }
-      }catch(e){
-        console.error("[TEST] Save/unlock error:", e);
-        showModal("An error occurred while saving your progress. Please try again.", 0);
-      }
-    });
-  }
-
-  function showModal(message, grade){
-    overlayEl.style.display = 'block';
-    modalEl.style.display   = 'block';
-    const p = modalEl.querySelector('p');
-    p.innerHTML = `${message}<br>Your Grade: ${grade}%.`;
-  }
-  window.closeModal = function(){
-    overlayEl.style.display = 'none';
-    modalEl.style.display   = 'none';
-  };
-
-  function displayGrade(grade, linked){
-    gradeEl.style.display = 'block';
-    gradeEl.style.color   = grade>=PASSING_GRADE ? '#16a34a' : '#ef4444';
-    const base = (grade>=PASSING_GRADE)
-      ? `Your Grade: ${grade}% — Congratulations on passing the ${TEST_DISPLAY_NAME}!`
-      : `Your Grade: ${grade}% — Insufficient score for the ${TEST_DISPLAY_NAME}.`;
-    gradeEl.innerHTML = base;
-
-    if (linked){
-      // aluno com professor: regras tratadas em loadExistingGrade()
-    }
-  }
-
-  function isStudentLinkedToProfessor(userId){
-    return firebase.database().ref(`usuarios/${userId}/atrelado_professor`)
-      .once("value")
-      .then(s=>s.exists() && s.val()!=="")
-      .catch(()=>false);
-  }
-
-  async function saveGradeToDatabase(userId, newGrade, linked){
-    const {level, unit} = getParams();
-    const ref = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/${TEST_DB_KEY}`);
-    const snap = await ref.once('value');
-    const existing = snap.val() ?? 0;
-
-    if(linked){
-      canOverwrite = existing === 0;
-      if(existing===0){
-        await ref.set(newGrade);
-        console.log("[Linked] Grade saved:", newGrade);
-      }else{
-        console.log("[Linked] Grade unchanged (teacher reset required).");
-      }
+      playFixedFriendly(['Great!','Awesome!']);
+      liveEl.textContent = 'Correct';
     }else{
-      const best = Math.max(existing||0, newGrade||0);
-      canOverwrite = true;
-      await ref.set(best);
-      console.log("[Unlinked] Grade saved (max policy):", best);
-    }
-  }
-
-  function loadExistingGrade(){
-    firebase.auth().onAuthStateChanged(async (u)=>{
-      if(!u) return;
-      const {level, unit}=getParams();
-      const ref = firebase.database().ref(`usuarios/${u.uid}/progresso/${level}/${unit}/${TEST_DB_KEY}`);
-      try{
-        isLinked = await isStudentLinkedToProfessor(u.uid);
-        const snap = await ref.once('value');
-        const has = snap.exists();
-        const g = has ? (snap.val()||0) : 0;
-
-        if(isLinked){
-          if(!has || g===0){
-            restartBtn.disabled = false;
-            restartNote.textContent = "";
-          }else{
-            restartBtn.disabled = true;
-            if(g < PASSING_GRADE){
-              restartNote.textContent = "Your score is below the minimum. Please contact your teacher to clear your current attempt so you can retake the Grammar Test.";
-            }else{
-              restartNote.textContent = "";
-            }
-          }
-        }else{
-          restartBtn.disabled = false;
-          restartNote.textContent = "";
-        }
-
-        if(has){
-          displayGrade(g, isLinked);
-          if(g>=PASSING_GRADE){ window.activityCompleted = true; }
-        }
-      }catch(e){ console.error("loadExistingGrade error", e); }
-    });
-  }
-
-  /* =========================
-     Restart Test
-  ========================= */
-  function resetTest(){
-    if(isLinked && restartBtn.disabled){
-      toast("Your teacher needs to clear your grade before you can retake the test.");
-      return;
+      btn.classList.add('err');
+      (ensureAudio()? sfxWrong() : sWrong.play().catch(()=>{}));
+      playFixedPhrase('We will learn with this one.');
+      liveEl.textContent = 'Wrong';
     }
 
-    closeModal();
-    initTestArrays(questions.length);
-    idx = 0;
-    answered = false;
-    window.activityCompleted = false;
-
-    bar.style.width = '0%';
-    gradeEl.style.display = 'none';
-
-    renderQuestion();
-
-    if(!canOverwrite && isLinked){
-      toast('This attempt is for practice only. Your stored grade will not change.');
-    }
-
-    try{ window.scrollTo({top:0, behavior:'smooth'}); }catch(e){}
+    btnNext.disabled = false;
+    btnNext.classList.add('ready');
   }
 
-  /* =========================
-     Boot
-  ========================= */
-  window.addEventListener('load', function(){
-    window.activityCompleted = false;
-    initTest();
-  });
+  window.goBack = function(){
+    try{ stopAllAudio(); }catch(e){}
+    history.back();
+  };
 
-})();
-</script>
+  initTest();
+})(); // end IIFE
+  </script>
 </body>
 </html>
