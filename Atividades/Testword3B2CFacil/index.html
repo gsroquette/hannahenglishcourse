@@ -403,20 +403,101 @@ async function generatePDF() {
     };
 }
 
-// =================== MISSING WORD LOGIC + CARREGANDO ARQUIVO ====================
-function playSound(word) {
+// =================== MISSING WORD LOGIC + ÁUDIO (MP3 -> TTS fallback) ====================
+// Áudio atual (para parar/evitar sobreposição)
+let currentAudio = null;
+
+// TTS (fallback)
+function speakWithTTS(text) {
     if ('speechSynthesis' in window) {
-        const synth = window.speechSynthesis;
-        const utterThis = new SpeechSynthesisUtterance(word);
-        utterThis.lang = 'en-US';
-        synth.cancel(); 
-        synth.speak(utterThis);
+        try {
+            const synth = window.speechSynthesis;
+            synth.cancel();
+            const utterThis = new SpeechSynthesisUtterance(text);
+            utterThis.lang = 'en-US';
+            synth.speak(utterThis);
+        } catch (e) {
+            console.error("Erro no TTS:", e);
+        }
     } else {
         console.error("Speech synthesis não é suportado neste navegador.");
     }
 }
 
-function createActivity(imageUrl, word) {
+// Checa existência do MP3 e tenta tocar. Se não existir (ou falhar), cai no TTS.
+// Observação: em alguns hosts, HEAD pode falhar/ser bloqueado; por isso há fallback para tocar direto.
+async function playSound(word, audioPath) {
+    // Para qualquer TTS em andamento
+    if ('speechSynthesis' in window) {
+        try { window.speechSynthesis.cancel(); } catch (e) {}
+    }
+
+    // Para áudio anterior
+    if (currentAudio) {
+        try {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+        } catch (e) {}
+        currentAudio = null;
+    }
+
+    // Se não passou caminho, vai direto pro TTS
+    if (!audioPath) {
+        speakWithTTS(word);
+        return;
+    }
+
+    // 1) Tenta verificar se o arquivo existe (HEAD)
+    let seemsToExist = false;
+    try {
+        const res = await fetch(audioPath, { method: 'HEAD', cache: 'no-store' });
+        if (res && res.ok) {
+            seemsToExist = true;
+        } else {
+            // 404/403/etc -> cai no TTS
+            seemsToExist = false;
+        }
+    } catch (err) {
+        // HEAD pode falhar (CORS/host). Nesse caso, tentamos tocar direto.
+        seemsToExist = true;
+    }
+
+    if (!seemsToExist) {
+        speakWithTTS(word);
+        return;
+    }
+
+    // 2) Tenta tocar MP3
+    try {
+        const audio = new Audio(audioPath);
+        currentAudio = audio;
+        audio.preload = "auto";
+
+        // Se der erro de mídia (404 real, decode, etc.), cai pro TTS
+        audio.onerror = function() {
+            console.warn("Falha ao carregar/tocar MP3. Usando TTS:", audioPath);
+            try {
+                if (currentAudio) {
+                    currentAudio.pause();
+                    currentAudio.currentTime = 0;
+                }
+            } catch (e) {}
+            currentAudio = null;
+            speakWithTTS(word);
+        };
+
+        const playPromise = audio.play();
+        if (playPromise && typeof playPromise.then === "function") {
+            await playPromise;
+        }
+    } catch (err) {
+        // Alguns browsers podem bloquear se não for gesto do usuário; aqui o clique é gesto, mas mantemos fallback
+        console.warn("Erro ao tentar tocar MP3. Usando TTS:", err);
+        speakWithTTS(word);
+    }
+}
+
+function createActivity(imageUrl, word, audioPath) {
     const activityContainer = document.getElementById('activity-container');
     const activityDiv = document.createElement('div');
     activityDiv.classList.add('activity');
@@ -438,7 +519,7 @@ function createActivity(imageUrl, word) {
     soundButton.style.cursor = 'pointer';
     soundButton.style.marginLeft = '10px';
     soundButton.addEventListener('click', function() {
-        playSound(word);
+        playSound(word, audioPath);
     });
     activityDiv.appendChild(soundButton);
 
@@ -452,7 +533,7 @@ function createActivity(imageUrl, word) {
     wordInput.placeholder = "Type the word here";
     wordContainer.appendChild(wordInput);
     
-// Exibe a palavra completa
+    // Exibe a palavra completa
     const fullWordElement = document.createElement('div');
     fullWordElement.innerText = word.toUpperCase();
     fullWordElement.style.fontWeight = 'bold';
@@ -476,7 +557,11 @@ async function loadActivities() {
         words.forEach((word, index) => {
             // imagens em ../../../../${level}/${unit}/data3/imagens/imagemX.png
             const imageUrl = `../../../../${level}/${unit}/data3/imagens/imagem${index + 1}.png`;
-            createActivity(imageUrl, word);
+
+            // áudios em ../../../../${level}/${unit}/data3/sounds/somX.mp3
+            const audioPath = `../../../../${level}/${unit}/data3/sounds/som${index + 1}.mp3`;
+
+            createActivity(imageUrl, word, audioPath);
         });
         activities = words;
     } catch (error) {
@@ -595,7 +680,7 @@ async function unlockNextPhase(userId) {
 async function saveGradeToDatabase(userId, newGrade, isLinked) {
     const { level, unit } = getParamsFromURL();
     // Ajuste o nome do campo conforme desejar
-    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/test - complete word 1`);
+    const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/test - complete word 3`);
 
     try {
         const snapshot = await dbRef.once('value');
@@ -624,7 +709,7 @@ function loadExistingGrade() {
         if (user) {
             const userId = user.uid;
             const { level, unit } = getParamsFromURL();
-            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/test - complete word 1`);
+            const dbRef = firebase.database().ref(`usuarios/${userId}/progresso/${level}/${unit}/test - complete word 3`);
 
             try {
                 const snapshot = await dbRef.once('value');
@@ -632,7 +717,7 @@ function loadExistingGrade() {
                 if (existingGrade !== null) {
                     displayGrade(existingGrade);
                 } else {
-                    console.log("Nenhuma nota encontrada (test - complete word 1).");
+                    console.log("Nenhuma nota encontrada (test - complete word 3).");
                 }
             } catch (error) {
                 console.error("Erro ao buscar a nota:", error);
