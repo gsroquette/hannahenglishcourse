@@ -118,6 +118,26 @@
         .missing-letter-input.correct{ border-style: solid; border-color: #2e7d32; }
         .missing-letter-input.incorrect{ border-style: solid; border-color: var(--err); }
 
+        /* ====== Slot visual para ESPAÇO (NOVO) ====== */
+        .missing-letter-space{
+            width: calc(var(--slot-w) * 0.55);
+            height: var(--slot-h);
+            flex: 0 0 calc(var(--slot-w) * 0.55);
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.65);
+            border: 2px solid rgba(0,0,0,0.10);
+        }
+        .missing-letter-space::after{
+            content:"";
+            width: 70%;
+            height: 3px;
+            border-radius: 99px;
+            background: rgba(0,0,0,0.18);
+        }
+
         /* ===== Trilho custom visível quando há overflow ===== */
         .overflow-ui{ display:none; align-items:center; gap:10px; }
         .drop-wrap[data-overflow="1"] .overflow-ui{ display:flex; }
@@ -389,7 +409,20 @@
         }
     }
 
-    // ===== Criar atividade (com híbrido + 1 letra por campo)
+    // ===== Helpers de hint (NOVO)
+    function buildHintText(word){
+        // Ex.: "Be kind" -> "_E _IND"
+        // Preserva palavras; se houver várias palavras, aplica a cada uma.
+        const parts = String(word).split(' ');
+        const hinted = parts.map(p => {
+            if (!p) return ""; // caso de espaços duplicados (não comum em words.txt)
+            if (p.length === 1) return "_";
+            return "_" + p.slice(1).toUpperCase();
+        });
+        return hinted.join(' ');
+    }
+
+    // ===== Criar atividade (com híbrido + 1 letra por campo + suporte a espaços)
     function createActivity(imageUrl, word, wordIndex) {
         const activityContainer = document.getElementById('activity-container');
         const activityDiv = document.createElement('div');
@@ -418,10 +451,22 @@
         track.appendChild(thumb); overflowUi.appendChild(leftBtn); overflowUi.appendChild(track); overflowUi.appendChild(rightBtn);
         dropWrap.appendChild(overflowUi);
 
-        // Inputs (uma letra por campo)
-        const letterInputs = [];
-        const letters = word.split('');
-        letters.forEach((expected, index) => {
+        // ===== Slots: letras + separadores de espaço (NOVO) =====
+        const letterInputs = [];          // só inputs de letras (para navegação/backspace)
+        const slots = [];                 // sequência completa, incluindo espaços, para validar/frase final
+        const chars = String(word).split('');
+
+        chars.forEach((expectedChar) => {
+            if (expectedChar === ' ') {
+                // Opção 1: NÃO cria input para espaço; cria um slot visual
+                const spaceEl = document.createElement('div');
+                spaceEl.className = 'missing-letter-space';
+                spaceEl.setAttribute('aria-hidden','true');
+                dropZone.appendChild(spaceEl);
+                slots.push({ type:'space', el: spaceEl, expected:' ' });
+                return;
+            }
+
             const input = document.createElement('input');
             input.classList.add('missing-letter-input');
             input.setAttribute('inputmode', 'latin');
@@ -431,9 +476,14 @@
             input.setAttribute('spellcheck', 'false');
             input.maxLength = 1;
 
+            // index dentro do array de inputs de letras (não conta espaços)
+            const letterIndex = letterInputs.length;
+
             input.addEventListener('input', () => {
                 let v = (input.value || '').toUpperCase();
                 if (v.length > 1) v = v.charAt(0);
+
+                // mantém regra original: apenas A-Z
                 if (!/^[A-Z]$/.test(v)) {
                     input.value = '';
                     input.classList.remove('correct','incorrect');
@@ -441,7 +491,7 @@
                 }
                 input.value = v;
 
-                if (v === expected.toUpperCase()) {
+                if (v === String(expectedChar).toUpperCase()) {
                     input.classList.add('correct');
                     input.classList.remove('incorrect');
                 } else {
@@ -449,14 +499,21 @@
                     input.classList.remove('correct');
                 }
 
-                if (index < letters.length - 1) {
-                    letterInputs[index + 1].focus();
+                // Auto-focus: próximo input de letra (como não existe input de espaço, já pula)
+                if (letterIndex < letterInputs.length - 1) {
+                    letterInputs[letterIndex + 1].focus();
                 }
 
-                const done = letterInputs.every(i => (i.value || '').length === 1);
+                // Done: todos os inputs de letra preenchidos (espaços já contam como "ok")
+                const done = slots.every(s => s.type === 'space' || ((s.input.value || '').length === 1));
+
                 if (done) {
-                    const userWord = letterInputs.map(i => (i.value || '').toUpperCase()).join('');
-                    if (userWord === word.toUpperCase()) {
+                    const userWord = slots.map(s => {
+                        if (s.type === 'space') return ' ';
+                        return (s.input.value || '').toUpperCase();
+                    }).join('');
+
+                    if (userWord === String(word).toUpperCase()) {
                         playMp3OrSpeak(wordIndex, word);
                         completedWords++;
                         if (completedWords === activities.length) showCompletionModal();
@@ -465,9 +522,9 @@
             });
 
             input.addEventListener('keydown', (e) => {
-                if (e.key === 'Backspace' && !input.value && index > 0) {
+                if (e.key === 'Backspace' && !input.value && letterIndex > 0) {
                     e.preventDefault();
-                    const prev = letterInputs[index - 1];
+                    const prev = letterInputs[letterIndex - 1];
                     prev.focus();
                     prev.value = '';
                     prev.classList.remove('correct','incorrect');
@@ -476,12 +533,13 @@
 
             letterInputs.push(input);
             dropZone.appendChild(input);
+            slots.push({ type:'letter', input, expected: expectedChar });
         });
 
-        // Texto com placeholder (mantido)
+        // Texto com placeholder (AJUSTADO para frases)
         const fullWordElement = document.createElement('div');
         fullWordElement.className = 'full-word';
-        fullWordElement.textContent = `___${word.slice(1).toUpperCase()}`;
+        fullWordElement.textContent = buildHintText(word);
         fullWordElement.style.fontWeight = 'bold';
         fullWordElement.style.marginTop = '10px';
         wordContainer.appendChild(fullWordElement);
@@ -491,7 +549,9 @@
         activities.push(word);
 
         // ====== Layout adaptativo + overflow amigável ======
-        dropZone.dataset.letters = String(word.length);
+        // Para layout, consideramos "slots" (letras + espaços visuais) como unidades.
+        dropZone.dataset.letters = String(slots.length);
+
         const ro = new ResizeObserver(()=> fitSlotsToOneLine(dropViewport, dropZone, dropWrap, track, thumb, {resetScroll:true}));
         ro.observe(activityDiv);
         imgElement.addEventListener('load', ()=> fitSlotsToOneLine(dropViewport, dropZone, dropWrap, track, thumb, {resetScroll:true}));
