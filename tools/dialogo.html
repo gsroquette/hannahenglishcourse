@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Gerador de Prompt — Diálogo (Robot Samuel & Hannah)</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; margin:16px; line-height:1.35}
+    label{font-weight:600}
+    textarea, select, input{width:100%; max-width:1100px; padding:10px; margin-top:6px; border:1px solid #cfd6df; border-radius:10px}
+    textarea{min-height:110px}
+    .row{display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; max-width:1100px}
+    .row2{display:grid; grid-template-columns:1fr 1fr; gap:12px; max-width:1100px}
+    .btn{padding:12px 14px; border:0; border-radius:12px; background:#2563eb; color:#fff; font-weight:700; cursor:pointer}
+    .btn:disabled{opacity:.6; cursor:not-allowed}
+    .card{max-width:1100px; border:1px solid #e5e7eb; border-radius:14px; padding:12px; margin:14px 0}
+    .muted{color:#6b7280; font-size:14px}
+    .status{white-space:pre-wrap; font-size:13px; background:#f7f9fc; border:1px dashed #cfd6df; border-radius:12px; padding:10px; max-width:1100px}
+    .small{font-size:13px}
+    .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
+  </style>
+</head>
+<body>
+
+  <h2>Gerador de Prompt — Diálogo</h2>
+  <div class="muted">
+    Este gerador busca automaticamente o vocabulário (<code>words.txt</code>) da <b>Unit atual</b> + <b>2 Units anteriores</b> (com “wrap” entre Levels, considerando 20 Units por Level).
+    Também busca a gramática de <code>/grammar/grammar.json</code> (na Base URL).
+  </div>
+
+  <div class="card">
+    <label for="baseUrl">Base URL (onde estão os arquivos do curso):</label>
+    <input id="baseUrl" value="https://hannahenglishcourse.netlify.app" />
+    <div class="muted small">
+      Se você estiver rodando este HTML localmente, este campo precisa apontar para o seu Netlify.
+      Ex.: <span class="mono">https://hannahenglishcourse.netlify.app</span>
+    </div>
+
+    <hr style="border:none;border-top:1px solid #e5e7eb;margin:12px 0"/>
+
+    <label for="temaInput">Tema da Lição de Conversação (FONTE PRINCIPAL):</label>
+    <textarea id="temaInput">Insira aqui o tema/objetivo da lição (ex.: “How old are you? — counting 1–10”).</textarea>
+
+    <div class="row" style="margin-top:12px">
+      <div>
+        <label for="englishLevel">Nível (CEFR):</label>
+        <select id="englishLevel">
+          <option value="Starter">Starter (antes do A1)</option>
+          <option value="A1">A1 - Iniciante</option>
+          <option value="A2">A2 - Básico</option>
+          <option value="B1">B1 - Intermediário</option>
+          <option value="B2">B2 - Intermediário Superior</option>
+          <option value="C1">C1 - Avançado</option>
+          <option value="C2">C2 - Proficiência</option>
+        </select>
+      </div>
+      <div>
+        <label for="levelNumber">Level atual (número):</label>
+        <input id="levelNumber" type="number" min="0" step="1" value="0"/>
+        <div class="muted small">Ex.: 0, 1, 2, 3, 4</div>
+      </div>
+      <div>
+        <label for="unitNumber">Unit atual (número):</label>
+        <input id="unitNumber" type="number" min="1" step="1" value="3"/>
+        <div class="muted small">Ex.: 1 até 20</div>
+      </div>
+    </div>
+
+    <div class="row2" style="margin-top:12px">
+      <div>
+        <label for="unitsPerLevel">Units por Level (padrão 20):</label>
+        <input id="unitsPerLevel" type="number" min="1" step="1" value="20"/>
+      </div>
+      <div>
+        <label for="maxWords">Máximo de palavras no prompt (padrão 90):</label>
+        <input id="maxWords" type="number" min="10" step="1" value="90"/>
+        <div class="muted small">Prioridade: Unit atual → Unit-1 → Unit-2</div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px">
+      <label for="textoInspirador">Texto inspirador (opcional):</label>
+      <textarea id="textoInspirador" placeholder="Opcional. Se você preencher, o texto entra como apoio (não copiar frases completas)."></textarea>
+      <div class="muted small">
+        Observação: o vocabulário principal virá dos <code>words.txt</code>. Este campo é só apoio.
+      </div>
+    </div>
+
+    <div style="margin-top:12px">
+      <button id="btnGerar" class="btn" onclick="gerarPrompt()">Gerar Prompt (com vocabulário + gramática)</button>
+    </div>
+
+    <div style="margin-top:12px">
+      <div class="status" id="statusBox">Status: pronto.</div>
+    </div>
+
+    <div style="margin-top:12px">
+      <label for="debugBox">Debug (URLs tentadas e status):</label>
+      <textarea id="debugBox" class="mono" style="min-height:160px" spellcheck="false"></textarea>
+      <div class="muted small">
+        Se aparecer 404 aqui, o caminho não existe no Netlify. Se aparecer “Failed to fetch”, é bloqueio/erro de rede ou Base URL errada.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <label for="promptOutput">Prompt Gerado:</label>
+    <textarea id="promptOutput" style="min-height:280px" spellcheck="false"></textarea>
+    <div class="muted small">Dica: copie o prompt e cole na IA para gerar o <code>dialogo.txt</code>.</div>
+  </div>
+
+<script>
+/** ======= UI helpers ======= */
+function setStatus(msg) {
+  document.getElementById("statusBox").textContent = msg;
+}
+function debugLog(line) {
+  const box = document.getElementById("debugBox");
+  box.value = (box.value ? box.value + "\n" : "") + line;
+}
+function clearDebug() {
+  document.getElementById("debugBox").value = "";
+}
+function clampInt(n, min, max) {
+  n = Number(n);
+  if (!Number.isFinite(n)) return min;
+  n = Math.floor(n);
+  if (n < min) return min;
+  if (typeof max === "number" && n > max) return max;
+  return n;
+}
+function unitKey(unitNumber) {
+  return "Unit" + unitNumber;
+}
+function levelKey(levelNumber) {
+  return "Level" + levelNumber;
+}
+function normalizeBaseUrl(raw) {
+  const s = (raw || "").trim();
+  if (!s) return "";
+  return s.replace(/\/+$/, ""); // remove trailing slashes
+}
+function buildUrl(baseUrl, path) {
+  baseUrl = normalizeBaseUrl(baseUrl);
+  // path deve começar com "/"
+  if (!path.startsWith("/")) path = "/" + path;
+  return baseUrl + path;
+}
+
+/** ======= Linear index helpers ======= */
+function toLinearIndex(levelNum, unitNum, unitsPerLevel) {
+  return (levelNum * unitsPerLevel) + unitNum; // unitNum começa em 1
+}
+function fromLinearIndex(idx, unitsPerLevel) {
+  const zeroBased = idx - 1;
+  const levelNum = Math.floor(zeroBased / unitsPerLevel);
+  const unitNum = (zeroBased % unitsPerLevel) + 1;
+  return { levelNum, unitNum };
+}
+
+/** ======= Fetch helpers ======= */
+async function fetchTextSafeAbs(url) {
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    debugLog(`${res.status} ${url}`);
+    if (!res.ok) return null;
+    return await res.text();
+  } catch (e) {
+    debugLog(`ERR  ${url}  -> ${e && e.message ? e.message : String(e)}`);
+    return null;
+  }
+}
+async function fetchJsonSafeAbs(url) {
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    debugLog(`${res.status} ${url}`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (e) {
+    debugLog(`ERR  ${url}  -> ${e && e.message ? e.message : String(e)}`);
+    return null;
+  }
+}
+function parseWordsTxt(txt) {
+  return txt
+    .split(/\r?\n/g)
+    .map(s => (s || "").trim())
+    .filter(Boolean);
+}
+
+/** ======= Vocabulary fetch (tries data1/data2/data3 + case variants) ======= */
+async function fetchWordsForUnit(baseUrl, levelNum, unitNum) {
+  const base = `/${levelKey(levelNum)}/${unitKey(unitNum)}`;
+
+  // tenta variações de case para evitar erro se pasta for "Data1" etc.
+  const dataFolders = [
+    "data1","data2","data3",
+    "Data1","Data2","Data3"
+  ];
+
+  const all = [];
+  for (const df of dataFolders) {
+    const url = buildUrl(baseUrl, `${base}/${df}/words.txt`);
+    const txt = await fetchTextSafeAbs(url);
+    if (txt) all.push(...parseWordsTxt(txt));
+  }
+  return Array.from(new Set(all));
+}
+
+/** ======= Grammar fetch ======= */
+async function fetchGrammarJSON(baseUrl) {
+  // Padrão: /grammar/grammar.json
+  // (Você precisa colocar esse arquivo no Netlify nesse caminho)
+  const url = buildUrl(baseUrl, "/grammar/grammar.json");
+  return await fetchJsonSafeAbs(url);
+}
+function getGrammarForUnit(grammarData, levelNum, unitNum) {
+  if (!grammarData) return [];
+  const L = grammarData[levelKey(levelNum)];
+  if (!L) return [];
+  const U = L[unitKey(unitNum)];
+  if (!Array.isArray(U)) return [];
+  return U.map(s => (s || "").trim()).filter(Boolean);
+}
+
+/** ======= Prompt building helpers ======= */
+function buildLevelRules(englishLevel) {
+  const rules = {
+    Starter: [
+      "Público: crianças pequenas (primeiro contato com inglês).",
+      "Linguagem MUITO simples, concreta e repetitiva.",
+      "Frases curtas (preferência: 2–6 palavras; máximo: 8).",
+      "Evitar: passado, futuro, continuous, phrasal verbs, idioms, gírias.",
+      "Repetir estruturas importantes 2–3 vezes com pequenas variações.",
+      "Se houver frase-alvo na lição (ex.: “How old are you?”), usar várias vezes.",
+      "Simplificar qualquer frase complexa que apareça no texto inspirador (se fornecido)."
+    ],
+    A1: [
+      "Frases simples e diretas. Vocabulário básico.",
+      "Perguntas/respostas curtas com pequenas variações.",
+      "Evitar explicações longas."
+    ],
+    A2: [
+      "Frases curtas a médias. Mais variações de perguntas.",
+      "Pode usar conectores simples (and, but, because) com moderação."
+    ],
+    B1: [
+      "Diálogo mais natural, com pequenos detalhes e justificativas simples.",
+      "Pode incluir opiniões curtas."
+    ],
+    B2: [
+      "Mais fluência. Vocabulário mais amplo, mas sempre ligado ao tema.",
+      "Pode incluir reformulações e nuances."
+    ],
+    C1: [
+      "Diálogo sofisticado, vocabulário avançado e natural.",
+      "Pode incluir explicações e precisão linguística."
+    ],
+    C2: [
+      "Máxima naturalidade e precisão. Registro apropriado ao contexto.",
+      "Pode incluir sutilezas/idioms apenas se fizer sentido no contexto."
+    ]
+  };
+  return (rules[englishLevel] || rules.Starter).map(x => `- ${x}`).join("\n");
+}
+function formatList(title, items) {
+  if (!items || !items.length) return `${title}\n- (nenhum)\n`;
+  return `${title}\n${items.map(x => `- ${x}`).join("\n")}\n`;
+}
+function mergeDedup(arr) {
+  return Array.from(new Set((arr || []).map(s => (s || "").trim()).filter(Boolean)));
+}
+function selectWordsWithPriority(currentWords, prev1Words, prev2Words, maxWords) {
+  const result = [];
+  const seen = new Set();
+  function pushFrom(list) {
+    for (const w of list) {
+      const key = (w || "").trim();
+      if (!key) continue;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push(key);
+      if (result.length >= maxWords) return false;
+    }
+    return true;
+  }
+  pushFrom(currentWords);
+  if (result.length < maxWords) pushFrom(prev1Words);
+  if (result.length < maxWords) pushFrom(prev2Words);
+  return result;
+}
+
+/** ======= Main ======= */
+async function gerarPrompt() {
+  const btn = document.getElementById("btnGerar");
+  btn.disabled = true;
+  clearDebug();
+
+  try {
+    const baseUrl = normalizeBaseUrl(document.getElementById("baseUrl").value);
+    const tema = document.getElementById("temaInput").value.trim();
+    const textoInspirador = document.getElementById("textoInspirador").value.trim();
+    const englishLevel = document.getElementById("englishLevel").value;
+
+    const unitsPerLevel = clampInt(document.getElementById("unitsPerLevel").value, 1, 200);
+    const maxWords = clampInt(document.getElementById("maxWords").value, 30, 200);
+
+    const levelNum = clampInt(document.getElementById("levelNumber").value, 0, 999);
+    const unitNum = clampInt(document.getElementById("unitNumber").value, 1, unitsPerLevel);
+
+    if (!baseUrl) {
+      setStatus("Status: erro — Base URL está vazia.");
+      btn.disabled = false;
+      return;
+    }
+    if (!tema) {
+      setStatus("Status: erro — o Tema da Lição está vazio.");
+      btn.disabled = false;
+      return;
+    }
+
+    setStatus("Status: buscando vocabulário (words.txt) na Base URL...");
+    const currentIdx = toLinearIndex(levelNum, unitNum, unitsPerLevel);
+    const idxs = [currentIdx, currentIdx - 1, currentIdx - 2].filter(i => i >= 1);
+    const targets = idxs.map(i => fromLinearIndex(i, unitsPerLevel));
+
+    const wordsByTarget = [];
+    for (const t of targets) {
+      setStatus(`Status: vocabulário ${levelKey(t.levelNum)} / ${unitKey(t.unitNum)}...`);
+      const words = await fetchWordsForUnit(baseUrl, t.levelNum, t.unitNum);
+      wordsByTarget.push(words);
+    }
+
+    const currentWords = wordsByTarget[0] || [];
+    const prev1Words = wordsByTarget[1] || [];
+    const prev2Words = wordsByTarget[2] || [];
+    const allowedWords = selectWordsWithPriority(currentWords, prev1Words, prev2Words, maxWords);
+
+    setStatus("Status: buscando gramática (grammar.json) na Base URL...");
+    const grammarData = await fetchGrammarJSON(baseUrl);
+
+    const grammarLists = targets.map(t => getGrammarForUnit(grammarData, t.levelNum, t.unitNum));
+    const allowedGrammar = mergeDedup([].concat(...grammarLists));
+
+    const basicWordsAllowed = [
+      "I","YOU","HE","SHE","IT","WE","THEY",
+      "MY","YOUR","HIS","HER","OUR","THEIR",
+      "A","AN","THE",
+      "AM","IS","ARE",
+      "YES","NO",
+      "WHAT","HOW","WHO","WHERE",
+      "AND","OR","BUT",
+      "PLEASE","THANK YOU",
+      "OK","HELLO","HI","GOOD MORNING","GOODBYE"
+    ];
+
+    const inspirationBlock = textoInspirador
+      ? `\nTEXTO INSPIRADOR (OPCIONAL — USAR APENAS PARA VOCABULÁRIO/EXPRESSÕES; NÃO COPIAR FRASES COMPLETAS)\n${textoInspirador}\n`
+      : "";
+
+    const levelRulesText = buildLevelRules(englishLevel);
+
+    const prompt = `
+Você é um gerador de diálogos para ensino de inglês. Crie um arquivo "dialogo.txt" contendo um diálogo realista e didático entre o Robot Samuel e a menina Hannah, simulando uma conversa real do dia a dia.
+
+OBJETIVO (FONTE PRINCIPAL)
+- O diálogo deve seguir EXCLUSIVAMENTE o objetivo/tema da lição fornecido abaixo.
+- O contexto da conversa deve vir do tema da lição (não inventar outro cenário fora do tema).
+
+NÍVEL DE INGLÊS (CEFR)
+- Nível escolhido: ${englishLevel}
+
+REGRAS DO NÍVEL (OBRIGATÓRIAS)
+${levelRulesText}
+
+CONTROLE DE VOCABULÁRIO (OBRIGATÓRIO)
+- Priorize fortemente as palavras do VOCABULÁRIO PERMITIDO (prioritário).
+- Você também pode usar palavras básicas de ligação (BASIC WORDS ALLOWED).
+- NÃO use vocabulário avançado fora dessas fontes.
+- Não invente palavras difíceis.
+
+CONTROLE DE GRAMÁTICA (OBRIGATÓRIO)
+- Use apenas as estruturas listadas em GRAMÁTICA PERMITIDA.
+- NÃO use tempos verbais/estruturas não ensinados (past, future, continuous, etc.).
+- Se houver dúvida, escolha a forma mais simples.
+
+ELEMENTOS DIDÁTICOS (OBRIGATÓRIOS)
+- Repetição inteligente: repetir estruturas importantes 2–3 vezes com pequenas variações.
+- Perguntas curtas e respostas curtas (guiadas).
+- Reformulação simples (dizer a mesma ideia de forma mais fácil).
+
+FORMATO DO ARQUIVO "dialogo.txt" (OBRIGATÓRIO)
+- Apenas falas (uma fala por linha).
+- Sem títulos, sem explicações, sem comentários, sem listas.
+- Sem marcações extras.
+- Robot Samuel e Hannah devem alternar as falas.
+- Tamanho sugerido:
+  - Starter/A1: 10 a 16 linhas
+  - A2/B1: 12 a 22 linhas
+  - B2/C1/C2: 14 a 26 linhas
+
+${formatList("GRAMÁTICA PERMITIDA:", allowedGrammar).trim()}
+
+${formatList("VOCABULÁRIO PERMITIDO (PRIORITÁRIO):", allowedWords).trim()}
+
+${formatList("BASIC WORDS ALLOWED (VOCABULÁRIO BÁSICO DE LIGAÇÃO):", basicWordsAllowed).trim()}
+${inspirationBlock}
+
+--- TEMA DA LIÇÃO (BASE PRINCIPAL) ---
+${tema}
+--- FIM DO TEMA ---
+
+Agora, gere APENAS o conteúdo final do arquivo "dialogo.txt", seguindo todas as regras acima.
+`.trim();
+
+    document.getElementById("promptOutput").value = prompt;
+
+    const info = [
+      "Status: pronto.",
+      `Base URL: ${baseUrl}`,
+      `Nível atual: ${levelKey(levelNum)} / ${unitKey(unitNum)} (unitsPerLevel=${unitsPerLevel})`,
+      `Units usadas (wrap): ${targets.map(t => `${levelKey(t.levelNum)}/${unitKey(t.unitNum)}`).join(" , ")}`,
+      `Vocabulário: current=${currentWords.length}, prev1=${prev1Words.length}, prev2=${prev2Words.length} => usados=${allowedWords.length} (max=${maxWords})`,
+      `Gramática: itens=${allowedGrammar.length}`,
+      grammarData ? "grammar.json: carregado (se itens=0, verifique se as chaves Level/Unit existem)." : "grammar.json: NÃO carregado (crie /grammar/grammar.json no Netlify)."
+    ].join("\n");
+
+    setStatus(info);
+
+  } catch (err) {
+    setStatus("Status: erro inesperado.\n" + (err && err.message ? err.message : String(err)));
+  } finally {
+    btn.disabled = false;
+  }
+}
+</script>
+
+</body>
+</html>
