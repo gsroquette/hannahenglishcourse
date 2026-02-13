@@ -26,6 +26,8 @@
   <div class="muted">
     Este gerador busca automaticamente o vocabulário (<code>words.txt</code>) da <b>Unit atual</b> + <b>2 Units anteriores</b> (com “wrap” entre Levels, considerando 20 Units por Level).
     Também busca a gramática de <code>/grammar/grammar.json</code> (na Base URL).
+    <br><br>
+    <b>Nova regra principal:</b> a <b>LIÇÃO</b> manda no diálogo (estrutura e frases-alvo). O vocabulário puxado é apenas um <b>banco de palavras já estudadas</b> (apoio/limite), e pode ser ignorado quando não fizer sentido para o tema.
   </div>
 
   <div class="card">
@@ -38,8 +40,8 @@
 
     <hr style="border:none;border-top:1px solid #e5e7eb;margin:12px 0"/>
 
-    <label for="temaInput">Tema da Lição de Conversação (FONTE PRINCIPAL):</label>
-    <textarea id="temaInput">Insira aqui o tema/objetivo da lição (ex.: “How old are you? — counting 1–10”).</textarea>
+    <label for="temaInput">Lição de Conversação (FONTE PRIMÁRIA — OBRIGATÓRIA):</label>
+    <textarea id="temaInput">Cole aqui a lição completa (objetivo, key phrases e exemplos). O diálogo deve ensinar e praticar esta lição.</textarea>
 
     <div class="row" style="margin-top:12px">
       <div>
@@ -72,22 +74,25 @@
         <input id="unitsPerLevel" type="number" min="1" step="1" value="20"/>
       </div>
       <div>
-        <label for="maxWords">Máximo de palavras no prompt (padrão 90):</label>
+        <label for="maxWords">Máximo de palavras “extras” no prompt (padrão 90):</label>
         <input id="maxWords" type="number" min="10" step="1" value="90"/>
-        <div class="muted small">Prioridade: Unit atual → Unit-1 → Unit-2</div>
+        <div class="muted small">
+          Essas palavras são <b>apoio/limite</b>, não o foco.
+          Prioridade: Unit atual → Unit-1 → Unit-2
+        </div>
       </div>
     </div>
 
     <div style="margin-top:12px">
-      <label for="textoInspirador">Texto inspirador (opcional):</label>
-      <textarea id="textoInspirador" placeholder="Opcional. Se você preencher, o texto entra como apoio (não copiar frases completas)."></textarea>
+      <label for="textoInspirador">Texto inspirador (opcional — apoio leve):</label>
+      <textarea id="textoInspirador" placeholder="Opcional. Se você preencher, o texto entra como apoio (vocabulário/expressões). NÃO copiar frases completas."></textarea>
       <div class="muted small">
-        Observação: o vocabulário principal virá dos <code>words.txt</code>. Este campo é só apoio.
+        Observação: o vocabulário principal vem da lição. As listas de words.txt e este texto são apoios.
       </div>
     </div>
 
     <div style="margin-top:12px">
-      <button id="btnGerar" class="btn" onclick="gerarPrompt()">Gerar Prompt (com vocabulário + gramática)</button>
+      <button id="btnGerar" class="btn" onclick="gerarPrompt()">Gerar Prompt (lição manda + apoios)</button>
     </div>
 
     <div style="margin-top:12px">
@@ -98,15 +103,15 @@
       <label for="debugBox">Debug (URLs tentadas e status):</label>
       <textarea id="debugBox" class="mono" style="min-height:160px" spellcheck="false"></textarea>
       <div class="muted small">
-        Se aparecer 404 aqui, o caminho não existe no Netlify. Se aparecer “Failed to fetch”, é bloqueio/erro de rede ou Base URL errada.
+        Se aparecer 404 aqui, o caminho não existe no Netlify. Se aparecer “Failed to fetch”, é Base URL errada, CORS, rede ou execução fora do domínio sem headers.
       </div>
     </div>
   </div>
 
   <div class="card">
     <label for="promptOutput">Prompt Gerado:</label>
-    <textarea id="promptOutput" style="min-height:280px" spellcheck="false"></textarea>
-    <div class="muted small">Dica: copie o prompt e cole na IA para gerar o <code>dialogo.txt</code>.</div>
+    <textarea id="promptOutput" style="min-height:320px" spellcheck="false"></textarea>
+    <div class="muted small">Copie e cole na IA para gerar o <code>dialogo.txt</code>.</div>
   </div>
 
 <script>
@@ -138,11 +143,10 @@ function levelKey(levelNumber) {
 function normalizeBaseUrl(raw) {
   const s = (raw || "").trim();
   if (!s) return "";
-  return s.replace(/\/+$/, ""); // remove trailing slashes
+  return s.replace(/\/+$/, "");
 }
 function buildUrl(baseUrl, path) {
   baseUrl = normalizeBaseUrl(baseUrl);
-  // path deve começar com "/"
   if (!path.startsWith("/")) path = "/" + path;
   return baseUrl + path;
 }
@@ -181,22 +185,35 @@ async function fetchJsonSafeAbs(url) {
     return null;
   }
 }
+
+/**
+ * words.txt no seu projeto pode estar:
+ * - uma palavra por linha
+ * - OU várias palavras na mesma linha separadas por espaços
+ * Aqui tratamos ambos:
+ */
 function parseWordsTxt(txt) {
-  return txt
-    .split(/\r?\n/g)
-    .map(s => (s || "").trim())
-    .filter(Boolean);
+  const lines = txt.split(/\r?\n/g).map(s => (s || "").trim()).filter(Boolean);
+  const words = [];
+  for (const line of lines) {
+    // divide por espaços/tabs múltiplos, preservando expressões com espaço?
+    // Como você tem itens como "STAND UP", este parser NÃO deve quebrar por espaço se essa expressão estiver em uma linha sozinha.
+    // Então: se a linha tiver 1 palavra -> ok; se tiver várias palavras e for "lista" -> quebra.
+    // Heurística: se a linha tiver mais de 3 tokens, provavelmente é lista; se 2 tokens pode ser expressão (STAND UP).
+    const tokens = line.split(/\s+/).filter(Boolean);
+    if (tokens.length >= 4) {
+      words.push(...tokens);
+    } else {
+      words.push(line);
+    }
+  }
+  return words.map(w => w.trim()).filter(Boolean);
 }
 
 /** ======= Vocabulary fetch (tries data1/data2/data3 + case variants) ======= */
 async function fetchWordsForUnit(baseUrl, levelNum, unitNum) {
   const base = `/${levelKey(levelNum)}/${unitKey(unitNum)}`;
-
-  // tenta variações de case para evitar erro se pasta for "Data1" etc.
-  const dataFolders = [
-    "data1","data2","data3",
-    "Data1","Data2","Data3"
-  ];
+  const dataFolders = ["data1","data2","data3","Data1","Data2","Data3"];
 
   const all = [];
   for (const df of dataFolders) {
@@ -209,8 +226,6 @@ async function fetchWordsForUnit(baseUrl, levelNum, unitNum) {
 
 /** ======= Grammar fetch ======= */
 async function fetchGrammarJSON(baseUrl) {
-  // Padrão: /grammar/grammar.json
-  // (Você precisa colocar esse arquivo no Netlify nesse caminho)
   const url = buildUrl(baseUrl, "/grammar/grammar.json");
   return await fetchJsonSafeAbs(url);
 }
@@ -223,7 +238,7 @@ function getGrammarForUnit(grammarData, levelNum, unitNum) {
   return U.map(s => (s || "").trim()).filter(Boolean);
 }
 
-/** ======= Prompt building helpers ======= */
+/** ======= Prompt building ======= */
 function buildLevelRules(englishLevel) {
   const rules = {
     Starter: [
@@ -263,6 +278,7 @@ function buildLevelRules(englishLevel) {
   };
   return (rules[englishLevel] || rules.Starter).map(x => `- ${x}`).join("\n");
 }
+
 function formatList(title, items) {
   if (!items || !items.length) return `${title}\n- (nenhum)\n`;
   return `${title}\n${items.map(x => `- ${x}`).join("\n")}\n`;
@@ -270,6 +286,7 @@ function formatList(title, items) {
 function mergeDedup(arr) {
   return Array.from(new Set((arr || []).map(s => (s || "").trim()).filter(Boolean)));
 }
+
 function selectWordsWithPriority(currentWords, prev1Words, prev2Words, maxWords) {
   const result = [];
   const seen = new Set();
@@ -298,12 +315,12 @@ async function gerarPrompt() {
 
   try {
     const baseUrl = normalizeBaseUrl(document.getElementById("baseUrl").value);
-    const tema = document.getElementById("temaInput").value.trim();
+    const lesson = document.getElementById("temaInput").value.trim();
     const textoInspirador = document.getElementById("textoInspirador").value.trim();
     const englishLevel = document.getElementById("englishLevel").value;
 
     const unitsPerLevel = clampInt(document.getElementById("unitsPerLevel").value, 1, 200);
-    const maxWords = clampInt(document.getElementById("maxWords").value, 30, 200);
+    const maxWords = clampInt(document.getElementById("maxWords").value, 10, 200);
 
     const levelNum = clampInt(document.getElementById("levelNumber").value, 0, 999);
     const unitNum = clampInt(document.getElementById("unitNumber").value, 1, unitsPerLevel);
@@ -313,20 +330,20 @@ async function gerarPrompt() {
       btn.disabled = false;
       return;
     }
-    if (!tema) {
-      setStatus("Status: erro — o Tema da Lição está vazio.");
+    if (!lesson) {
+      setStatus("Status: erro — a Lição (fonte primária) está vazia.");
       btn.disabled = false;
       return;
     }
 
-    setStatus("Status: buscando vocabulário (words.txt) na Base URL...");
+    setStatus("Status: buscando vocabulário extra (words.txt) na Base URL...");
     const currentIdx = toLinearIndex(levelNum, unitNum, unitsPerLevel);
     const idxs = [currentIdx, currentIdx - 1, currentIdx - 2].filter(i => i >= 1);
     const targets = idxs.map(i => fromLinearIndex(i, unitsPerLevel));
 
     const wordsByTarget = [];
     for (const t of targets) {
-      setStatus(`Status: vocabulário ${levelKey(t.levelNum)} / ${unitKey(t.unitNum)}...`);
+      setStatus(`Status: vocabulário extra ${levelKey(t.levelNum)} / ${unitKey(t.unitNum)}...`);
       const words = await fetchWordsForUnit(baseUrl, t.levelNum, t.unitNum);
       wordsByTarget.push(words);
     }
@@ -334,14 +351,16 @@ async function gerarPrompt() {
     const currentWords = wordsByTarget[0] || [];
     const prev1Words = wordsByTarget[1] || [];
     const prev2Words = wordsByTarget[2] || [];
-    const allowedWords = selectWordsWithPriority(currentWords, prev1Words, prev2Words, maxWords);
+    const extraWords = selectWordsWithPriority(currentWords, prev1Words, prev2Words, maxWords);
 
     setStatus("Status: buscando gramática (grammar.json) na Base URL...");
     const grammarData = await fetchGrammarJSON(baseUrl);
 
+    // Gramática cumulativa: Unit atual + 2 anteriores (dedup)
     const grammarLists = targets.map(t => getGrammarForUnit(grammarData, t.levelNum, t.unitNum));
     const allowedGrammar = mergeDedup([].concat(...grammarLists));
 
+    // Vocabulário básico de ligação (sempre liberado)
     const basicWordsAllowed = [
       "I","YOU","HE","SHE","IT","WE","THEY",
       "MY","YOUR","HIS","HER","OUR","THEIR",
@@ -355,17 +374,32 @@ async function gerarPrompt() {
     ];
 
     const inspirationBlock = textoInspirador
-      ? `\nTEXTO INSPIRADOR (OPCIONAL — USAR APENAS PARA VOCABULÁRIO/EXPRESSÕES; NÃO COPIAR FRASES COMPLETAS)\n${textoInspirador}\n`
+      ? `\nTEXTO INSPIRADOR (OPCIONAL — APOIO LEVE)\n- Use apenas como fonte de algumas palavras/expressões.\n- NÃO copiar frases completas.\n${textoInspirador}\n`
       : "";
 
     const levelRulesText = buildLevelRules(englishLevel);
 
+    /**
+     * ===== NOVAS REGRAS PRINCIPAIS (HIERARQUIA) =====
+     * - A LIÇÃO MANDA: estruturas, frases-alvo, exemplos, objetivo.
+     * - Vocabulário extra (words.txt) é só apoio/limite.
+     * - Pode ignorar palavras irrelevantes.
+     */
     const prompt = `
-Você é um gerador de diálogos para ensino de inglês. Crie um arquivo "dialogo.txt" contendo um diálogo realista e didático entre o Robot Samuel e a menina Hannah, simulando uma conversa real do dia a dia.
+Você é um gerador de diálogos para ensino de inglês. Crie um arquivo "dialogo.txt" contendo um diálogo realista e didático entre o Robot Samuel e a menina Hannah.
 
-OBJETIVO (FONTE PRINCIPAL)
-- O diálogo deve seguir EXCLUSIVAMENTE o objetivo/tema da lição fornecido abaixo.
-- O contexto da conversa deve vir do tema da lição (não inventar outro cenário fora do tema).
+🔴 HIERARQUIA OBRIGATÓRIA (NÃO CONFUNDIR)
+1) A LIÇÃO abaixo é a FONTE PRIMÁRIA e MANDA no diálogo.
+   - O diálogo deve ensinar e praticar as frases-alvo, estruturas e exemplos da lição.
+   - O diálogo deve permanecer focado no objetivo da lição.
+2) GRAMÁTICA PERMITIDA é um LIMITE: pode usar as estruturas já estudadas (cumulativas).
+3) VOCABULÁRIO EXTRA (words.txt) é APENAS APOIO/LIMITE:
+   - Serve como banco de palavras que o aluno já conhece.
+   - Use somente se fizer sentido para o tema da lição.
+   - NÃO tente usar todas as palavras.
+   - Se houver palavras irrelevantes (ex.: comandos de sala) e o tema não for esse, IGNORE.
+4) BASIC WORDS ALLOWED sempre pode ser usado para ligar frases.
+${inspirationBlock ? "5) TEXTO INSPIRADOR (se fornecido) é APOIO LEVE, nunca o foco.\n" : ""}
 
 NÍVEL DE INGLÊS (CEFR)
 - Nível escolhido: ${englishLevel}
@@ -373,21 +407,22 @@ NÍVEL DE INGLÊS (CEFR)
 REGRAS DO NÍVEL (OBRIGATÓRIAS)
 ${levelRulesText}
 
-CONTROLE DE VOCABULÁRIO (OBRIGATÓRIO)
-- Priorize fortemente as palavras do VOCABULÁRIO PERMITIDO (prioritário).
-- Você também pode usar palavras básicas de ligação (BASIC WORDS ALLOWED).
-- NÃO use vocabulário avançado fora dessas fontes.
-- Não invente palavras difíceis.
-
 CONTROLE DE GRAMÁTICA (OBRIGATÓRIO)
 - Use apenas as estruturas listadas em GRAMÁTICA PERMITIDA.
 - NÃO use tempos verbais/estruturas não ensinados (past, future, continuous, etc.).
 - Se houver dúvida, escolha a forma mais simples.
 
+CONTROLE DE VOCABULÁRIO (OBRIGATÓRIO)
+- Prioridade máxima: usar as palavras e frases que aparecem na LIÇÃO.
+- Pode usar BASIC WORDS ALLOWED para naturalidade.
+- VOCABULÁRIO EXTRA: use apenas quando precisar de palavras adicionais e apenas se forem relevantes ao tema.
+- NÃO invente vocabulário avançado fora do nível.
+
 ELEMENTOS DIDÁTICOS (OBRIGATÓRIOS)
-- Repetição inteligente: repetir estruturas importantes 2–3 vezes com pequenas variações.
+- Repetição inteligente: repetir as frases-alvo da lição 2–3 vezes com pequenas variações.
 - Perguntas curtas e respostas curtas (guiadas).
 - Reformulação simples (dizer a mesma ideia de forma mais fácil).
+- Foco total no objetivo da lição.
 
 FORMATO DO ARQUIVO "dialogo.txt" (OBRIGATÓRIO)
 - Apenas falas (uma fala por linha).
@@ -399,16 +434,17 @@ FORMATO DO ARQUIVO "dialogo.txt" (OBRIGATÓRIO)
   - A2/B1: 12 a 22 linhas
   - B2/C1/C2: 14 a 26 linhas
 
-${formatList("GRAMÁTICA PERMITIDA:", allowedGrammar).trim()}
+${formatList("GRAMÁTICA PERMITIDA (CUMULATIVA):", allowedGrammar).trim()}
 
-${formatList("VOCABULÁRIO PERMITIDO (PRIORITÁRIO):", allowedWords).trim()}
+${formatList("VOCABULÁRIO EXTRA (APOIO/LIMITE — USE SÓ SE FOR RELEVANTE):", extraWords).trim()}
 
 ${formatList("BASIC WORDS ALLOWED (VOCABULÁRIO BÁSICO DE LIGAÇÃO):", basicWordsAllowed).trim()}
-${inspirationBlock}
 
---- TEMA DA LIÇÃO (BASE PRINCIPAL) ---
-${tema}
---- FIM DO TEMA ---
+${inspirationBlock ? inspirationBlock.trim() + "\n" : ""}
+
+--- LIÇÃO (FONTE PRIMÁRIA — O DIÁLOGO DEVE ENSINAR ISTO) ---
+${lesson}
+--- FIM DA LIÇÃO ---
 
 Agora, gere APENAS o conteúdo final do arquivo "dialogo.txt", seguindo todas as regras acima.
 `.trim();
@@ -420,9 +456,9 @@ Agora, gere APENAS o conteúdo final do arquivo "dialogo.txt", seguindo todas as
       `Base URL: ${baseUrl}`,
       `Nível atual: ${levelKey(levelNum)} / ${unitKey(unitNum)} (unitsPerLevel=${unitsPerLevel})`,
       `Units usadas (wrap): ${targets.map(t => `${levelKey(t.levelNum)}/${unitKey(t.unitNum)}`).join(" , ")}`,
-      `Vocabulário: current=${currentWords.length}, prev1=${prev1Words.length}, prev2=${prev2Words.length} => usados=${allowedWords.length} (max=${maxWords})`,
-      `Gramática: itens=${allowedGrammar.length}`,
-      grammarData ? "grammar.json: carregado (se itens=0, verifique se as chaves Level/Unit existem)." : "grammar.json: NÃO carregado (crie /grammar/grammar.json no Netlify)."
+      `Vocabulário EXTRA: current=${currentWords.length}, prev1=${prev1Words.length}, prev2=${prev2Words.length} => usados=${extraWords.length} (max=${maxWords})`,
+      `Gramática (cumulativa): itens=${allowedGrammar.length}`,
+      grammarData ? "grammar.json: carregado." : "grammar.json: NÃO carregado (verifique /grammar/grammar.json)."
     ].join("\n");
 
     setStatus(info);
