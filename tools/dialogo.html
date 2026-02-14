@@ -2,15 +2,19 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Gerador de Prompt - Hannah</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gerador de Prompt Hannah</title>
 
 <style>
-body { font-family: Arial; margin: 20px; }
+body {
+  font-family: Arial;
+  margin: 20px;
+}
 
 textarea, input, select {
   width: 100%;
   padding: 10px;
-  margin-top: 5px;
+  margin-top: 6px;
   border-radius: 8px;
   border: 1px solid #ccc;
 }
@@ -28,9 +32,7 @@ button {
 
 button:hover { background: #1e4ed8; }
 
-.copyBtn {
-  background: #10b981;
-}
+.copyBtn { background: #10b981; }
 
 .status {
   margin-top: 10px;
@@ -39,24 +41,25 @@ button:hover { background: #1e4ed8; }
   border-radius: 8px;
   white-space: pre-line;
 }
-</style>
 
+</style>
 </head>
+
 <body>
 
-<h2>Gerador de Prompt (Hannah)</h2>
+<h2>Gerador de Prompt Hannah (Versão Final)</h2>
 
 <label>Base URL:</label>
 <input id="baseUrl" value="https://hannahenglishcourse.netlify.app">
 
-<label>Lição:</label>
+<label>Lição (FONTE PRINCIPAL):</label>
 <textarea id="lessonInput"></textarea>
 
 <label>Texto Inspirador (opcional):</label>
 <textarea id="inspirationInput"></textarea>
 
 <label>Nível:</label>
-<select id="level">
+<select id="levelName">
   <option value="Starter">Starter</option>
   <option value="A1">A1</option>
   <option value="A2">A2</option>
@@ -73,10 +76,12 @@ button:hover { background: #1e4ed8; }
 
 <div class="status" id="status"></div>
 
-<label>Prompt:</label>
-<textarea id="output" style="height:400px;"></textarea>
+<label>Prompt Gerado:</label>
+<textarea id="output" style="height:450px;"></textarea>
 
 <script>
+
+// ===== Helpers =====
 
 function log(msg){
   document.getElementById("status").innerText += msg + "\n";
@@ -95,8 +100,14 @@ async function fetchText(url){
 
 function parseWords(txt){
   if(!txt) return [];
-  return txt.split("\n").map(x => x.trim()).filter(x => x);
+  return txt.split(/\r?\n/).map(x=>x.trim()).filter(x=>x);
 }
+
+function unique(arr){
+  return [...new Set(arr)];
+}
+
+// ===== Fetch Words =====
 
 async function getWords(base, level, unit){
   let words = [];
@@ -112,15 +123,15 @@ async function getWords(base, level, unit){
   return words;
 }
 
+// ===== Fetch Grammar =====
+
 async function getGrammar(base){
   const txt = await fetchText(base + "/grammar/grammar.json");
   if(!txt) return {};
   return JSON.parse(txt);
 }
 
-function unique(arr){
-  return [...new Set(arr)];
-}
+// ===== Main =====
 
 async function gerarPrompt(){
 
@@ -129,17 +140,23 @@ async function gerarPrompt(){
   const base = document.getElementById("baseUrl").value;
   const lesson = document.getElementById("lessonInput").value;
   const inspiration = document.getElementById("inspirationInput").value;
-  const levelName = document.getElementById("level").value;
-  const level = parseInt(document.getElementById("levelNumber").value);
-  const unit = parseInt(document.getElementById("unitNumber").value);
+  const levelName = document.getElementById("levelName").value;
 
-  log("Buscando palavras...");
+  let level = parseInt(document.getElementById("levelNumber").value);
+  let unit = parseInt(document.getElementById("unitNumber").value);
 
-  const current = await getWords(base, level, unit);
-  const prev1 = await getWords(base, level, unit-1);
-  const prev2 = await getWords(base, level, unit-2);
+  if(!lesson){
+    alert("Insira a lição");
+    return;
+  }
 
-  const vocab = unique([...current, ...prev1, ...prev2]).slice(0,200);
+  log("Buscando vocabulário...");
+
+  let current = await getWords(base, level, unit);
+  let prev1 = await getWords(base, level, unit-1);
+  let prev2 = await getWords(base, level, unit-2);
+
+  let vocab = unique([...current, ...prev1, ...prev2]).slice(0,200);
 
   log("Buscando gramática...");
 
@@ -147,7 +164,7 @@ async function gerarPrompt(){
 
   let grammar = [];
 
-  for(let i=unit;i>=unit-2;i--){
+  for(let i=unit; i>=unit-2; i--){
     if(grammarData["Level"+level] && grammarData["Level"+level]["Unit"+i]){
       grammar.push(...grammarData["Level"+level]["Unit"+i]);
     }
@@ -161,19 +178,21 @@ async function gerarPrompt(){
     "A","AN","THE",
     "AM","IS","ARE",
     "YES","NO",
-    "WHAT","HOW",
-    "AND","OR",
-    "HELLO","HI","GOODBYE"
+    "WHAT","HOW","WHO","WHERE",
+    "AND","OR","BUT",
+    "PLEASE","THANK YOU",
+    "OK","HELLO","HI","GOOD MORNING","GOODBYE"
   ];
+
+  // ===== PROMPT FINAL =====
 
   const prompt = `
 Você é um gerador de diálogos para ensino de inglês.
 
 🔴 REGRA MÁXIMA
-A LIÇÃO é a fonte principal. O diálogo deve ensinar essa lição.
+A LIÇÃO é a fonte principal. O diálogo deve ensinar exatamente essa lição.
 
-🔴 IMPORTANTE
-Execute as etapas em ordem:
+🔴 IMPORTANTE (ORDEM)
 1) Gerar
 2) Revisar
 3) Validar
@@ -181,13 +200,29 @@ NÃO misture as etapas.
 
 NÍVEL: ${levelName}
 
-CONTROLE DE COMPLEXIDADE
+CONTROLE DE COMPLEXIDADE (OBRIGATÓRIO)
 - Linguagem muito simples
-- Frases curtas
+- Frases curtas (2 a 6 palavras)
 - Evitar descrição
+- Não adicionar ideias novas
+- Focar apenas na prática da lição
 
 GRAMÁTICA PERMITIDA:
-${grammar.map(x=>"- "+x).join("\n")}
+${grammar.map(g=>"- "+g).join("\n")}
+
+USO OBRIGATÓRIO DAS FRASES-ALVO
+- Usar exatamente as frases da lição
+- Não substituir por sinônimos
+- Repetir pelo menos 3 vezes
+
+ESTRUTURA DO DIÁLOGO
+- Mínimo 3 ciclos
+- Cada ciclo:
+  1 pergunta + 1 resposta
+
+Exemplo:
+How old are you?
+I am six years old.
 
 BASIC WORDS:
 ${basicWords.join(", ")}
@@ -198,43 +233,68 @@ ${vocab.join(", ")}
 ================================
 ETAPA 1 - GERAR
 ================================
-Crie um diálogo ensinando a lição.
+- Criar diálogo baseado na LIÇÃO
+- Usar frases-alvo
+- Repetir estrutura
+- Usar frases simples
+- NÃO usar repertório como fonte
 
 ================================
 ETAPA 2 - REVISAR
 ================================
-Substitua palavras fora do repertório.
+- Verificar todas as palavras
+- Se não estiver na LIÇÃO, BASIC ou REPERTÓRIO:
+  → substituir
+  → ou remover
 
 ================================
 ETAPA 3 - VALIDAR
 ================================
 Verifique:
-- Segue a lição?
-- Frases simples?
-- Sem palavras fora do repertório?
-- Estrutura pergunta/resposta?
 
-Corrija antes de entregar.
+- Segue a lição?
+- Frases-alvo repetidas?
+- 3 ciclos pergunta/resposta?
+- Frases curtas?
+- Sem palavras fora do repertório?
+- Sem gramática proibida?
+
+Se houver erro:
+- Corrigir antes de entregar
+
+Não explicar.
+Entregar apenas o diálogo final.
 
 --- LIÇÃO ---
 ${lesson}
 
+${inspiration ? `
 --- TEXTO INSPIRADOR ---
 ${inspiration}
+` : ""}
 
 Agora gere apenas o dialogo.txt
 `;
 
   document.getElementById("output").value = prompt;
 
-  log("Pronto.");
+  log("Prompt gerado com sucesso.");
 }
 
+// ===== Copy =====
+
 function copiarPrompt(){
-  const txt = document.getElementById("output");
-  txt.select();
-  document.execCommand("copy");
-  alert("Copiado!");
+  const textarea = document.getElementById("output");
+
+  textarea.select();
+  textarea.setSelectionRange(0, 99999);
+
+  try{
+    document.execCommand("copy");
+    alert("Copiado!");
+  }catch(e){
+    alert("Erro ao copiar");
+  }
 }
 
 </script>
