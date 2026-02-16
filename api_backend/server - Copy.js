@@ -6,7 +6,7 @@ const OpenAI = require('openai');
 const admin = require('firebase-admin');
 const textToSpeech = require('@google-cloud/text-to-speech');
 
-const BUILD_VERSION = "2026-02-16-v7-finish-lock+result-tags+tries+state-fix";
+const BUILD_VERSION = "2025-10-16-v6-topic-state+logs+meta-fix";
 const DEBUG_PROMPT = process.env.DEBUG_PROMPT === '1';
 
 // fetch compat (caso o runtime não exponha global.fetch)
@@ -105,29 +105,6 @@ function normalizeLevelForCap(level) {
   return map[low] || level;
 }
 
-/**
- * RESULT TAGS
- * O modelo deve sempre terminar a resposta com [[RESULT=OK]] ou [[RESULT=NO]].
- * Nós removemos isso antes de enviar ao aluno.
- */
-function extractResultTag(text) {
-  const raw = String(text || '');
-  const m = raw.match(/\[\[RESULT=(OK|NO)\]\]\s*$/);
-  const result = m ? m[1] : null;
-  const clean = raw.replace(/\s*\[\[RESULT=(OK|NO)\]\]\s*$/, '');
-  return { result, clean };
-}
-
-/** Detecta se a conversa terminou (fim rígido) */
-function isConversationFinished(meta) {
-  if (!meta || !meta.state) return false;
-  const m = String(meta.state).match(/STATE:\s*next=([^;]*);\s*remaining=([^;]*);\s*done=(.*)$/i);
-  if (!m) return false;
-  const next = (m[1] || "").trim();
-  const remaining = (m[2] || "").trim();
-  return (!next && !remaining);
-}
-
 /** System compact */
 function createInitialContext(studentName, studentLevel) {
   return {
@@ -139,12 +116,6 @@ Ask one question per goal.
 Do not add, skip, or change any topic.
 After finishing all goals:
 congratulate, say goodbye, tell the student they are ready for the next stage, ask to press the black button to exit, then stop talking.
-
-MANDATORY SCORING TAG (append at the VERY END of EVERY reply):
-- If the student's LAST answer is correct for the current goal, append exactly: [[RESULT=OK]]
-- Otherwise append exactly: [[RESULT=NO]]
-Never explain the tag. Do not add anything after the tag.
-
 Language by CEFR level:
 L0 (Pre-A1, young beginners) – 1–2 very short simple sentences
 L1 (A1) – ≤3 short sentences
@@ -278,13 +249,6 @@ function buildDynamicMetaFromBrief(studentName, studentLevel, studentUnit, pinne
   return meta;
 }
 
-/**
- * AVANÇA o state para o próximo goal.
- * Importante: agora vamos chamar isso SOMENTE quando:
- * - o aluno acertou (RESULT=OK), ou
- * - ele errou 2x (forçado), ou
- * - hint=provide_model_and_move_on (forçado)
- */
 function updateStateTopic(meta /*, userText = "" */) {
   if (!meta || !meta.state) return;
   const m = (meta.state || "").match(/STATE:\s*next=([^;]*);\s*remaining=([^;]*);\s*done=(.*)$/i);
@@ -577,16 +541,6 @@ app.post('/api/chat', async (req, res) => {
       meta = conversations[userId][1];
     }
 
-    // ✅ AJUSTE 1: Bloqueio rígido se terminou
-    if (isConversationFinished(meta)) {
-      const finalMsg = "Please press the black button to exit.";
-      return res.json({
-        response: finalMsg,
-        chatHistory: conversations[userId],
-        tokenInfo: { canChat: false }
-      });
-    }
-
     // ------- TOKENS: PRECHECK -------
     let tokenInfo = {};
     let usageRef, walletRef;
@@ -626,11 +580,16 @@ app.post('/api/chat', async (req, res) => {
       }
     }
 
-    // Adiciona mensagem do aluno (NÃO avança state aqui)
+    // Adiciona mensagem do aluno e AVANÇA por tópico
     const userMsgTrimmed = String(userMessage).trim();
     console.log("[CHAT] user message:", userMsgTrimmed);
     console.log("[STATE/BEFORE] state:", conversations[userId]?.[1]?.state);
     conversations[userId].push({ role: 'user', content: userMsgTrimmed });
+
+    updateStateTopic(conversations[userId]?.[1]);
+
+    console.log("[STATE/AFTER] state:", conversations[userId]?.[1]?.state);
+    console.log("[STATE/NEXT] next goal:", conversations[userId]?.[1]?.loopGuard?.next || "(none)");
 
     // ------- OPENAI -------
     const messagesForOpenAI = getMessagesForOpenAI(userId);
@@ -642,44 +601,7 @@ app.post('/api/chat', async (req, res) => {
       temperature: 0.6
     });
 
-    const rawResponse = completion.choices?.[0]?.message?.content || "I'm sorry, I couldn't generate a response.";
-    const { result, clean } = extractResultTag(rawResponse);
-
-    // ✅ AJUSTE 2: controla tries no servidor
-    // Fallback: se não vier tag, trate como NO (seguro)
-    const scored = (result === "OK" || result === "NO") ? result : "NO";
-
-    meta.loopGuard = meta.loopGuard || { next: meta.loopGuard?.next || "", tries: 0, hint: "" };
-    meta.loopGuard.tries = Number(meta.loopGuard.tries || 0);
-
-    if (scored === "OK") {
-      meta.loopGuard.tries = 0;
-
-      // ✅ AJUSTE 3: avança state apenas quando OK
-      updateStateTopic(meta);
-
-    } else {
-      meta.loopGuard.tries += 1;
-
-      if (meta.loopGuard.tries >= 2) {
-        // força: modelar e avançar
-        meta.loopGuard.hint = "provide_model_and_move_on";
-        meta.loopGuard.tries = 0;
-
-        // avançar state forçado após 2 erros
-        updateStateTopic(meta);
-      }
-    }
-
-    // Atualiza o meta salvo na conversa
-    conversations[userId][1] = meta;
-
-    console.log("[STATE/AFTER] state:", conversations[userId]?.[1]?.state);
-    console.log("[STATE/NEXT] next goal:", conversations[userId]?.[1]?.loopGuard?.next || "(none)");
-    console.log("[SCORE] result tag:", result, "=> used:", scored, "| tries now:", conversations[userId]?.[1]?.loopGuard?.tries || 0, "| hint:", conversations[userId]?.[1]?.loopGuard?.hint || "");
-
-    // salva resposta limpa (sem tag)
-    const responseMessage = clean;
+    const responseMessage = completion.choices?.[0]?.message?.content || "I'm sorry, I couldn't generate a response.";
     conversations[userId].push({ role: 'assistant', content: responseMessage });
 
     // ------- LOG DE TOKENS -------
@@ -738,12 +660,6 @@ app.post('/api/chat', async (req, res) => {
           canChat: updatedUsage.remainingTokens > tokenConfig.minSessionReserve
         };
       }
-    }
-
-    // ✅ Bloqueio pós-fim: se após avançar state acabou, já devolve canChat=false
-    const finishedNow = isConversationFinished(conversations[userId]?.[1]);
-    if (finishedNow) {
-      tokenInfo = { ...tokenInfo, canChat: false };
     }
 
     return res.json({
@@ -820,7 +736,7 @@ app.listen(PORT, () => {
   console.log(`📦 Versão: ${BUILD_VERSION}`);
   console.log(`📊 Controle de tokens: ${TOKENS_CONTROL_ENABLED ? 'ATIVADO' : 'DESATIVADO'}`);
   console.log(`🌐 CORS: hannahenglishcourse.netlify.app, localhost:3000`);
-  console.log(`🔧 Estratégia: System fixo + UNIT_BRIEF + STATE por tópicos + RESULT tags + tries server-side + histórico limitado (${MAX_HISTORY_MSGS} msgs)`);
+  console.log(`🔧 Estratégia: System fixo + UNIT_BRIEF + STATE por tópicos (sem gatilhos) + histórico limitado (${MAX_HISTORY_MSGS} msgs)`);
   if (DEBUG_PROMPT) console.log("🔎 DEBUG_PROMPT ATIVADO (conteúdo enviado será logado).");
 });
 
