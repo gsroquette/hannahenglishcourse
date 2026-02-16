@@ -431,7 +431,7 @@ app.get('/api/start', async (req, res) => {
     const context = createInitialContext(studentName, rawLevel);
     const meta = buildDynamicMetaFromBrief(studentName, rawLevel, rawUnit, pinnedBrief);
 
-    const initialMessage = `Hello ${studentName}! Today's topic is: ${topic}. I'm ready to help you at your ${rawLevel}, in ${rawUnit}. Shall we begin?`;
+    const initialMessage = `Hello ${studentName}! Today's topic is: ${topic}. I'm ready to help you at your ${rawLevel}, in ${rawUnit}. Let's start. Press the button and say: Hello.`;
 
     conversations[userId] = [
       context,
