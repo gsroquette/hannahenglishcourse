@@ -6,7 +6,7 @@ const OpenAI = require('openai');
 const admin = require('firebase-admin');
 const textToSpeech = require('@google-cloud/text-to-speech');
 
-const BUILD_VERSION = "2026-02-16-v7-finish-lock+result-tags+tries+state-fix";
+const BUILD_VERSION = "2026-02-16-v8-finish-lock+prevention+fixed";
 const DEBUG_PROMPT = process.env.DEBUG_PROMPT === '1';
 
 // fetch compat (caso o runtime não exponha global.fetch)
@@ -516,7 +516,7 @@ app.get('/api/start', async (req, res) => {
 });
 
 // ======================
-// /api/chat
+// /api/chat (CORRIGIDO - NÃO REINICIA APÓS FIM)
 // ======================
 app.post('/api/chat', async (req, res) => {
   const { uid: userId, message: userMessage, level, unit } = req.body;
@@ -527,7 +527,22 @@ app.post('/api/chat', async (req, res) => {
   try {
     console.log(`[POST /api/chat] User: ${userId}, Message: "${String(userMessage).substring(0, 50)}...", Level: ${level}, Unit: ${unit}`);
 
-    // Fallback de contexto
+    // ✅ VERIFICAÇÃO 1: BLOQUEIO ANTES DE QUALQUER PROCESSAMENTO
+    // Se a conversa já existe E está finalizada, bloqueia imediatamente
+    if (conversations[userId] && conversations[userId].length > 0) {
+      const existingMeta = conversations[userId][1];
+      if (existingMeta && isConversationFinished(existingMeta)) {
+        console.log(`[BLOQUEADO] Conversa já finalizada para usuário ${userId} - ignorando nova mensagem`);
+        return res.json({
+          response: "Please press the black button to exit.",
+          chatHistory: conversations[userId],
+          tokenInfo: { canChat: false },
+          conversationFinished: true
+        });
+      }
+    }
+
+    // Fallback de contexto - SÓ EXECUTA SE NÃO EXISTIR CONVERSA ALGUMA
     if (!conversations[userId] || conversations[userId].length === 0) {
       console.log(`[INFO] Criando contexto fallback para usuário: ${userId}`);
       const nameSnap = await db.ref(`usuarios/${userId}/nome`).once('value');
@@ -548,7 +563,21 @@ app.post('/api/chat', async (req, res) => {
 
     validateAndTrimHistory(userId);
 
-    // BLINDAGEM: se o meta sumiu, reconstruir
+    // ✅ VERIFICAÇÃO 2: VERIFICAR NOVAMENTE APÓS VALIDAÇÃO
+    if (conversations[userId] && conversations[userId].length > 0) {
+      const meta = conversations[userId][1];
+      if (meta && isConversationFinished(meta)) {
+        console.log(`[BLOQUEADO] Conversa finalizada detectada após validação para usuário ${userId}`);
+        return res.json({
+          response: "Please press the black button to exit.",
+          chatHistory: conversations[userId],
+          tokenInfo: { canChat: false },
+          conversationFinished: true
+        });
+      }
+    }
+
+    // BLINDAGEM: se o meta sumiu, reconstruir (MAS VERIFICANDO SE JÁ TERMINOU)
     let meta = conversations[userId]?.[1];
     if (!meta || !meta.state) {
       console.warn("[META] ausente ou sem state — reconstruindo a partir do brief.");
@@ -577,13 +606,14 @@ app.post('/api/chat', async (req, res) => {
       meta = conversations[userId][1];
     }
 
-    // ✅ AJUSTE 1: Bloqueio rígido se terminou
+    // ✅ VERIFICAÇÃO 3: BLOQUEIO RÍGIDO (REDUNDANTE MAS SEGURO)
     if (isConversationFinished(meta)) {
-      const finalMsg = "Please press the black button to exit.";
+      console.log(`[BLOQUEADO] Conversa finalizada detectada no bloqueio rígido para usuário ${userId}`);
       return res.json({
-        response: finalMsg,
+        response: "Please press the black button to exit.",
         chatHistory: conversations[userId],
-        tokenInfo: { canChat: false }
+        tokenInfo: { canChat: false },
+        conversationFinished: true
       });
     }
 
@@ -626,7 +656,7 @@ app.post('/api/chat', async (req, res) => {
       }
     }
 
-    // Adiciona mensagem do aluno (NÃO avança state aqui)
+    // Adiciona mensagem do aluno (NÃO AVANÇA STATE AINDA)
     const userMsgTrimmed = String(userMessage).trim();
     console.log("[CHAT] user message:", userMsgTrimmed);
     console.log("[STATE/BEFORE] state:", conversations[userId]?.[1]?.state);
@@ -645,7 +675,6 @@ app.post('/api/chat', async (req, res) => {
     const rawResponse = completion.choices?.[0]?.message?.content || "I'm sorry, I couldn't generate a response.";
     const { result, clean } = extractResultTag(rawResponse);
 
-    // ✅ AJUSTE 2: controla tries no servidor
     // Fallback: se não vier tag, trate como NO (seguro)
     const scored = (result === "OK" || result === "NO") ? result : "NO";
 
@@ -655,7 +684,7 @@ app.post('/api/chat', async (req, res) => {
     if (scored === "OK") {
       meta.loopGuard.tries = 0;
 
-      // ✅ AJUSTE 3: avança state apenas quando OK
+      // AVANÇA state apenas quando OK
       updateStateTopic(meta);
 
     } else {
@@ -740,7 +769,7 @@ app.post('/api/chat', async (req, res) => {
       }
     }
 
-    // ✅ Bloqueio pós-fim: se após avançar state acabou, já devolve canChat=false
+    // ✅ VERIFICAÇÃO FINAL: Se após avançar state acabou, já devolve canChat=false
     const finishedNow = isConversationFinished(conversations[userId]?.[1]);
     if (finishedNow) {
       tokenInfo = { ...tokenInfo, canChat: false };
@@ -750,7 +779,8 @@ app.post('/api/chat', async (req, res) => {
       response: responseMessage,
       chatHistory: conversations[userId],
       usage: completion.usage,
-      tokenInfo
+      tokenInfo,
+      conversationFinished: finishedNow
     });
 
   } catch (error) {
@@ -811,7 +841,7 @@ app.post('/api/tts', async (req, res) => {
 // Health & Root
 // ======================
 app.get('/health', (_req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString(), uptime: process.uptime(), memory: process.memoryUsage() });
+  res.json({ status: 'OK', timestamp: new Date().toISOString(), uptime: process.uptime(), memory: process.process.memoryUsage() });
 });
 app.get('/', (_req, res) => { res.send("Servidor rodando com sucesso!"); });
 
@@ -820,7 +850,7 @@ app.listen(PORT, () => {
   console.log(`📦 Versão: ${BUILD_VERSION}`);
   console.log(`📊 Controle de tokens: ${TOKENS_CONTROL_ENABLED ? 'ATIVADO' : 'DESATIVADO'}`);
   console.log(`🌐 CORS: hannahenglishcourse.netlify.app, localhost:3000`);
-  console.log(`🔧 Estratégia: System fixo + UNIT_BRIEF + STATE por tópicos + RESULT tags + tries server-side + histórico limitado (${MAX_HISTORY_MSGS} msgs)`);
+  console.log(`🔧 Estratégia: System fixo + UNIT_BRIEF + STATE por tópicos + RESULT tags + tries server-side + histórico limitado (${MAX_HISTORY_MSGS} msgs) + BLOQUEIO DE REINÍCIO`);
   if (DEBUG_PROMPT) console.log("🔎 DEBUG_PROMPT ATIVADO (conteúdo enviado será logado).");
 });
 
