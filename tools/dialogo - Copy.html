@@ -42,10 +42,6 @@
       transition:opacity .18s ease, transform .18s ease;
     }
     .toast.show{opacity:1; transform:translateY(0)}
-    .sepTitle{
-      font-weight:800; margin:0 0 6px 0; font-size:15px;
-      color:#111827;
-    }
   </style>
 </head>
 <body>
@@ -57,9 +53,7 @@
     <br><br>
     <b>Regra-chave:</b> a <b>LIÇÃO</b> manda no diálogo. O vocabulário puxado serve como <b>verificação</b> (filtro final), não como fonte para criar conteúdo.
     <br>
-    O prompt clássico é em <b>3 etapas</b> dentro do mesmo texto: <b>(1) gerar</b> + <b>(2) revisar</b> + <b>(3) validar</b>.
-    <br><br>
-    <b>NOVIDADE:</b> Agora você também pode gerar <b>2 prompts separados</b> (modo manual): <b>Prompt 1</b> (GERAR) e <b>Prompt 2</b> (REVISAR/VALIDAR).
+    O prompt é em <b>3 etapas</b> dentro do mesmo texto: <b>(1) gerar</b> + <b>(2) revisar</b> + <b>(3) validar</b>.
   </div>
 
   <div class="card">
@@ -124,17 +118,8 @@
     </div>
 
     <div class="toolbar">
-      <!-- Botão original (mantido) -->
       <button id="btnGerar" class="btn" onclick="gerarPrompt()">Gerar Prompt (3 etapas)</button>
       <button id="btnCopiar" class="btnSecondary" onclick="copiarPrompt()" disabled>Copiar Prompt</button>
-
-      <!-- Novos botões (modo manual 2 prompts) -->
-      <button id="btnGerarP1" class="btnSecondary" onclick="gerarPrompt1()">Gerar Prompt 1 (GERAR)</button>
-      <button id="btnCopiarP1" class="btnSecondary" onclick="copiarPrompt1()" disabled>Copiar Prompt 1</button>
-
-      <button id="btnGerarP2" class="btnSecondary" onclick="gerarPrompt2()">Gerar Prompt 2 (REVISAR)</button>
-      <button id="btnCopiarP2" class="btnSecondary" onclick="copiarPrompt2()" disabled>Copiar Prompt 2</button>
-
       <span id="toast" class="toast">Copiado!</span>
     </div>
 
@@ -151,35 +136,8 @@
     </div>
   </div>
 
-  <!-- NOVO: MODO MANUAL EM 2 PROMPTS -->
   <div class="card">
-    <div class="sepTitle">Modo Manual (2 prompts) — recomendado para deixar a IA mais leve</div>
-    <div class="muted small" style="margin-bottom:10px">
-      Fluxo: (1) Gere o Prompt 1 → cole na IA → copie o diálogo gerado → cole no campo abaixo → (2) Gere o Prompt 2 → cole na IA para revisar.
-    </div>
-
-    <label for="prompt1Output">Prompt 1 (GERAR) — leve:</label>
-    <textarea id="prompt1Output" style="min-height:260px" spellcheck="false"></textarea>
-    <div class="muted small">Use este prompt primeiro para gerar o <code>dialogo.txt</code>.</div>
-
-    <hr style="border:none;border-top:1px solid #e5e7eb;margin:12px 0"/>
-
-    <label for="dialogInputForReview">Cole aqui o diálogo gerado (resultado da IA) para revisar:</label>
-    <textarea id="dialogInputForReview" class="mono" style="min-height:220px" spellcheck="false" placeholder="Cole aqui o conteúdo do dialogo.txt (uma fala por linha) que a IA gerou usando o Prompt 1."></textarea>
-    <div class="muted small">
-      Sim: no modo manual, você cola aqui manualmente (copy/paste).
-    </div>
-
-    <hr style="border:none;border-top:1px solid #e5e7eb;margin:12px 0"/>
-
-    <label for="prompt2Output">Prompt 2 (REVISAR/VALIDAR) — auditoria:</label>
-    <textarea id="prompt2Output" style="min-height:320px" spellcheck="false"></textarea>
-    <div class="muted small">Use este prompt para corrigir e validar o diálogo sem reescrever do zero.</div>
-  </div>
-
-  <!-- ORIGINAL (mantido) -->
-  <div class="card">
-    <label for="promptOutput">Prompt Gerado (modo clássico — 3 etapas no mesmo texto):</label>
+    <label for="promptOutput">Prompt Gerado:</label>
     <textarea id="promptOutput" style="min-height:360px" spellcheck="false"></textarea>
     <div class="muted small">Copie e cole na IA para gerar o <code>dialogo.txt</code>.</div>
   </div>
@@ -366,38 +324,31 @@ function selectWordsWithPriority(currentWords, prev1Words, prev2Words, maxWords)
 }
 
 /** ===== Copy button (with Safari fallback) ===== */
-async function copyTextFromTextarea(textareaId){
-  const text = (document.getElementById(textareaId).value || "");
-  if(!text.trim()) return false;
+async function copiarPrompt(){
+  const text = document.getElementById("promptOutput").value || "";
+  if(!text.trim()) return;
 
   // Modern clipboard
   try{
     if(navigator.clipboard && window.isSecureContext){
       await navigator.clipboard.writeText(text);
       showToast("Copiado!");
-      return true;
+      return;
     }
   }catch(e){ /* fallback below */ }
 
   // Fallback (execCommand), works on many browsers including older Safari
   try{
-    const ta = document.getElementById(textareaId);
+    const ta = document.getElementById("promptOutput");
     ta.focus();
     ta.select();
     ta.setSelectionRange(0, ta.value.length);
     const ok = document.execCommand("copy");
     showToast(ok ? "Copiado!" : "Não foi possível copiar");
-    return ok;
   }catch(e){
     showToast("Não foi possível copiar");
-    return false;
   }
 }
-
-async function copiarPrompt(){ return await copyTextFromTextarea("promptOutput"); }
-async function copiarPrompt1(){ return await copyTextFromTextarea("prompt1Output"); }
-async function copiarPrompt2(){ return await copyTextFromTextarea("prompt2Output"); }
-
 function showToast(msg){
   const t = document.getElementById("toast");
   t.textContent = msg;
@@ -405,32 +356,17 @@ function showToast(msg){
   setTimeout(() => t.classList.remove("show"), 1200);
 }
 
-/** ===== Shared data collection (keeps original logic intact) ===== */
-function getLessonNormalized(){
-  const raw = document.getElementById("lessonInput").value.trim();
-  // Evita gerar prompt sem lição real: se ainda for o texto "template", trate como vazio
-  const template = "Cole aqui a lição completa";
-  if(!raw) return "";
-  if(raw.toLowerCase().startsWith(template.toLowerCase())) return "";
-  return raw;
-}
-
-/** ===== Main: original (3 steps) ===== */
+/** ===== Main ===== */
 async function gerarPrompt(){
   const btn = document.getElementById("btnGerar");
   const btnCopy = document.getElementById("btnCopiar");
-  const btnP1 = document.getElementById("btnGerarP1");
-  const btnP2 = document.getElementById("btnGerarP2");
-
   btn.disabled = true;
   btnCopy.disabled = true;
-  btnP1.disabled = true;
-  btnP2.disabled = true;
   clearDebug();
 
   try{
     const baseUrl = normalizeBaseUrl(document.getElementById("baseUrl").value);
-    const lesson = getLessonNormalized();
+    const lesson = document.getElementById("lessonInput").value.trim();
     const inspiration = document.getElementById("inspirationInput").value.trim();
     const englishLevel = document.getElementById("englishLevel").value;
 
@@ -443,15 +379,11 @@ async function gerarPrompt(){
     if(!baseUrl){
       setStatus("Status: erro — Base URL está vazia.");
       btn.disabled = false;
-      btnP1.disabled = false;
-      btnP2.disabled = false;
       return;
     }
     if(!lesson){
-      setStatus("Status: erro — a LIÇÃO (fonte primária) está vazia. Cole a lição no campo acima.");
+      setStatus("Status: erro — a LIÇÃO (fonte primária) está vazia.");
       btn.disabled = false;
-      btnP1.disabled = false;
-      btnP2.disabled = false;
       return;
     }
 
@@ -496,7 +428,8 @@ async function gerarPrompt(){
       ? `\nTEXTO INSPIRADOR (OPCIONAL — APOIO LEVE)\n- Use como fonte de algumas palavras/expressões relevantes.\n- NÃO copiar frases completas.\n${inspiration}\n`
       : "";
 
-    // ✅ MODO CLÁSSICO (3 etapas) - preservado
+    // ✅ AQUI FOI O ÚNICO LUGAR MODIFICADO: O TEXTO DO PROMPT
+    // (todo o resto do seu sistema foi preservado)
     const prompt = `
 Você é um gerador de diálogos para ensino de inglês. Seu objetivo final é produzir o conteúdo do arquivo "dialogo.txt" (uma fala por linha), com um diálogo didático e realista entre o Robot Samuel e a menina Hannah.
 
@@ -640,285 +573,12 @@ Agora, gere APENAS o conteúdo final do arquivo "dialogo.txt" (uma fala por linh
     ].join("\n");
 
     setStatus(info);
-    document.getElementById("btnCopiar").disabled = false;
+    btnCopy.disabled = false;
 
   }catch(err){
     setStatus("Status: erro inesperado.\n" + (err && err.message ? err.message : String(err)));
   }finally{
     btn.disabled = false;
-    document.getElementById("btnGerarP1").disabled = false;
-    document.getElementById("btnGerarP2").disabled = false;
-  }
-}
-
-/** ===== Novo: Prompt 1 (GERAR leve) ===== */
-async function gerarPrompt1(){
-  const btn = document.getElementById("btnGerarP1");
-  const btnCopy = document.getElementById("btnCopiarP1");
-  const btnMain = document.getElementById("btnGerar");
-  const btnP2 = document.getElementById("btnGerarP2");
-
-  btn.disabled = true;
-  btnCopy.disabled = true;
-  btnMain.disabled = true;
-  btnP2.disabled = true;
-  clearDebug();
-
-  try{
-    const baseUrl = normalizeBaseUrl(document.getElementById("baseUrl").value);
-    const lesson = getLessonNormalized();
-    const inspiration = document.getElementById("inspirationInput").value.trim();
-    const englishLevel = document.getElementById("englishLevel").value;
-
-    const unitsPerLevel = clampInt(document.getElementById("unitsPerLevel").value, 1, 200);
-    const levelNum = clampInt(document.getElementById("levelNumber").value, 0, 999);
-    const unitNum  = clampInt(document.getElementById("unitNumber").value, 1, unitsPerLevel);
-
-    if(!baseUrl){
-      setStatus("Status: erro — Base URL está vazia.");
-      btn.disabled = false; btnMain.disabled = false; btnP2.disabled = false;
-      return;
-    }
-    if(!lesson){
-      setStatus("Status: erro — a LIÇÃO (fonte primária) está vazia. Cole a lição no campo acima.");
-      btn.disabled = false; btnMain.disabled = false; btnP2.disabled = false;
-      return;
-    }
-
-    // Prompt 1 não precisa buscar words/grammar: intencionalmente leve
-    setStatus("Status: gerando Prompt 1 (leve)...");
-    const levelRulesText = buildLevelRules(englishLevel);
-
-    const inspirationBlock = inspiration
-      ? `\nTEXTO INSPIRADOR (OPCIONAL — APOIO LEVE)\n- Use apenas como apoio de contexto e algumas palavras/expressões relevantes.\n- NÃO copiar frases completas.\n${inspiration}\n`
-      : "";
-
-    const exampleFormat = `
-EXEMPLO APENAS DE FORMATO (NÃO COPIAR CONTEÚDO)
-- Uma fala por linha
-- Alternância entre Robot Samuel e Hannah
-
-Hello, Hannah!
-Hello, Robot Samuel!
-How old are you?
-I am six years old.
-`.trim();
-
-    const prompt1 = `
-Você é um gerador de diálogos para ensino de inglês. Seu objetivo final é produzir o conteúdo do arquivo "dialogo.txt" (uma fala por linha), com um diálogo didático e realista entre o Robot Samuel e a menina Hannah.
-
-🔴 PRIORIDADES (ORDEM)
-1) CONTEXTO/FORMATO (Robot Samuel & Hannah; 1 fala por linha; alternar falas).
-2) LIÇÃO (FONTE PRIMÁRIA): o diálogo deve ensinar e praticar exatamente a lição.
-3) REGRAS DO NÍVEL: mantenha a complexidade apropriada.
-4) (Opcional) TEXTO INSPIRADOR: apoio leve. NÃO dominar.
-
-NÍVEL DE INGLÊS (CEFR)
-- Nível escolhido: ${englishLevel}
-
-REGRAS DO NÍVEL (OBRIGATÓRIAS)
-${levelRulesText}
-
-FORMATO DO "dialogo.txt" (OBRIGATÓRIO)
-- Apenas falas (uma fala por linha).
-- Sem títulos, sem explicações, sem comentários, sem listas.
-- Robot Samuel e Hannah devem alternar as falas.
-- Tamanho sugerido:
-  - Starter/A1: 10 a 16 linhas
-  - A2/B1: 12 a 22 linhas
-  - B2/C1/C2: 14 a 26 linhas
-
-FOCO TOTAL NA LIÇÃO
-- Use explicitamente as frases-alvo/“key phrases” da LIÇÃO.
-- Repita as frases-alvo várias vezes com pequenas variações (nome, número, etc.).
-- Não substitua por sinônimos se a lição trouxe a frase-alvo.
-
-RESTRIÇÕES IMPORTANTES
-- Não mude de assunto.
-- Não invente novos tópicos.
-- Evite texto longo: frases curtas e diretas (especialmente no Starter).
-- Gere um diálogo natural, como uma situação real, mas 100% dentro do tema da lição.
-
-${inspirationBlock ? inspirationBlock.trim() + "\n\n" : ""}
-
-${exampleFormat}
-
---- LIÇÃO (FONTE PRIMÁRIA — O DIÁLOGO DEVE ENSINAR ISTO) ---
-${lesson}
---- FIM DA LIÇÃO ---
-
-AGORA: Gere APENAS o conteúdo final do arquivo "dialogo.txt" (uma fala por linha), seguindo todas as regras acima.
-`.trim();
-
-    document.getElementById("prompt1Output").value = prompt1;
-    btnCopy.disabled = false;
-
-    setStatus([
-      "Status: Prompt 1 pronto (leve).",
-      `Base URL: ${baseUrl}`,
-      `Nível atual: ${levelKey(levelNum)} / ${unitKey(unitNum)} (unitsPerLevel=${unitsPerLevel})`,
-      "Observação: Prompt 1 NÃO puxa words.txt/grammar.json por design (para ficar leve)."
-    ].join("\n"));
-
-  }catch(err){
-    setStatus("Status: erro inesperado (Prompt 1).\n" + (err && err.message ? err.message : String(err)));
-  }finally{
-    btn.disabled = false;
-    btnMain.disabled = false;
-    document.getElementById("btnGerarP2").disabled = false;
-  }
-}
-
-/** ===== Novo: Prompt 2 (REVISAR/VALIDAR) ===== */
-async function gerarPrompt2(){
-  const btn = document.getElementById("btnGerarP2");
-  const btnCopy = document.getElementById("btnCopiarP2");
-  const btnMain = document.getElementById("btnGerar");
-  const btnP1 = document.getElementById("btnGerarP1");
-
-  btn.disabled = true;
-  btnCopy.disabled = true;
-  btnMain.disabled = true;
-  btnP1.disabled = true;
-  clearDebug();
-
-  try{
-    const baseUrl = normalizeBaseUrl(document.getElementById("baseUrl").value);
-    const lesson = getLessonNormalized();
-    const englishLevel = document.getElementById("englishLevel").value;
-
-    const unitsPerLevel = clampInt(document.getElementById("unitsPerLevel").value, 1, 200);
-    const maxWords = clampInt(document.getElementById("maxWords").value, 30, 600);
-    const levelNum = clampInt(document.getElementById("levelNumber").value, 0, 999);
-    const unitNum  = clampInt(document.getElementById("unitNumber").value, 1, unitsPerLevel);
-
-    const dialogToReview = (document.getElementById("dialogInputForReview").value || "").trim();
-
-    if(!baseUrl){
-      setStatus("Status: erro — Base URL está vazia.");
-      btn.disabled = false; btnMain.disabled = false; btnP1.disabled = false;
-      return;
-    }
-    if(!lesson){
-      setStatus("Status: erro — a LIÇÃO (fonte primária) está vazia. Cole a lição no campo acima.");
-      btn.disabled = false; btnMain.disabled = false; btnP1.disabled = false;
-      return;
-    }
-    if(!dialogToReview){
-      setStatus("Status: erro — cole o diálogo gerado no campo 'Diálogo gerado' antes de criar o Prompt 2.");
-      btn.disabled = false; btnMain.disabled = false; btnP1.disabled = false;
-      return;
-    }
-
-    setStatus("Status: buscando repertório (words.txt) e gramática (grammar.json) para auditoria...");
-
-    const currentIdx = toLinearIndex(levelNum, unitNum, unitsPerLevel);
-    const idxs = [currentIdx, currentIdx - 1, currentIdx - 2].filter(i => i >= 1);
-    const targets = idxs.map(i => fromLinearIndex(i, unitsPerLevel));
-
-    const wordsByTarget = [];
-    for(const t of targets){
-      setStatus(`Status: repertório ${levelKey(t.levelNum)} / ${unitKey(t.unitNum)}...`);
-      const words = await fetchWordsForUnit(baseUrl, t.levelNum, t.unitNum);
-      wordsByTarget.push(words);
-    }
-
-    const currentWords = wordsByTarget[0] || [];
-    const prev1Words   = wordsByTarget[1] || [];
-    const prev2Words   = wordsByTarget[2] || [];
-    const repertoireWords = selectWordsWithPriority(currentWords, prev1Words, prev2Words, maxWords);
-
-    setStatus("Status: gramática (grammar.json)...");
-    const grammarData = await fetchGrammarJSON(baseUrl);
-    const grammarLists = targets.map(t => getGrammarForUnit(grammarData, t.levelNum, t.unitNum));
-    const allowedGrammar = mergeDedup([].concat(...grammarLists));
-
-    const basicWordsAllowed = [
-      "I","YOU","HE","SHE","IT","WE","THEY",
-      "MY","YOUR","HIS","HER","OUR","THEIR",
-      "A","AN","THE",
-      "AM","IS","ARE",
-      "YES","NO",
-      "WHAT","HOW","WHO","WHERE",
-      "AND","OR","BUT",
-      "PLEASE","THANK YOU",
-      "OK","HELLO","HI","GOOD MORNING","GOODBYE"
-    ];
-
-    const levelRulesText = buildLevelRules(englishLevel);
-
-    const prompt2 = `
-Você é um REVISOR/AUDITOR de um diálogo de ensino de inglês. Sua tarefa é corrigir o diálogo abaixo com o MÍNIMO de mudanças possível, mantendo o conteúdo e a estrutura originais.
-
-🔴 OBJETIVO
-- Entregar como saída final apenas o conteúdo do arquivo "dialogo.txt" revisado (uma fala por linha).
-- Não reescrever do zero.
-- Não adicionar novos tópicos.
-- Não aumentar o tamanho desnecessariamente.
-
-🔴 PRIORIDADES (ORDEM)
-1) Manter o tema e as frases-alvo da LIÇÃO.
-2) Manter frases curtas e adequadas ao nível.
-3) Corrigir vocabulário: remover/substituir palavras fora das listas permitidas.
-4) Corrigir gramática: remover/substituir estruturas fora da GRAMÁTICA PERMITIDA.
-5) Manter a alternância de falas e o formato (uma fala por linha).
-
-NÍVEL DE INGLÊS (CEFR)
-- Nível escolhido: ${englishLevel}
-
-REGRAS DO NÍVEL (OBRIGATÓRIAS)
-${levelRulesText}
-
-REGRAS OBJETIVAS DE CORREÇÃO (OBRIGATÓRIO)
-- Faça APENAS correções pontuais.
-- Se uma palavra “extra” (fora da LIÇÃO e fora de BASIC WORDS) não estiver no REPERTÓRIO:
-  - substitua por uma alternativa simples que esteja no REPERTÓRIO, OU
-  - remova a palavra mantendo o sentido.
-- Se uma estrutura gramatical não estiver em GRAMÁTICA PERMITIDA:
-  - simplifique para uma estrutura permitida.
-- Preserve as frases-alvo da LIÇÃO (não trocar por sinônimos).
-- Preserve a quantidade de linhas o máximo possível (se precisar ajustar, ajuste o mínimo).
-
-FORMATO DO "dialogo.txt" (OBRIGATÓRIO)
-- Apenas falas (uma fala por linha).
-- Sem títulos, sem explicações, sem comentários, sem listas.
-- Robot Samuel e Hannah devem alternar as falas.
-
-${formatList("GRAMÁTICA PERMITIDA (CUMULATIVA) — LIMITE:", allowedGrammar).trim()}
-
-${formatList("BASIC WORDS ALLOWED (sempre permitido):", basicWordsAllowed).trim()}
-
-${formatList("REPERTÓRIO DO ALUNO (APENAS PARA VERIFICAÇÃO DE VOCABULÁRIO):", repertoireWords).trim()}
-
---- LIÇÃO (FONTE PRIMÁRIA — O DIÁLOGO DEVE ENSINAR ISTO) ---
-${lesson}
---- FIM DA LIÇÃO ---
-
---- DIÁLOGO PARA REVISAR (ENTRADA) ---
-${dialogToReview}
---- FIM DO DIÁLOGO ---
-
-AGORA: Corrija e devolva APENAS o conteúdo final do "dialogo.txt" revisado (uma fala por linha), sem comentários.
-`.trim();
-
-    document.getElementById("prompt2Output").value = prompt2;
-    btnCopy.disabled = false;
-
-    setStatus([
-      "Status: Prompt 2 pronto (auditoria).",
-      `Base URL: ${baseUrl}`,
-      `Units usadas (wrap): ${targets.map(t => `${levelKey(t.levelNum)}/${unitKey(t.unitNum)}`).join(" , ")}`,
-      `Repertório incluído: ${repertoireWords.length} (max=${maxWords})`,
-      `Gramática (cumulativa): ${allowedGrammar.length} itens`,
-      grammarData ? "grammar.json: carregado." : "grammar.json: NÃO carregado (verifique /grammar/grammar.json)."
-    ].join("\n"));
-
-  }catch(err){
-    setStatus("Status: erro inesperado (Prompt 2).\n" + (err && err.message ? err.message : String(err)));
-  }finally{
-    btn.disabled = false;
-    btnMain.disabled = false;
-    document.getElementById("btnGerarP1").disabled = false;
   }
 }
 </script>
