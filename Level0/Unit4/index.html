@@ -23,13 +23,18 @@
     firebase.initializeApp(firebaseConfig);
   </script>
 
+  <!-- Webfont para manter a mesma fonte em todos os dispositivos -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap" rel="stylesheet">
+
   <style>
     /* ====== Base ====== */
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body {
       width: 100%;
       min-height: 100svh;
-      background: url('../../imagens/fundo.png') repeat;
+      background-color: #ffffff; /* laterais brancas */
       font-family: "Times New Roman", Times, serif;
       -webkit-user-select: none;
       user-select: none;
@@ -65,41 +70,190 @@
     .dropdown-item { padding: 10px 16px; color: #333; text-decoration: none; font-size: 14px; }
     .dropdown-item:hover { background-color: #f0f0f0; }
 
-    /* ====== Layout ====== */
+    /* ====== Layout principal com MAPA ====== */
     .map-container {
-      width: 100%; position: relative; background-image: url('../../imagens/fundo.png');
-      background-repeat: repeat; background-size: 200%; overflow-y: auto;
-      display: flex; flex-direction: column; align-items: center;
+      width: 100%;
+      min-height: calc(100svh - 72px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 24px;
+      background-color: #ffffff;
     }
-    header { width: 100%; padding: 0; text-align: center; background: none; }
-    .title-container { text-align: center; margin-top: 28px; position: relative; z-index: 2; }
-    .title-container h1 { font-size: 2.5em; color: #4CAF50; font-family: Arial, sans-serif; margin: 0; text-shadow: 1px 1px 2px #000000; }
 
-    /* Grade */
+    header {
+      width: 100%;
+      padding: 0;
+      text-align: center;
+      background: none;
+      margin-top: 12px;
+      margin-bottom: 8px;
+    }
+
+    .title-container { text-align: center; position: relative; z-index: 2; }
+    .title-container h1 {
+      font-size: 2.1em;
+      color: #4CAF50;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      text-shadow: 1px 1px 2px #000000;
+    }
+
+    /* Área que contém o fundo map.png e os nós em zigue-zague */
+    .map-inner {
+      position: relative;
+      width: 100%;
+      max-width: 540px;          /* imita celular em telas grandes */
+      margin: 8px auto 0;
+      background-image: url('../../imagens/map.png');
+      background-repeat: no-repeat;
+      background-position: top center;
+      background-size: 100% 100%;
+      aspect-ratio: 1080 / 2880;  /* mantém proporção do mapa */
+    }
+
+    /* BLOCO DO TÍTULO/VERSE NO PERGAMINHO – POSICIONADO COMO UM "NODE" */
+    .unit-info-box {
+      position: absolute;
+      top: 10%;          /* ponto fixo no mapa (y) */
+      left: 67%;         /* ponto fixo no mapa (x) */
+      transform: translate(-50%, -50%);
+      width: 52%;
+      z-index: 2;
+      text-align: left;
+      font-family: "Patrick Hand", "Comic Sans MS", "Trebuchet MS", cursive;
+      color: #145c2c;
+      line-height: 1.25;
+      pointer-events: none; /* para não atrapalhar cliques no mapa */
+    }
+    .unit-level-line {
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #8a5a2b; /* marrom, combina com pergaminho */
+      margin-bottom: 4px;
+      letter-spacing: 0.04em;
+    }
+    .unit-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #188244;  /* verde vivo estilo "AQUI" */
+      margin-bottom: 3px;
+    }
+    .unit-verse-ref {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #145c2c;
+      margin-bottom: 2px;
+    }
+
+    /* Ajustes para telas menores (somente tamanho de fonte, não posição) */
+    @media (max-width: 600px) {
+      .unit-level-line { font-size: 0.8rem; }
+      .unit-title      { font-size: 0.98rem; }
+      .unit-verse-ref  { font-size: 0.85rem; }
+    }
+
+    @media (max-width: 400px) {
+      .unit-level-line { font-size: 0.75rem; }
+      .unit-title      { font-size: 0.9rem; }
+      .unit-verse-ref  { font-size: 0.8rem; }
+    }
+
+    /* Container invisível que segura os botões/click targets */
+    .map-inner main {
+      position: absolute;
+      inset: 0;
+    }
+
     .activity-buttons {
-      display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;
-      max-width: 800px; width: 100%; justify-content: center; align-items: start;
-      padding: 16px 20px 40px; box-sizing: border-box;
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none; /* os <a> internos recebem os eventos */
     }
-    .activity-button, .teacher-resources, .robot-lex, .hannah-video {
-      display: flex; justify-content: center; align-items: center;
-      padding: 15px; background-color: #FFFFFF; border: 2px solid #4CAF50;
-      border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-      transition: transform 0.3s ease, box-shadow 0.3s ease; text-decoration: none;
-    }
-    .activity-button img, .teacher-resources img, .robot-lex img, .hannah-video img { width: 100%; height: auto; max-width: 130px; }
-    .activity-button:hover, .teacher-resources:hover, .robot-lex:hover, .hannah-video:hover { transform: scale(1.05); box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3); }
-    .teacher-resources, .robot-lex, .hannah-video { grid-column: span 2; }
-    @media (max-width: 400px) { .teacher-resources, .robot-lex, .hannah-video { grid-column: span 1; } }
 
-    #linesSvg{ position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; display: block; }
+    /* Botões circulares sobre o mapa */
+    .activity-button,
+    .teacher-resources,
+    .robot-lex,
+    .hannah-video {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      width: 34%;              /* tamanho calibrado para os círculos azuis */
+      aspect-ratio: 1 / 1;
+      border-radius: 50%;
+      background-color: rgba(255,255,255,0.0);
+      border: 3px solid transparent;
+      box-shadow: none;
+      padding: 0;
+      display: block;
+      text-decoration: none;
+      pointer-events: auto;
+      transition: transform 0.2s ease, box-shadow 0.2s ease,
+                  border-color 0.2s ease, background-color 0.2s ease;
+    }
+
+    /* Imagens dentro do botão */
+    .activity-button img,
+    .teacher-resources img,
+    .robot-lex img,
+    .hannah-video img {
+      position: absolute;
+      inset: 6%;              /* margem pra não passar muito da linha azul */
+      width: 88%;
+      height: 88%;
+      object-fit: contain;
+      border-radius: 50%;
+      pointer-events: none;
+      display: block;
+    }
+
+    .activity-button:hover,
+    .teacher-resources:hover,
+    .robot-lex:hover,
+    .hannah-video:hover {
+      transform: translate(-50%, -50%) scale(1.05);
+      box-shadow: 0 0 12px rgba(0,0,0,0.35);
+      border-color: rgba(255, 255, 255, 0.7);
+      background-color: rgba(255,255,255,0.12);
+    }
+
+    /* Posições ZIGUE-ZAGUE – valores em % conforme especificação */
+    .node-1 { top: 10.42%; left: 20%; }
+    .node-2 { top: 20.83%; left: 50%; }
+    .node-3 { top: 31.25%; left: 80%; }
+    .node-4 { top: 41.67%; left: 50%; }
+    .node-5 { top: 52.08%; left: 20%; }
+    .node-6 { top: 62.50%; left: 50%; }
+    .node-7 { top: 72.92%; left: 80%; }
+    .node-8 { top: 83.33%; left: 50%; }
+    .node-9 { top: 93.75%; left: 20%; }
+
+    /* SVG opcional (mantido, mas atrás dos botões se usado) */
+    #linesSvg{
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 0;
+      display: block;
+    }
 
     /* ====== DESABILITADO ====== */
     .disabled-btn {
-      filter: grayscale(100%); opacity: 0.55; pointer-events: none; cursor: not-allowed;
-      border-color: #999 !important; box-shadow: none !important; transform: none !important;
+      filter: grayscale(100%);
+      opacity: 0.55;
+      pointer-events: none;
+      cursor: not-allowed;
+      border-color: #999 !important;
+      box-shadow: none !important;
+      transform: translate(-50%, -50%) !important;
+      background-color: rgba(0,0,0,0.15);
     }
-    .disabled-btn img { filter: grayscale(100%); }
   </style>
 </head>
 
@@ -118,16 +272,25 @@
       <div class="title-container"><h1>Select an Activity</h1></div>
     </header>
 
-    <main>
-      <div class="activity-buttons" id="activity-buttons">
-        <!-- Teacher Resources (controlado por role) -->
-        <a href="teacher/index.html" class="teacher-resources" style="display:none;">
-          <img src="../../imagens/resources.png" alt="Teacher Resources">
-        </a>
+    <div class="map-inner">
+      <!-- BLOCO DO LEVEL / TÍTULO / VERSÍCULO -->
+      <div class="unit-info-box">
+        <div class="unit-level-line" id="unit-level-line"></div>
+        <div class="unit-title" id="unit-title"></div>
+        <div class="unit-verse-ref" id="unit-verse-ref"></div>
       </div>
-    </main>
 
-    <svg id="linesSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+      <main>
+        <div class="activity-buttons" id="activity-buttons">
+          <!-- Teacher Resources (controlado por role) -->
+          <a href="teacher/index.html" class="teacher-resources" style="display:none;">
+            <img src="../../imagens/resources.png" alt="Teacher Resources">
+          </a>
+        </div>
+      </main>
+
+      <svg id="linesSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
   </div>
 
   <script>
@@ -180,39 +343,100 @@
   }
 
   /* ==========
+     Header dinâmico: Level / Unit / Título / Versículo (somente linha 1 e 2)
+  ========== */
+  async function loadUnitHeader() {
+    const levelLineEl = document.getElementById("unit-level-line");
+    const titleEl     = document.getElementById("unit-title");
+    const verseRefEl  = document.getElementById("unit-verse-ref");
+    if (!levelLineEl || !titleEl || !verseRefEl) return;
+
+    // Level display – Starter para Level0
+    const levelRaw = __levelDB || __level;
+    let levelDisplay = String(levelRaw);
+    const mLev = String(levelRaw).match(/(\d+)/);
+    if (mLev) {
+      if (mLev[1] === "0") {
+        levelDisplay = "Starter";
+      } else {
+        levelDisplay = "Level " + mLev[1];
+      }
+    }
+
+    // Unit display
+    const unitRaw = __unitDB || __unit;
+    let unitDisplay = String(unitRaw);
+    const mUnit = String(unitRaw).match(/(\d+)/);
+    if (mUnit) {
+      unitDisplay = "Unit " + mUnit[1];
+    }
+
+    levelLineEl.textContent = `${levelDisplay} – ${unitDisplay}`;
+
+    // Caminho do arquivo de título/verso
+    const titlePath = `/${__level}/${__unit}/DataTitle/title.txt`;
+
+    try {
+      const resp = await fetch(titlePath);
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      const text = await resp.text();
+      const lines = text
+        .split(/\r?\n/)
+        .map(l => l.trim())
+        .filter(l => l.length > 0);
+
+      // Apenas linha 1 (título) e linha 2 (referência)
+      if (lines[0]) titleEl.textContent = lines[0];
+      if (lines[1]) verseRefEl.textContent = lines[1];
+    } catch (e) {
+      console.warn("Falha ao carregar título/versículo:", e?.message);
+      // fallback: mantém só o Level/Unit, sem quebrar layout
+    }
+  }
+
+  /* ==========
      Construção dos botões (abre travado exceto os livres)
   ========== */
   document.addEventListener("DOMContentLoaded", () => {
     const container = document.getElementById("activity-buttons");
 
+    // Teacher Resources já existe no HTML
+    const teacherEl = container.querySelector(".teacher-resources");
+    if (teacherEl) {
+      teacherEl.classList.add("node-1"); // Botão 1 → Teacher Resources
+    }
+
     // Hannah Video (sempre livre)
     const hannahVideo = document.createElement("a");
     hannahVideo.href = `/Atividades/HannahVideo/index.html?level=${__level}&unit=${__unit}`;
-    hannahVideo.className = "activity-button hannah-video";
+    hannahVideo.className = "activity-button hannah-video node-2"; // Botão 2
     const hvImg = document.createElement("img");
     hvImg.src = "../../imagens/botoes/video_button.png";
     hvImg.alt = "Hannah Video";
     hannahVideo.appendChild(hvImg);
-    const teacherEl = container.querySelector(".teacher-resources");
     if (teacherEl) teacherEl.insertAdjacentElement("afterend", hannahVideo);
     else container.prepend(hannahVideo);
 
     // Trechos
     const buttonData = [
       { trecho: "trecho1", img: "../../imagens/listening.png", alt: "Listening" },
-      { trecho: "trecho2", img: "../../imagens/grammar.png",   alt: "Grammar" , requiresPhase:  8 },
-      { trecho: "trecho3", img: "../../imagens/speaking.png",  alt: "Speaking", requiresPhase: 14 },
-      { trecho: "trecho4", img: "../../imagens/writing.png",   alt: "Writing" , requiresPhase: 20 },
-      { trecho: "trecho5", img: "../../imagens/Bible.png",     alt: "Bible"   , requiresPhase: 25 },
-      { trecho: "trecho6", img: "../../imagens/test.png",      alt: "Test"    , requiresPhase: 29 }
+      { trecho: "trecho2", img: "../../imagens/grammar.png",   alt: "Grammar" , requiresPhase:  10 },
+      { trecho: "trecho3", img: "../../imagens/speaking.png",  alt: "Speaking", requiresPhase: 19 },
+      { trecho: "trecho4", img: "../../imagens/writing.png",   alt: "Writing" , requiresPhase: 27 },
+      { trecho: "trecho5", img: "../../imagens/Bible.png",     alt: "Bible"   , requiresPhase: 33 },
+      { trecho: "trecho6", img: "../../imagens/test.png",      alt: "Test"    , requiresPhase: 37 }
     ];
+
+    let nodeIndexForTrechos = 3; // Botão 3 até 8
 
     buttonData.forEach(data => {
       const href = `/${__level}/${__unit}/fases.html?trecho=${data.trecho}`;
+      const nodeClass = `node-${nodeIndexForTrechos++}`;
+
       if (!data.requiresPhase) {
         const a = document.createElement("a");
         a.href = href;
-        a.className = "activity-button";
+        a.className = "activity-button " + nodeClass;
         a.dataset.trecho = data.trecho;
         const img = document.createElement("img");
         img.src = data.img; img.alt = data.alt;
@@ -222,7 +446,7 @@
       }
       const gated = createGatedLink({
         href,
-        className: "activity-button",
+        className: "activity-button " + nodeClass,
         imgSrc: data.img,
         imgAlt: data.alt,
         requiresPhase: data.requiresPhase
@@ -231,16 +455,19 @@
       container.appendChild(gated);
     });
 
-    // Robô Lex (requer 27)
+    // Robô Lex (requer 27) – Botão 9
     const robotButton = createGatedLink({
       href: `../../Atividades/LEX/index.html?level=${__level}&unit=${__unit}`,
-      className: "activity-button robot-lex",
+      className: "activity-button robot-lex node-9",
       imgSrc: "../../imagens/botoes/lex_button.png",
       imgAlt: "Robot Lex",
-      requiresPhase: 27
+      requiresPhase: 37
     });
     robotButton.dataset.kind = "robotLex";
     container.appendChild(robotButton);
+
+    // Carrega título / versículo para o header do pergaminho
+    loadUnitHeader().catch(e => console.warn("Erro loadUnitHeader:", e?.message));
   });
 
   /* ==========
