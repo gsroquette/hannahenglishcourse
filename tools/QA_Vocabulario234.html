@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Hannah — Prompt Builder v2 (Blocks A/B/C + prompts.txt)</title>
+  <style>
+    :root { --bg:#0b1220; --card:#0f1a33; --muted:#8aa0c8; --text:#e9f0ff; --accent:#61dafb; --border:#1f2f55; }
+    body { margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; background:linear-gradient(180deg,var(--bg),#050914); color:var(--text); }
+    .wrap { max-width:1100px; margin:0 auto; padding:22px; }
+    h1 { margin:0 0 6px; font-size:20px; letter-spacing:.2px; }
+    .sub { margin:0 0 18px; color:var(--muted); font-size:13px; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:14px; }
+    @media (max-width: 980px){ .grid{ grid-template-columns:1fr; } }
+    .card { background:rgba(15,26,51,.86); border:1px solid var(--border); border-radius:14px; padding:14px; box-shadow: 0 8px 30px rgba(0,0,0,.25); }
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    @media (max-width: 540px){ .row{ grid-template-columns:1fr; } }
+    label { display:block; font-size:12px; color:var(--muted); margin:0 0 6px; }
+    input, select, textarea {
+      width:100%; box-sizing:border-box;
+      background:#071127; color:var(--text);
+      border:1px solid var(--border);
+      border-radius:10px; padding:10px 10px;
+      outline:none;
+    }
+    textarea { min-height:160px; resize:vertical; line-height:1.35; }
+    .small { font-size:12px; color:var(--muted); margin-top:6px; }
+    .btnbar { display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; align-items:center; }
+    button {
+      border:1px solid var(--border);
+      background:#0a1733;
+      color:var(--text);
+      padding:10px 12px;
+      border-radius:10px;
+      cursor:pointer;
+      font-weight:600;
+    }
+    button.primary { border-color: rgba(97,218,251,.35); background: rgba(97,218,251,.14); }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    .pill { display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; border:1px solid var(--border); color:var(--muted); font-size:12px; }
+    .ok { color:#a6ffbf; }
+    .warn { color:#ffdba6; }
+    .err { color:#ffb0b0; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .hr { height:1px; background: rgba(31,47,85,.9); margin:12px 0; }
+    .hint { color:var(--muted); font-size:12px; margin-top:6px; }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <h1>🧠 Prompt Builder v2 — Blocks (A/B/C) + Block*_prompts.txt</h1>
+    <p class="sub">
+      Carrega automaticamente <span class="mono">images.txt</span> e <span class="mono">words.txt</span> (data1–data3) do Netlify e gera o prompt completo para IA montar:
+      <span class="mono">6 mcq + 3 audio_mcq + 1 match</span> por bloco, mais os <span class="mono">BlockA/B/C_prompts.txt</span>.
+    </p>
+
+    <div class="grid">
+      <!-- LEFT: Inputs -->
+      <div class="card">
+        <h2 style="margin:0 0 10px; font-size:15px;">1) Entradas e Carregamento</h2>
+
+        <div class="row">
+          <div>
+            <label for="baseUrl">Base URL (Netlify)</label>
+            <input id="baseUrl" value="https://hannahenglishcourse.netlify.app" />
+            <div class="small">Sem barra no final. Ex.: <span class="mono">https://hannahenglishcourse.netlify.app</span></div>
+          </div>
+
+          <div>
+            <label for="cefr">Nível CEFR (Aluno)</label>
+            <select id="cefr">
+              <option value="Starter" selected>Starter</option>
+              <option value="Pre-A1">Pre-A1</option>
+              <option value="A1">A1</option>
+              <option value="A2">A2</option>
+              <option value="B1">B1</option>
+              <option value="B2">B2</option>
+              <option value="C1">C1</option>
+              <option value="C2">C2</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:10px;">
+          <div>
+            <label for="level">Level (path segment)</label>
+            <input id="level" value="Level0" />
+            <div class="small">Usado em URLs: <span class="mono">/{level}/{unit}/...</span></div>
+          </div>
+          <div>
+            <label for="unit">Unit (path segment)</label>
+            <input id="unit" value="unit4" />
+            <div class="small">Ex.: <span class="mono">unit4</span> (igual ao seu Netlify)</div>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:10px;">
+          <div>
+            <label for="qaA">QA do Grupo A (editável)</label>
+            <input id="qaA" value="QA2" />
+            <div class="small">PromptAudio: <span class="mono">/{level}/{unit}/{qaA}/prompt{q}.mp3</span></div>
+          </div>
+          <div>
+            <label for="qaB">QA do Grupo B (editável)</label>
+            <input id="qaB" value="QA3" />
+            <div class="small">PromptAudio: <span class="mono">/{level}/{unit}/{qaB}/prompt{q}.mp3</span></div>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:10px;">
+          <div>
+            <label for="qaC">QA do Grupo C (editável, se existir)</label>
+            <input id="qaC" value="QA4" />
+            <div class="small">PromptAudio: <span class="mono">/{level}/{unit}/{qaC}/prompt{q}.mp3</span></div>
+          </div>
+          <div>
+            <label>&nbsp;</label>
+            <div class="btnbar" style="margin-top:0;">
+              <button class="primary" id="btnLoadAll">Carregar do Netlify</button>
+              <span class="pill" id="statusPill">Status: <span class="warn" id="statusText">Aguardando</span></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="hr"></div>
+
+        <div>
+          <label for="inspirer">Texto inspirador (DataStory/images.txt)</label>
+          <textarea id="inspirer" placeholder="Clique em 'Carregar do Netlify' ou cole aqui o conteúdo do images.txt..."></textarea>
+          <div class="small">Caminho: <span class="mono">/{level}/{unit}/DataStory/images.txt</span></div>
+        </div>
+
+        <div class="row" style="margin-top:10px;">
+          <div>
+            <label for="groupA">Grupo A (data1/words.txt)</label>
+            <textarea id="groupA" placeholder="1 palavra por linha (UPPERCASE)"></textarea>
+            <div class="small">Caminho: <span class="mono">/{level}/{unit}/data1/words.txt</span></div>
+          </div>
+          <div>
+            <label for="groupB">Grupo B (data2/words.txt)</label>
+            <textarea id="groupB" placeholder="1 palavra por linha (UPPERCASE)"></textarea>
+            <div class="small">Caminho: <span class="mono">/{level}/{unit}/data2/words.txt</span></div>
+          </div>
+        </div>
+
+        <div style="margin-top:10px;">
+          <label for="groupC">Grupo C (data3/words.txt — opcional)</label>
+          <textarea id="groupC" placeholder="Se não existir na unit, pode ficar vazio"></textarea>
+          <div class="small">Caminho: <span class="mono">/{level}/{unit}/data3/words.txt</span></div>
+        </div>
+
+        <div class="hint">
+          Regra extra (do seu fluxo): usar <b>todas as palavras disponíveis</b> no grupo, distribuindo nas 10 questões <b>sem repetir quando possível</b>.
+        </div>
+      </div>
+
+      <!-- RIGHT: Output -->
+      <div class="card">
+        <h2 style="margin:0 0 10px; font-size:15px;">2) Prompt Final</h2>
+
+        <div class="btnbar" style="margin-top:0;">
+          <button class="primary" id="btnGenerate">Gerar Prompt Completo</button>
+          <button id="btnCopy" disabled>Copiar</button>
+          <span class="pill">Contagem: <span class="mono" id="countInfo">0 chars</span></span>
+        </div>
+
+        <div style="margin-top:10px;">
+          <label for="outPrompt">Saída</label>
+          <textarea id="outPrompt" class="mono" placeholder="O prompt completo aparecerá aqui..." style="min-height:580px;"></textarea>
+          <div class="hint" id="copyHint"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ========= Helpers =========
+    function $(id){ return document.getElementById(id); }
+
+    function normalizeBaseUrl(url){
+      return String(url || "").trim().replace(/\/+$/, "");
+    }
+    function normalizePathSegment(seg){
+      return String(seg || "").trim().replace(/^\/+|\/+$/g, "");
+    }
+    function joinUrl(base, path){
+      base = normalizeBaseUrl(base);
+      path = String(path || "").trim();
+      if (!path.startsWith("/")) path = "/" + path;
+      return base + path;
+    }
+    function setStatus(type, msg){
+      const el = $("statusText");
+      el.textContent = msg;
+      el.className = type; // ok | warn | err
+    }
+    async function fetchText(url){
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error("HTTP " + res.status + " — " + url);
+      return await res.text();
+    }
+    function parseWords(raw){
+      return String(raw || "")
+        .split(/\r?\n/)
+        .map(s => s.trim())
+        .filter(Boolean)
+        .map(w => w.toUpperCase());
+    }
+    function wordsToTextarea(words){ return words.join("\n"); }
+
+    // Clipboard (Safari-safe)
+    async function copyToClipboard(text){
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.top = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, ta.value.length);
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch(e) { ok = false; }
+      document.body.removeChild(ta);
+      return ok;
+    }
+    function updateCount(){
+      const txt = $("outPrompt").value || "";
+      $("countInfo").textContent = txt.length + " chars";
+      $("btnCopy").disabled = txt.trim().length === 0;
+    }
+
+    // ========= Prompt Template (v2) =========
+    function buildFullPrompt(params){
+      const {
+        cefr, level, unit,
+        qaA, qaB, qaC,
+        inspirerText,
+        groupA, groupB, groupC
+      } = params;
+
+      // Prompt base (derivado do seu "Texto colado.txt"), com GrammarTag removido e placeholders dinamizados.
+      // Mantém a rigidez do texto e adiciona suas entradas preenchidas ao final.
+      return [
+`Você é um gerador de questões do sistema Hannah Questions, voltado para crianças iniciantes de inglês.`,
+`Seu objetivo é gerar blocos de exercícios (A, B e opcionalmente C) e também gerar arquivos .txt com a lista de prompts, seguindo EXATAMENTE a estrutura, a lógica de arquivos e os padrões abaixo.`,
+``,
+`🔴 CONFIGURAÇÃO GLOBAL OBRIGATÓRIA (NÃO IGNORAR)`,
+``,
+`Antes de gerar qualquer exercício, considere obrigatoriamente as seguintes informações de contexto, que definem onde os arquivos serão buscados e gravados:`,
+``,
+`📘 Unidade (Unit)`,
+``,
+`Unit atual: ${unit}`,
+``,
+`Todos os caminhos de imagens, áudios e prompts devem usar exatamente esta unidade, a menos que eu indique outra explicitamente.`,
+``,
+`🎧 Estrutura de QA por Grupo`,
+``,
+`Cada grupo utiliza um diretório de QA específico, que não pode ser alterado:`,
+``,
+`Grupo A`,
+``,
+`QA: ${qaA}`,
+``,
+`PromptAudio:`,
+`/${level}/${unit}/${qaA}/prompt{q}.mp3`,
+``,
+`Grupo B`,
+``,
+`QA: ${qaB}`,
+``,
+`PromptAudio:`,
+`/${level}/${unit}/${qaB}/prompt{q}.mp3`,
+``,
+`Grupo C (se existir)`,
+``,
+`QA: ${qaC}`,
+``,
+`PromptAudio:`,
+`/${level}/${unit}/${qaC}/prompt{q}.mp3`,
+``,
+`⚠️ Regra absoluta:`,
+``,
+`❌ Nunca misturar QA entre grupos`,
+``,
+`❌ Nunca inferir QA automaticamente`,
+``,
+`✔️ Sempre respeitar exatamente o QA definido acima`,
+``,
+`Essas definições valem para todas as listas de exercícios geradas neste prompt, incluindo:`,
+``,
+`MCQ visual`,
+``,
+`Listen–Choose (audio_mcq)`,
+``,
+`Match`,
+``,
+`1) ENTRADA (eu fornecerei)`,
+``,
+`Eu vou fornecer 2 ou 3 grupos de palavras:`,
+``,
+`Grupo A`,
+``,
+`Grupo B`,
+``,
+`Grupo C (opcional)`,
+``,
+`Para cada grupo, eu vou fornecer:`,
+``,
+`Nome do grupo: A, B ou C`,
+``,
+`Lista ordenada de palavras (posição 1, 2, 3, …)`,
+``,
+`⚠️ IMPORTANTE:`,
+`A posição da palavra na lista determina automaticamente o número do arquivo de imagem e som:`,
+`palavra #1 → imagem1.png / som1.mp3, palavra #2 → imagem2.png / som2.mp3, etc.`,
+``,
+`2) LÓGICA FIXA DE CAMINHOS (NÃO ALTERAR)`,
+`Grupo A`,
+``,
+`Imagem da palavra {n}:`,
+`/${level}/${unit}/data1/imagens/imagem{n}.png`,
+``,
+`Som da palavra {n}:`,
+`/${level}/${unit}/data1/sounds/som{n}.mp3`,
+``,
+`Áudio do prompt (se existir):`,
+`/${level}/${unit}/${qaA}/prompt{q}.mp3`,
+``,
+`Grupo B`,
+``,
+`Imagem da palavra {n}:`,
+`/${level}/${unit}/data2/imagens/imagem{n}.png`,
+``,
+`Som da palavra {n}:`,
+`/${level}/${unit}/data2/sounds/som{n}.mp3`,
+``,
+`Áudio do prompt (se existir):`,
+`/${level}/${unit}/${qaB}/prompt{q}.mp3`,
+``,
+`Grupo C (se existir)`,
+``,
+`Imagem da palavra {n}:`,
+`/${level}/${unit}/data3/imagens/imagem{n}.png`,
+``,
+`Som da palavra {n}:`,
+`/${level}/${unit}/data3/sounds/som{n}.mp3`,
+``,
+`Áudio do prompt (se existir):`,
+`/${level}/${unit}/${qaC}/prompt{q}.mp3`,
+``,
+`Onde:`,
+``,
+`{n} = posição da palavra na lista do grupo (1, 2, 3…)`,
+``,
+`{q} = número da questão (1 a 10)`,
+``,
+`3) ESTRUTURA OBRIGATÓRIA DE CADA BLOCO`,
+``,
+`Para cada grupo (A, B e se existir C) gere UM JSON separado contendo:`,
+``,
+`"title" (um título claro, incluindo “Block A”, “Block B”, etc.)`,
+``,
+`"questions" com exatamente 10 questões, sempre nesta ordem:`,
+``,
+`Questões 1 a 6: MCQ visual (imagem + texto)`,
+``,
+`Questões 7 a 9: Listen–Choose (escuta a palavra correta e escolhe)`,
+``,
+`Questão 10: Match (3 pares)`,
+``,
+`⚠️ A contagem sempre é: 6 + 3 + 1.`,
+``,
+`4) REGRAS POR TIPO DE QUESTÃO`,
+``,
+`IMPORTANTE: TIPOS OFICIAIS DE QUESTÕES (VOCABULÁRIO FECHADO)`,
+``,
+`⚠️ APENAS estes 8 valores são permitidos no campo type:`,
+``,
+`mcq`,
+`yesno`,
+`truefalse`,
+`image_mcq`,
+`audio_mcq`,
+`fillblank`,
+`order`,
+`match`,
+``,
+`❌ Não inventar novos tipos`,
+`❌ Não usar nomes alternativos`,
+``,
+`4.1) Questões 1–6 — MCQ VISUAL (imagem + texto)`,
+``,
+`Cada uma deve conter:`,
+``,
+`"type": "mcq"`,
+``,
+`"prompt": "Look. Choose."`,
+``,
+`"promptAudio": "/${level}/${unit}/QAZ/prompt{q}.mp3"`,
+`(QAZ depende do grupo: A=${qaA}, B=${qaB}, C=${qaC})`,
+``,
+`"image" deve ser a imagem da palavra-alvo (a correta)`,
+``,
+`"options" deve ter 3 opções, todas do mesmo grupo, e cada opção deve ter:`,
+``,
+`"label" = palavra visível (ex.: "Mary")`,
+``,
+`"value" = palavra em minúsculo (ex.: "mary")`,
+``,
+`"image" = caminho da imagem dessa palavra`,
+``,
+`"audio" = caminho do som dessa palavra`,
+``,
+`"answer" = "value" da opção correta`,
+``,
+`4.2) Questões 7–9 — LISTEN–CHOOSE`,
+``,
+`Este tipo de questão tem como objetivo avaliar a compreensão auditiva do aluno iniciante.`,
+``,
+`O aluno ouve uma palavra e deve escolher a alternativa correta, utilizando apoio visual (imagem + texto).`,
+``,
+`Cada questão deste tipo deve obedecer rigorosamente às regras abaixo:`,
+``,
+`Estrutura obrigatória:`,
+``,
+`"type" deve ser exatamente "audio_mcq"`,
+``,
+`"prompt" deve ser exatamente "Listen. Choose."`,
+``,
+`"promptAudio" deve apontar para o áudio do prompt correspondente à questão`,
+``,
+`"tts" contém o texto da palavra que será falada (ex.: "Abraham")`,
+``,
+`"answer" deve ser o value da palavra correta`,
+``,
+`"answerAudio" deve apontar para o som correto da palavra-alvo`,
+``,
+`"optionAudios" deve ser um objeto contendo todas as opções, mapeando:`,
+``,
+`value da palavra → caminho do áudio correspondente`,
+``,
+`"options" deve conter 3 opções, todas do mesmo grupo, e cada opção deve ter:`,
+``,
+`"label" (texto visível)`,
+``,
+`"value" (minúsculo)`,
+``,
+`"image" (imagem da palavra)`,
+``,
+`"audio" (som da palavra)`,
+``,
+`Comportamento esperado no sistema:`,
+``,
+`O sistema toca automaticamente o áudio da palavra correta (answerAudio).`,
+``,
+`O aluno observa as imagens e lê os rótulos.`,
+``,
+`O aluno seleciona a alternativa correspondente ao áudio ouvido.`,
+``,
+`O sistema valida a resposta comparando com "answer".`,
+``,
+`⚠️ Regras críticas:`,
+``,
+`❌ Não usar speechSynthesis`,
+``,
+`❌ Não inventar novos campos`,
+``,
+`❌ Não omitir optionAudios`,
+``,
+`✔️ Todas as opções devem pertencer ao mesmo grupo`,
+``,
+`✔️ Sempre usar exatamente 3 opções`,
+``,
+`Este tipo de questão sempre ocupa as posições 7, 8 e 9 de cada bloco.`,
+``,
+`4.3) Questão 10 — MATCH (3 pares)`,
+``,
+`A questão final do grupo deve conter:`,
+``,
+`"type": "match"`,
+``,
+`"prompt": "Look. Choose."`,
+``,
+`"promptAudio": "/${level}/${unit}/QAZ/prompt10.mp3"`,
+``,
+`"pairs" com 3 pares, onde:`,
+``,
+`"left" sempre: { "label": "Word", "value": "word_lower" }`,
+``,
+`"right" sempre: { "image": "/.../imagemX.png", "value": "word_lower" }`,
+``,
+`"answer": "all"`,
+``,
+`5) REGRAS CRÍTICAS (NÃO QUEBRAR)`,
+``,
+`❌ NÃO incluir o campo id em nenhuma questão`,
+``,
+`❌ NÃO mudar nomes de chaves (type, prompt, promptAudio, tts, image, options, pairs, answer, etc.)`,
+``,
+`❌ NÃO alterar os textos dos prompts (“Look. Choose.” e “Listen. Choose.”)`,
+``,
+`✔️ Sempre gerar exatamente 10 questões por grupo (6 + 3 + 1)`,
+``,
+`✔️ Texto deve aparecer junto com imagem nas opções (label + image)`,
+``,
+`✔️ Todas as opções de uma questão devem ser do mesmo grupo`,
+``,
+`7) ARQUIVOS .TXT COM LISTA DE PROMPTS (OBRIGATÓRIO)`,
+``,
+`Depois de gerar os JSONs, gere também um arquivo .txt por grupo:`,
+``,
+`BlockA_prompts.txt`,
+``,
+`BlockB_prompts.txt`,
+``,
+`BlockC_prompts.txt (se houver grupo C)`,
+``,
+`Cada arquivo deve ter 10 linhas, uma por questão, nesta ordem:`,
+``,
+`Linhas 1 a 6:`,
+``,
+`Look. Choose.`,
+``,
+`Linhas 7 a 9:`,
+``,
+`Listen. Choose.`,
+``,
+`Linha 10:`,
+``,
+`Look. Choose.`,
+``,
+`Exatamente assim:`,
+``,
+`Look. Choose.`,
+`Look. Choose.`,
+`Look. Choose.`,
+`Look. Choose.`,
+`Look. Choose.`,
+`Look. Choose.`,
+`Listen. Choose.`,
+`Listen. Choose.`,
+`Listen. Choose.`,
+`Look. Choose.`,
+``,
+`8) FORMATO FINAL DA RESPOSTA (OBRIGATÓRIO)`,
+``,
+`Responder exatamente nesta sequência:`,
+``,
+`=== BLOCK A JSON === + JSON completo do Grupo A`,
+``,
+`=== BLOCK B JSON === + JSON completo do Grupo B`,
+``,
+`=== BLOCK C JSON === + JSON completo do Grupo C (somente se eu fornecer grupo C)`,
+``,
+`=== BlockA_prompts.txt === + conteúdo (10 linhas)`,
+``,
+`=== BlockB_prompts.txt === + conteúdo (10 linhas)`,
+``,
+`=== BlockC_prompts.txt === + conteúdo (10 linhas) se existir`,
+``,
+`9) ESTRUTURA OBRIGATÓRIA DE CADA QUESTÃO (JSON)`,
+``,
+`⚠️ Use EXATAMENTE este formato (os conteúdos de cada campo são só exemplos)`,
+`a) Look. Choose.`,
+``,
+`{`,
+`  "answer": "hello",`,
+`  "image": "/${level}/${unit}/data2/imagens/imagem1.png",`,
+`  "options": [`,
+`    {`,
+`      "audio": "/${level}/${unit}/data2/sounds/som1.mp3",`,
+`      "image": "/${level}/${unit}/data2/imagens/imagem1.png",`,
+`      "label": "Hello",`,
+`      "value": "hello"`,
+`    },`,
+`    {`,
+`      "audio": "/${level}/${unit}/data2/sounds/som2.mp3",`,
+`      "image": "/${level}/${unit}/data2/imagens/imagem2.png",`,
+`      "label": "Goodbye",`,
+`      "value": "goodbye"`,
+`    },`,
+`    {`,
+`      "audio": "/${level}/${unit}/data2/sounds/som3.mp3",`,
+`      "image": "/${level}/${unit}/data2/imagens/imagem3.png",`,
+`      "label": "Welcome",`,
+`      "value": "welcome"`,
+`    }`,
+`  ],`,
+`  "prompt": "Look. Choose.",`,
+`  "promptAudio": "/${level}/${unit}/${qaB}/prompt1.mp3"`,
+`}`,
+``,
+`b) Listen. Choose.`,
+``,
+`{`,
+`  "type": "audio_mcq",`,
+`  "prompt": "Listen. Choose.",`,
+`  "promptAudio": "/${level}/${unit}/${qaA}/prompt7.mp3",`,
+`  "tts": "Abraham",`,
+`  "answer": "abraham",`,
+`  "answerAudio": "/${level}/${unit}/data1/sounds/som1.mp3",`,
+`  "optionAudios": {`,
+`    "abraham": "/${level}/${unit}/data1/sounds/som1.mp3",`,
+`    "sarah": "/${level}/${unit}/data1/sounds/som2.mp3",`,
+`    "father": "/${level}/${unit}/data1/sounds/som3.mp3"`,
+`  },`,
+`  "options": [`,
+`    { "label": "ABRAHAM", "value": "abraham", "image": "/${level}/${unit}/data1/imagens/imagem1.png", "audio": "/${level}/${unit}/data1/sounds/som1.mp3" },`,
+`    { "label": "SARAH", "value": "sarah", "image": "/${level}/${unit}/data1/imagens/imagem2.png", "audio": "/${level}/${unit}/data1/sounds/som2.mp3" },`,
+`    { "label": "FATHER", "value": "father", "image": "/${level}/${unit}/data1/imagens/imagem3.png", "audio": "/${level}/${unit}/data1/sounds/som3.mp3" }`,
+`  ]`,
+`}`,
+``,
+`c) Look. Choose.`,
+``,
+`{`,
+`  "answer": "all",`,
+`  "pairs": [`,
+`    { "left": { "label": "Hello", "value": "hello" }, "right": { "image": "/${level}/${unit}/data2/imagens/imagem1.png", "value": "hello" } },`,
+`    { "left": { "label": "Goodbye", "value": "goodbye" }, "right": { "image": "/${level}/${unit}/data2/imagens/imagem2.png", "value": "goodbye" } },`,
+`    { "left": { "label": "Welcome", "value": "welcome" }, "right": { "image": "/${level}/${unit}/data2/imagens/imagem3.png", "value": "welcome" } }`,
+`  ],`,
+`  "prompt": "Look. Choose.",`,
+`  "promptAudio": "/${level}/${unit}/${qaB}/prompt10.mp3"`,
+`}`,
+``,
+`🔴 REGRA EXTRA (OBRIGATÓRIA) — SELEÇÃO DE PALAVRAS`,
+``,
+`Use TODAS as palavras disponíveis em cada grupo, distribuindo ao longo das 10 questões sem repetir quando possível.`,
+``,
+`10) DADOS PARA EXECUÇÃO`,
+``,
+`Nível CEFR (Aluno): ${cefr}`,
+``,
+`Level / Unit: ${level} / ${unit}`,
+``,
+`Texto inspirador (DataStory/images.txt):`,
+`${(inspirerText || "").trim()}`,
+``,
+`Grupo A (lista ordenada):`,
+`${groupA.join("\n")}`,
+``,
+`Grupo B (lista ordenada):`,
+`${groupB.join("\n")}`,
+``,
+(groupC.length ? `Grupo C (lista ordenada):\n${groupC.join("\n")}\n` : `Grupo C: (não fornecido)\n`)
+      ].join("\n");
+    }
+
+    // ========= Loaders =========
+    async function loadAll(){
+      const baseUrl = normalizeBaseUrl($("baseUrl").value);
+      const level = normalizePathSegment($("level").value);
+      const unit  = normalizePathSegment($("unit").value);
+
+      const urlImages = joinUrl(baseUrl, `/${level}/${unit}/DataStory/images.txt`);
+      const urlA = joinUrl(baseUrl, `/${level}/${unit}/data1/words.txt`);
+      const urlB = joinUrl(baseUrl, `/${level}/${unit}/data2/words.txt`);
+      const urlC = joinUrl(baseUrl, `/${level}/${unit}/data3/words.txt`);
+
+      setStatus("warn", "Carregando...");
+      $("btnLoadAll").disabled = true;
+
+      try{
+        const [imagesTxt, aTxt, bTxt] = await Promise.all([
+          fetchText(urlImages),
+          fetchText(urlA),
+          fetchText(urlB)
+        ]);
+
+        $("inspirer").value = imagesTxt.trim();
+
+        const aWords = parseWords(aTxt);
+        const bWords = parseWords(bTxt);
+        $("groupA").value = wordsToTextarea(aWords);
+        $("groupB").value = wordsToTextarea(bWords);
+
+        try{
+          const cTxt = await fetchText(urlC);
+          const cWords = parseWords(cTxt);
+          $("groupC").value = wordsToTextarea(cWords);
+        }catch(_e){
+          $("groupC").value = "";
+        }
+
+        setStatus("ok", "Carregado com sucesso");
+      }catch(e){
+        console.error(e);
+        setStatus("err", "Erro ao carregar (ver console)");
+        alert("Falha ao carregar do Netlify.\n\nDetalhe: " + (e && e.message ? e.message : String(e)));
+      }finally{
+        $("btnLoadAll").disabled = false;
+      }
+    }
+
+    function generatePrompt(){
+      const level = normalizePathSegment($("level").value);
+      const unit  = normalizePathSegment($("unit").value);
+      const cefr  = $("cefr").value;
+
+      const qaA = normalizePathSegment($("qaA").value);
+      const qaB = normalizePathSegment($("qaB").value);
+      const qaC = normalizePathSegment($("qaC").value);
+
+      const inspirerText = $("inspirer").value || "";
+
+      const groupA = parseWords($("groupA").value || "");
+      const groupB = parseWords($("groupB").value || "");
+      const groupC = parseWords($("groupC").value || "");
+
+      const prompt = buildFullPrompt({
+        cefr, level, unit,
+        qaA, qaB, qaC,
+        inspirerText,
+        groupA, groupB, groupC
+      });
+
+      $("outPrompt").value = prompt;
+      $("copyHint").textContent = "";
+      updateCount();
+    }
+
+    // ========= Events =========
+    $("btnLoadAll").addEventListener("click", loadAll);
+    $("btnGenerate").addEventListener("click", generatePrompt);
+
+    $("btnCopy").addEventListener("click", async () => {
+      const text = $("outPrompt").value || "";
+      if (!text.trim()) return;
+      const ok = await copyToClipboard(text);
+      $("copyHint").textContent = ok ? "✅ Copiado." : "⚠️ Não foi possível copiar automaticamente. Selecione o texto e copie manualmente.";
+    });
+
+    $("outPrompt").addEventListener("input", updateCount);
+    updateCount();
+  </script>
+</body>
+</html>
