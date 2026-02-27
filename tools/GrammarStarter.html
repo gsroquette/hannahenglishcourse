@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Gerador de Prompt — texto.txt (Automático)</title>
+<title>Gerador de Prompt — Automático (Netlify)</title>
 
 <style>
 :root{
@@ -73,7 +73,7 @@ button.ghost{
 <div class="wrap">
 
 <h1>Gerador de Prompt — Automático (Netlify)</h1>
-<p class="sub">Os dados são carregados automaticamente do Netlify.</p>
+<p class="sub">Carregue os dados, edite se quiser, e depois gere o prompt.</p>
 
 <div class="card">
 
@@ -110,9 +110,20 @@ button.ghost{
 </div>
 
 <div class="row" style="margin:14px 0">
+  <button id="btnLoad">Carregar dados do Netlify</button>
   <button id="btnGen">Gerar prompt</button>
   <button id="btnCopy" class="ghost">Copiar prompt</button>
   <span id="msg" class="badge"></span>
+</div>
+
+<div class="card">
+  <label>Texto bíblico inspirador (editável)</label>
+  <textarea id="bibtext"></textarea>
+</div>
+
+<div class="card">
+  <label>Tema gramatical (editável)</label>
+  <textarea id="theme"></textarea>
 </div>
 
 <div class="card">
@@ -129,6 +140,10 @@ const baseEl = document.getElementById('baseUrl');
 const levelEl = document.getElementById('level');
 const unitEl = document.getElementById('unit');
 const cefrEl = document.getElementById('cefr');
+
+const bibEl = document.getElementById('bibtext');
+const themeEl = document.getElementById('theme');
+
 const outEl = document.getElementById('out');
 const msgEl = document.getElementById('msg');
 
@@ -224,7 +239,8 @@ Agora, gere apenas o arquivo "texto.txt" seguindo as regras.
 
 }
 
-document.getElementById('btnGen').addEventListener('click', async ()=>{
+// 🔵 CARREGAR DO NETLIFY
+document.getElementById('btnLoad').addEventListener('click', async ()=>{
 
   try{
 
@@ -233,35 +249,56 @@ document.getElementById('btnGen').addEventListener('click', async ()=>{
     const base = baseEl.value.trim();
     const level = levelEl.value.trim();
     const unit = unitEl.value.trim();
-    const cefr = cefrEl.value;
 
-    // Texto inspirador
+    // TEXTO INSPIRADOR
     const storyUrl = joinUrl(base, `/${level}/${unit}/DataStory/images.txt`);
     const bib = await fetchText(storyUrl);
 
-    // Gramática
+    // GRAMÁTICA
     const grammarUrl = joinUrl(base, `/grammar/grammar.json`);
     const grammarJSON = await fetchJSON(grammarUrl);
 
     if(!grammarJSON[level] || !grammarJSON[level][unit]){
-      throw new Error("Gramática não encontrada para Level/Unit");
+      throw new Error("Gramática não encontrada");
     }
 
     const theme = grammarJSON[level][unit].join(', ');
 
-    const prompt = buildPrompt(bib, theme, cefr, level, unit);
+    // Preenche campos editáveis
+    bibEl.value = bib;
+    themeEl.value = theme;
 
-    outEl.value = prompt;
-    msgEl.textContent = "✅ Prompt gerado";
+    msgEl.textContent = "✅ Dados carregados";
 
   }catch(e){
     console.error(e);
     msgEl.textContent = "❌ Erro ao carregar dados";
-    outEl.value = "";
   }
 
 });
 
+// 🟢 GERAR PROMPT (USA OS CAMPOS)
+document.getElementById('btnGen').addEventListener('click', ()=>{
+
+  const bib = bibEl.value.trim();
+  const theme = themeEl.value.trim();
+  const cefr = cefrEl.value;
+  const level = levelEl.value.trim();
+  const unit = unitEl.value.trim();
+
+  if(!bib || !theme){
+    msgEl.textContent = "⚠ Preencha ou carregue os dados primeiro";
+    return;
+  }
+
+  const prompt = buildPrompt(bib, theme, cefr, level, unit);
+
+  outEl.value = prompt;
+  msgEl.textContent = "✅ Prompt gerado";
+
+});
+
+// 📋 COPIAR
 document.getElementById('btnCopy').addEventListener('click', async()=>{
   try{
     await navigator.clipboard.writeText(outEl.value);
