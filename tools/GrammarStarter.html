@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Gerador de Prompt — texto.txt (Automático)</title>
+
+<style>
+:root{
+  --bg:#0f172a; --card:#0b1022; --muted:#94a3b8; --text:#e2e8f0;
+  --brand:#60a5fa; --ok:#22c55e; --bd:#1f2a44; --err:#ef4444;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:linear-gradient(180deg,#0b1022,#0f172a);
+  color:var(--text);
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial
+}
+.wrap{max-width:1100px;margin:32px auto;padding:0 16px}
+h1{font-weight:900;font-size:26px;margin:0 0 6px}
+.sub{color:var(--muted);margin:0 0 18px}
+.card{
+  background:rgba(255,255,255,.03);
+  border:1px solid var(--bd);
+  border-radius:14px;
+  padding:14px;
+  margin-bottom:14px
+}
+label{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  font-size:13px;
+  color:#cbd5e1;
+  margin-bottom:6px
+}
+input, select{
+  width:100%;
+  background:#0a0f1e;
+  border:1px solid #1f2a44;
+  border-radius:10px;
+  color:var(--text);
+  padding:10px;
+  font-size:14px;
+}
+textarea{
+  width:100%; background:#0a0f1e; border:1px solid #1f2a44; border-radius:10px;
+  color:var(--text); padding:10px; font-size:14px; min-height:160px; line-height:1.45; resize:vertical
+}
+.small{min-height:140px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+button{
+  appearance:none;
+  border:none;
+  background:linear-gradient(90deg,#3b82f6,#22c55e);
+  color:white;
+  font-weight:800;
+  padding:12px 16px;
+  border-radius:12px;
+  cursor:pointer
+}
+button.ghost{
+  background:transparent;
+  border:1px solid var(--bd);
+  color:#cbd5e1
+}
+.badge{font-size:12px;color:var(--muted)}
+</style>
+</head>
+
+<body>
+<div class="wrap">
+
+<h1>Gerador de Prompt — Automático (Netlify)</h1>
+<p class="sub">Os dados são carregados automaticamente do Netlify.</p>
+
+<div class="card">
+
+  <label>Base URL (Netlify)</label>
+  <input id="baseUrl" value="https://hannahenglishcourse.netlify.app">
+
+  <div class="row">
+    <div style="flex:1">
+      <label>Level</label>
+      <input id="level" value="Level0">
+    </div>
+    <div style="flex:1">
+      <label>Unit</label>
+      <input id="unit" value="Unit1">
+    </div>
+  </div>
+
+  <div class="row">
+    <div style="flex:1">
+      <label>Nível CEFR</label>
+      <select id="cefr">
+        <option>Starter</option>
+        <option>Pre-A1</option>
+        <option>A1</option>
+        <option>A2</option>
+        <option>B1</option>
+        <option>B2</option>
+        <option>C1</option>
+        <option>C2</option>
+      </select>
+    </div>
+  </div>
+
+</div>
+
+<div class="row" style="margin:14px 0">
+  <button id="btnGen">Gerar prompt</button>
+  <button id="btnCopy" class="ghost">Copiar prompt</button>
+  <span id="msg" class="badge"></span>
+</div>
+
+<div class="card">
+  <label>Prompt gerado</label>
+  <textarea id="out" class="small" readonly></textarea>
+</div>
+
+</div>
+
+<script>
+(function(){
+
+const baseEl = document.getElementById('baseUrl');
+const levelEl = document.getElementById('level');
+const unitEl = document.getElementById('unit');
+const cefrEl = document.getElementById('cefr');
+const outEl = document.getElementById('out');
+const msgEl = document.getElementById('msg');
+
+function normalizeBaseUrl(url){
+  return (url || '').trim().replace(/\/+$/, '');
+}
+
+function joinUrl(base, path){
+  base = normalizeBaseUrl(base);
+  if(!path.startsWith('/')) path = '/' + path;
+  return base + path;
+}
+
+async function fetchText(url){
+  const res = await fetch(url, {cache:'no-store'});
+  if(!res.ok) throw new Error("Erro: " + url);
+  return await res.text();
+}
+
+async function fetchJSON(url){
+  const res = await fetch(url, {cache:'no-store'});
+  if(!res.ok) throw new Error("Erro: " + url);
+  return await res.json();
+}
+
+function buildPrompt(bib, theme, cefr, level, unit){
+
+return `
+Quero que você crie um arquivo de gramática chamado "texto.txt" para crianças pequenas iniciantes em inglês (${cefr} CEFR) que aprendem pelo meu aplicativo que ensina inglês através de histórias da Bíblia. O conteúdo deve ser adaptado ao público infantil: lúdico, ilustrado, organizado e eficaz — inspirado em um pequeno texto bíblico inspirador e que alcance os objetivos do TEMA GRAMATICAL.
+Essa gramática além de poder ser estudada individualmente pelo aluno, vai servir como recurso de apresentação do professor durante a aula.
+Crie o texto.txt para que tenha excelência de didática. O texto.txt deve conter um título seguido da seção GRAMMAR que contém subtítulos. Você deve usar recursos como imagens e tabelas que ilustram e auxiliam a explicação. Ao final coloque a seção IMAGENS que deve conter descrição detalhada de cada imagem que você julgou necessária à explicação (GRAMMAR) para que outra IA posteriormente gere corretamente essa imagem (prompt).
+
+=====================
+CONFIGURAÇÃO
+=====================
+Level: ${level}
+Unit: ${unit}
+Nível CEFR: ${cefr}
+
+=====================
+BÍBLIA — INSPIRAÇÃO
+=====================
+${bib}
+
+====================
+TEMA GRAMATICAL
+====================
+${theme}
+
+====================
+OBJETIVO DO GERADOR
+====================
+Gerar SOMENTE o conteúdo do arquivo "texto.txt", seguindo fielmente o formato descrito abaixo. Não comentar e não explicar nada fora do arquivo.
+
+=========================
+FORMATO (EXEMPLO)
+=========================
+Title: >>> título em inglês
+
+# GRAMMAR
+>>> Introdução 
+
+## 1. >>> Subtítulo 1
+#IMG:>>>imagem1.png
+>>> Explicação 
+
+TableStart
+>>>Coluna1 | >>>Coluna2
+>>>itemA | itemB
+>>>itemC | itemD
+TableEnd
+
+# IMAGENS
+Imagem1: >>> descrição da imagem 1
+
+=====================
+REGRAS ESSENCIAIS
+=====================
+✔ Idioma: inglês
+✔ Público: crianças pequenas (${cefr})
+✔ Conectar o conteúdo à inspiração bíblica
+✔ Explicações curtas, claras, carinhosas
+✔ Manter título, # GRAMMAR, seções e tabelas
+✔ Usar ## para subtítulo
+✔ Usar "#IMG:" antes de cada imagem
+✔ Usar **negrito** apenas fora de tabelas
+✔ NÃO usar negrito/itálico dentro de tabelas
+✔ Manter "TableStart" / "TableEnd" exatamente
+✔ Devolver APENAS o arquivo (sem comentários)
+
+Agora, gere apenas o arquivo "texto.txt" seguindo as regras.
+`.trim();
+
+}
+
+document.getElementById('btnGen').addEventListener('click', async ()=>{
+
+  try{
+
+    msgEl.textContent = "Carregando...";
+
+    const base = baseEl.value.trim();
+    const level = levelEl.value.trim();
+    const unit = unitEl.value.trim();
+    const cefr = cefrEl.value;
+
+    // Texto inspirador
+    const storyUrl = joinUrl(base, `/${level}/${unit}/DataStory/images.txt`);
+    const bib = await fetchText(storyUrl);
+
+    // Gramática
+    const grammarUrl = joinUrl(base, `/grammar/grammar.json`);
+    const grammarJSON = await fetchJSON(grammarUrl);
+
+    if(!grammarJSON[level] || !grammarJSON[level][unit]){
+      throw new Error("Gramática não encontrada para Level/Unit");
+    }
+
+    const theme = grammarJSON[level][unit].join(', ');
+
+    const prompt = buildPrompt(bib, theme, cefr, level, unit);
+
+    outEl.value = prompt;
+    msgEl.textContent = "✅ Prompt gerado";
+
+  }catch(e){
+    console.error(e);
+    msgEl.textContent = "❌ Erro ao carregar dados";
+    outEl.value = "";
+  }
+
+});
+
+document.getElementById('btnCopy').addEventListener('click', async()=>{
+  try{
+    await navigator.clipboard.writeText(outEl.value);
+    msgEl.textContent = "Copiado!";
+  }catch{
+    outEl.select();
+    document.execCommand('copy');
+  }
+});
+
+})();
+</script>
+
+</body>
+</html>
