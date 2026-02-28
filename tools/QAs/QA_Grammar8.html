@@ -100,7 +100,7 @@ TableEnd"></textarea>
   <!-- 2) PARÂMETROS GERAIS -->
   <div class="grid">
     <div class="card">
-      <label>2) Nível, quantidade, alternativas e caminhos</label>
+      <label>2) Nível, quantidade, alternativas e QA</label>
       <div class="inline" style="margin-bottom:8px">
         <div>
           <div class="help" style="margin-bottom:6px">Nível (CEFR)</div>
@@ -126,31 +126,31 @@ TableEnd"></textarea>
         </div>
       </div>
 
-      <!-- 2B) Metadados Hannah -->
+      <!-- 2B) Parâmetros para caminhos (Level/Unit/QA) -->
       <div class="inline" style="margin-top:8px">
         <div>
-          <div class="help" style="margin-bottom:6px">Level do curso (Hannah)</div>
+          <div class="help" style="margin-bottom:6px">Level do curso (para caminhos)</div>
           <input id="courseLevel" type="text" placeholder="Level0" />
         </div>
         <div>
-          <div class="help" style="margin-bottom:6px">Unit do curso</div>
-          <input id="courseUnit" type="text" placeholder="Unit1" />
+          <div class="help" style="margin-bottom:6px">Unit do curso (para caminhos)</div>
+          <input id="courseUnit" type="text" placeholder="Unit3" />
         </div>
         <div>
-          <div class="help" style="margin-bottom:6px">Fase</div>
-          <input id="courseFase" type="number" min="1" step="1" placeholder="7" />
+          <div class="help" style="margin-bottom:6px">QA (obrigatório p/ caminhos)</div>
+          <input id="courseQA" type="text" placeholder="QA8" />
         </div>
       </div>
 
       <div class="inline" style="margin-top:8px">
-        <div>
-          <div class="help" style="margin-bottom:6px">grammarTag (ponto de gramática ou vocabulário)</div>
-          <input id="grammarTag" type="text" placeholder="grammar-to-be-present" />
+        <div style="flex:1;min-width:260px">
+          <div class="help" style="margin-bottom:6px">grammarTag (opcional; pode deixar vazio)</div>
+          <input id="grammarTag" type="text" placeholder="a-an-grammar" />
         </div>
         <div>
-          <div class="help" style="margin-bottom:6px">skillType</div>
+          <div class="help" style="margin-bottom:6px">skillType (opcional)</div>
           <select id="skillType">
-            <option value="">(auto)</option>
+            <option value="">(não gerar nesta etapa)</option>
             <option value="vocabulary">vocabulary</option>
             <option value="grammar">grammar</option>
             <option value="reading">reading</option>
@@ -159,9 +159,9 @@ TableEnd"></textarea>
           </select>
         </div>
         <div>
-          <div class="help" style="margin-bottom:6px">difficulty</div>
+          <div class="help" style="margin-bottom:6px">difficulty (opcional)</div>
           <select id="difficulty">
-            <option value="">(auto)</option>
+            <option value="">(não gerar nesta etapa)</option>
             <option value="easy">easy</option>
             <option value="medium" selected>medium</option>
             <option value="hard">hard</option>
@@ -169,7 +169,10 @@ TableEnd"></textarea>
         </div>
       </div>
 
-      <div class="help">yesno/truefalse sempre têm 2 opções.</div>
+      <div class="help">
+        <span class="note">Importante:</span> Nesta etapa, a IA deve gerar apenas o <b>núcleo das questões</b>.
+        Não inclua <code>id</code>, <code>order</code>, <code>level</code>, <code>unit</code>, <code>fase</code>, <code>difficulty</code>, <code>skillType</code> — isso é adicionado depois.
+      </div>
     </div>
   </div>
 
@@ -261,7 +264,8 @@ BIRD
 
   const courseLevelEl = $('courseLevel');
   const courseUnitEl  = $('courseUnit');
-  const courseFaseEl  = $('courseFase');
+  const courseQAEl    = $('courseQA');
+
   const grammarTagEl  = $('grammarTag');
   const skillTypeEl   = $('skillType');
   const difficultyEl  = $('difficulty');
@@ -296,16 +300,16 @@ BIRD
     p4: { img: '../DataStory/images/',sound: '../DataStory/sounds/'}
   };
 
-  // Lista dos tipos
+  // Lista dos tipos (nomes alinhados ao que você usa de verdade)
   const TYPE_LIST = [
-    { key:'choice',     label:'Choice (MCQ)' },
-    { key:'yesno',      label:'Yes/No' },
-    { key:'truefalse',  label:'True/False' },
-    { key:'picture',    label:'Picture (MCQ + imagem)' },
-    { key:'audiochoice',label:'Audio (MCQ + áudio)' },
-    { key:'fillblank',  label:'Fill in the Blanks' },
-    { key:'order',      label:'Order (montar frase)' },
-    { key:'match',      label:'Match (correspondência)' },
+    { key:'mcq',       label:'mcq' },
+    { key:'image_mcq', label:'image_mcq' },
+    { key:'audio_mcq', label:'audio_mcq' },
+    { key:'fillblank', label:'fillblank' },
+    { key:'order',     label:'order' },
+    { key:'match',     label:'match' },
+    { key:'truefalse', label:'truefalse' },
+    { key:'yesno',     label:'yesno' },
   ];
 
   function renderTypes(){
@@ -428,11 +432,10 @@ BIRD
       if(i.ok){
         inspireEl.value = (i.text || '').trim();
       } else {
-        // inspirador é opcional
         inspireEl.value = inspireEl.value || '';
       }
 
-      // Ajuda: preencher metadados Hannah automaticamente (sem forçar)
+      // Ajuda: preencher campos de caminho (sem forçar)
       if(!sanitize(courseLevelEl.value)) courseLevelEl.value = level;
       if(!sanitize(courseUnitEl.value))  courseUnitEl.value  = unit;
 
@@ -452,7 +455,6 @@ BIRD
 
   // Defaults
   (function initDefaults(){
-    // tenta colocar a origem atual como base (funciona bem se você hospedar isso no mesmo domínio)
     try{
       baseUrlEl.value = window.location.origin || '';
     }catch{
@@ -593,19 +595,6 @@ BIRD
   }
 
   /* -------------------------
-      FUNÇÕES AUX. METADADOS
-  --------------------------*/
-
-  function normalizeCourseKey(prefix, value, fallbackNum){
-    const v = (value||'').trim();
-    if(!v) return prefix + fallbackNum;
-    const lower = v.toLowerCase();
-    if(lower.startsWith(prefix.toLowerCase())) return v;
-    const onlyNum = (v.match(/\d+/)||[''])[0] || fallbackNum;
-    return prefix + onlyNum;
-  }
-
-  /* -------------------------
       GENERATE PROMPT
   --------------------------*/
 
@@ -638,6 +627,120 @@ BIRD
     return map;
   }
 
+  function buildExamples(levelForPaths, unitForPaths, qaForPaths){
+    const L = levelForPaths || 'Level0';
+    const U = unitForPaths  || 'UnitX';
+    const Q = qaForPaths    || 'QA?';
+
+    // Exemplos enxutos (sem metadados que você adiciona depois)
+    // Nota: mantemos promptAudio/image/audio porque são caminhos dependentes de QA (quando aplicável).
+    return `
+EXEMPLOS OFICIAIS (COPIE O FORMATO EXATO; NÃO INCLUA METADADOS ADICIONADOS DEPOIS)
+
+1) truefalse (mínimo)
+{
+  "type": "truefalse",
+  "prompt": "Sarah laughed and said, 'I am ninety years old!'",
+  "image": "/${L}/${U}/${Q}/imagem2.png",
+  "options": [
+    { "label": "True",  "value": "true",  "audio": "/${L}/${U}/${Q}/sounds/true.mp3" },
+    { "label": "False", "value": "false", "audio": "/${L}/${U}/${Q}/sounds/false.mp3" }
+  ],
+  "answer": "true",
+  "promptAudio": "/${L}/${U}/${Q}/prompt6.mp3"
+}
+
+2) image_mcq (mínimo)
+{
+  "type": "image_mcq",
+  "prompt": "Look and choose the correct answer.",
+  "image": "/${L}/${U}/${Q}/imagem3.png",
+  "options": [
+    { "label": "I am seven years old.", "value": "correct",    "audio": "/${L}/${U}/${Q}/sounds/i-am-seven-years-old.mp3" },
+    { "label": "I am ten years old.",   "value": "wrong",      "audio": "/${L}/${U}/${Q}/sounds/i-am-ten-years-old.mp3" },
+    { "label": "I am seven.",           "value": "incomplete", "audio": "/${L}/${U}/${Q}/sounds/i-am-seven.mp3" }
+  ],
+  "answer": "correct",
+  "promptAudio": "/${L}/${U}/${Q}/prompt7.mp3"
+}
+
+3) yesno (mínimo)
+{
+  "type": "yesno",
+  "prompt": "Is this Mary?",
+  "image": "/${L}/${U}/${Q}/imagem4.png",
+  "options": [
+    { "label": "Yes", "value": "yes" },
+    { "label": "No",  "value": "no" }
+  ],
+  "answer": "yes"
+}
+
+4) fillblank (mínimo)
+{
+  "type": "fillblank",
+  "prompt": "___ and Sarah lived in Canaan.",
+  "image": "/${L}/${U}/DataStory/images/imagem1.png",
+  "options": [
+    { "label": "Abraham", "value": "Abraham", "audio": "/${L}/${U}/data1/sounds/som1.mp3" },
+    { "label": "Father",  "value": "Father",  "audio": "/${L}/${U}/data1/sounds/som3.mp3" }
+  ],
+  "answer": "Abraham",
+  "promptAudio": "/${L}/${U}/${Q}/prompt1.mp3"
+}
+
+5) mcq (mínimo)
+{
+  "type": "mcq",
+  "prompt": "Choose the correct word.",
+  "options": [
+    { "label": "Cat", "value": "cat", "audio": "/${L}/${U}/data1/sounds/som2.mp3" },
+    { "label": "Dog", "value": "dog", "audio": "/${L}/${U}/data1/sounds/som4.mp3" }
+  ],
+  "answer": "cat"
+}
+
+6) audio_mcq (mínimo)
+{
+  "type": "audio_mcq",
+  "prompt": "Listen and choose.",
+  "promptAudio": "/${L}/${U}/${Q}/prompt1.mp3",
+  "answerAudio": "/${L}/${U}/${Q}/answer1.mp3",
+  "optionAudios": [
+    "/${L}/${U}/${Q}/option1_1.mp3",
+    "/${L}/${U}/${Q}/option1_2.mp3",
+    "/${L}/${U}/${Q}/option1_3.mp3"
+  ],
+  "options": [
+    { "label": "Cat",  "value": "cat" },
+    { "label": "Dog",  "value": "dog" },
+    { "label": "Bird", "value": "bird" }
+  ],
+  "answer": "cat"
+}
+
+7) match (mínimo)
+{
+  "type": "match",
+  "prompt": "Match the words.",
+  "pairs": [
+    { "left": "cat", "right": "CAT" },
+    { "left": "dog", "right": "DOG" }
+  ],
+  "answer": "all"
+}
+
+8) order (mínimo)
+{
+  "type": "order",
+  "prompt": "Put the letters in order.",
+  "options": ["C","A","T"],
+  "answer": ["C","A","T"],
+  "promptAudio": "/${L}/${U}/${Q}/prompt3.mp3"
+}
+`.trim();
+  }
+
   function buildPrompt({
     textoInsp,
     textoGram,
@@ -647,9 +750,9 @@ BIRD
     mediaBase,
     types,
     dist,
-    courseLevelKey,
-    courseUnitKey,
-    courseFase,
+    levelForPaths,
+    unitForPaths,
+    qaForPaths,
     grammarTagDefault,
     skillTypeDefault,
     difficultyDefault
@@ -659,63 +762,6 @@ BIRD
       textoGram ? `TEXTO PRINCIPAL (GRAMÁTICA):\n${textoGram}` : '',
       textoInsp ? `\n\nTEXTO DE APOIO (INSPIRADOR):\n${textoInsp}` : ''
     ].filter(Boolean).join('\n');
-
-    const SPEC = `INSTRUÇÕES COMPLETAS PARA GERAR questions.txt (INCORPORADAS NO PROMPT)
-
-OBJETIVO PEDAGÓGICO (MUITO IMPORTANTE)
-• Gere as questões para EXPLICAR e TREINAR o conteúdo do TEXTO PRINCIPAL (GRAMÁTICA).
-• Use o TEXTO DE APOIO (INSPIRADOR) apenas como CONTEXTO e VOCABULÁRIO secundário.
-• Não fuja do ponto de gramática descrito no TEXTO PRINCIPAL.
-
-FORMATO OBRIGATÓRIO DO ARQUIVO
-{
-  "title": string,
-  "questions": [ array de questões ]
-}
-
-PARA CADA QUESTÃO (OBJETO DENTRO DE "questions"):
-CAMPOS OBRIGATÓRIOS
-• id: string curto, minúsculo, padrão "q001", "q002", ...
-• type: tipo de questão, por exemplo "mcq", "yesno", "fillblank", "order", "match".
-• prompt: texto da pergunta em inglês.
-• options: array de opções (para mcq/yesno/truefalse/audiochoice/picture/fillblank) com objetos:
-  { "label": string, "value": string, "image"?: string, "emoji"?: string, "audio"?: string, "tts"?: string, "sub"?: string, "aria"?: string }
-• answer: resposta correta.
-    - Para MCQ/yesno/truefalse: string igual ao value correto.
-    - Para fillblank simples: string ou array de strings.
-    - Para order: array de strings na ordem correta.
-    - Para match: estrutura adequada de pares (você pode usar um campo "pairs").
-
-METADADOS QUE DEVEM APARECER EM TODAS AS QUESTÕES
-Use SEMPRE os seguintes campos em cada objeto de questão:
-• level: string → level do curso Hannah (ex.: "Level0").
-• unit: string → unidade (ex.: "Unit1").
-• fase: string ou number → número da fase (ex.: "7").
-• grammarTag: string curto que identifica a gramática ou vocabulário alvo.
-• skillType: string, por exemplo: "vocabulary", "grammar", "reading", "listening" ou "mixed".
-• difficulty: string, um de: "easy", "medium", "hard".
-
-OUTROS CAMPOS OPCIONAIS
-• image: caminho da imagem relativa à base fornecida.
-• promptAudio: caminho do áudio da pergunta (se não houver, TTS lê o prompt).
-• tts: string alternativa para o TTS ler, se quiser uma fala diferente do prompt.
-• shuffleOptions: boolean; se omitido, considere true.
-• qualquer outro campo útil, desde que o JSON permaneça válido.
-
-REGRAS GERAIS DO PLAYER
-• Compare respostas por value (minúsculas + trim).
-• Caminhos de mídia relativos à base ${mediaBase || '../../LevelX/UnitY/QA/'} (ou URL http/https).
-• Áudio da pergunta: se promptAudio falhar, TTS lê prompt (ou tts se fornecido).
-• Áudio da opção: tocar ao clicar e só depois validar.
-• Embaralhar opções: "shuffleOptions": true por padrão.
-• IDs únicos sequenciais: q001, q002, ...
-• Prompts em INGLÊS, curtos e adequados ao nível.
-
-AVISOS IMPORTANTES
-• NÃO REPLICAR OS EXEMPLOS. GERE NOVAS QUESTÕES ALINHADAS AO TEXTO-FONTE.
-• USE IDs ZERO-PADDED (q001, q002, …) NO ARQUIVO FINAL.
-• EM FILLBLANK, SEMPRE INCLUA {blank}/{bN}/___ NO prompt.
-`;
 
     const levelGuide = {
       'Starter':'Use frases curtíssimas (3–6 palavras), vocabulário concreto e repetição; prompts simples e claros.',
@@ -734,40 +780,99 @@ AVISOS IMPORTANTES
       .map(([k,v])=>`• ${k}: ${v}`)
       .join('\n');
 
-    const metaHannah = `
-METADADOS DO CURSO HANNAH (USE EM TODAS AS QUESTÕES)
-• level (fixo em todas as questões): "${courseLevelKey || 'LevelX'}"
-• unit  (fixo em todas as questões): "${courseUnitKey || 'UnitY'}"
-• fase  (fixo em todas as questões): "${courseFase || '1'}"
-• grammarTag padrão: ${grammarTagDefault ? `"${grammarTagDefault}"` : 'crie uma tag curta relacionada à gramática/vocabulário principal desta atividade.'}
-• skillType padrão: ${skillTypeDefault ? `"${skillTypeDefault}"` : 'escolha entre "vocabulary", "grammar", "reading", "listening" ou "mixed".'}
-• difficulty padrão: ${difficultyDefault ? `"${difficultyDefault}"` : 'classifique como "easy", "medium" ou "hard".'}
+    const L = levelForPaths || 'Level0';
+    const U = unitForPaths  || 'UnitX';
+    const Q = qaForPaths    || 'QA?';
 
-INSTRUÇÃO IMPORTANTE:
-Em CADA objeto dentro de "questions", inclua explicitamente:
-  "level", "unit", "fase", "grammarTag", "skillType", "difficulty".
-Se houver um valor padrão acima (não marcado como "crie/ escolha"), use EXATAMENTE esse valor em todas as questões.
-`;
+    const QA_RULES = `
+REGRAS DE QA E CAMINHOS (MUITO IMPORTANTE)
+• Use este Level/Unit/QA nos caminhos quando houver imagem/áudio:
+  Level: "${L}"
+  Unit: "${U}"
+  QA: "${Q}"
+
+• Padrões comuns (siga os exemplos):
+  - promptAudio: "/${L}/${U}/${Q}/promptN.mp3"
+  - image (QA): "/${L}/${U}/${Q}/imagemN.png"
+  - sounds: "/${L}/${U}/${Q}/sounds/arquivo.mp3"
+  - DataStory images: "/${L}/${U}/DataStory/images/imagemN.png"
+  - data1 sounds: "/${L}/${U}/data1/sounds/somN.mp3"
+
+• Se algum tipo não precisar de imagem/áudio, pode omitir esses campos.
+`.trim();
+
+    const CORE_RULES = `
+REGRAS DO JSON (NESTA ETAPA)
+1) Gere um JSON VÁLIDO no formato:
+{
+  "title": string,
+  "questions": [ ... ]
+}
+
+2) Nesta etapa, gere APENAS o NÚCLEO das questões.
+NÃO inclua estes campos (serão adicionados depois):
+"id", "order", "level", "unit", "fase", "difficulty", "skillType".
+
+3) Use os tipos exatamente como:
+${activeLabels}
+
+4) Opções:
+• mcq / image_mcq / audio_mcq / fillblank / truefalse / yesno → devem ter "options" e "answer".
+• truefalse e yesno → 2 opções.
+• match → use "pairs" e "answer": "all".
+• order → "options" (itens embaralhados) e "answer" (ordem correta).
+
+5) Objetivo pedagógico (MUITO IMPORTANTE)
+• Gere as questões para EXPLICAR e TREINAR o conteúdo do TEXTO PRINCIPAL (GRAMÁTICA).
+• Use o TEXTO DE APOIO (INSPIRADOR) apenas como CONTEXTO e VOCABULÁRIO secundário.
+• Não fuja do ponto de gramática descrito no TEXTO PRINCIPAL.
+
+6) Não invente campos fora do padrão dos exemplos.
+`.trim();
+
+    const OPTIONAL_NOTE = `
+OBS (OPCIONAL)
+Você pode incluir "promptAudio", "image" e "options[].audio" quando isso for útil e consistente com QA.
+Se eu quiser remover isso depois, eu removo no pós-processamento.
+`.trim();
+
+    const TAG_NOTE = (grammarTagDefault || skillTypeDefault || difficultyDefault)
+      ? `
+NOTA (OPCIONAL — SE VOCÊ JÁ PRECISAR NESTA ETAPA)
+Se eu tiver preenchido valores aqui, você pode incluir também:
+- grammarTag: "${grammarTagDefault || ''}"
+- skillType: "${skillTypeDefault || ''}"
+- difficulty: "${difficultyDefault || ''}"
+Se estiverem vazios, NÃO crie esses campos (serão adicionados depois).
+`.trim()
+      : '';
+
+    const examples = buildExamples(L, U, Q);
 
     return (
-`Crie um arquivo JSON para <questions.txt> seguindo ESTRITAMENTE o FORMATO e as REGRAS abaixo. Gere ${total} questões com os TIPOS: ${activeLabels}.
+`Crie um arquivo JSON para <questions.txt> seguindo ESTRITAMENTE o FORMATO e as REGRAS abaixo.
+Gere ${total} questões com os TIPOS: ${activeLabels}.
 
 TEXTO-FONTE:
 ${textoFonte}
 
-ESPECIFICAÇÃO COMPLETA (copie as instruções e siga à risca):
-${SPEC}
+${QA_RULES}
 
-${metaHannah}
+${CORE_RULES}
+
+${OPTIONAL_NOTE}
+${TAG_NOTE ? '\n\n' + TAG_NOTE : ''}
 
 NÍVEL CEFR (linguístico): ${cefrLevel}. ${levelGuide}
 
 QUANTIDADE TOTAL DE QUESTÕES: ${total}
 QUANTIDADE DE ALTERNATIVAS POR QUESTÃO: ${altCount}
-(yes/no e true/false continuam com apenas 2 alternativas coerentes.)
+(yesno e truefalse sempre têm 2 alternativas.)
 
-DISTRIBUIÇÃO POR TIPO (aproximada, mas respeite as quantidades):
+DISTRIBUIÇÃO POR TIPO (respeite as quantidades):
 ${distLines}
+
+${examples}
 
 SAÍDA EXIGIDA:
 • Apenas o JSON VÁLIDO, sem Markdown, sem explicações.
@@ -785,13 +890,9 @@ SAÍDA EXIGIDA:
     const altCount  = parseInt(altCountEl.value||'4',10);
     const mediaBase = sanitize(mediaBaseEl.value);
 
-    const cLevelRaw = sanitize(courseLevelEl.value);
-    const cUnitRaw  = sanitize(courseUnitEl.value);
-    const cFaseRaw  = sanitize(courseFaseEl.value);
-
-    const courseLevelKey = cLevelRaw ? normalizeCourseKey('Level', cLevelRaw, '0') : '';
-    const courseUnitKey  = cUnitRaw  ? normalizeCourseKey('Unit',  cUnitRaw,  '1') : '';
-    const courseFase     = cFaseRaw || '';
+    const levelForPaths = sanitize(courseLevelEl.value);
+    const unitForPaths  = sanitize(courseUnitEl.value);
+    const qaForPaths    = sanitize(courseQAEl.value);
 
     const grammarTagDefault = sanitize(grammarTagEl.value);
     const skillTypeDefault  = skillTypeEl.value || '';
@@ -799,6 +900,13 @@ SAÍDA EXIGIDA:
 
     if(!textoInsp && !textoGram){
       msgEl.textContent = '⚠ Preencha ao menos um dos textos (inspirador ou gramática).';
+      outEl.value = '';
+      return;
+    }
+
+    // QA é necessário para os exemplos e para orientar caminhos
+    if(!qaForPaths){
+      msgEl.textContent = '⚠ Preencha o campo QA (ex.: QA8).';
       outEl.value = '';
       return;
     }
@@ -835,9 +943,9 @@ SAÍDA EXIGIDA:
       mediaBase,
       types,
       dist,
-      courseLevelKey,
-      courseUnitKey,
-      courseFase,
+      levelForPaths,
+      unitForPaths,
+      qaForPaths,
       grammarTagDefault,
       skillTypeDefault,
       difficultyDefault
