@@ -30,13 +30,7 @@
   .k>div{display:flex;gap:8px;align-items:center}
   .k input[type="number"]{width:88px}
   code{background:#0b1224;border:1px solid #1f2a44;border-radius:6px;padding:1px 6px}
-  table{width:100%;border-collapse:collapse}
-  th,td{border:1px solid #263254;padding:8px;font-size:13px}
-  th{background:#0b1224;color:#bcd0e8}
-  td.actions{width:72px;text-align:center}
-  input[type="text"].sm{padding:8px;font-size:13px}
   .note{color:#fcd34d;font-weight:700}
-  .stack-sm{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
 </style>
 </head>
 <body>
@@ -148,45 +142,6 @@
     </div>
   </div>
 
-  <!-- 4) BANCO DE PALAVRAS / MÍDIA (BULK) — OCULTO -->
-  <div class="card" id="bankCard" style="display:none">
-    <label>4) Banco de palavras + mídia (opcional)</label>
-    <div class="inline" style="gap:10px;align-items:flex-start;margin-top:6px">
-      <input id="bwFile" type="file" accept=".txt" />
-      <button id="btnLoadFile" class="ghost">Carregar do arquivo</button>
-      <button id="btnClearWords" class="ghost" style="border-color:#ef4444;color:#ef4444">Apagar Palavras</button>
-    </div>
-
-    <textarea id="bwBulk" placeholder="DOG
-CAT
-BIRD
-..." style="min-height:140px;margin-top:8px"></textarea>
-
-    <div class="stack-sm" style="margin-top:8px">
-      <div>
-        <div class="help" style="margin-bottom:6px">Prefixo de mídia</div>
-        <select id="mediaPrefix" title="Prefixo para imagens e sons">
-          <option value="p1" selected>../data1/...</option>
-          <option value="p2">../data2/...</option>
-          <option value="p3">../data3/...</option>
-          <option value="p4">../DataStory/...</option>
-        </select>
-      </div>
-      <div class="inline" style="align-items:center">
-        <button id="btnAddBulk">Adicionar todos</button>
-      </div>
-    </div>
-
-    <div class="help">Cada lote recomeça em imagem1/som1 independentemente da tabela já ter palavras.</div>
-
-    <div style="margin-top:10px">
-      <table id="bwTable" style="display:none">
-        <thead><tr><th>Palavra</th><th>Imagem</th><th>Som</th><th class="actions">Ações</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </div>
-
   <!-- 5) AÇÕES -->
   <div class="row" style="display:flex;gap:10px;align-items:center;margin:14px 0">
     <button id="btnGen">Gerar prompt</button>
@@ -231,26 +186,6 @@ BIRD
   const typesWrap  = $('types');
   const autoDistEl = $('autoDist');
   const sumInfoEl  = $('sumInfo');
-
-  // Banco (bulk) — mantido no código, mas UI está oculta
-  const bwFileEl      = $('bwFile');
-  const btnLoadFile   = $('btnLoadFile');
-  const bwBulkEl      = $('bwBulk');
-  const btnAddBulk    = $('btnAddBulk');
-  const btnClearWords = $('btnClearWords');
-  const mediaPrefixEl = $('mediaPrefix');
-  const bwTable       = $('bwTable');
-  const bwTBody       = bwTable ? bwTable.querySelector('tbody') : null;
-
-  // Tabela de palavras adicionadas
-  let WORDS_MEDIA = [];
-
-  const MEDIA_PREFIX_MAP = {
-    p1: { img: '../data1/imagens/',   sound: '../data1/sounds/'   },
-    p2: { img: '../data2/imagens/',   sound: '../data2/sounds/'   },
-    p3: { img: '../data3/imagens/',   sound: '../data3/sounds/'   },
-    p4: { img: '../DataStory/images/',sound: '../DataStory/sounds/'}
-  };
 
   // Tipos alinhados ao app
   const TYPE_LIST = [
@@ -384,7 +319,6 @@ BIRD
       if(i.ok){
         inspireEl.value = (i.text || '').trim();
       } else {
-        // inspirador é opcional
         inspireEl.value = inspireEl.value || '';
       }
 
@@ -409,138 +343,9 @@ BIRD
     }catch{
       baseUrlEl.value = '';
     }
-    // padrões para evitar confusão de "0/4"
     if(!sanitize(netLevelEl.value)) netLevelEl.value = 'Level0';
     if(!sanitize(netUnitEl.value))  netUnitEl.value  = 'Unit1';
   })();
-
-  /* -------------------------
-      BANCO DE PALAVRAS
-      (mantido, mas UI oculta)
-  --------------------------*/
-
-  if(btnClearWords){
-    btnClearWords.addEventListener('click', ()=>{
-      if(bwBulkEl) bwBulkEl.value = '';
-    });
-  }
-
-  if(btnLoadFile && bwFileEl){
-    btnLoadFile.addEventListener('click', ()=>{ bwFileEl.click(); });
-    bwFileEl.addEventListener('change', (e)=>{
-      const file = e.target.files && e.target.files[0];
-      if(!file){ msgEl.textContent = '⚠ Nenhum arquivo selecionado.'; return; }
-      const reader = new FileReader();
-      reader.onload = (ev)=>{
-        const prev = bwBulkEl.value;
-        const txt = (ev.target.result || '').trim();
-        bwBulkEl.value = prev ? (prev + '\n' + txt) : txt;
-        msgEl.textContent = '📄 Conteúdo acrescentado ao campo.';
-      };
-      reader.onerror = ()=>{ msgEl.textContent = '⚠ Erro ao ler o arquivo.'; };
-      reader.readAsText(file, 'utf-8');
-    });
-  }
-
-  function getSelectedPrefixes(){
-    const key = (mediaPrefixEl && mediaPrefixEl.value) ? mediaPrefixEl.value : 'p1';
-    return MEDIA_PREFIX_MAP[key] || MEDIA_PREFIX_MAP.p1;
-  }
-
-  function refreshBWTable(){
-    if(!bwTable || !bwTBody) return;
-    if(!WORDS_MEDIA.length){
-      bwTable.style.display='none';
-      bwTBody.innerHTML='';
-      return;
-    }
-    bwTable.style.display='table';
-    bwTBody.innerHTML = '';
-    WORDS_MEDIA.forEach((item, idx)=>{
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><input class="sm" data-field="word"  data-i="${idx}" type="text" value="${item.word}" /></td>
-        <td><input class="sm" data-field="img"   data-i="${idx}" type="text" value="${item.img}" /></td>
-        <td><input class="sm" data-field="audio" data-i="${idx}" type="text" value="${item.audio}" /></td>
-        <td class="actions"><button data-i="${idx}" class="ghost">Remover</button></td>
-      `;
-      bwTBody.appendChild(tr);
-    });
-  }
-
-  function addManyWordsFromText(text){
-    const lines = (text||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-    if(!lines.length){ msgEl.textContent = '⚠ Nada para adicionar (campo vazio).'; return; }
-
-    const prefixes = getSelectedPrefixes();
-    let batchIndex = 1;
-    let added = 0;
-
-    const existing = new Set(WORDS_MEDIA.map(w=>w.word));
-    const normalizedLines = lines.map(w => w.toUpperCase());
-    const hasDuplicates = normalizedLines.some(w => existing.has(w));
-
-    let addDuplicatesToo = true;
-    if(hasDuplicates){
-      addDuplicatesToo = confirm(
-        'Existem palavras já existentes na tabela.\n' +
-        'Deseja adicionar mesmo assim TODAS as palavras deste lote (incluindo duplicadas)?\n\n' +
-        'OK = Adicionar todas (incluindo duplicadas)\n' +
-        'Cancelar = Adicionar apenas as novas'
-      );
-    }
-
-    const seenInBatch = new Set();
-
-    for(const raw of lines){
-      const word = raw.toUpperCase();
-      if(!word) continue;
-      if(seenInBatch.has(word)) continue;
-      seenInBatch.add(word);
-
-      if(!addDuplicatesToo && existing.has(word)) continue;
-
-      const img   = `${prefixes.img}imagem${batchIndex}.png`;
-      const audio = `${prefixes.sound}som${batchIndex}.mp3`;
-
-      WORDS_MEDIA.push({word, img, audio});
-      existing.add(word);
-      batchIndex++;
-      added++;
-    }
-
-    msgEl.textContent = added ? `✅ ${added} palavra(s) adicionada(s) (numeração reiniciada).` : '⚠ Nenhuma palavra adicionada.';
-    refreshBWTable();
-  }
-
-  if(btnAddBulk){
-    btnAddBulk.addEventListener('click', ()=>{ addManyWordsFromText(bwBulkEl.value); });
-  }
-
-  if(bwTBody){
-    bwTBody.addEventListener('click', (e)=>{
-      const btn = e.target.closest('button');
-      if(!btn) return;
-      const idx = parseInt(btn.getAttribute('data-i'),10);
-      if(!Number.isNaN(idx)){
-        WORDS_MEDIA.splice(idx,1);
-        refreshBWTable();
-      }
-    });
-
-    bwTBody.addEventListener('input', (e)=>{
-      const input = e.target.closest('input');
-      if(!input) return;
-      const idx   = parseInt(input.getAttribute('data-i'),10);
-      const field = input.getAttribute('data-field');
-      if(Number.isNaN(idx) || !field) return;
-
-      const val = input.value.trim();
-      if(field==='word')  WORDS_MEDIA[idx].word  = val.toUpperCase();
-      if(field==='img')   WORDS_MEDIA[idx].img   = val;
-      if(field==='audio') WORDS_MEDIA[idx].audio = val;
-    });
-  }
 
   /* -------------------------
       PROMPT BUILDER
@@ -576,8 +381,6 @@ BIRD
   }
 
   function buildExamples(L, U, Q){
-    // Exemplos enxutos (sem metadados que você adiciona depois)
-    // Regra de áudio de alternativa: usar slug do texto (minúsculo + espaço→hífen) como nome de arquivo em /sounds/
     return `
 EXEMPLOS OFICIAIS (COPIE O FORMATO EXATO; NÃO INCLUA METADADOS ADICIONADOS DEPOIS)
 
@@ -585,7 +388,7 @@ EXEMPLOS OFICIAIS (COPIE O FORMATO EXATO; NÃO INCLUA METADADOS ADICIONADOS DEPO
 {
   "type": "truefalse",
   "prompt": "Sarah laughed and said, 'I am ninety years old!'",
-  "image": "/${L}/${U}/${Q}/imagem2.png",
+  "image": "/${L}/${U}/${Q}/imagem1.png",
   "options": [
     { "label": "True",  "value": "true",  "audio": "/${L}/${U}/${Q}/sounds/true.mp3" },
     { "label": "False", "value": "false", "audio": "/${L}/${U}/${Q}/sounds/false.mp3" }
@@ -598,7 +401,7 @@ EXEMPLOS OFICIAIS (COPIE O FORMATO EXATO; NÃO INCLUA METADADOS ADICIONADOS DEPO
 {
   "type": "image_mcq",
   "prompt": "Look and choose the correct answer.",
-  "image": "/${L}/${U}/${Q}/imagem3.png",
+  "image": "/${L}/${U}/${Q}/imagem2.png",
   "options": [
     { "label": "I am seven years old.", "value": "correct",    "audio": "/${L}/${U}/${Q}/sounds/i-am-seven-years-old.mp3" },
     { "label": "I am ten years old.",   "value": "wrong",      "audio": "/${L}/${U}/${Q}/sounds/i-am-ten-years-old.mp3" },
@@ -612,7 +415,7 @@ EXEMPLOS OFICIAIS (COPIE O FORMATO EXATO; NÃO INCLUA METADADOS ADICIONADOS DEPO
 {
   "type": "yesno",
   "prompt": "Is this Mary?",
-  "image": "/${L}/${U}/${Q}/imagem4.png",
+  "image": "/${L}/${U}/${Q}/imagem3.png",
   "options": [
     { "label": "Yes", "value": "yes", "audio": "/${L}/${U}/${Q}/sounds/yes.mp3" },
     { "label": "No",  "value": "no",  "audio": "/${L}/${U}/${Q}/sounds/no.mp3" }
@@ -625,12 +428,12 @@ EXEMPLOS OFICIAIS (COPIE O FORMATO EXATO; NÃO INCLUA METADADOS ADICIONADOS DEPO
 {
   "type": "fillblank",
   "prompt": "___ and Sarah lived in Canaan.",
-  "image": "/${L}/${U}/DataStory/images/imagem1.png",
+  "image": "/${L}/${U}/${Q}/imagem4.png",
   "options": [
-    { "label": "Abraham", "value": "Abraham", "audio": "/${L}/${U}/data1/sounds/abraham.mp3" },
-    { "label": "Father",  "value": "Father",  "audio": "/${L}/${U}/data1/sounds/father.mp3" }
+    { "label": "Abraham", "value": "abraham", "audio": "/${L}/${U}/${Q}/sounds/abraham.mp3" },
+    { "label": "Father",  "value": "father",  "audio": "/${L}/${U}/${Q}/sounds/father.mp3" }
   ],
-  "answer": "Abraham",
+  "answer": "abraham",
   "promptAudio": "/${L}/${U}/${Q}/prompt4.mp3"
 }
 
@@ -694,7 +497,6 @@ EXEMPLOS OFICIAIS (COPIE O FORMATO EXATO; NÃO INCLUA METADADOS ADICIONADOS DEPO
     cefrLevel,
     total,
     altCount,
-    mediaBase,
     types,
     dist,
     L,
@@ -724,31 +526,28 @@ EXEMPLOS OFICIAIS (COPIE O FORMATO EXATO; NÃO INCLUA METADADOS ADICIONADOS DEPO
       .join('\n');
 
     const QA_RULES = `
-REGRAS DE QA E CAMINHOS (OBRIGATÓRIO)
+REGRAS DE QA, IMAGENS E ÁUDIOS (OBRIGATÓRIO)
 • Use estes valores nos caminhos:
   Level: "${L}"
   Unit: "${U}"
   QA: "${Q}"
 
-• Imagens para ilustrar questões (quando criar novas):
-  "/${L}/${U}/${Q}/imagemN.png"
+• TODA imagem usada nas questões deve ser CRIADA por você (não reutilize imagens existentes da gramática).
+  Portanto:
+  - Se uma questão tiver "image": "/${L}/${U}/${Q}/imagemN.png"
+  - ENTÃO essa mesma imagemN.png deve aparecer na lista [IMAGES_TO_CREATE] com descrição detalhada.
 
-• PromptAudio (sempre que possível):
-  "/${L}/${U}/${Q}/promptN.mp3"
-  Regra de N: N = posição da questão no array "questions" (começa em 1)
+• Padrões:
+  - image: "/${L}/${U}/${Q}/imagemN.png"
+  - promptAudio: "/${L}/${U}/${Q}/promptN.mp3"  (N = posição da questão no array, começando em 1)
+  - options[].audio: "/${L}/${U}/${Q}/sounds/<arquivo>.mp3"
 
-• Áudios das alternativas (quando houver):
-  "/${L}/${U}/${Q}/sounds/<nome-do-arquivo>.mp3"
-
-  IMPORTANTE: o nome do arquivo deve ser derivado do texto da alternativa (label):
+• Nome do arquivo de áudio das alternativas:
+  Derive do texto da alternativa (label), assim:
   - minúsculo
   - espaços viram hífen
   - sem acentos/pontuação
-  - exemplo: "Stand up" → "stand-up.mp3"
-
-• Imagens já existentes no texto de gramática:
-  Se o texto de gramática citar um arquivo de imagem que já existe, você pode usar.
-  Nesse caso, escreva EXATAMENTE o nome/arquivo como aparece no texto e NÃO inclua essa imagem na lista de "IMAGES_TO_CREATE".
+  Ex.: "Stand up" → "stand-up.mp3"; "sit down" → "sit-down.mp3"; "May" → "may.mp3"
 `.trim();
 
     const CORE_RULES = `
@@ -781,8 +580,6 @@ ${activeLabels}
 • Crie questões visualmente didáticas: use imagens para ilustrar o conteúdo sempre que fizer sentido.
 • Crie alternativas que ajudem a criança a aprender (sem pegadinhas injustas).
 • Use frases simples e adequadas ao nível.
-
-7) Não invente campos fora do padrão dos exemplos.
 `.trim();
 
     const ASSET_OUTPUT = `
@@ -793,10 +590,10 @@ SAÍDA COMPLETA (OBRIGATÓRIO) — em 4 blocos, nesta ordem EXATA:
 [/QUESTIONS_JSON]
 
 [IMAGES_TO_CREATE]
-Liste somente as IMAGENS NOVAS que você quer que eu crie para ilustrar as questões.
+Liste TODAS as imagens usadas no JSON (mesmo nome) + descrição detalhada.
 Formato: uma linha por imagem
 imagemN.png — descrição detalhada da imagem (para eu gerar depois)
-NÃO inclua imagens que você reutilizou do texto de gramática.
+REGRA: se apareceu no JSON, tem que aparecer aqui. Não deixe esse bloco vazio.
 [/IMAGES_TO_CREATE]
 
 [PROMPTS_AUDIO_LIST]
@@ -851,14 +648,13 @@ LEMBRETE FINAL:
     const textoInsp = sanitize(inspireEl.value);
     const textoGram = sanitize(grammarEl.value);
 
-    const baseLevel = sanitize(netLevelEl.value);
-    const baseUnit  = sanitize(netUnitEl.value);
-    const qaForPaths= sanitize(courseQAEl.value);
+    const L = sanitize(netLevelEl.value);
+    const U = sanitize(netUnitEl.value);
+    const Q = sanitize(courseQAEl.value);
 
     const cefrLevel = cefrLevelEl.value;
     const total     = parseInt(qCountEl.value||'12',10);
     const altCount  = parseInt(altCountEl.value||'4',10);
-    const mediaBase = sanitize(mediaBaseEl.value); // mantido por compatibilidade (não é obrigatório)
 
     if(!textoInsp && !textoGram){
       msgEl.textContent = '⚠ Preencha ao menos um dos textos (inspirador ou gramática).';
@@ -866,13 +662,13 @@ LEMBRETE FINAL:
       return;
     }
 
-    if(!baseLevel || !baseUnit){
+    if(!L || !U){
       msgEl.textContent = '⚠ Preencha Level e Unit do topo (ex.: Level0 / Unit4).';
       outEl.value = '';
       return;
     }
 
-    if(!qaForPaths){
+    if(!Q){
       msgEl.textContent = '⚠ Preencha o campo QA (ex.: QA8).';
       outEl.value = '';
       return;
@@ -907,12 +703,9 @@ LEMBRETE FINAL:
       cefrLevel,
       total,
       altCount,
-      mediaBase,
       types,
       dist,
-      L: baseLevel,
-      U: baseUnit,
-      Q: qaForPaths
+      L, U, Q
     });
 
     outEl.value = prompt;
