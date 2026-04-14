@@ -277,9 +277,10 @@
       width: 100%;
       max-width: 600px;
       aspect-ratio: 1 / 1;
-      object-fit: cover;
+      object-fit: contain;
       border-radius: 20px;
       display: block;
+      background: #000;
     }
 
     /* Tabela preços */
@@ -803,6 +804,20 @@
         font-size: 0.92rem;
       }
 
+      .video-container {
+        max-width: 100%;
+        padding: 10px;
+        border-radius: 18px;
+      }
+
+      video {
+        width: 100%;
+        max-width: 100%;
+        aspect-ratio: auto;
+        object-fit: contain;
+        border-radius: 14px;
+      }
+
       .nav-controls {
         left: 50%;
         right: auto;
@@ -946,7 +961,7 @@
       <h2>Vídeo demonstrativo</h2>
       <p class="lead">Apresentação do app: atividades interativas, jogos, vídeos e prática de conversação com IA.</p>
       <div class="video-container">
-        <video controls>
+        <video id="demoVideo" controls playsinline webkit-playsinline preload="metadata">
           <source src="assets/demo.mp4" type="video/mp4">
           Seu navegador não suporta vídeo.
         </video>
@@ -1158,21 +1173,45 @@
   const prevBtn = document.getElementById('prevBtn');
   const nextBtn = document.getElementById('nextBtn');
   const counterSpan = document.getElementById('slideCounter');
+  const demoVideo = document.getElementById('demoVideo');
   let current = 0;
   const total = slides.length;
 
+  function pauseAllMedia() {
+    document.querySelectorAll('video').forEach((video) => {
+      try {
+        video.pause();
+      } catch (err) {}
+    });
+  }
+
   function updateSlide() {
+    pauseAllMedia();
     slidesContainer.style.transform = `translateX(-${current * 100}%)`;
     counterSpan.innerText = `${current+1} / ${total}`;
   }
 
-  function next() { if (current < total-1) { current++; updateSlide(); } }
-  function prev() { if (current > 0) { current--; updateSlide(); } }
+  function next() {
+    if (current < total-1) {
+      current++;
+      updateSlide();
+    }
+  }
+
+  function prev() {
+    if (current > 0) {
+      current--;
+      updateSlide();
+    }
+  }
 
   prevBtn.addEventListener('click', prev);
   nextBtn.addEventListener('click', next);
 
-  document.getElementById('restartBtn')?.addEventListener('click', () => { current = 0; updateSlide(); });
+  document.getElementById('restartBtn')?.addEventListener('click', () => {
+    current = 0;
+    updateSlide();
+  });
 
   const partnerModal = document.getElementById('partnerModal');
   const contactBtn = document.getElementById('contactBtn');
@@ -1180,6 +1219,7 @@
   const closePartnerModalBtn = document.getElementById('closePartnerModalBtn');
 
   function openPartnerModal() {
+    pauseAllMedia();
     partnerModal.classList.add('active');
     partnerModal.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
@@ -1201,9 +1241,29 @@
     }
   });
 
+  if (demoVideo) {
+    demoVideo.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement) {
+        demoVideo.pause();
+      }
+    });
+
+    demoVideo.addEventListener('webkitfullscreenchange', () => {
+      const isWebkitFullscreen = document.webkitFullscreenElement || document.webkitCurrentFullScreenElement;
+      if (!isWebkitFullscreen) {
+        demoVideo.pause();
+      }
+    });
+
+    demoVideo.addEventListener('ended', () => {
+      demoVideo.currentTime = 0;
+    });
+  }
+
   const fsBtn = document.getElementById('fullscreenBtn');
   if (fsBtn) {
     fsBtn.addEventListener('click', () => {
+      pauseAllMedia();
       if (!document.fullscreenElement) document.documentElement.requestFullscreen();
       else document.exitFullscreen();
     });
@@ -1222,6 +1282,7 @@
       next();
     }
     if (e.key === 'f' || e.key === 'F') {
+      pauseAllMedia();
       if (!document.fullscreenElement) document.documentElement.requestFullscreen();
       else document.exitFullscreen();
     }
