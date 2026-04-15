@@ -1,4 +1,4 @@
-const cacheName = 'hannah-course-v4';
+const cacheName = 'hannah-course-v5';
 const staticAssets = [
   '/',
   '/index.html',
@@ -14,6 +14,12 @@ const staticAssets = [
   '/Level4/index.html',
   '/offline.html'
 ];
+
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
 
 self.addEventListener('install', event => {
   console.log('[SW] Instalando...');
@@ -52,6 +58,7 @@ self.addEventListener('fetch', event => {
   // Ignorar login (sensível)
   if (url.pathname.includes('/Formulario/login.html')) {
     console.log('[SW] Ignorando cache de login:', url.href);
+    event.respondWith(fetch(request));
     return;
   }
 
@@ -72,32 +79,31 @@ self.addEventListener('fetch', event => {
 
   console.log('[SW] Interceptando:', finalRequest.url);
 
-  // Dispositivo offline → fallback
-  if (!navigator.onLine) {
-    console.warn('[SW] Offline — fornecendo conteúdo em cache.');
-    if (isHTMLRequest(request)) {
-      event.respondWith(caches.match('/offline.html'));
-    } else {
-      event.respondWith(new Response('', { status: 503, statusText: 'Offline' }));
-    }
-    return;
-  }
-
-  // Online: fetch + cache fallback
+  // Estratégia principal: tentar rede primeiro e usar cache/fallback se falhar
   event.respondWith(
     fetch(finalRequest)
       .then(response => {
-        return caches.open(cacheName).then(cache => {
-          cache.put(finalRequest, response.clone());
-          return response;
-        });
+        if (response && response.status === 200 && response.type === 'basic') {
+          return caches.open(cacheName).then(cache => {
+            cache.put(finalRequest, response.clone());
+            return response;
+          });
+        }
+        return response;
       })
       .catch(() => {
-        console.warn('[SW] Falha na rede. Verificando cache.');
-        if (isHTMLRequest(finalRequest)) {
-          return caches.match('/offline.html');
-        }
-        return new Response('', { status: 503, statusText: 'Offline' });
+        console.warn('[SW] Falha na rede. Verificando cache/fallback.');
+        return caches.match(finalRequest).then(cachedResponse => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+
+          if (isHTMLRequest(finalRequest)) {
+            return caches.match('/offline.html');
+          }
+
+          return new Response('', { status: 503, statusText: 'Offline' });
+        });
       })
   );
 });

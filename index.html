@@ -13,6 +13,12 @@
   <link rel="icon" type="image/png" sizes="512x512" href="android-chrome-512x512.png"/>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png"/>
 
+  <!-- META PWA / APPLE -->
+  <meta name="theme-color" content="#4CAF50"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="apple-mobile-web-app-title" content="HIS English Course"/>
+
   <!-- CSS PRINCIPAL -->
   <link rel="stylesheet" href="CSS/styles.css"/>
 
@@ -435,6 +441,7 @@ firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 /* ========================= PWA =========================== */
 
 let deferredPrompt=null;
+let installPromptAvailable=false;
 const installBtn=document.getElementById("installBtn");
 
 function isInStandaloneMode(){
@@ -460,70 +467,99 @@ function hideInstallButton(){
 }
 
 function controlPWAButtons(){
+  const iosBanner=document.getElementById("iosInstallBanner");
+
   if(isInStandaloneMode()){
     hideInstallButton();
+    iosBanner.style.display="none";
     return;
   }
-  if(deferredPrompt){
+
+  if(isIOS){
+    iosBanner.style.display="block";
+  }else{
+    iosBanner.style.display="none";
+  }
+
+  if(installPromptAvailable && deferredPrompt){
     showInstallButton();
   }else{
     hideInstallButton();
   }
 }
 
-if(isIOS && !isInStandaloneMode()){
-  const b=document.getElementById("iosInstallBanner");
-  b.style.display="block";
-  document.getElementById("iosBannerClose").onclick=()=>b.style.display="none";
-}
+document.getElementById("iosBannerClose").onclick=()=>{
+  document.getElementById("iosInstallBanner").style.display="none";
+};
 
 window.addEventListener("beforeinstallprompt",(e)=>{
   if(isInStandaloneMode()) return;
   e.preventDefault();
   deferredPrompt=e;
-  showInstallButton();
+  installPromptAvailable=true;
+  controlPWAButtons();
 });
 
 installBtn.addEventListener("click",async()=>{
   if(!deferredPrompt) return;
+
   hideInstallButton();
-  deferredPrompt.prompt();
-  await deferredPrompt.userChoice;
+
+  try{
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+  }catch(e){
+    console.error("Erro no prompt de instalação:",e);
+  }
+
   deferredPrompt=null;
-  setTimeout(controlPWAButtons,500);
+  installPromptAvailable=false;
+  setTimeout(controlPWAButtons,800);
 });
 
 window.addEventListener("appinstalled",()=>{
   deferredPrompt=null;
+  installPromptAvailable=false;
   hideInstallButton();
+  document.getElementById("iosInstallBanner").style.display="none";
 });
 
 async function verificarInstalacaoInicial(){
   if(isInStandaloneMode()){
     hideInstallButton();
+    document.getElementById("iosInstallBanner").style.display="none";
     return;
   }
-  if("getInstalledRelatedApps" in navigator){
-    try{
-      const apps=await navigator.getInstalledRelatedApps();
-      if(apps.length>0){
-        hideInstallButton();
-      }
-    }catch(e){}
-  }
+
   controlPWAButtons();
+
+  setTimeout(()=>{
+    if(isInStandaloneMode()){
+      hideInstallButton();
+      document.getElementById("iosInstallBanner").style.display="none";
+    }
+  },1000);
 }
 
 function updateNetworkStatus(){
   if(!navigator.onLine){
     installBtn.disabled=true;
-  }else if(deferredPrompt){
+  }else if(installPromptAvailable && deferredPrompt){
     installBtn.disabled=false;
   }
 }
 
-window.addEventListener("online",updateNetworkStatus);
+window.addEventListener("online",()=>{
+  updateNetworkStatus();
+  controlPWAButtons();
+});
 window.addEventListener("offline",updateNetworkStatus);
+window.addEventListener("pageshow",()=>setTimeout(controlPWAButtons,300));
+document.addEventListener("visibilitychange",()=>{
+  if(!document.hidden){
+    setTimeout(controlPWAButtons,300);
+  }
+});
 
 
 /* ====================== ÁUDIO DO ROBÔ ======================= */
@@ -874,9 +910,32 @@ document.addEventListener("DOMContentLoaded",()=>{
 /* ============================= SERVICE WORKER ============================= */
 
 if("serviceWorker" in navigator){
-  navigator.serviceWorker.register("/service-worker.js")
-    .then(r=>console.log("SW registrado:", r.scope))
-    .catch(err=>console.error("SW erro:",err));
+  window.addEventListener("load",()=>{
+    navigator.serviceWorker.register("/service-worker.js")
+      .then(r=>{
+        console.log("SW registrado:", r.scope);
+
+        if(r.waiting){
+          r.waiting.postMessage({ type:"SKIP_WAITING" });
+        }
+
+        r.addEventListener("updatefound",()=>{
+          const newWorker=r.installing;
+          if(!newWorker) return;
+
+          newWorker.addEventListener("statechange",()=>{
+            if(newWorker.state==="installed" && navigator.serviceWorker.controller){
+              console.log("Nova versão do app disponível.");
+            }
+          });
+        });
+      })
+      .catch(err=>console.error("SW erro:",err));
+  });
+
+  navigator.serviceWorker.addEventListener("controllerchange",()=>{
+    console.log("Service Worker atualizado.");
+  });
 }
 </script>
 
