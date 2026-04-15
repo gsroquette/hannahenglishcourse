@@ -1,4 +1,4 @@
-const cacheName = 'hannah-course-v5';
+const cacheName = 'hannah-course-v6';
 const staticAssets = [
   '/',
   '/index.html',
@@ -24,9 +24,18 @@ self.addEventListener('message', event => {
 self.addEventListener('install', event => {
   console.log('[SW] Instalando...');
   event.waitUntil(
-    caches.open(cacheName).then(cache => {
+    caches.open(cacheName).then(async cache => {
       console.log('[SW] Armazenando em cache estático:', staticAssets);
-      return cache.addAll(staticAssets);
+
+      const resultados = await Promise.allSettled(
+        staticAssets.map(asset => cache.add(asset))
+      );
+
+      resultados.forEach((resultado, index) => {
+        if (resultado.status === 'rejected') {
+          console.warn('[SW] Falha ao adicionar no cache:', staticAssets[index], resultado.reason);
+        }
+      });
     })
   );
   self.skipWaiting();
@@ -39,9 +48,8 @@ self.addEventListener('activate', event => {
       return Promise.all(
         keys.filter(key => key !== cacheName).map(key => caches.delete(key))
       );
-    })
+    }).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 // Função utilitária para detectar se é uma navegação HTML
@@ -54,6 +62,9 @@ self.addEventListener('fetch', event => {
 
   const url = new URL(event.request.url);
   const request = event.request;
+
+  // Ignorar origens externas
+  if (url.origin !== self.location.origin) return;
 
   // Ignorar login (sensível)
   if (url.pathname.includes('/Formulario/login.html')) {
@@ -74,7 +85,9 @@ self.addEventListener('fetch', event => {
   // Redirecionar diretórios para index.html
   let finalRequest = request;
   if (url.pathname.endsWith('/')) {
-    finalRequest = new Request(url.pathname + 'index.html', { headers: request.headers });
+    finalRequest = new Request(url.pathname + 'index.html', {
+      headers: request.headers
+    });
   }
 
   console.log('[SW] Interceptando:', finalRequest.url);
@@ -99,7 +112,13 @@ self.addEventListener('fetch', event => {
           }
 
           if (isHTMLRequest(finalRequest)) {
-            return caches.match('/offline.html');
+            return caches.match('/offline.html').then(offlineResponse => {
+              return offlineResponse || new Response('Offline', {
+                status: 503,
+                statusText: 'Offline',
+                headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+              });
+            });
           }
 
           return new Response('', { status: 503, statusText: 'Offline' });
