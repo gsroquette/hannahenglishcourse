@@ -101,12 +101,24 @@
       font-size: 1.25rem;
       font-weight: 900;
       transition: .2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      padding: 0;
     }
 
     .nav-btn:hover {
       background: #111;
       color: #fff;
       transform: translateY(-1px);
+    }
+
+    .nav-btn svg {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+      pointer-events: none;
     }
 
     .slide-counter {
@@ -154,7 +166,7 @@
 </head>
 
 <body>
-  <div class="presentation">
+  <div class="presentation" id="presentation">
     <div class="slides-container" id="slidesContainer">
 
       <section class="slide">
@@ -211,7 +223,7 @@
 
       <section class="slide">
         <div class="video-slide">
-          <video id="demoVideo" src="assets/demo.mp4" controls playsinline></video>
+          <video id="demoVideo" src="assets/demo.mp4" controls playsinline webkit-playsinline></video>
         </div>
       </section>
 
@@ -222,9 +234,21 @@
     </div>
 
     <div class="nav-controls">
-      <button class="nav-btn" id="prevBtn" aria-label="Slide anterior">‹</button>
+      <button class="nav-btn" id="prevBtn" aria-label="Slide anterior" title="Anterior">
+        ‹
+      </button>
+
       <div class="slide-counter" id="slideCounter">1 / 15</div>
-      <button class="nav-btn" id="nextBtn" aria-label="Próximo slide">›</button>
+
+      <button class="nav-btn" id="nextBtn" aria-label="Próximo slide" title="Próximo">
+        ›
+      </button>
+
+      <button class="nav-btn" id="fullscreenBtn" aria-label="Tela cheia" title="Tela cheia">
+        <svg id="fullscreenIcon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M7 3H3v4h2V5h2V3zm14 0h-4v2h2v2h2V3zM5 17H3v4h4v-2H5v-2zm16 0h-2v2h-2v2h4v-4z"/>
+        </svg>
+      </button>
     </div>
 
     <div class="progress">
@@ -233,10 +257,13 @@
   </div>
 
   <script>
+    const presentation = document.getElementById("presentation");
     const slidesContainer = document.getElementById("slidesContainer");
     const slides = document.querySelectorAll(".slide");
     const prevBtn = document.getElementById("prevBtn");
     const nextBtn = document.getElementById("nextBtn");
+    const fullscreenBtn = document.getElementById("fullscreenBtn");
+    const fullscreenIcon = document.getElementById("fullscreenIcon");
     const slideCounter = document.getElementById("slideCounter");
     const progressBar = document.getElementById("progressBar");
     const demoVideo = document.getElementById("demoVideo");
@@ -269,16 +296,85 @@
       }
     }
 
+    function isFullscreenActive() {
+      return !!(
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.msFullscreenElement
+      );
+    }
+
+    function updateFullscreenIcon() {
+      if (isFullscreenActive()) {
+        fullscreenIcon.innerHTML = `
+          <path d="M9 9H3V3h2v4h4v2zm12 0h-6V7h4V3h2v6zM5 15H3v6h6v-2H5v-4zm16 0h-2v4h-4v2h6v-6z"/>
+        `;
+        fullscreenBtn.title = "Sair da tela cheia";
+        fullscreenBtn.setAttribute("aria-label", "Sair da tela cheia");
+      } else {
+        fullscreenIcon.innerHTML = `
+          <path d="M7 3H3v4h2V5h2V3zm14 0h-4v2h2v2h2V3zM5 17H3v4h4v-2H5v-2zm16 0h-2v2h-2v2h4v-4z"/>
+        `;
+        fullscreenBtn.title = "Tela cheia";
+        fullscreenBtn.setAttribute("aria-label", "Tela cheia");
+      }
+    }
+
+    async function toggleFullscreen() {
+      try {
+        if (!isFullscreenActive()) {
+          if (presentation.requestFullscreen) {
+            await presentation.requestFullscreen();
+          } else if (presentation.webkitRequestFullscreen) {
+            presentation.webkitRequestFullscreen();
+          } else if (presentation.msRequestFullscreen) {
+            presentation.msRequestFullscreen();
+          }
+        } else {
+          if (document.exitFullscreen) {
+            await document.exitFullscreen();
+          } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+          } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+          }
+        }
+      } catch (error) {
+        console.warn("Não foi possível alternar para tela cheia:", error);
+      }
+    }
+
     nextBtn.addEventListener("click", nextSlide);
     prevBtn.addEventListener("click", prevSlide);
+    fullscreenBtn.addEventListener("click", toggleFullscreen);
+
+    document.addEventListener("fullscreenchange", updateFullscreenIcon);
+    document.addEventListener("webkitfullscreenchange", updateFullscreenIcon);
+    document.addEventListener("msfullscreenchange", updateFullscreenIcon);
 
     document.addEventListener("keydown", function(event) {
+      const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : "";
+
+      if (activeTag === "input" || activeTag === "textarea") return;
+
       if (event.key === "ArrowRight" || event.key === " ") {
+        event.preventDefault();
         nextSlide();
       }
 
       if (event.key === "ArrowLeft") {
+        event.preventDefault();
         prevSlide();
+      }
+
+      if (event.key === "f" || event.key === "F") {
+        event.preventDefault();
+        toggleFullscreen();
+      }
+
+      if (event.key === "Escape" && demoVideo && currentSlide !== 13) {
+        demoVideo.pause();
+        demoVideo.currentTime = 0;
       }
     });
 
@@ -307,6 +403,7 @@
     }
 
     updatePresentation();
+    updateFullscreenIcon();
   </script>
 </body>
 </html>
