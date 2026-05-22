@@ -107,24 +107,27 @@
             }
         }
 
-        /* Transparent content containers */
+        /* Premium readable content containers */
         .content {
-            max-width: 800px;
+            max-width: 920px;
             margin: 40px auto;
             /* Added extra top padding to avoid overlap with the close button */
-            padding: 40px 20px 20px;
-            background-color: transparent; 
-            border: none;
-            box-shadow: none;
+            padding: 60px 38px 38px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px solid rgba(76, 175, 80, 0.18);
+            border-radius: 24px;
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.14);
             position: relative;
             display: none; /* hidden by default */
+            backdrop-filter: blur(2px);
+            -webkit-backdrop-filter: blur(2px);
         }
 
         /* Close button */
         .close-btn {
             position: absolute;
-            top: 10px;
-            right: 10px;
+            top: 14px;
+            right: 14px;
             background-color: #FF6347; 
             color: #fff;
             border: none;
@@ -133,11 +136,13 @@
             border-radius: 30px;
             font-weight: bold;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-            transition: background-color 0.3s ease;
+            transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
         }
 
         .close-btn:hover {
             background-color: #e0553c;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.22);
         }
 
         /* Print button (novo) */
@@ -159,22 +164,61 @@
             background-color: #45a049;
         }
 
-        /* Base class for formatted text, now all bold and slightly larger */
+        /* Base class for formatted text, optimized for long reading */
         .formatted-text {
-            line-height: 1.6;
-            font-size: 1.1rem; /* slightly bigger font */
-            font-weight: bold; /* ALL text in bold */
-            color: #444;
+            line-height: 1.75;
+            font-size: 1.15rem; /* slightly bigger font */
+            font-weight: 600;
+            color: #333;
         }
 
         .formatted-text h3 {
-            color: #333;
+            color: #2e7d32;
             margin-top: 1.5em;
-            margin-bottom: 0.5em;
+            margin-bottom: 0.7em;
+            padding: 12px 16px;
+            background: rgba(76, 175, 80, 0.10);
+            border-left: 6px solid #4CAF50;
+            border-radius: 12px;
+            text-shadow: none;
+        }
+
+        .formatted-text .heading-main {
+            color: #333;
+            background: transparent;
+            border-left: none;
+            padding: 0;
+            font-size: 1.45rem;
+            margin-top: 1.8em;
+            margin-bottom: 1em;
+            border-radius: 0;
+        }
+
+        .formatted-text .heading-section {
+            color: #4CAF50;
+            background: transparent;
+            border-left: none;
+            padding: 0;
+            font-size: 1.35rem;
+            margin-top: 1.6em;
+            margin-bottom: 1em;
+            border-radius: 0;
+        }
+
+        .formatted-text .heading-small {
+            color: #4CAF50;
+            background: transparent;
+            border-left: none;
+            padding: 0;
+            font-size: 1.18rem;
+            margin-top: 1.4em;
+            margin-bottom: 0.8em;
+            border-radius: 0;
         }
 
         .formatted-text strong {
             color: #4CAF50; /* highlight for double-bold is not very visible but kept for color difference */
+            font-weight: 800;
         }
 
         .formatted-text em {
@@ -184,16 +228,17 @@
         .formatted-text ul {
             margin-left: 1.5em;
             margin-bottom: 1em;
+            padding-left: 1em;
         }
 
         .formatted-text li {
-            margin-bottom: 0.5em;
+            margin-bottom: 0.6em;
         }
 
         .formatted-text hr {
-            margin: 20px 0;
+            margin: 28px 0;
             border: 0;
-            border-top: 1px solid #ccc;
+            border-top: 1px solid rgba(76, 175, 80, 0.25);
         }
 
         .formatted-text p {
@@ -207,8 +252,37 @@
         /* Responsive adjustments */
         @media (max-width: 800px) {
             .content {
-                padding: 50px 15px 15px;
-                margin: 20px auto;
+                padding: 58px 18px 22px;
+                margin: 20px 12px;
+                border-radius: 18px;
+            }
+
+            .formatted-text {
+                font-size: 1.05rem;
+                line-height: 1.65;
+            }
+
+            .formatted-text h3 {
+                padding: 10px 12px;
+                border-radius: 10px;
+            }
+
+            .formatted-text .heading-main {
+                padding: 0;
+                font-size: 1.25rem;
+                border-radius: 0;
+            }
+
+            .formatted-text .heading-section {
+                padding: 0;
+                font-size: 1.18rem;
+                border-radius: 0;
+            }
+
+            .formatted-text .heading-small {
+                padding: 0;
+                font-size: 1.08rem;
+                border-radius: 0;
             }
 
             h1 {
@@ -358,10 +432,10 @@
 
         /**
          * Convert plain text to basic HTML formatting:
-         * - Lines starting with ### => <h3>
+         * - Lines starting with #, ##, ###, ####, #####, ###### => heading styles
          * - Lines with '---' => <hr>
          * - **bold** => <strong>
-         * - lines starting with '- ' => <li> inside a <ul>
+         * - lines starting with '- ' or '* ' => <li> inside a <ul>
          * - blank lines => <br>
          * - otherwise => <p> line
          */
@@ -383,25 +457,37 @@
                     continue;
                 }
 
-                // If line starts with ### => <h3>
-                if (trimmed.startsWith('###')) {
+                // Markdown-style headings: #, ##, ###, ####, #####, ######
+                if (/^#{1,6}\s+/.test(trimmed)) {
                     if (inUl) {
                         html += '</ul>';
                         inUl = false;
                     }
-                    let content = trimmed.replace(/^###\s*/, '');
+
+                    const level = trimmed.match(/^#{1,6}/)[0].length;
+                    let content = trimmed.replace(/^#{1,6}\s*/, '');
                     content = applyBold(content);
-                    html += `<h3>${content}</h3>`;
+
+                    if (level === 1) {
+                        html += `<h3 class="heading-main">${content}</h3>`;
+                    } else if (level === 2) {
+                        html += `<h3 class="heading-section">${content}</h3>`;
+                    } else if (level === 3) {
+                        html += `<h3>${content}</h3>`;
+                    } else {
+                        html += `<h3 class="heading-small">${content}</h3>`;
+                    }
+
                     continue;
                 }
 
-                // If line starts with '- ' => list item
-                if (trimmed.startsWith('- ')) {
+                // If line starts with '- ' or '* ' => list item
+                if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
                     if (!inUl) {
                         html += '<ul>';
                         inUl = true;
                     }
-                    let content = trimmed.replace(/^- /, '');
+                    let content = trimmed.replace(/^[-*]\s+/, '');
                     content = applyBold(content);
                     html += `<li>${content}</li>`;
                     continue;
@@ -517,7 +603,7 @@
                 'imagem4.png',
                 'imagem5.png',
                 'imagem6.png',
-                'imagem7.png'
+                'imagem7.png'               
             ];
 
             let html = `<h3>Documents</h3>`;
@@ -586,9 +672,7 @@
             const container = document.getElementById('bibleActivityContainer');
             const contentDiv = document.getElementById('bibleActivityContent');
 
-            const imageFiles = [
-                'imagem21.png',
-                'imagem22.png'                
+            const imageFiles = [            
             ];
 
             let html = `<h3>Bible Documents</h3>`;
