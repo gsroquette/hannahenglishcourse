@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-  <title>Hannah English - Learn English Through Bible Stories</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+  <title>HIS English Course - Learn English Through Bible Stories</title>
 
   <!-- FAVICONS -->
   <link rel="icon" type="image/x-icon" href="favicon.ico"/>
@@ -12,6 +12,12 @@
   <link rel="icon" type="image/png" sizes="192x192" href="android-chrome-192x192.png"/>
   <link rel="icon" type="image/png" sizes="512x512" href="android-chrome-512x512.png"/>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png"/>
+
+  <!-- META PWA / APPLE -->
+  <meta name="theme-color" content="#4CAF50"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="apple-mobile-web-app-title" content="HIS English Course"/>
 
   <!-- CSS PRINCIPAL -->
   <link rel="stylesheet" href="CSS/styles.css"/>
@@ -309,7 +315,7 @@
       font-size:clamp(18px, 3.5vw, 26px);
       margin:0;
       color:#4CAF50;
-      text-shadow:none !important;    /* sem sombra */
+      text-shadow:none !important;
       font-family:Arial, sans-serif;
     }
 
@@ -343,9 +349,9 @@
       </div>
 
       <div class="logo-title">
-        <img src="imagens/hannah_logo.png" class="logo" alt="Hannah English Logo"/>
+        <img src="imagens/hannah_logo.png" class="logo" alt="HIS English Course Logo"/>
         <!-- Título: usa header h1 do styles.css (cor + sombra) -->
-        <h1 class="main-title">Hannah English</h1>
+        <h1 class="main-title">HIS English Course</h1>
         <!-- Subtítulo: verde, sem sombra -->
         <h2 class="main-subtitle">Learn English Through Bible Stories</h2>
       </div>
@@ -388,8 +394,8 @@
 
     <!-- Rodapé -->
     <footer>
-      © 2025 Hannah English Course — All rights reserved.<br>
-      © 2025 Curso de Inglês Hannah — Todos os direitos reservados.
+      © 2025 HIS English Course — All rights reserved.<br>
+      © 2025 Curso de Inglês HIS — Todos os direitos reservados.
     </footer>
 
   </div>
@@ -402,12 +408,12 @@
 
   <!-- Banner iOS -->
   <div id="iosInstallBanner">
-    To install HannahEnglish on your device, tap the 
+    To install HIS English Course on your device, tap the 
     <img src="imagens/share-icon.png" height="22" style="vertical-align:middle;">
     Share button and choose “Add to Home Screen”.
     <br>
     <span style="font-size:14px;">
-      Para instalar o HannahEnglish no seu dispositivo, clique no ícone 
+      Para instalar o HIS English Course no seu dispositivo, clique no ícone 
       <img src="imagens/share-icon.png" height="22" style="vertical-align:middle;">
       ou toque no botão <strong>Compartilhar</strong> e depois em “Adicionar à Tela de Início”.
     </span>
@@ -435,6 +441,7 @@ firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 /* ========================= PWA =========================== */
 
 let deferredPrompt=null;
+let installPromptAvailable=false;
 const installBtn=document.getElementById("installBtn");
 
 function isInStandaloneMode(){
@@ -460,70 +467,99 @@ function hideInstallButton(){
 }
 
 function controlPWAButtons(){
+  const iosBanner=document.getElementById("iosInstallBanner");
+
   if(isInStandaloneMode()){
     hideInstallButton();
+    iosBanner.style.display="none";
     return;
   }
-  if(deferredPrompt){
+
+  if(isIOS){
+    iosBanner.style.display="block";
+  }else{
+    iosBanner.style.display="none";
+  }
+
+  if(installPromptAvailable && deferredPrompt){
     showInstallButton();
   }else{
     hideInstallButton();
   }
 }
 
-if(isIOS && !isInStandaloneMode()){
-  const b=document.getElementById("iosInstallBanner");
-  b.style.display="block";
-  document.getElementById("iosBannerClose").onclick=()=>b.style.display="none";
-}
+document.getElementById("iosBannerClose").onclick=()=>{
+  document.getElementById("iosInstallBanner").style.display="none";
+};
 
 window.addEventListener("beforeinstallprompt",(e)=>{
   if(isInStandaloneMode()) return;
   e.preventDefault();
   deferredPrompt=e;
-  showInstallButton();
+  installPromptAvailable=true;
+  controlPWAButtons();
 });
 
 installBtn.addEventListener("click",async()=>{
   if(!deferredPrompt) return;
+
   hideInstallButton();
-  deferredPrompt.prompt();
-  await deferredPrompt.userChoice;
+
+  try{
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+  }catch(e){
+    console.error("Erro no prompt de instalação:",e);
+  }
+
   deferredPrompt=null;
-  setTimeout(controlPWAButtons,500);
+  installPromptAvailable=false;
+  setTimeout(controlPWAButtons,800);
 });
 
 window.addEventListener("appinstalled",()=>{
   deferredPrompt=null;
+  installPromptAvailable=false;
   hideInstallButton();
+  document.getElementById("iosInstallBanner").style.display="none";
 });
 
 async function verificarInstalacaoInicial(){
   if(isInStandaloneMode()){
     hideInstallButton();
+    document.getElementById("iosInstallBanner").style.display="none";
     return;
   }
-  if("getInstalledRelatedApps" in navigator){
-    try{
-      const apps=await navigator.getInstalledRelatedApps();
-      if(apps.length>0){
-        hideInstallButton();
-      }
-    }catch(e){}
-  }
+
   controlPWAButtons();
+
+  setTimeout(()=>{
+    if(isInStandaloneMode()){
+      hideInstallButton();
+      document.getElementById("iosInstallBanner").style.display="none";
+    }
+  },1000);
 }
 
 function updateNetworkStatus(){
   if(!navigator.onLine){
     installBtn.disabled=true;
-  }else if(deferredPrompt){
+  }else if(installPromptAvailable && deferredPrompt){
     installBtn.disabled=false;
   }
 }
 
-window.addEventListener("online",updateNetworkStatus);
+window.addEventListener("online",()=>{
+  updateNetworkStatus();
+  controlPWAButtons();
+});
 window.addEventListener("offline",updateNetworkStatus);
+window.addEventListener("pageshow",()=>setTimeout(controlPWAButtons,300));
+document.addEventListener("visibilitychange",()=>{
+  if(!document.hidden){
+    setTimeout(controlPWAButtons,300);
+  }
+});
 
 
 /* ====================== ÁUDIO DO ROBÔ ======================= */
@@ -716,7 +752,14 @@ firebase.auth().onAuthStateChanged(async user=>{
       let dash="";
 
       if(d.role==="proprietario"||d.role==="professor"){
-        dash=`<a href="painel_${d.role==='proprietario'?'proprietario':'professor'}.html" class="dashboard-link">${d.role.toUpperCase()} DASHBOARD</a>`;
+        if(d.role==="proprietario"){
+          dash =
+            '<a href="painel_proprietario.html" class="dashboard-link">PROPRIETARIO DASHBOARD</a>' +
+            '<a href="Questions/Uploader/upload-questoes.html" class="dashboard-link">UPLOAD DE QUESTÕES</a>';
+        } else {
+          dash =
+            '<a href="painel_professor.html" class="dashboard-link">PROFESSOR DASHBOARD</a>';
+        }
         liberarNiveis(VALID_LEVELS);
       }
       else if(d.role==="aluno"){
@@ -867,9 +910,32 @@ document.addEventListener("DOMContentLoaded",()=>{
 /* ============================= SERVICE WORKER ============================= */
 
 if("serviceWorker" in navigator){
-  navigator.serviceWorker.register("/service-worker.js")
-    .then(r=>console.log("SW registrado:", r.scope))
-    .catch(err=>console.error("SW erro:",err));
+  window.addEventListener("load",()=>{
+    navigator.serviceWorker.register("/service-worker.js")
+      .then(r=>{
+        console.log("SW registrado:", r.scope);
+
+        if(r.waiting){
+          r.waiting.postMessage({ type:"SKIP_WAITING" });
+        }
+
+        r.addEventListener("updatefound",()=>{
+          const newWorker=r.installing;
+          if(!newWorker) return;
+
+          newWorker.addEventListener("statechange",()=>{
+            if(newWorker.state==="installed" && navigator.serviceWorker.controller){
+              console.log("Nova versão do app disponível.");
+            }
+          });
+        });
+      })
+      .catch(err=>console.error("SW erro:",err));
+  });
+
+  navigator.serviceWorker.addEventListener("controllerchange",()=>{
+    console.log("Service Worker atualizado.");
+  });
 }
 </script>
 
