@@ -155,6 +155,25 @@ document.addEventListener('DOMContentLoaded', function() {
         return null;
     }
 
+    function getLevelNumber(levelValue) {
+        if (!levelValue) return null;
+        const match = String(levelValue).match(/level\s*(\d+)/i);
+        if (match && match[1]) return Number(match[1]);
+        return null;
+    }
+
+    function getLevelStartNumber(levelValue) {
+        const levelNumber = getLevelNumber(levelValue);
+
+        if (levelNumber === 0) return 1;
+        if (levelNumber === 1) return 1001;
+        if (levelNumber === 2) return 2001;
+        if (levelNumber === 3) return 3001;
+        if (levelNumber === 4) return 4001;
+
+        return 1001;
+    }
+
     function getLevelLimitFromClassAccess(limits, levelDB) {
         if (!limits || typeof limits !== "object") return null;
 
@@ -227,6 +246,90 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function getPossiblePhaseKeysForActivity(activityId) {
+        const keys = [];
+        const localId = Number(activityId);
+        const currentUnitNumber = getUnitNumber(currentUnit);
+        const levelStart = getLevelStartNumber(currentLevel);
+
+        if (!Number.isFinite(localId)) return keys;
+
+        // Formato local usado especialmente no Level0 e em alguns históricos
+        keys.push(`fase${localId}`);
+
+        if (currentLevel === "Level0") {
+            return [...new Set(keys)];
+        }
+
+        // Padrão atual usado pelo painel do professor e pelas páginas principais: blocos de 30 por unidade
+        if (currentUnitNumber) {
+            const phaseNumBy30 = levelStart + ((currentUnitNumber - 1) * 30) + (localId - 1);
+            keys.push(`fase${phaseNumBy30}`);
+
+            // Compatibilidade com registros antigos que possam ter usado 37 fases por unidade
+            const phaseNumBy37 = levelStart + ((currentUnitNumber - 1) * 37) + (localId - 1);
+            keys.push(`fase${phaseNumBy37}`);
+        }
+
+        return [...new Set(keys)];
+    }
+
+    function isTruthyProgressValue(value) {
+        return value === true || value === 1 || value === "true" || value === "True";
+    }
+
+    function isActivityCompletedInProgress(progress, activityId) {
+        if (!progress || typeof progress !== "object") return false;
+
+        const possibleKeys = getPossiblePhaseKeysForActivity(activityId);
+
+        for (const key of possibleKeys) {
+            if (isTruthyProgressValue(progress[key])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    function applyIndividualProgressToActivities(progress) {
+        let firstLockedIndexFound = false;
+        let lastPlayableIndex = -1;
+
+        activities.forEach(activity => {
+            activity.unlocked = false;
+            activity.completed = false;
+        });
+
+        for (let index = 0; index < activities.length; index++) {
+            const activity = activities[index];
+            const completed = isActivityCompletedInProgress(progress, activity.id);
+
+            activity.completed = completed;
+
+            if (completed) {
+                activity.unlocked = true;
+                lastPlayableIndex = index;
+                continue;
+            }
+
+            if (!firstLockedIndexFound) {
+                // Libera a próxima fase jogável depois da sequência concluída.
+                activity.unlocked = true;
+                lastPlayableIndex = index;
+                firstLockedIndexFound = true;
+            } else {
+                activity.unlocked = false;
+            }
+        }
+
+        lastUnlockedIndex = lastPlayableIndex;
+
+        activities.forEach(activity => {
+            console.log(`Fase ${activity.id} - completed? ${!!activity.completed} / unlocked by progress? ${!!activity.unlocked}`);
+        });
+    }
+
     function isAllowedByClassLimit(activityId, levelLimit) {
         if (!levelLimit) return false;
 
@@ -273,25 +376,31 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         let lastAllowedIndex = -1;
+        let teacherBlockedNextPhase = false;
 
         activities.forEach((activity, index) => {
+            const wasUnlockedByProgress = !!activity.unlocked;
             const classAllows = isAllowedByClassLimit(activity.id, levelLimit);
 
-            if (!classAllows) {
-                activity.unlocked = false;
+            if (wasUnlockedByProgress && !classAllows) {
+                teacherBlockedNextPhase = true;
             }
+
+            activity.unlocked = wasUnlockedByProgress && classAllows;
 
             if (activity.unlocked) {
                 lastAllowedIndex = index;
             }
 
-            console.log(`Fase ${activity.id} - permitida pela turma? ${classAllows} / liberada final? ${!!activity.unlocked}`);
+            console.log(`Fase ${activity.id} - progress allows? ${wasUnlockedByProgress} / class allows? ${classAllows} / final unlocked? ${!!activity.unlocked}`);
         });
 
         lastUnlockedIndex = lastAllowedIndex;
 
         if (lastUnlockedIndex < 0) {
             setPermissionMessage("Your teacher has not released these phases yet.");
+        } else if (teacherBlockedNextPhase) {
+            setPermissionMessage("Your teacher has not released the next phase yet. Please wait for your teacher.");
         } else {
             setPermissionMessage("");
         }
@@ -305,7 +414,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             database.ref('/usuarios/' + userId).once('value')
                 .then(snapshot => {
-                    const userData = snapshot.val();
+                    const userData = snapshot.val() || {};
                     console.log("Dados do usuário:", userData);
 
                     const userName = userData.nome || user.email;
@@ -368,7 +477,10 @@ document.addEventListener('DOMContentLoaded', function() {
         lastUnlockedIndex = -1;
 
         if (userRole === 'proprietario' || userRole === 'professor') {
-            activities.forEach(activity => (activity.unlocked = true));
+            activities.forEach(activity => {
+                activity.unlocked = true;
+                activity.completed = true;
+            });
             lastUnlockedIndex = activities.length - 1;
             initializeMap(userAvatar);
         } else {
@@ -377,20 +489,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const progress = snapshot.val() || {};
                     console.log("Progresso encontrado:", progress);
 
-                    activities.forEach((activity, index) => {
-                        const faseKey = Object.keys(progress).find(
-                            key => key.includes(`fase${activity.id}`) || key.includes(activity.id.toString())
-                        );
-
-                        if (faseKey && progress[faseKey] === true) {
-                            activity.unlocked = index === 0 || activities[index - 1].unlocked;
-                            if (activity.unlocked) lastUnlockedIndex = index;
-                        } else {
-                            activity.unlocked = false;
-                        }
-
-                        console.log(`Fase ${activity.id} - liberada pelo progresso? ${!!activity.unlocked}`);
-                    });
+                    applyIndividualProgressToActivities(progress);
 
                     if (userRole === 'aluno' && userData && userData.atrelado_professor) {
                         const classPermission = await getClassPermissionForStudent(userId, userData, currentLevel);
@@ -398,7 +497,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (classPermission.foundClass && classPermission.levelLimit) {
                             applyClassLimitToActivities(classPermission.levelLimit);
                         } else {
-                            activities.forEach(activity => (activity.unlocked = false));
+                            activities.forEach(activity => {
+                                activity.unlocked = false;
+                            });
                             lastUnlockedIndex = -1;
                             setPermissionMessage("Your teacher has not released these phases yet.");
                         }
@@ -559,7 +660,9 @@ document.addEventListener('DOMContentLoaded', function() {
         phaseDiv.appendChild(unlockGif);
 
         const unlockSound = new Audio('../../imagens/unlock-padlock.mp3');
-        unlockSound.play();
+        unlockSound.play().catch(error => {
+            console.warn("Não foi possível tocar o som de desbloqueio:", error);
+        });
 
         setTimeout(() => { unlockGif.remove(); }, 3000);
     }
