@@ -320,6 +320,21 @@
       box-shadow:0 10px 24px rgba(0,0,0,.15);
     }
 
+    .permission-message{
+      display:none;
+      width:min(90%, 620px);
+      margin:12px auto 0;
+      padding:12px 16px;
+      border-radius:12px;
+      background:#fff3cd;
+      border:1px solid #ffe08a;
+      color:#5d4037;
+      font-weight:700;
+      line-height:1.4;
+      text-align:center;
+      box-shadow:0 4px 10px rgba(0,0,0,0.08);
+    }
+
     /* Rodapé simples */
     footer{
       margin-top:20px;
@@ -417,6 +432,8 @@
       <h2 class="subtitle" id="subtitleLoggedIn" style="display:none;">
         Choose your level and Start Learning English While Playing
       </h2>
+
+      <div id="permissionMessage" class="permission-message"></div>
 
       <!-- Botões de Níveis -->
       <div class="levels">
@@ -690,14 +707,27 @@ function levelsAPartirDoProgresso(progresso){
 let permissionsReady=false;
 let allowedLevels=new Set();
 const permOverlay=document.getElementById("permOverlay");
+const permissionMessage=document.getElementById("permissionMessage");
 
 function setPermOverlay(show){
   permOverlay.style.display=show?"block":"none";
 }
 
+function setPermissionMessage(message){
+  if(!permissionMessage) return;
+  if(message){
+    permissionMessage.textContent=message;
+    permissionMessage.style.display="block";
+  }else{
+    permissionMessage.textContent="";
+    permissionMessage.style.display="none";
+  }
+}
+
 function bloquearTodosNiveis(){
   permissionsReady=false;
   allowedLevels=new Set();
+  setPermissionMessage("");
   document.querySelectorAll(".level-button").forEach(b=>{
     b.style.filter="grayscale(100%)";
     b.style.pointerEvents="none";
@@ -708,6 +738,7 @@ function liberarNiveis(arr){
   const alvo=new Set(arr||[]);
   allowedLevels=new Set(alvo);
   permissionsReady=true;
+  setPermissionMessage("");
 
   document.querySelectorAll(".level-button").forEach(b=>{
     if(alvo.has(b.id)){
@@ -722,6 +753,41 @@ function liberarNiveis(arr){
   if(alvo.size>0){
     setPermOverlay(false);
   }
+}
+
+function bloquearAlunoAtreladoSemLiberacao(){
+  permissionsReady=true;
+  allowedLevels=new Set();
+
+  document.querySelectorAll(".level-button").forEach(b=>{
+    b.style.filter="grayscale(100%)";
+    b.style.pointerEvents="none";
+  });
+
+  setPermOverlay(false);
+  setPermissionMessage("Your teacher has not released any level yet.");
+}
+
+function levelsAPartirDosLimitesDaTurma(limits){
+  if(!limits || typeof limits!=="object") return [];
+
+  const liberados=[];
+
+  VALID_LEVELS.forEach(levelKey=>{
+    const limit=limits[levelKey];
+
+    if(
+      limit &&
+      limit.enabled === true &&
+      limit.unit &&
+      limit.phase &&
+      typeof limit.order !== "undefined"
+    ){
+      liberados.push(levelKey);
+    }
+  });
+
+  return liberados;
 }
 
 function enviarNivel(n){
@@ -855,31 +921,33 @@ firebase.auth().onAuthStateChanged(async user=>{
               .ref("usuarios/"+d.atrelado_professor+"/turmas")
               .once("value");
             const turmas=snapTurmas.val()||{};
-            let registroAluno=null;
+            let turmaDoAluno=null;
 
             for(const turmaId in turmas){
               const st=turmas[turmaId]?.students?.[user.uid];
-              if(st){registroAluno=st; break;}
+              if(st){
+                turmaDoAluno=turmas[turmaId];
+                break;
+              }
             }
 
-            if(registroAluno){
-              const arrProf=normalizarListaLevels(registroAluno.levels_liberados);
-              if(liberarPorPreferencia(arrProf)){}
-              else{
-                const nProf=normalizarNivel(registroAluno.nivel_em_curso);
-                if(nProf){
-                  enviarNivel(nProf);
-                }else{
-                  tentarAlunoDireto();
-                }
+            if(turmaDoAluno){
+              const limits=turmaDoAluno.class_access?.limits || {};
+              const arrTurma=levelsAPartirDosLimitesDaTurma(limits);
+
+              if(arrTurma.length){
+                liberarNiveis(arrTurma);
+              }else{
+                bloquearAlunoAtreladoSemLiberacao();
               }
             }
             else{
-              tentarAlunoDireto();
+              bloquearAlunoAtreladoSemLiberacao();
             }
 
           }catch(e){
-            tentarAlunoDireto();
+            console.error("Erro ao carregar permissões da turma:", e);
+            bloquearAlunoAtreladoSemLiberacao();
           }
         }
         else{
