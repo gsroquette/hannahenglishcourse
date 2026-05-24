@@ -200,6 +200,17 @@
     .test-score.bad {
       color: #c62828;
     }
+
+    .warning-box {
+      background-color: #fff3cd;
+      border: 1px solid #ffe08a;
+      color: #5d4037;
+      border-radius: 8px;
+      padding: 10px;
+      margin-top: 10px;
+      font-weight: 600;
+      line-height: 1.4;
+    }
   </style>
 </head>
 <body>
@@ -282,6 +293,8 @@
     const auth = firebase.auth();
     const db = firebase.database();
 
+    let currentStudentData = null;
+
     auth.onAuthStateChanged(user => {
       if (user) {
         const studentId = user.uid;
@@ -337,18 +350,24 @@
     function loadStudentData(studentId) {
       const studentRef = db.ref('usuarios/' + studentId);
       studentRef.once('value', snapshot => {
-        const data = snapshot.val();
+        const data = snapshot.val() || {};
+        currentStudentData = data;
+
         document.getElementById('student-name').value = data.nome || '';
         document.getElementById('student-email').value = data.email || '';
         const avatar = data.avatar || 'avatar_aluno1.png';
         document.getElementById('avatar-preview').src = 'imagens/' + avatar;
         
         if (data.atrelado_professor) {
-          loadTeacherInfo(data.atrelado_professor);
+          loadTeacherInfo(data.atrelado_professor, studentId);
         } else {
           document.getElementById('teacher-info').innerHTML = '<p>You are not currently linked to a teacher.</p>';
         }
 
+        loadProgress(studentId);
+      }).catch(error => {
+        console.error("Error loading student data:", error);
+        document.getElementById('teacher-info').innerHTML = '<p>Error loading student data.</p>';
         loadProgress(studentId);
       });
     }
@@ -485,34 +504,108 @@
       });
     }
 
-    function loadTeacherInfo(teacherId) {
+    async function findStudentClassUnderTeacher(teacherId, studentId) {
+      try {
+        const turmasSnapshot = await db.ref(`usuarios/${teacherId}/turmas`).once('value');
+        const turmas = turmasSnapshot.val() || {};
+
+        for (const classId in turmas) {
+          if (turmas[classId] && turmas[classId].students && turmas[classId].students[studentId]) {
+            return {
+              classId: classId,
+              classData: turmas[classId],
+              studentRecord: turmas[classId].students[studentId]
+            };
+          }
+        }
+
+        return null;
+      } catch (error) {
+        console.error("Error finding student's class:", error);
+        return null;
+      }
+    }
+
+    function loadTeacherInfo(teacherId, studentId) {
       const teacherRef = db.ref('usuarios/' + teacherId);
-      teacherRef.once('value', snapshot => {
-        const teacherData = snapshot.val();
+
+      Promise.all([
+        teacherRef.once('value'),
+        findStudentClassUnderTeacher(teacherId, studentId)
+      ]).then(([teacherSnapshot, classInfo]) => {
+        const teacherData = teacherSnapshot.val();
         const teacherName = teacherData ? teacherData.nome : 'Unknown Teacher';
         const teacherAvatar = teacherData && teacherData.avatar ? teacherData.avatar : 'default_avatar.png';
+        const className = classInfo && classInfo.classData && classInfo.classData.nome ? classInfo.classData.nome : null;
+
+        let classInfoHTML = '';
+
+        if (classInfo && className) {
+          classInfoHTML = `<p>Class: <strong>${className}</strong></p>`;
+        } else if (classInfo) {
+          classInfoHTML = `<p>Class: <strong>Class found</strong></p>`;
+        } else {
+          classInfoHTML = `
+            <div class="warning-box">
+              Your teacher link is incomplete. You are linked to a teacher, but you were not found inside any class. Please contact your teacher or unlink and ask to be enrolled again.
+            </div>
+          `;
+        }
 
         document.getElementById('teacher-info').innerHTML = `
           <p>Linked to Teacher: <img src="imagens/${teacherAvatar}" alt="Teacher Avatar" style="width: 30px; height: 30px; vertical-align: middle; border-radius: 50%;"> ${teacherName}</p>
+          ${classInfoHTML}
+          <button onclick="unlinkTeacher()">Unlink from Teacher</button>
+        `;
+      }).catch(error => {
+        console.error("Error loading teacher info:", error);
+        document.getElementById('teacher-info').innerHTML = `
+          <div class="warning-box">
+            Error loading teacher information. Please try again later.
+          </div>
           <button onclick="unlinkTeacher()">Unlink from Teacher</button>
         `;
       });
     }
 
-    function unlinkTeacher() {
+    async function unlinkTeacher() {
       if (confirm("Are you sure you want to unlink from your teacher? You will no longer have a teacher if you proceed.")) {
         const studentId = auth.currentUser.uid;
-        const studentRef = db.ref('usuarios/' + studentId + '/atrelado_professor');
 
-        studentRef.remove()
-          .then(() => {
-            alert("You have been unlinked from your teacher.");
+        if (!studentId) {
+          alert("No authenticated student found.");
+          return;
+        }
+
+        try {
+          const studentSnapshot = await db.ref('usuarios/' + studentId).once('value');
+          const studentData = studentSnapshot.val() || {};
+          const teacherId = studentData.atrelado_professor;
+
+          if (!teacherId) {
             document.getElementById('teacher-info').innerHTML = '<p>You are not currently linked to a teacher.</p>';
-          })
-          .catch(error => {
-            console.error("Error unlinking from teacher:", error);
-            alert("An error occurred while trying to unlink. Please try again later.");
-          });
+            alert("You are not currently linked to a teacher.");
+            return;
+          }
+
+          const classInfo = await findStudentClassUnderTeacher(teacherId, studentId);
+          const updates = {};
+
+          updates[`usuarios/${studentId}/atrelado_professor`] = null;
+
+          if (classInfo && classInfo.classId) {
+            updates[`usuarios/${teacherId}/turmas/${classInfo.classId}/students/${studentId}`] = null;
+          }
+
+          await db.ref().update(updates);
+
+          alert("You have been unlinked from your teacher.");
+          document.getElementById('teacher-info').innerHTML = '<p>You are not currently linked to a teacher.</p>';
+          currentStudentData = Object.assign({}, currentStudentData || {}, { atrelado_professor: null });
+        } catch (error) {
+          console.error("Error unlinking from teacher:", error);
+          alert("An error occurred while trying to unlink. Please try again later.");
+        }
       }
     }
 
