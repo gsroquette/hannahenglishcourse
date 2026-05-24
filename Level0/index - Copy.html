@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select a Unit - Level A</title>
+    <link rel="stylesheet" href="../CSS/styles.css">
+    <style>
+        .map-container {
+            width: 100%;
+            height: 100vh;
+            position: relative;
+            background-image: url('../../imagens/fundo.png');
+            background-repeat: repeat;
+            background-size: 200%;
+            overflow-y: auto;
+        }
+
+        .header-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+        }
+
+        .header-container h1 {
+            margin: 0;
+            font-size: 36px;
+            color: #4CAF50;
+        }
+
+        .level-display {
+            margin-top: 5px;
+            font-family: Times, serif;
+            font-weight: bold;
+            color: black;
+            font-size: 24px;
+        }
+
+        .back-button {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            background-color: black;
+            color: white;
+            text-align: center;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .units {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            justify-content: center;
+        }
+
+        .unit-button {
+            text-align: center;
+            padding: 10px 0;
+            color: green;
+            border: 2px solid green;
+            border-radius: 20px;
+            background-color: white;
+            text-decoration: none;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            width: 100%;
+            max-width: 200px;
+            box-sizing: border-box;
+        }
+
+        .unit-button:hover {
+            background-color: green;
+            color: white;
+        }
+
+        .unit-button.disabled {
+            background-color: rgba(128, 128, 128, 0.3);
+            border-color: rgba(128, 128, 128, 0.5);
+            color: rgba(128, 128, 128, 0.5);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="map-container">
+        <!-- Cabeçalho -->
+        <header class="header-container">
+            <h1>Select a Unit</h1>
+            <div id="level-display" class="level-display"></div>
+        </header>
+        
+        <!-- Botão de voltar -->
+        <div style="text-align: center;">
+            <button class="back-button" onclick="window.location.href='../index.html';">Back</button>
+        </div>
+
+        <!-- Container das unidades (será preenchido via JavaScript) -->
+        <main>
+            <div class="units" id="units-container"></div>            
+        </main>
+    </div>
+
+    <!-- Firebase Configuration and Initialization -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDGgo2H_hDKXF88xN7XnLFNUj8ikMY7Xdc",
+            authDomain: "hannahenglishcourse.firebaseapp.com",
+            projectId: "hannahenglishcourse",
+            storageBucket: "hannahenglishcourse.appspot.com",
+            messagingSenderId: "449818788486",
+            appId: "1:449818788486:web:8a49d3f68591e6fb3f0707",
+            measurementId: "G-07VVJG9LRS",
+            databaseURL: "https://hannahenglishcourse-default-rtdb.asia-southeast1.firebasedatabase.app"
+        };
+        firebase.initializeApp(firebaseConfig);
+
+        const db = firebase.database();
+        const auth = firebase.auth();
+
+        // Função para criar os 20 botões de unidades
+        function criarBotoesUnidades() {
+            const container = document.getElementById('units-container');
+            container.innerHTML = ''; // Limpa o container antes de adicionar
+            for (let i = 1; i <= 20; i++) {
+                const button = document.createElement('a');
+                button.href = `Unit${i}/index.html`;
+                button.id = `unit${i}`;
+                button.className = 'unit-button disabled'; // Inicia bloqueado
+                button.textContent = `Unit ${i}`;
+                container.appendChild(button);
+            }
+        }
+
+        // Função para extrair o nível da URL de forma precisa
+        function getCurrentLevel() {
+            const path = window.location.pathname;
+            // Extrai o nível da URL (ex: /level1/ → Level1)
+            const levelMatch = path.match(/\/(level[a-z0-9]+)\//i);
+            if (levelMatch && levelMatch[1]) {
+                // Capitaliza a primeira letra (level1 → Level1)
+                return levelMatch[1].charAt(0).toUpperCase() + levelMatch[1].slice(1);
+            }
+            return 'Level1'; // Padrão seguro
+        }
+
+        // Função para verificar se uma unidade está liberada
+        async function verificarUnidadeLiberada(userId, level, unitNumber) {
+            try {
+                const unitPath = `usuarios/${userId}/progresso/${level}/Unit${unitNumber}`;
+                const snapshot = await db.ref(unitPath).once('value');
+                const unitData = snapshot.val();
+                
+                // Se não existir no BD, não está liberada
+                if (unitData === null) {
+                    console.log(`Unit${unitNumber} não encontrada no BD (${level})`);
+                    return false;
+                }
+                
+                // Se for objeto, verifica se alguma fase está true
+                if (typeof unitData === 'object') {
+                    const liberada = Object.values(unitData).some(val => val === true);
+                    console.log(`Unit${unitNumber} tem ${liberada ? 'fases liberadas' : 'nenhuma fase liberada'}`);
+                    return liberada;
+                }
+                
+                // Se for booleano, retorna o valor
+                console.log(`Unit${unitNumber} está ${unitData ? 'liberada' : 'bloqueada'}`);
+                return !!unitData;
+            } catch (error) {
+                console.error(`Erro ao verificar Unit${unitNumber}:`, error);
+                return false;
+            }
+        }
+
+        // Função principal para carregar o progresso
+        async function carregarProgresso(userId) {
+            const currentLevel = getCurrentLevel();
+            console.log(`Verificando progresso para nível: ${currentLevel}`);
+            
+            document.getElementById('level-display').textContent = currentLevel;
+            
+            for (let i = 1; i <= 20; i++) {
+                const button = document.getElementById(`unit${i}`);
+                if (!button) continue;
+                
+                const liberada = await verificarUnidadeLiberada(userId, currentLevel, i);
+                button.classList.toggle('disabled', !liberada);
+            }
+        }
+
+        // Desbloquear todas as unidades (para professores/proprietários)
+        function desbloquearTodasUnidades() {
+            for (let i = 1; i <= 20; i++) {
+                const button = document.getElementById(`unit${i}`);
+                if (button) {
+                    button.classList.remove('disabled');
+                }
+            }
+            console.log("Todas unidades liberadas (modo professor/proprietário)");
+        }
+
+        // Função para verificar o papel do usuário
+        async function verificarPapelUsuario(userId) {
+            try {
+                const snapshot = await db.ref(`usuarios/${userId}/role`).once('value');
+                return snapshot.val();
+            } catch (error) {
+                console.error("Erro ao verificar papel do usuário:", error);
+                return null;
+            }
+        }
+
+        // Monitorar autenticação
+        auth.onAuthStateChanged(async (user) => {
+            try {
+                criarBotoesUnidades(); // Recria os botões
+                
+                if (!user) {
+                    console.log("Usuário não autenticado - mantendo unidades bloqueadas");
+                    return;
+                }
+
+                const role = await verificarPapelUsuario(user.uid);
+                const currentLevel = getCurrentLevel();
+                
+                if (role === 'proprietario' || role === 'professor') {
+                    desbloquearTodasUnidades();
+                    console.log(`Modo professor/proprietário - todas unidades liberadas em ${currentLevel}`);
+                } else {
+                    await carregarProgresso(user.uid);
+                    console.log(`Progresso do aluno carregado para ${currentLevel}`);
+                }
+            } catch (error) {
+                console.error("Erro no fluxo de autenticação:", error);
+            }
+        });
+
+        // Inicialização
+        document.addEventListener("DOMContentLoaded", function() {
+            console.log("Página carregada - Nível atual:", getCurrentLevel());
+            criarBotoesUnidades();
+        });
+    </script>
+</body>
+</html>
