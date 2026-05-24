@@ -20,6 +20,10 @@ document.addEventListener('DOMContentLoaded', function() {
     let player;
     let lastUnlockedIndex = -1;
 
+    // Controle extra da turma
+    let classLimitActiveForStudent = false;
+    let currentClassLevelLimit = null;
+
     console.log("Elementos da DOM capturados com sucesso.");
 
     // 3️⃣ Extrai Level e Unit da URL atual
@@ -112,22 +116,19 @@ document.addEventListener('DOMContentLoaded', function() {
         const phases = Array.from(document.querySelectorAll('.phase'));
         if (phases.length === 0) return;
 
-        // ponto mais baixo (em coordenadas do container)
         const mapRect = mapContainer.getBoundingClientRect();
         const bottoms = phases.map(p => {
             const r = p.getBoundingClientRect();
-            const yInMap = (r.top - mapRect.top) + r.height; // base do elemento dentro do container
+            const yInMap = (r.top - mapRect.top) + r.height;
             return yInMap;
         });
 
         const maxBottom = Math.max(...bottoms);
         const minHeight = Math.max(window.innerHeight, Math.ceil(maxBottom + padding));
 
-        // Define altura explícita
-        mapContainer.style.minHeight = '100svh'; // garante pelo menos uma tela
+        mapContainer.style.minHeight = '100svh';
         mapContainer.style.height = `${minHeight}px`;
 
-        // Sincroniza SVG com o container
         const w = mapContainer.clientWidth;
         const h = mapContainer.clientHeight;
         svgContainer.setAttribute('width', w);
@@ -299,6 +300,8 @@ document.addEventListener('DOMContentLoaded', function() {
         activities.forEach(activity => {
             activity.unlocked = false;
             activity.completed = false;
+            activity.classAllowed = true;
+            activity.blockedByTeacher = false;
         });
 
         for (let index = 0; index < activities.length; index++) {
@@ -354,12 +357,17 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function applyClassLimitToActivities(levelLimit) {
+        currentClassLevelLimit = levelLimit || null;
+        classLimitActiveForStudent = true;
+
         const currentUnitNumber = getUnitNumber(currentUnit);
         const limitUnitNumber = getUnitNumber(levelLimit?.unit);
 
         if (!levelLimit || !currentUnitNumber || !limitUnitNumber) {
             activities.forEach(activity => {
                 activity.unlocked = false;
+                activity.classAllowed = false;
+                activity.blockedByTeacher = true;
             });
             lastUnlockedIndex = -1;
             setPermissionMessage("Your teacher has not released these phases yet.");
@@ -369,6 +377,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (currentUnitNumber > limitUnitNumber) {
             activities.forEach(activity => {
                 activity.unlocked = false;
+                activity.classAllowed = false;
+                activity.blockedByTeacher = true;
             });
             lastUnlockedIndex = -1;
             setPermissionMessage("Your teacher has not released this unit yet.");
@@ -381,6 +391,9 @@ document.addEventListener('DOMContentLoaded', function() {
         activities.forEach((activity, index) => {
             const wasUnlockedByProgress = !!activity.unlocked;
             const classAllows = isAllowedByClassLimit(activity.id, levelLimit);
+
+            activity.classAllowed = classAllows;
+            activity.blockedByTeacher = !classAllows;
 
             if (wasUnlockedByProgress && !classAllows) {
                 teacherBlockedNextPhase = true;
@@ -404,6 +417,22 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             setPermissionMessage("");
         }
+    }
+
+    function canOpenActivity(activity) {
+        if (!activity) return false;
+
+        if (classLimitActiveForStudent && currentClassLevelLimit) {
+            const classAllowsNow = isAllowedByClassLimit(activity.id, currentClassLevelLimit);
+
+            if (!classAllowsNow) {
+                activity.classAllowed = false;
+                activity.blockedByTeacher = true;
+                return false;
+            }
+        }
+
+        return !!activity.unlocked;
     }
 
     // 7️⃣ Caso de usuário autenticado ou não:
@@ -475,11 +504,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
         setPermissionMessage("");
         lastUnlockedIndex = -1;
+        classLimitActiveForStudent = false;
+        currentClassLevelLimit = null;
 
         if (userRole === 'proprietario' || userRole === 'professor') {
             activities.forEach(activity => {
                 activity.unlocked = true;
                 activity.completed = true;
+                activity.classAllowed = true;
+                activity.blockedByTeacher = false;
             });
             lastUnlockedIndex = activities.length - 1;
             initializeMap(userAvatar);
@@ -497,8 +530,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (classPermission.foundClass && classPermission.levelLimit) {
                             applyClassLimitToActivities(classPermission.levelLimit);
                         } else {
+                            classLimitActiveForStudent = true;
+                            currentClassLevelLimit = null;
                             activities.forEach(activity => {
                                 activity.unlocked = false;
+                                activity.classAllowed = false;
+                                activity.blockedByTeacher = true;
                             });
                             lastUnlockedIndex = -1;
                             setPermissionMessage("Your teacher has not released these phases yet.");
@@ -544,6 +581,8 @@ document.addEventListener('DOMContentLoaded', function() {
             phaseDiv.style.left = `${horizontalPositionPx}px`;
             phaseDiv.style.top = `${topPosition}px`;
 
+            const allowedAtRender = canOpenActivity(activity);
+
             // Imagem da fase
             const phaseImage = document.createElement('img');
             phaseImage.src = activity.img;
@@ -552,7 +591,7 @@ document.addEventListener('DOMContentLoaded', function() {
             phaseDiv.appendChild(phaseImage);
 
             // Estado (bloqueada ou ativa)
-            if (activity.unlocked) {
+            if (allowedAtRender) {
                 phaseDiv.classList.add('active');
             } else {
                 phaseDiv.classList.add('locked');
@@ -562,14 +601,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 phaseDiv.appendChild(lockIcon);
             }
 
-            // Clique
+            // Clique com dupla proteção: progresso + limite da turma
             phaseDiv.addEventListener('click', () => {
-                if (activity.unlocked) {
+                if (canOpenActivity(activity)) {
                     moveToPhase(index, activity.path);
+                } else if (activity.blockedByTeacher) {
+                    setPermissionMessage("Your teacher has not released this phase yet. Please wait for your teacher.");
                 }
             });
 
             mapContainer.appendChild(phaseDiv);
+        });
+
+        // Recalcula lastUnlockedIndex a partir do estado final renderizado
+        lastUnlockedIndex = -1;
+        activities.forEach((activity, index) => {
+            if (canOpenActivity(activity)) {
+                lastUnlockedIndex = index;
+            }
         });
 
         // Só depois que as imagens carregarem, ajusta container, desenha e posiciona o player
