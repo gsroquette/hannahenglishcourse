@@ -6,14 +6,28 @@
     <title>Select a Unit - Level A</title>
     <link rel="stylesheet" href="../CSS/styles.css">
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
         .map-container {
             width: 100%;
-            height: 100vh;
+            min-height: 100vh;
             position: relative;
             background-image: url('../../imagens/fundo.png');
             background-repeat: repeat;
             background-size: 200%;
             overflow-y: auto;
+            overflow-x: hidden;
+            padding-bottom: 30px;
         }
 
         .header-container {
@@ -21,12 +35,15 @@
             flex-direction: column;
             align-items: center;
             margin-top: 20px;
+            padding: 0 16px;
+            text-align: center;
         }
 
         .header-container h1 {
             margin: 0;
             font-size: 36px;
             color: #4CAF50;
+            text-align: center;
         }
 
         .level-display {
@@ -35,6 +52,7 @@
             font-weight: bold;
             color: black;
             font-size: 24px;
+            text-align: center;
         }
 
         .back-button {
@@ -49,33 +67,62 @@
             cursor: pointer;
         }
 
-        .units {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            padding: 20px;
-            max-width: 1200px;
-            margin: 0 auto;
+        .permission-message {
+            display: none;
+            width: min(90%, 620px);
+            margin: 12px auto 0;
+            padding: 12px 16px;
+            border-radius: 12px;
+            background: #fff3cd;
+            border: 1px solid #ffe08a;
+            color: #5d4037;
+            font-weight: 700;
+            line-height: 1.4;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+        }
+
+        main {
+            width: 100%;
+            display: flex;
             justify-content: center;
         }
 
+        .units {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 200px));
+            gap: 20px;
+            padding: 20px;
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            justify-content: center;
+            justify-items: center;
+            align-items: center;
+        }
+
         .unit-button {
+            display: block;
             text-align: center;
-            padding: 10px 0;
+            padding: 12px 0;
             color: green;
             border: 2px solid green;
             border-radius: 20px;
             background-color: white;
             text-decoration: none;
-            transition: background-color 0.3s ease, color 0.3s ease;
+            transition: background-color 0.3s ease, color 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
             width: 100%;
             max-width: 200px;
             box-sizing: border-box;
+            font-weight: bold;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.12);
         }
 
         .unit-button:hover {
             background-color: green;
             color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.18);
         }
 
         .unit-button.disabled {
@@ -83,6 +130,36 @@
             border-color: rgba(128, 128, 128, 0.5);
             color: rgba(128, 128, 128, 0.5);
             pointer-events: none;
+            box-shadow: none;
+            transform: none;
+        }
+
+        @media (max-width: 480px) {
+            .map-container {
+                background-size: 260%;
+            }
+
+            .header-container h1 {
+                font-size: 30px;
+            }
+
+            .level-display {
+                font-size: 22px;
+            }
+
+            .units {
+                grid-template-columns: minmax(180px, 220px);
+                justify-content: center;
+                justify-items: center;
+                padding: 18px 12px;
+                gap: 14px;
+            }
+
+            .unit-button {
+                width: 100%;
+                max-width: 220px;
+                padding: 13px 0;
+            }
         }
     </style>
 </head>
@@ -98,6 +175,8 @@
         <div style="text-align: center;">
             <button class="back-button" onclick="window.location.href='../index.html';">Back</button>
         </div>
+
+        <div id="permission-message" class="permission-message"></div>
 
         <!-- Container das unidades (será preenchido via JavaScript) -->
         <main>
@@ -125,10 +204,27 @@
         const db = firebase.database();
         const auth = firebase.auth();
 
+        const VALID_LEVELS = ["Level0", "Level1", "Level2", "Level3", "Level4"];
+
+        function setPermissionMessage(message) {
+            const msg = document.getElementById('permission-message');
+            if (!msg) return;
+
+            if (message) {
+                msg.textContent = message;
+                msg.style.display = 'block';
+            } else {
+                msg.textContent = '';
+                msg.style.display = 'none';
+            }
+        }
+
         // Função para criar os 20 botões de unidades
         function criarBotoesUnidades() {
             const container = document.getElementById('units-container');
             container.innerHTML = ''; // Limpa o container antes de adicionar
+            setPermissionMessage('');
+
             for (let i = 1; i <= 20; i++) {
                 const button = document.createElement('a');
                 button.href = `Unit${i}/index.html`;
@@ -151,7 +247,54 @@
             return 'Level1'; // Padrão seguro
         }
 
-        // Função para verificar se uma unidade está liberada
+        function normalizarNivel(n) {
+            if (!n) return null;
+            n = String(n).trim().toLowerCase();
+
+            if (n === "level0" || n === "0" || n === "starter") return "Level0";
+            if (n === "level1" || n === "1") return "Level1";
+            if (n === "level2" || n === "2") return "Level2";
+            if (n === "level3" || n === "3") return "Level3";
+            if (n === "level4" || n === "4") return "Level4";
+
+            return null;
+        }
+
+        function extrairNumeroUnidade(unitValue) {
+            if (!unitValue) return null;
+            const match = String(unitValue).match(/unit\s*(\d+)/i);
+            if (match && match[1]) return parseInt(match[1], 10);
+            return null;
+        }
+
+        function bloquearTodasUnidades() {
+            for (let i = 1; i <= 20; i++) {
+                const button = document.getElementById(`unit${i}`);
+                if (button) {
+                    button.classList.add('disabled');
+                }
+            }
+        }
+
+        function liberarUnidadesAte(unitLimitNumber) {
+            for (let i = 1; i <= 20; i++) {
+                const button = document.getElementById(`unit${i}`);
+                if (!button) continue;
+
+                if (i <= unitLimitNumber) {
+                    button.classList.remove('disabled');
+                } else {
+                    button.classList.add('disabled');
+                }
+            }
+        }
+
+        function bloquearAlunoAtreladoSemLiberacao(message) {
+            bloquearTodasUnidades();
+            setPermissionMessage(message || "Your teacher has not released this level yet.");
+        }
+
+        // Função para verificar se uma unidade está liberada pelo progresso individual do aluno
         async function verificarUnidadeLiberada(userId, level, unitNumber) {
             try {
                 const unitPath = `usuarios/${userId}/progresso/${level}/Unit${unitNumber}`;
@@ -180,12 +323,13 @@
             }
         }
 
-        // Função principal para carregar o progresso
+        // Função principal para carregar o progresso individual
         async function carregarProgresso(userId) {
             const currentLevel = getCurrentLevel();
             console.log(`Verificando progresso para nível: ${currentLevel}`);
             
             document.getElementById('level-display').textContent = currentLevel;
+            setPermissionMessage('');
             
             for (let i = 1; i <= 20; i++) {
                 const button = document.getElementById(`unit${i}`);
@@ -198,6 +342,8 @@
 
         // Desbloquear todas as unidades (para professores/proprietários)
         function desbloquearTodasUnidades() {
+            setPermissionMessage('');
+
             for (let i = 1; i <= 20; i++) {
                 const button = document.getElementById(`unit${i}`);
                 if (button) {
@@ -218,10 +364,109 @@
             }
         }
 
+        async function carregarDadosUsuario(userId) {
+            try {
+                const snapshot = await db.ref(`usuarios/${userId}`).once('value');
+                return snapshot.val() || {};
+            } catch (error) {
+                console.error("Erro ao carregar dados do usuário:", error);
+                return {};
+            }
+        }
+
+        function getLevelLimitFromClassAccess(limits, currentLevel) {
+            if (!limits || typeof limits !== 'object') return null;
+
+            const normalizedCurrentLevel = normalizarNivel(currentLevel);
+            if (!normalizedCurrentLevel) return null;
+
+            const limit = limits[normalizedCurrentLevel];
+
+            if (
+                limit &&
+                limit.enabled === true &&
+                limit.unit &&
+                limit.phase &&
+                typeof limit.order !== "undefined"
+            ) {
+                return limit;
+            }
+
+            return null;
+        }
+
+        async function carregarPermissoesDaTurma(userId, userData, currentLevel) {
+            try {
+                if (!userData.atrelado_professor) {
+                    return {
+                        hasTeacher: false,
+                        foundClass: false,
+                        levelLimit: null
+                    };
+                }
+
+                const snapTurmas = await db.ref(`usuarios/${userData.atrelado_professor}/turmas`).once('value');
+                const turmas = snapTurmas.val() || {};
+                let turmaDoAluno = null;
+
+                for (const turmaId in turmas) {
+                    const studentRecord = turmas[turmaId]?.students?.[userId];
+
+                    if (studentRecord) {
+                        turmaDoAluno = turmas[turmaId];
+                        break;
+                    }
+                }
+
+                if (!turmaDoAluno) {
+                    return {
+                        hasTeacher: true,
+                        foundClass: false,
+                        levelLimit: null
+                    };
+                }
+
+                const limits = turmaDoAluno.class_access?.limits || {};
+                const levelLimit = getLevelLimitFromClassAccess(limits, currentLevel);
+
+                return {
+                    hasTeacher: true,
+                    foundClass: true,
+                    levelLimit: levelLimit
+                };
+            } catch (error) {
+                console.error("Erro ao carregar permissões da turma:", error);
+                return {
+                    hasTeacher: true,
+                    foundClass: false,
+                    levelLimit: null,
+                    error: error
+                };
+            }
+        }
+
+        function aplicarLimiteDaTurmaNaPaginaDeUnits(levelLimit, currentLevel) {
+            document.getElementById('level-display').textContent = currentLevel;
+
+            const unitLimitNumber = extrairNumeroUnidade(levelLimit.unit);
+
+            if (!unitLimitNumber) {
+                bloquearAlunoAtreladoSemLiberacao("Your teacher has not released this level yet.");
+                return;
+            }
+
+            liberarUnidadesAte(unitLimitNumber);
+
+            console.log(`${currentLevel} liberado pela turma até ${levelLimit.unit} / ${levelLimit.phase}`);
+        }
+
         // Monitorar autenticação
         auth.onAuthStateChanged(async (user) => {
             try {
                 criarBotoesUnidades(); // Recria os botões
+
+                const currentLevel = getCurrentLevel();
+                document.getElementById('level-display').textContent = currentLevel;
                 
                 if (!user) {
                     console.log("Usuário não autenticado - mantendo unidades bloqueadas");
@@ -229,14 +474,27 @@
                 }
 
                 const role = await verificarPapelUsuario(user.uid);
-                const currentLevel = getCurrentLevel();
                 
                 if (role === 'proprietario' || role === 'professor') {
                     desbloquearTodasUnidades();
                     console.log(`Modo professor/proprietário - todas unidades liberadas em ${currentLevel}`);
                 } else {
-                    await carregarProgresso(user.uid);
-                    console.log(`Progresso do aluno carregado para ${currentLevel}`);
+                    const userData = await carregarDadosUsuario(user.uid);
+
+                    if (userData.atrelado_professor) {
+                        const classPermission = await carregarPermissoesDaTurma(user.uid, userData, currentLevel);
+
+                        if (classPermission.foundClass && classPermission.levelLimit) {
+                            aplicarLimiteDaTurmaNaPaginaDeUnits(classPermission.levelLimit, currentLevel);
+                            console.log(`Permissões da turma carregadas para ${currentLevel}`);
+                        } else {
+                            bloquearAlunoAtreladoSemLiberacao("Your teacher has not released this level yet.");
+                            console.log(`Aluno atrelado sem liberação de turma para ${currentLevel}`);
+                        }
+                    } else {
+                        await carregarProgresso(user.uid);
+                        console.log(`Progresso do aluno carregado para ${currentLevel}`);
+                    }
                 }
             } catch (error) {
                 console.error("Erro no fluxo de autenticação:", error);
@@ -247,6 +505,7 @@
         document.addEventListener("DOMContentLoaded", function() {
             console.log("Página carregada - Nível atual:", getCurrentLevel());
             criarBotoesUnidades();
+            document.getElementById('level-display').textContent = getCurrentLevel();
         });
     </script>
 </body>
