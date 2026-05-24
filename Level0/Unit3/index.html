@@ -100,6 +100,23 @@
       text-shadow: 1px 1px 2px #000000;
     }
 
+    .permission-message {
+      display: none;
+      width: min(90%, 520px);
+      margin: 8px auto 10px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      background: #fff3cd;
+      border: 1px solid #ffe08a;
+      color: #5d4037;
+      font-family: Arial, sans-serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      line-height: 1.35;
+      text-align: center;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    }
+
     /* Área que contém o fundo map.png e os nós em zigue-zague */
     .map-inner {
       position: relative;
@@ -272,6 +289,8 @@
       <div class="title-container"><h1>Select an Activity</h1></div>
     </header>
 
+    <div id="permissionMessage" class="permission-message"></div>
+
     <div class="map-inner">
       <!-- BLOCO DO LEVEL / TÍTULO / VERSÍCULO -->
       <div class="unit-info-box">
@@ -326,13 +345,15 @@
     a.appendChild(img);
     return a; // sem href
   }
-  function markDisabled(anchorEl, requiredPhase) {
+
+  function markDisabled(anchorEl, requiredPhase, customTitle) {
     if (!anchorEl) return;
     anchorEl.classList.add("disabled-btn");
     anchorEl.removeAttribute("href");
     anchorEl.setAttribute("aria-disabled", "true");
-    anchorEl.title = requiredPhase ? `Liberado após concluir a fase ${requiredPhase}.` : `Indisponível.`;
+    anchorEl.title = customTitle || (requiredPhase ? `Liberado após concluir a fase ${requiredPhase}.` : `Indisponível.`);
   }
+
   function markEnabled(anchorEl) {
     if (!anchorEl) return;
     const dh = anchorEl.dataset.href;
@@ -340,6 +361,106 @@
     anchorEl.classList.remove("disabled-btn");
     anchorEl.removeAttribute("aria-disabled");
     anchorEl.removeAttribute("title");
+  }
+
+  function setPermissionMessage(message) {
+    const msg = document.getElementById("permissionMessage");
+    if (!msg) return;
+
+    if (message) {
+      msg.textContent = message;
+      msg.style.display = "block";
+    } else {
+      msg.textContent = "";
+      msg.style.display = "none";
+    }
+  }
+
+  function disableAllStudentActivities(message) {
+    const container = document.getElementById("activity-buttons");
+    if (!container) return;
+
+    const allAnchors = Array.from(container.querySelectorAll("a.activity-button, a.robot-lex, a.hannah-video"));
+    allAnchors.forEach(a => markDisabled(a, a.dataset.requiresPhase, message || "Your teacher has not released these activities yet."));
+    setPermissionMessage(message || "Your teacher has not released these activities yet.");
+  }
+
+  function getUnitNumber(unitValue) {
+    if (!unitValue) return null;
+    const match = String(unitValue).match(/unit\s*(\d+)/i);
+    if (match && match[1]) return Number(match[1]);
+    return null;
+  }
+
+  function getLevelLimitFromClassAccess(limits, levelDB) {
+    if (!limits || typeof limits !== "object") return null;
+
+    const limit = limits[levelDB];
+
+    if (
+      limit &&
+      limit.enabled === true &&
+      limit.unit &&
+      limit.phase &&
+      typeof limit.order !== "undefined" &&
+      typeof limit.phaseNumber !== "undefined"
+    ) {
+      return limit;
+    }
+
+    return null;
+  }
+
+  async function getClassPermissionForStudent(userId, userData, levelDB) {
+    try {
+      if (!userData || !userData.atrelado_professor) {
+        return {
+          hasTeacher: false,
+          foundClass: false,
+          levelLimit: null
+        };
+      }
+
+      const snapTurmas = await firebase.database()
+        .ref("usuarios/" + userData.atrelado_professor + "/turmas")
+        .once("value");
+
+      const turmas = snapTurmas.val() || {};
+      let turmaDoAluno = null;
+
+      for (const turmaId in turmas) {
+        const studentRecord = turmas[turmaId]?.students?.[userId];
+        if (studentRecord) {
+          turmaDoAluno = turmas[turmaId];
+          break;
+        }
+      }
+
+      if (!turmaDoAluno) {
+        return {
+          hasTeacher: true,
+          foundClass: false,
+          levelLimit: null
+        };
+      }
+
+      const limits = turmaDoAluno.class_access?.limits || {};
+      const levelLimit = getLevelLimitFromClassAccess(limits, levelDB);
+
+      return {
+        hasTeacher: true,
+        foundClass: true,
+        levelLimit: levelLimit
+      };
+    } catch (error) {
+      console.error("Erro ao carregar permissões da turma:", error);
+      return {
+        hasTeacher: true,
+        foundClass: false,
+        levelLimit: null,
+        error: error
+      };
+    }
   }
 
   /* ==========
@@ -409,6 +530,7 @@
     // Hannah Video (sempre livre)
     const hannahVideo = document.createElement("a");
     hannahVideo.href = `/Atividades/HannahVideo/index.html?level=${__level}&unit=${__unit}`;
+    hannahVideo.dataset.href = `/Atividades/HannahVideo/index.html?level=${__level}&unit=${__unit}`;
     hannahVideo.className = "activity-button hannah-video node-2"; // Botão 2
     const hvImg = document.createElement("img");
     hvImg.src = "../../imagens/botoes/video_button.png";
@@ -420,11 +542,11 @@
     // Trechos
     const buttonData = [
       { trecho: "trecho1", img: "../../imagens/listening.png", alt: "Listening" },
-      { trecho: "trecho2", img: "../../imagens/grammar.png",   alt: "Grammar" , requiresPhase:  10 },
-      { trecho: "trecho3", img: "../../imagens/speaking.png",  alt: "Speaking", requiresPhase: 19 },
-      { trecho: "trecho4", img: "../../imagens/writing.png",   alt: "Writing" , requiresPhase: 27 },
-      { trecho: "trecho5", img: "../../imagens/Bible.png",     alt: "Bible"   , requiresPhase: 33 },
-      { trecho: "trecho6", img: "../../imagens/test.png",      alt: "Test"    , requiresPhase: 37 }
+      { trecho: "trecho2", img: "../../imagens/grammar.png",   alt: "Grammar" , requiresPhase:  7 },
+      { trecho: "trecho3", img: "../../imagens/speaking.png",  alt: "Speaking", requiresPhase: 13 },
+      { trecho: "trecho4", img: "../../imagens/writing.png",   alt: "Writing" , requiresPhase: 19 },
+      { trecho: "trecho5", img: "../../imagens/Bible.png",     alt: "Bible"   , requiresPhase: 22 },
+      { trecho: "trecho6", img: "../../imagens/test.png",      alt: "Test"    , requiresPhase: 25 }
     ];
 
     let nodeIndexForTrechos = 3; // Botão 3 até 8
@@ -436,6 +558,7 @@
       if (!data.requiresPhase) {
         const a = document.createElement("a");
         a.href = href;
+        a.dataset.href = href;
         a.className = "activity-button " + nodeClass;
         a.dataset.trecho = data.trecho;
         const img = document.createElement("img");
@@ -444,6 +567,7 @@
         container.appendChild(a);
         return;
       }
+
       const gated = createGatedLink({
         href,
         className: "activity-button " + nodeClass,
@@ -455,13 +579,13 @@
       container.appendChild(gated);
     });
 
-    // Robô Lex (requer 27) – Botão 9
+    // Robô Lex (requer 25) – Botão 9
     const robotButton = createGatedLink({
       href: `../../Atividades/LEX/index.html?level=${__level}&unit=${__unit}`,
       className: "activity-button robot-lex node-9",
       imgSrc: "../../imagens/botoes/lex_button.png",
       imgAlt: "Robot Lex",
-      requiresPhase: 37
+      requiresPhase: 25
     });
     robotButton.dataset.kind = "robotLex";
     container.appendChild(robotButton);
@@ -541,6 +665,8 @@
   }
 
   async function applyStudentGates(userId, levelDB, unitDB) {
+    setPermissionMessage("");
+
     const { lastUnlocked, unlockedSet } = await getUnlockedInfo(userId, levelDB, unitDB);
     const container = document.getElementById("activity-buttons");
     if (!container) return;
@@ -561,6 +687,86 @@
         // trecho1 e Hannah Video sempre liberados
         markEnabled(a);
       }
+    }
+  }
+
+  async function applyClassAndStudentGates(userId, levelDB, unitDB, levelLimit) {
+    const container = document.getElementById("activity-buttons");
+    if (!container) return;
+
+    const currentUnitNumber = getUnitNumber(unitDB);
+    const limitUnitNumber = getUnitNumber(levelLimit?.unit);
+
+    if (!levelLimit || !currentUnitNumber || !limitUnitNumber) {
+      disableAllStudentActivities("Your teacher has not released these activities yet.");
+      return;
+    }
+
+    if (currentUnitNumber > limitUnitNumber) {
+      disableAllStudentActivities("Your teacher has not released this unit yet.");
+      return;
+    }
+
+    const { lastUnlocked, unlockedSet } = await getUnlockedInfo(userId, levelDB, unitDB);
+    const allAnchors = Array.from(container.querySelectorAll("a.activity-button, a.robot-lex, a.hannah-video"));
+
+    const isBeforeLimitUnit = currentUnitNumber < limitUnitNumber;
+    const isLimitUnit = currentUnitNumber === limitUnitNumber;
+    const classPhaseLimit = Number(levelLimit.phaseNumber || 0);
+
+    let anyEnabled = false;
+
+    for (const a of allAnchors) {
+      const trecho = a.dataset.trecho;
+      const reqRaw = a.dataset.requiresPhase;
+      const kind = a.dataset.kind;
+      const req = reqRaw ? Number(reqRaw) : null;
+
+      const isAlwaysFreeGroup = (!req && (a.classList.contains("hannah-video") || trecho === "trecho1"));
+
+      if (isAlwaysFreeGroup) {
+        markEnabled(a);
+        anyEnabled = true;
+        continue;
+      }
+
+      const needsProgressGate = (
+        trecho === "trecho2" ||
+        trecho === "trecho3" ||
+        trecho === "trecho4" ||
+        trecho === "trecho5" ||
+        trecho === "trecho6" ||
+        kind === "robotLex"
+      );
+
+      if (!needsProgressGate) {
+        markEnabled(a);
+        anyEnabled = true;
+        continue;
+      }
+
+      const progressAllows = isPhaseSatisfied(req, lastUnlocked, unlockedSet);
+
+      let classAllows = true;
+
+      if (isLimitUnit) {
+        classAllows = Number.isFinite(req) && classPhaseLimit >= req;
+      }
+
+      if (progressAllows && classAllows) {
+        markEnabled(a);
+        anyEnabled = true;
+      } else if (!classAllows) {
+        markDisabled(a, req, "Your teacher has not released this activity yet.");
+      } else {
+        markDisabled(a, req);
+      }
+    }
+
+    if (!anyEnabled) {
+      setPermissionMessage("Your teacher has not released these activities yet.");
+    } else {
+      setPermissionMessage("");
     }
   }
 
@@ -624,14 +830,34 @@
 
       // Teacher Resources + gates
       if (role === "professor" || role === "proprietario") {
+        setPermissionMessage("");
         const tr = document.querySelector(".teacher-resources");
         if (tr) tr.style.display = "flex";
         document.querySelectorAll(".activity-button, .robot-lex, .hannah-video").forEach(a => markEnabled(a));
       } else if (role === "aluno") {
-        try { await applyStudentGates(user.uid, __levelDB, __unitDB); }
-        catch (e) { console.warn("Falha ao aplicar travas de aluno:", e?.message); }
+        if (dados.atrelado_professor) {
+          try {
+            const classPermission = await getClassPermissionForStudent(user.uid, dados, __levelDB);
+
+            if (classPermission.foundClass && classPermission.levelLimit) {
+              await applyClassAndStudentGates(user.uid, __levelDB, __unitDB, classPermission.levelLimit);
+            } else {
+              disableAllStudentActivities("Your teacher has not released these activities yet.");
+            }
+          } catch (e) {
+            console.warn("Falha ao aplicar travas da turma:", e?.message);
+            disableAllStudentActivities("Your teacher has not released these activities yet.");
+          }
+        } else {
+          try {
+            await applyStudentGates(user.uid, __levelDB, __unitDB);
+          } catch (e) {
+            console.warn("Falha ao aplicar travas de aluno:", e?.message);
+          }
+        }
       } else {
         // Role desconhecido: libera apenas o que é sempre livre
+        setPermissionMessage("");
         document.querySelectorAll(".hannah-video, [data-trecho='trecho1']").forEach(a => markEnabled(a));
       }
 

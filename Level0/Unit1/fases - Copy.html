@@ -29,7 +29,7 @@
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body {
       width: 100%;
-      min-height: 100svh; /* lida melhor com barras do mobile */
+      min-height: 100svh;
       background: url('../../imagens/fundo.png') repeat;
       font-family: "Times New Roman", Times, serif;
       -webkit-user-select: none;
@@ -37,48 +37,78 @@
       touch-action: manipulation;
     }
 
-    /* ====== Login / User ====== */
-    .login-link { cursor: pointer; }
+    /* ====== LOGIN - mesmo estilo da página principal ====== */
+    .login-container {
+      position: absolute;
+      top: 16px;
+      right: 14px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      background: none;
+      border: none;
+      box-shadow: none;
+      padding: 0;
+      cursor: pointer;
+    }
+
+    .user-icon {
+      width: 55px;
+      height: auto;
+      display: block;
+      border: none;
+      box-shadow: none;
+      border-radius: 0;
+      object-fit: contain;
+      pointer-events: none;
+    }
+
+    .user-name {
+      margin: 0;
+      line-height: 1.05;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: #1a5f34;
+      white-space: nowrap;
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-shadow: 0 1px 1px rgba(255,255,255,0.45), 0 1px 2px rgba(0,0,0,0.18);
+    }
+
+    /* Dropdown mantém suas funções originais */
     .user-dropdown {
       display: none;
       flex-direction: column;
       position: absolute;
-      top: 50px;
+      top: 70px;
       right: 0;
       background-color: #fff;
       border: 1px solid #ccc;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      border-radius: 8px;
+      overflow: hidden;
       z-index: 9999;
     }
+
     .user-dropdown .dropdown-item {
       padding: 10px 20px;
       color: #333;
       text-decoration: none;
     }
-    .user-dropdown .dropdown-item:hover { background-color: #f0f0f0; }
-
-    .login-container {
-      position: absolute;
-      top: 20px; right: 20px;
-      display: flex; align-items: center;
-      padding: 8px 12px;
-      background: #fff;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      z-index: 9999;
+    .user-dropdown .dropdown-item:hover {
+      background-color: #f0f0f0;
     }
-    .user-icon {
-      width: 30px; height: 30px; border-radius: 50%; margin-right: 8px;
-    }
-    .user-name { margin: 0; font-size: 14px; color: #333; }
 
     /* ====== Header / Título ====== */
     .title-container {
       text-align: center;
       margin-top: 20px;
       position: relative;
-      z-index: 2; /* acima do SVG */
+      z-index: 2;
     }
     .title-image {
       display: block;
@@ -98,15 +128,14 @@
     .map-container{
       position: relative;
       width: 100%;
-      min-height: 100svh; /* garante tela cheia ao menos */
-      height: auto;       /* será ajustado via JS conforme # de fases */
+      min-height: 100svh;
+      height: auto;
       overflow: visible;
     }
 
-    /* O SVG cobre toda a área do mapContainer e fica atrás das .phase */
     #linesSvg{
       position: absolute;
-      inset: 0;           /* top:0; right:0; bottom:0; left:0; */
+      inset: 0;
       width: 100%;
       height: 100%;
       pointer-events: none;
@@ -145,7 +174,7 @@
 
     .player {
       position: absolute;
-      width: 90px; height: 90px;      /* maior para tangenciar a fase */
+      width: 90px; height: 90px;
       transform: translate(-50%, -10%);
       z-index: 3;
       pointer-events: none;
@@ -185,7 +214,7 @@
   </style>
 </head>
 <body>
-  <!-- Caixa de Login -->
+  <!-- Login -->
   <div id="loginContainer" class="login-container">
     <a href="Formulario/login.html" id="loginLink" class="login-link">Login</a>
     <div id="userDropdown" class="user-dropdown"></div>
@@ -195,19 +224,61 @@
   <a href="javascript:history.back()" class="back-button">Back</a>
 
   <div class="map-container" id="mapContainer">
-    <!-- Título centralizado -->
+    <!-- Título -->
     <div class="title-container">
       <img src="../../imagens/titulo.png" alt="Hannah English Course" class="title-image">
       <div id="levelUnitInfo" class="level-unit-info"></div>
     </div>
 
-    <!-- SVG para linhas (atrás das fases) -->
+    <!-- Linhas -->
     <svg id="linesSvg" xmlns="http://www.w3.org/2000/svg"></svg>
-    <!-- As fases serão inseridas via script.js -->
   </div>
 
-  <!-- Importa configuração de atividades e lógica -->
+  <!-- Scripts -->
   <script src="atividadesPorTrecho.js"></script>
   <script src="script.js"></script>
+
+  <script>
+    // Controla login appearance
+    firebase.auth().onAuthStateChanged(async (user) => {
+      const loginLink = document.getElementById("loginLink");
+      const userDropdown = document.getElementById("userDropdown");
+
+      if (user) {
+        const snap = await firebase.database().ref("usuarios/" + user.uid).once("value");
+        const dados = snap.val() || {};
+        const nome = (dados.nome || user.email || "User").trim();
+        const displayName = nome.length > 10 ? nome.slice(0, 10) + "…" : nome;
+        const avatar = dados.avatar ? `../../imagens/${dados.avatar}` : "../../imagens/bonecologin1.png";
+
+        loginLink.innerHTML = "";
+        loginLink.removeAttribute("href");
+
+        const img = document.createElement("img");
+        img.src = avatar;
+        img.alt = "User Avatar";
+        img.className = "user-icon";
+        img.onerror = () => { img.src = "../../imagens/bonecologin1.png"; };
+
+        const p = document.createElement("p");
+        p.className = "user-name";
+        p.textContent = displayName;
+
+        loginLink.append(img, p);
+
+        // Toggle dropdown
+        loginLink.onclick = (e) => {
+          e.preventDefault();
+          userDropdown.style.display = userDropdown.style.display === "flex" ? "none" : "flex";
+        };
+        window.addEventListener("click", (e) => {
+          if (!loginLink.contains(e.target)) userDropdown.style.display = "none";
+        });
+      } else {
+        loginLink.textContent = "Login";
+        loginLink.href = "Formulario/login.html";
+      }
+    });
+  </script>
 </body>
 </html>
