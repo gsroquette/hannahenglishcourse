@@ -425,6 +425,18 @@
       background-color: #b71c1c;
     }
 
+    .clear-level-limit-button {
+      background-color: #d32f2f;
+      padding: 8px 10px;
+      font-size: 0.85em;
+      margin: 0 0 0 8px;
+      white-space: nowrap;
+    }
+
+    .clear-level-limit-button:hover {
+      background-color: #b71c1c;
+    }
+
     .access-badge {
       display: inline-block;
       padding: 3px 8px;
@@ -449,6 +461,28 @@
       color: #424242;
     }
 
+    .level-summary-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(0,0,0,0.08);
+    }
+
+    .level-summary-row:last-child {
+      border-bottom: none;
+    }
+
+    .level-summary-left {
+      font-weight: 700;
+    }
+
+    .level-summary-right {
+      text-align: right;
+      font-size: 0.92em;
+    }
+
     @media (max-width: 600px) {
       .class-access-phase-item {
         flex-direction: column;
@@ -466,6 +500,20 @@
         flex-direction: column;
         align-items: flex-start;
         gap: 4px;
+      }
+
+      .level-summary-row {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .level-summary-right {
+        text-align: left;
+      }
+
+      .clear-level-limit-button {
+        width: 100%;
+        margin: 6px 0 0 0;
       }
     }
   </style>
@@ -597,12 +645,10 @@
       return `fase${phaseNum}`;
     }
 
-    // Função auxiliar para gerar uma ordem numérica sequencial para comparar limites
+    // Função auxiliar para gerar uma ordem numérica independente por Level
     function getPhaseOrder(levelKey, unitKey, phaseNumber) {
-      const levelIndex = parseInt(levelKey.replace('Level', ''));
       const unitNum = parseInt(unitKey.replace('Unit', ''));
-
-      return (levelIndex * 100000) + (unitNum * 1000) + phaseNumber;
+      return (unitNum * 1000) + phaseNumber;
     }
 
     // Função auxiliar para gerar os dados completos de uma fase
@@ -844,9 +890,9 @@
           </div>
         `;
 
-        db.ref(`usuarios/${teacherId}/turmas/${classId}/class_access/limit`).once('value').then(snapshot => {
-          const limitData = snapshot.val() || null;
-          buildClassAccessPanel(teacherId, classId, limitData);
+        db.ref(`usuarios/${teacherId}/turmas/${classId}/class_access/limits`).once('value').then(snapshot => {
+          const limitsData = snapshot.val() || {};
+          buildClassAccessPanel(teacherId, classId, limitsData);
         }).catch(error => {
           console.error("Error loading class access settings:", error);
           accessContainer.innerHTML = `
@@ -869,34 +915,45 @@
     }
 
     // Função para montar o painel de acesso da turma
-    function buildClassAccessPanel(teacherId, classId, limitData) {
+    function buildClassAccessPanel(teacherId, classId, limitsData) {
       const accessContainer = document.getElementById(`class-access-container-${classId}`);
       if (!accessContainer) return;
 
-      const hasLimit = limitData && limitData.level && limitData.unit && limitData.phase && typeof limitData.order !== 'undefined';
+      limitsData = limitsData || {};
 
-      let summaryHTML = '';
+      let summaryHTML = `
+        <div class="class-access-summary">
+          <div style="font-weight: 700; margin-bottom: 8px;">Current class access by Level:</div>
+      `;
 
-      if (hasLimit) {
-        summaryHTML = `
-          <div class="class-access-summary">
-            Current class limit:<br>
-            ${limitData.level} / ${limitData.unit} / ${limitData.phase}
-            <br>
-            <small>Students in this class should only access activities up to this phase after the student pages are updated to read this setting.</small>
-          </div>
-          <button class="clear-limit-button" onclick="clearClassAccessLimit('${teacherId}', '${classId}')">Clear Class Limit</button>
-        `;
-      } else {
-        summaryHTML = `
-          <div class="class-access-summary">
-            Current class limit:<br>
-            No class limit configured yet.
-            <br>
-            <small>Choose a phase below and click “Set limit here”.</small>
-          </div>
-        `;
-      }
+      Object.keys(levels).forEach(levelKey => {
+        const levelLimit = limitsData[levelKey] || null;
+        const hasLevelLimit = levelLimit && levelLimit.unit && levelLimit.phase && typeof levelLimit.order !== 'undefined';
+
+        if (hasLevelLimit) {
+          summaryHTML += `
+            <div class="level-summary-row">
+              <div class="level-summary-left">${levelKey}</div>
+              <div class="level-summary-right">
+                Released until ${levelLimit.unit} / ${levelLimit.phase}
+              </div>
+            </div>
+          `;
+        } else {
+          summaryHTML += `
+            <div class="level-summary-row">
+              <div class="level-summary-left">${levelKey}</div>
+              <div class="level-summary-right">Locked</div>
+            </div>
+          `;
+        }
+      });
+
+      summaryHTML += `
+          <br>
+          <small>Each Level is independent. Setting a limit in Level2 does not release Level0 or Level1.</small>
+        </div>
+      `;
 
       let accessHTML = `
         <div style="position: relative;">
@@ -904,12 +961,15 @@
           <div class="class-access-panel">
             <h3>Class Access Control</h3>
             <div class="class-access-help">
-              Choose the last phase that this class is allowed to access. The teacher can open each Level, then each Unit, see all phases, and set the class limit visually.
+              Choose the last phase allowed for each Level. A class may have one or more Levels released. Levels without a configured limit remain locked.
             </div>
             ${summaryHTML}
       `;
 
       Object.keys(levels).forEach(levelKey => {
+        const levelLimit = limitsData[levelKey] || null;
+        const hasLevelLimit = levelLimit && levelLimit.unit && levelLimit.phase && typeof levelLimit.order !== 'undefined';
+
         let levelReleasedCount = 0;
         let levelTotalCount = 0;
 
@@ -919,7 +979,7 @@
 
           for (let phaseNumber = 1; phaseNumber <= totalPhases; phaseNumber++) {
             const meta = getPhaseMeta(levelKey, unitKey, phaseNumber);
-            if (hasLimit && meta.order <= limitData.order) {
+            if (hasLevelLimit && meta.order <= levelLimit.order) {
               levelReleasedCount++;
             }
           }
@@ -931,10 +991,18 @@
           <div class="level-container">
             <div class="class-access-level-header" onclick="toggleVisibility('${levelId}')">
               <span>${levelKey}</span>
-              <span>${hasLimit ? `${levelReleasedCount}/${levelTotalCount} released` : `${levelTotalCount} phases`}</span>
+              <span>${hasLevelLimit ? `${levelReleasedCount}/${levelTotalCount} released` : 'Locked'}</span>
             </div>
             <div id="${levelId}" style="display: none; margin-top: 10px;">
         `;
+
+        if (hasLevelLimit) {
+          accessHTML += `
+            <div style="text-align: right; margin-bottom: 10px;">
+              <button class="clear-level-limit-button" onclick="clearClassAccessLevelLimit('${teacherId}', '${classId}', '${levelKey}')">Clear ${levelKey} Limit</button>
+            </div>
+          `;
+        }
 
         Object.keys(structure[levelKey]).forEach(unitKey => {
           const totalPhases = structure[levelKey][unitKey];
@@ -942,7 +1010,7 @@
 
           for (let phaseNumber = 1; phaseNumber <= totalPhases; phaseNumber++) {
             const meta = getPhaseMeta(levelKey, unitKey, phaseNumber);
-            if (hasLimit && meta.order <= limitData.order) {
+            if (hasLevelLimit && meta.order <= levelLimit.order) {
               unitReleasedCount++;
             }
           }
@@ -953,7 +1021,7 @@
             <div>
               <div class="class-access-unit-header" onclick="toggleVisibility('${unitId}')">
                 <span>${unitKey}</span>
-                <span>${hasLimit ? `${unitReleasedCount}/${totalPhases} released` : `${totalPhases} phases`}</span>
+                <span>${hasLevelLimit ? `${unitReleasedCount}/${totalPhases} released` : `${totalPhases} phases`}</span>
               </div>
               <div id="${unitId}" style="display: none; margin-top: 10px; padding: 10px;">
           `;
@@ -961,28 +1029,28 @@
           for (let phaseNumber = 1; phaseNumber <= totalPhases; phaseNumber++) {
             const meta = getPhaseMeta(levelKey, unitKey, phaseNumber);
             let statusClass = 'locked';
-            let statusText = 'Locked by class limit';
+            let statusText = 'This Level has no class limit configured';
             let badgeClass = 'locked';
             let badgeText = 'Locked';
 
-            if (!hasLimit) {
+            if (!hasLevelLimit) {
               statusClass = 'locked';
-              statusText = 'No class limit configured yet';
+              statusText = 'Level locked. Set a limit in this Level to release it.';
               badgeClass = 'locked';
-              badgeText = 'Not set';
-            } else if (meta.order < limitData.order) {
+              badgeText = 'Locked';
+            } else if (meta.order < levelLimit.order) {
               statusClass = 'released';
-              statusText = 'Released before class limit';
+              statusText = 'Released before this Level limit';
               badgeClass = 'released';
               badgeText = 'Released';
-            } else if (meta.order === limitData.order) {
+            } else if (meta.order === levelLimit.order) {
               statusClass = 'limit';
-              statusText = 'Current class limit';
+              statusText = 'Current limit for this Level';
               badgeClass = 'limit';
               badgeText = 'Limit';
             } else {
               statusClass = 'locked';
-              statusText = 'Locked after class limit';
+              statusText = 'Locked after this Level limit';
               badgeClass = 'locked';
               badgeText = 'Locked';
             }
@@ -996,7 +1064,7 @@
                   </span>
                   <span class="class-access-status">${statusText}</span>
                 </div>
-                <button class="set-limit-button" onclick="setClassAccessLimit('${teacherId}', '${classId}', '${meta.level}', '${meta.unit}', '${meta.phase}', ${meta.phaseNumber}, ${meta.totalPhases}, ${meta.order})">
+                <button class="set-limit-button" onclick="setClassAccessLevelLimit('${teacherId}', '${classId}', '${meta.level}', '${meta.unit}', '${meta.phase}', ${meta.phaseNumber}, ${meta.totalPhases}, ${meta.order})">
                   Set limit here
                 </button>
               </div>
@@ -1023,15 +1091,15 @@
       accessContainer.innerHTML = accessHTML;
     }
 
-    // Função para salvar a fase limite da turma
-    function setClassAccessLimit(teacherId, classId, levelKey, unitKey, phaseKey, phaseNumber, totalPhases, order) {
-      const confirmMessage = `Set class limit to ${levelKey} / ${unitKey} / ${phaseKey}?\n\nStudents in this class will be limited up to this phase after the student pages are updated to read this setting.`;
+    // Função para salvar a fase limite independente de um Level da turma
+    function setClassAccessLevelLimit(teacherId, classId, levelKey, unitKey, phaseKey, phaseNumber, totalPhases, order) {
+      const confirmMessage = `Set ${levelKey} limit to ${unitKey} / ${phaseKey}?\n\nOnly ${levelKey} will be released up to this phase. Other Levels will not be released unless they have their own limits.`;
 
       if (!confirm(confirmMessage)) {
         return;
       }
 
-      const limitRef = db.ref(`usuarios/${teacherId}/turmas/${classId}/class_access/limit`);
+      const limitRef = db.ref(`usuarios/${teacherId}/turmas/${classId}/class_access/limits/${levelKey}`);
 
       const limitData = {
         level: levelKey,
@@ -1040,30 +1108,63 @@
         phaseNumber: phaseNumber,
         totalPhases: totalPhases,
         order: order,
+        enabled: true,
         updatedAt: firebase.database.ServerValue.TIMESTAMP
       };
 
       limitRef.set(limitData).then(() => {
-        alert(`Class limit saved: ${levelKey} / ${unitKey} / ${phaseKey}`);
-        buildClassAccessPanel(teacherId, classId, limitData);
+        alert(`${levelKey} limit saved: ${unitKey} / ${phaseKey}`);
+
+        db.ref(`usuarios/${teacherId}/turmas/${classId}/class_access/limits`).once('value').then(snapshot => {
+          const limitsData = snapshot.val() || {};
+          buildClassAccessPanel(teacherId, classId, limitsData);
+        });
       }).catch(error => {
-        console.error("Error saving class access limit:", error);
-        alert("Error saving class access limit: " + error.message);
+        console.error("Error saving class access level limit:", error);
+        alert("Error saving class access level limit: " + error.message);
       });
     }
 
-    // Função para limpar a fase limite da turma
+    // Compatibilidade: antiga função global agora redireciona para limite independente por Level
+    function setClassAccessLimit(teacherId, classId, levelKey, unitKey, phaseKey, phaseNumber, totalPhases, order) {
+      setClassAccessLevelLimit(teacherId, classId, levelKey, unitKey, phaseKey, phaseNumber, totalPhases, order);
+    }
+
+    // Função para limpar a fase limite independente de um Level
+    function clearClassAccessLevelLimit(teacherId, classId, levelKey) {
+      if (!confirm(`Are you sure you want to clear the ${levelKey} limit? This Level will become locked for this class.`)) {
+        return;
+      }
+
+      db.ref(`usuarios/${teacherId}/turmas/${classId}/class_access/limits/${levelKey}`).remove().then(() => {
+        alert(`${levelKey} limit cleared.`);
+
+        db.ref(`usuarios/${teacherId}/turmas/${classId}/class_access/limits`).once('value').then(snapshot => {
+          const limitsData = snapshot.val() || {};
+          buildClassAccessPanel(teacherId, classId, limitsData);
+        });
+      }).catch(error => {
+        console.error("Error clearing class access level limit:", error);
+        alert("Error clearing class access level limit: " + error.message);
+      });
+    }
+
+    // Compatibilidade: limpa o limite antigo global, se existir
     function clearClassAccessLimit(teacherId, classId) {
-      if (!confirm("Are you sure you want to clear the class limit?")) {
+      if (!confirm("Are you sure you want to clear the old global class limit?")) {
         return;
       }
 
       db.ref(`usuarios/${teacherId}/turmas/${classId}/class_access/limit`).remove().then(() => {
-        alert("Class limit cleared.");
-        buildClassAccessPanel(teacherId, classId, null);
+        alert("Old global class limit cleared.");
+
+        db.ref(`usuarios/${teacherId}/turmas/${classId}/class_access/limits`).once('value').then(snapshot => {
+          const limitsData = snapshot.val() || {};
+          buildClassAccessPanel(teacherId, classId, limitsData);
+        });
       }).catch(error => {
-        console.error("Error clearing class access limit:", error);
-        alert("Error clearing class access limit: " + error.message);
+        console.error("Error clearing old global class access limit:", error);
+        alert("Error clearing old global class access limit: " + error.message);
       });
     }
 
