@@ -386,7 +386,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         let lastAllowedIndex = -1;
-        let teacherBlockedNextPhase = false;
+        let progressWantedBlockedPhase = false;
 
         activities.forEach((activity, index) => {
             const wasUnlockedByProgress = !!activity.unlocked;
@@ -396,7 +396,7 @@ document.addEventListener('DOMContentLoaded', function() {
             activity.blockedByTeacher = !classAllows;
 
             if (wasUnlockedByProgress && !classAllows) {
-                teacherBlockedNextPhase = true;
+                progressWantedBlockedPhase = true;
             }
 
             activity.unlocked = wasUnlockedByProgress && classAllows;
@@ -410,9 +410,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
         lastUnlockedIndex = lastAllowedIndex;
 
+        const hasPlayablePhaseInsideTeacherLimit = activities.some(activity => {
+            return activity.unlocked === true && activity.completed !== true && activity.classAllowed === true;
+        });
+
         if (lastUnlockedIndex < 0) {
             setPermissionMessage("Your teacher has not released these phases yet.");
-        } else if (teacherBlockedNextPhase) {
+        } else if (!hasPlayablePhaseInsideTeacherLimit && progressWantedBlockedPhase) {
             setPermissionMessage("Your teacher has not released the next phase yet. Please wait for your teacher.");
         } else {
             setPermissionMessage("");
@@ -661,7 +665,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const yInMap = (r.top - mapRect.top) + r.height / 2;
 
         player.style.left = `${xInMap}px`;
-        player.style.top  = `${yInMap}px`;
+        player.style.top = `${yInMap}px`;
 
         if (path) {
             setTimeout(() => { window.location.href = path; }, 600);
