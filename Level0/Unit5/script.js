@@ -20,6 +20,10 @@ document.addEventListener('DOMContentLoaded', function() {
     let player;
     let lastUnlockedIndex = -1;
 
+    // Controle extra da turma
+    let classLimitActiveForStudent = false;
+    let currentClassLevelLimit = null;
+
     console.log("Elementos da DOM capturados com sucesso.");
 
     // 3️⃣ Extrai Level e Unit da URL atual
@@ -42,6 +46,41 @@ document.addEventListener('DOMContentLoaded', function() {
     // 5️⃣ Atualiza texto de nível/unidade na interface
     levelUnitInfo.innerHTML = `${currentLevel}<br>${currentUnit}`;
     console.log("Informações de nível e unidade atualizadas na interface.");
+
+    // Mensagem visual de bloqueio por professor/turma
+    const permissionMessage = document.createElement("div");
+    permissionMessage.id = "permissionMessage";
+    permissionMessage.style.display = "none";
+    permissionMessage.style.width = "min(90%, 620px)";
+    permissionMessage.style.margin = "10px auto";
+    permissionMessage.style.padding = "12px 16px";
+    permissionMessage.style.borderRadius = "12px";
+    permissionMessage.style.background = "#fff3cd";
+    permissionMessage.style.border = "1px solid #ffe08a";
+    permissionMessage.style.color = "#5d4037";
+    permissionMessage.style.fontFamily = "Arial, sans-serif";
+    permissionMessage.style.fontWeight = "700";
+    permissionMessage.style.lineHeight = "1.4";
+    permissionMessage.style.textAlign = "center";
+    permissionMessage.style.boxShadow = "0 4px 10px rgba(0,0,0,0.08)";
+
+    const titleContainerForMessage = document.querySelector(".title-container");
+    if (titleContainerForMessage && titleContainerForMessage.parentNode) {
+        titleContainerForMessage.insertAdjacentElement("afterend", permissionMessage);
+    }
+
+    function setPermissionMessage(message) {
+        const msg = document.getElementById("permissionMessage");
+        if (!msg) return;
+
+        if (message) {
+            msg.textContent = message;
+            msg.style.display = "block";
+        } else {
+            msg.textContent = "";
+            msg.style.display = "none";
+        }
+    }
 
     // 6️⃣ Fecha o dropdown ao clicar fora dele
     document.addEventListener("click", function(event) {
@@ -77,22 +116,19 @@ document.addEventListener('DOMContentLoaded', function() {
         const phases = Array.from(document.querySelectorAll('.phase'));
         if (phases.length === 0) return;
 
-        // ponto mais baixo (em coordenadas do container)
         const mapRect = mapContainer.getBoundingClientRect();
         const bottoms = phases.map(p => {
             const r = p.getBoundingClientRect();
-            const yInMap = (r.top - mapRect.top) + r.height; // base do elemento dentro do container
+            const yInMap = (r.top - mapRect.top) + r.height;
             return yInMap;
         });
 
         const maxBottom = Math.max(...bottoms);
         const minHeight = Math.max(window.innerHeight, Math.ceil(maxBottom + padding));
 
-        // Define altura explícita
-        mapContainer.style.minHeight = '100svh'; // garante pelo menos uma tela
+        mapContainer.style.minHeight = '100svh';
         mapContainer.style.height = `${minHeight}px`;
 
-        // Sincroniza SVG com o container
         const w = mapContainer.clientWidth;
         const h = mapContainer.clientHeight;
         svgContainer.setAttribute('width', w);
@@ -111,6 +147,298 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
 
+    // ===== Helpers da nova regra de turma/professor =====
+
+    function getUnitNumber(unitValue) {
+        if (!unitValue) return null;
+        const match = String(unitValue).match(/unit\s*(\d+)/i);
+        if (match && match[1]) return Number(match[1]);
+        return null;
+    }
+
+    function getLevelNumber(levelValue) {
+        if (!levelValue) return null;
+        const match = String(levelValue).match(/level\s*(\d+)/i);
+        if (match && match[1]) return Number(match[1]);
+        return null;
+    }
+
+    function getLevelStartNumber(levelValue) {
+        const levelNumber = getLevelNumber(levelValue);
+
+        if (levelNumber === 0) return 1;
+        if (levelNumber === 1) return 1001;
+        if (levelNumber === 2) return 2001;
+        if (levelNumber === 3) return 3001;
+        if (levelNumber === 4) return 4001;
+
+        return 1001;
+    }
+
+    function getLevelLimitFromClassAccess(limits, levelDB) {
+        if (!limits || typeof limits !== "object") return null;
+
+        const limit = limits[levelDB];
+
+        if (
+            limit &&
+            limit.enabled === true &&
+            limit.unit &&
+            limit.phase &&
+            typeof limit.order !== "undefined" &&
+            typeof limit.phaseNumber !== "undefined"
+        ) {
+            return limit;
+        }
+
+        return null;
+    }
+
+    async function getClassPermissionForStudent(userId, userData, levelDB) {
+        try {
+            if (!userData || !userData.atrelado_professor) {
+                return {
+                    hasTeacher: false,
+                    foundClass: false,
+                    levelLimit: null
+                };
+            }
+
+            const snapTurmas = await database
+                .ref("usuarios/" + userData.atrelado_professor + "/turmas")
+                .once("value");
+
+            const turmas = snapTurmas.val() || {};
+            let turmaDoAluno = null;
+
+            for (const turmaId in turmas) {
+                const studentRecord = turmas[turmaId]?.students?.[userId];
+
+                if (studentRecord) {
+                    turmaDoAluno = turmas[turmaId];
+                    break;
+                }
+            }
+
+            if (!turmaDoAluno) {
+                return {
+                    hasTeacher: true,
+                    foundClass: false,
+                    levelLimit: null
+                };
+            }
+
+            const limits = turmaDoAluno.class_access?.limits || {};
+            const levelLimit = getLevelLimitFromClassAccess(limits, levelDB);
+
+            return {
+                hasTeacher: true,
+                foundClass: true,
+                levelLimit: levelLimit
+            };
+        } catch (error) {
+            console.error("Erro ao carregar permissões da turma:", error);
+            return {
+                hasTeacher: true,
+                foundClass: false,
+                levelLimit: null,
+                error: error
+            };
+        }
+    }
+
+    function getPossiblePhaseKeysForActivity(activityId) {
+        const keys = [];
+        const localId = Number(activityId);
+        const currentUnitNumber = getUnitNumber(currentUnit);
+        const levelStart = getLevelStartNumber(currentLevel);
+
+        if (!Number.isFinite(localId)) return keys;
+
+        // Formato local usado especialmente no Level0 e em alguns históricos
+        keys.push(`fase${localId}`);
+
+        if (currentLevel === "Level0") {
+            return [...new Set(keys)];
+        }
+
+        // Padrão atual usado pelo painel do professor e pelas páginas principais: blocos de 30 por unidade
+        if (currentUnitNumber) {
+            const phaseNumBy30 = levelStart + ((currentUnitNumber - 1) * 30) + (localId - 1);
+            keys.push(`fase${phaseNumBy30}`);
+
+            // Compatibilidade com registros antigos que possam ter usado 37 fases por unidade
+            const phaseNumBy37 = levelStart + ((currentUnitNumber - 1) * 37) + (localId - 1);
+            keys.push(`fase${phaseNumBy37}`);
+        }
+
+        return [...new Set(keys)];
+    }
+
+    function isTruthyProgressValue(value) {
+        return value === true || value === 1 || value === "true" || value === "True";
+    }
+
+    function isActivityCompletedInProgress(progress, activityId) {
+        if (!progress || typeof progress !== "object") return false;
+
+        const possibleKeys = getPossiblePhaseKeysForActivity(activityId);
+
+        for (const key of possibleKeys) {
+            if (isTruthyProgressValue(progress[key])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    function applyIndividualProgressToActivities(progress) {
+        let firstLockedIndexFound = false;
+        let lastPlayableIndex = -1;
+
+        activities.forEach(activity => {
+            activity.unlocked = false;
+            activity.completed = false;
+            activity.classAllowed = true;
+            activity.blockedByTeacher = false;
+        });
+
+        for (let index = 0; index < activities.length; index++) {
+            const activity = activities[index];
+            const completed = isActivityCompletedInProgress(progress, activity.id);
+
+            activity.completed = completed;
+
+            if (completed) {
+                activity.unlocked = true;
+                lastPlayableIndex = index;
+                continue;
+            }
+
+            if (!firstLockedIndexFound) {
+                // Libera a próxima fase jogável depois da sequência concluída.
+                activity.unlocked = true;
+                lastPlayableIndex = index;
+                firstLockedIndexFound = true;
+            } else {
+                activity.unlocked = false;
+            }
+        }
+
+        lastUnlockedIndex = lastPlayableIndex;
+
+        activities.forEach(activity => {
+            console.log(`Fase ${activity.id} - completed? ${!!activity.completed} / unlocked by progress? ${!!activity.unlocked}`);
+        });
+    }
+
+    function isAllowedByClassLimit(activityId, levelLimit) {
+        if (!levelLimit) return false;
+
+        const currentUnitNumber = getUnitNumber(currentUnit);
+        const limitUnitNumber = getUnitNumber(levelLimit.unit);
+
+        if (!currentUnitNumber || !limitUnitNumber) return false;
+
+        // Unidade atual depois da unidade limite: bloqueia tudo
+        if (currentUnitNumber > limitUnitNumber) {
+            return false;
+        }
+
+        // Unidade atual antes da unidade limite: a turma permite todas as fases da unidade atual
+        if (currentUnitNumber < limitUnitNumber) {
+            return true;
+        }
+
+        // Unidade atual é a unidade limite: libera somente até a fase limite
+        const phaseLimit = Number(levelLimit.phaseNumber || 0);
+        return Number(activityId) <= phaseLimit;
+    }
+
+    function applyClassLimitToActivities(levelLimit) {
+        currentClassLevelLimit = levelLimit || null;
+        classLimitActiveForStudent = true;
+
+        const currentUnitNumber = getUnitNumber(currentUnit);
+        const limitUnitNumber = getUnitNumber(levelLimit?.unit);
+
+        if (!levelLimit || !currentUnitNumber || !limitUnitNumber) {
+            activities.forEach(activity => {
+                activity.unlocked = false;
+                activity.classAllowed = false;
+                activity.blockedByTeacher = true;
+            });
+            lastUnlockedIndex = -1;
+            setPermissionMessage("Your teacher has not released these phases yet.");
+            return;
+        }
+
+        if (currentUnitNumber > limitUnitNumber) {
+            activities.forEach(activity => {
+                activity.unlocked = false;
+                activity.classAllowed = false;
+                activity.blockedByTeacher = true;
+            });
+            lastUnlockedIndex = -1;
+            setPermissionMessage("Your teacher has not released this unit yet.");
+            return;
+        }
+
+        let lastAllowedIndex = -1;
+        let progressWantedBlockedPhase = false;
+
+        activities.forEach((activity, index) => {
+            const wasUnlockedByProgress = !!activity.unlocked;
+            const classAllows = isAllowedByClassLimit(activity.id, levelLimit);
+
+            activity.classAllowed = classAllows;
+            activity.blockedByTeacher = !classAllows;
+
+            if (wasUnlockedByProgress && !classAllows) {
+                progressWantedBlockedPhase = true;
+            }
+
+            activity.unlocked = wasUnlockedByProgress && classAllows;
+
+            if (activity.unlocked) {
+                lastAllowedIndex = index;
+            }
+
+            console.log(`Fase ${activity.id} - progress allows? ${wasUnlockedByProgress} / class allows? ${classAllows} / final unlocked? ${!!activity.unlocked}`);
+        });
+
+        lastUnlockedIndex = lastAllowedIndex;
+
+        const hasPlayablePhaseInsideTeacherLimit = activities.some(activity => {
+            return activity.unlocked === true && activity.completed !== true && activity.classAllowed === true;
+        });
+
+        if (lastUnlockedIndex < 0) {
+            setPermissionMessage("Your teacher has not released these phases yet.");
+        } else if (!hasPlayablePhaseInsideTeacherLimit && progressWantedBlockedPhase) {
+            setPermissionMessage("Your teacher has not released the next phase yet. Please wait for your teacher.");
+        } else {
+            setPermissionMessage("");
+        }
+    }
+
+    function canOpenActivity(activity) {
+        if (!activity) return false;
+
+        if (classLimitActiveForStudent && currentClassLevelLimit) {
+            const classAllowsNow = isAllowedByClassLimit(activity.id, currentClassLevelLimit);
+
+            if (!classAllowsNow) {
+                activity.classAllowed = false;
+                activity.blockedByTeacher = true;
+                return false;
+            }
+        }
+
+        return !!activity.unlocked;
+    }
+
     // 7️⃣ Caso de usuário autenticado ou não:
     auth.onAuthStateChanged(user => {
         if (user) {
@@ -119,7 +447,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             database.ref('/usuarios/' + userId).once('value')
                 .then(snapshot => {
-                    const userData = snapshot.val();
+                    const userData = snapshot.val() || {};
                     console.log("Dados do usuário:", userData);
 
                     const userName = userData.nome || user.email;
@@ -160,7 +488,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     // Carrega progresso e, em seguida, inicializa o mapa
                     console.log("Carregando progresso do usuário...");
-                    loadUserProgress(userId, userAvatar, userData.role);
+                    loadUserProgress(userId, userAvatar, userData.role, userData);
                 })
                 .catch(error => {
                     console.error("Erro ao carregar dados do usuário:", error);
@@ -174,30 +502,49 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // 8️⃣ Função para carregar o progresso do usuário
-    function loadUserProgress(userId, userAvatar, userRole) {
+    function loadUserProgress(userId, userAvatar, userRole, userData = {}) {
         const progressPath = `/usuarios/${userId}/progresso/${currentLevel}/${currentUnit}`;
         console.log(`Buscando progresso em: ${progressPath}`);
 
+        setPermissionMessage("");
+        lastUnlockedIndex = -1;
+        classLimitActiveForStudent = false;
+        currentClassLevelLimit = null;
+
         if (userRole === 'proprietario' || userRole === 'professor') {
-            activities.forEach(activity => (activity.unlocked = true));
+            activities.forEach(activity => {
+                activity.unlocked = true;
+                activity.completed = true;
+                activity.classAllowed = true;
+                activity.blockedByTeacher = false;
+            });
             lastUnlockedIndex = activities.length - 1;
             initializeMap(userAvatar);
         } else {
             database.ref(progressPath).once('value')
-                .then(snapshot => {
+                .then(async snapshot => {
                     const progress = snapshot.val() || {};
                     console.log("Progresso encontrado:", progress);
 
-                    activities.forEach((activity, index) => {
-                        const faseKey = Object.keys(progress).find(
-                            key => key.includes(`fase${activity.id}`) || key.includes(activity.id.toString())
-                        );
-                        if (faseKey && progress[faseKey] === true) {
-                            activity.unlocked = index === 0 || activities[index - 1].unlocked;
-                            if (activity.unlocked) lastUnlockedIndex = index;
+                    applyIndividualProgressToActivities(progress);
+
+                    if (userRole === 'aluno' && userData && userData.atrelado_professor) {
+                        const classPermission = await getClassPermissionForStudent(userId, userData, currentLevel);
+
+                        if (classPermission.foundClass && classPermission.levelLimit) {
+                            applyClassLimitToActivities(classPermission.levelLimit);
+                        } else {
+                            classLimitActiveForStudent = true;
+                            currentClassLevelLimit = null;
+                            activities.forEach(activity => {
+                                activity.unlocked = false;
+                                activity.classAllowed = false;
+                                activity.blockedByTeacher = true;
+                            });
+                            lastUnlockedIndex = -1;
+                            setPermissionMessage("Your teacher has not released these phases yet.");
                         }
-                        console.log(`Fase ${activity.id} - liberada? ${!!activity.unlocked}`);
-                    });
+                    }
 
                     initializeMap(userAvatar);
                 })
@@ -238,6 +585,8 @@ document.addEventListener('DOMContentLoaded', function() {
             phaseDiv.style.left = `${horizontalPositionPx}px`;
             phaseDiv.style.top = `${topPosition}px`;
 
+            const allowedAtRender = canOpenActivity(activity);
+
             // Imagem da fase
             const phaseImage = document.createElement('img');
             phaseImage.src = activity.img;
@@ -246,7 +595,7 @@ document.addEventListener('DOMContentLoaded', function() {
             phaseDiv.appendChild(phaseImage);
 
             // Estado (bloqueada ou ativa)
-            if (activity.unlocked) {
+            if (allowedAtRender) {
                 phaseDiv.classList.add('active');
             } else {
                 phaseDiv.classList.add('locked');
@@ -256,14 +605,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 phaseDiv.appendChild(lockIcon);
             }
 
-            // Clique
+            // Clique com dupla proteção: progresso + limite da turma
             phaseDiv.addEventListener('click', () => {
-                if (activity.unlocked) {
+                if (canOpenActivity(activity)) {
                     moveToPhase(index, activity.path);
+                } else if (activity.blockedByTeacher) {
+                    setPermissionMessage("Your teacher has not released this phase yet. Please wait for your teacher.");
                 }
             });
 
             mapContainer.appendChild(phaseDiv);
+        });
+
+        // Recalcula lastUnlockedIndex a partir do estado final renderizado
+        lastUnlockedIndex = -1;
+        activities.forEach((activity, index) => {
+            if (canOpenActivity(activity)) {
+                lastUnlockedIndex = index;
+            }
         });
 
         // Só depois que as imagens carregarem, ajusta container, desenha e posiciona o player
@@ -306,7 +665,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const yInMap = (r.top - mapRect.top) + r.height / 2;
 
         player.style.left = `${xInMap}px`;
-        player.style.top  = `${yInMap}px`;
+        player.style.top = `${yInMap}px`;
 
         if (path) {
             setTimeout(() => { window.location.href = path; }, 600);
@@ -346,13 +705,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 1️⃣3️⃣ Anima desbloqueio (GIF + som)
     function animateUnlock(phaseDiv) {
+        if (!phaseDiv) return;
+
         const unlockGif = document.createElement('img');
         unlockGif.src = '../../imagens/cadeado.gif';
         unlockGif.classList.add('unlock-gif');
         phaseDiv.appendChild(unlockGif);
 
         const unlockSound = new Audio('../../imagens/unlock-padlock.mp3');
-        unlockSound.play();
+        unlockSound.play().catch(error => {
+            console.warn("Não foi possível tocar o som de desbloqueio:", error);
+        });
 
         setTimeout(() => { unlockGif.remove(); }, 3000);
     }
