@@ -94,6 +94,11 @@
     .mini-item{display:flex;gap:10px;align-items:flex-start;padding:12px 13px;border-radius:17px;background:rgba(255,255,255,.12);color:rgba(255,255,255,.88);font-weight:750}
     .mini-item span:first-child{color:var(--gold-200);font-weight:900}
 
+    /* Classe para esconder o hero quando estiver no reader-view */
+    .hero.hidden-hero {
+      display: none;
+    }
+
     /* RESPONSIVIDADE DO HERO */
     @media (max-width: 1100px) {
       .hero{padding:80px 0 70px}
@@ -243,7 +248,7 @@
   </header>
 
   <main>
-    <section class="hero">
+    <section class="hero" id="hero-section">
       <div class="container hero-grid">
         <div>
           <span class="eyebrow" data-i18n="heroEyebrow">Histórias do campo</span>
@@ -497,9 +502,51 @@
 
     // Função para scroll suave até a seção de histórias
     function scrollToStories() {
-      const listView = document.getElementById('list-view');
-      if (listView) {
-        listView.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // Primeiro, garante que estamos na list-view
+      if (state.storyId) {
+        // Se estiver em uma história, volta para a lista primeiro
+        state.storyId = null;
+        state.currentStory = null;
+        showView('list-view');
+        state.filtered = [...state.stories];
+        renderList();
+        updateUrlLang();
+        document.title = t('pageTitleList');
+        
+        // Mostra o hero novamente
+        const heroSection = document.getElementById('hero-section');
+        if (heroSection) {
+          heroSection.classList.remove('hidden-hero');
+        }
+      }
+      
+      // Pequeno delay para garantir que o DOM foi atualizado
+      setTimeout(() => {
+        const listSection = document.getElementById('list-view');
+        if (listSection) {
+          const headerOffset = 94;
+          const elementPosition = listSection.getBoundingClientRect().top;
+          const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+          
+          window.scrollTo({
+            top: offsetPosition,
+            behavior: 'smooth'
+          });
+        }
+      }, 100);
+    }
+
+    // Função para controlar visibilidade do hero baseado na view atual
+    function updateHeroVisibility() {
+      const heroSection = document.getElementById('hero-section');
+      if (!heroSection) return;
+      
+      if (state.storyId) {
+        // Estamos lendo uma história - esconde o hero
+        heroSection.classList.add('hidden-hero');
+      } else {
+        // Estamos na lista - mostra o hero
+        heroSection.classList.remove('hidden-hero');
       }
     }
 
@@ -526,12 +573,15 @@
         state.filtered=[...state.stories];
         renderList();
       }
+      
+      updateHeroVisibility();
     }
 
     function showView(id){
       document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
       const el=document.getElementById(id);
       if(el) el.classList.add('active');
+      updateHeroVisibility();
     }
 
     function bindFilters(){
